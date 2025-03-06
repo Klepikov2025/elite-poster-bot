@@ -140,7 +140,7 @@ def process_delete_choice(message):
     else:
         try:
             for post in user_posts[message.chat.id]:
-                time_formatted = format_time(p[ost["time"])
+                time_formatted = format_time(post["time"])  # Исправлено
                 if message.text == f"Удалить: {time_formatted}, {post['city']}, {post['network']}":
                     bot.delete_message(post["chat_id"], post["message_id"])
                     user_posts[message.chat.id].remove(post)
