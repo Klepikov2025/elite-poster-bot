@@ -60,6 +60,9 @@ VIP_CHAT_ID = -1002446486648  # Ваш VIP-чат
 # Ссылка для верификации и оплаты
 VERIFICATION_LINK = "http://t.me/vip_znakbot"  # Ссылка на бота для верификации
 
+# Словарь для хранения ID сообщений пользователей
+user_posts = {}
+
 # Создаём клавиатуру с кнопкой "Создать новое объявление"
 def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -81,8 +84,58 @@ def create_new_post(message):
     bot.send_message(message.chat.id, "Напишите текст объявления:")
     bot.register_next_step_handler(message, process_text)
 
+# Обработчик команды /cancel
+@bot.message_handler(commands=['cancel'])
+def cancel(message):
+    bot.send_message(
+        message.chat.id,
+        "Публикация отменена. Вы вернулись в главное меню.",
+        reply_markup=get_main_keyboard()
+    )
+
+# Обработчик команды /delete
+@bot.message_handler(commands=['delete'])
+def delete_post(message):
+    if message.chat.id in user_posts:
+        try:
+            chat_id = user_posts[message.chat.id]["chat_id"]
+            message_id = user_posts[message.chat.id]["message_id"]
+            bot.delete_message(chat_id, message_id)
+            bot.send_message(message.chat.id, "✅ Ваше объявление успешно удалено.")
+        except telebot.apihelper.ApiTelegramException as e:
+            bot.send_message(message.chat.id, f"❌ Ошибка при удалении: {e.description}")
+    else:
+        bot.send_message(message.chat.id, "❌ Вы не опубликовали ни одного объявления.")
+
+# Функция для подтверждения текста
+def confirm_text(message, text, media_type=None, file_id=None):
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+    markup.add("Да", "Нет")
+    bot.send_message(message.chat.id, f"Ваш текст:\n{text}\n\nВсё верно?", reply_markup=markup)
+    bot.register_next_step_handler(message, handle_confirmation, text, media_type, file_id)
+
+# Обработчик подтверждения
+def handle_confirmation(message, text, media_type, file_id):
+    if message.text.lower() == "да":
+        bot.send_message(message.chat.id, "📋 Выберите сеть для публикации:", reply_markup=get_network_markup())
+        bot.register_next_step_handler(message, select_network, text, media_type, file_id)
+    elif message.text.lower() == "нет":
+        bot.send_message(message.chat.id, "Хорошо, напишите текст объявления заново:")
+        bot.register_next_step_handler(message, process_text)
+    else:
+        bot.send_message(message.chat.id, "❌ Неверный ответ. Выберите 'Да' или 'Нет'.")
+        bot.register_next_step_handler(message, handle_confirmation, text, media_type, file_id)
+
 # Функция для обработки текста объявления
 def process_text(message):
+    if message.text == "Назад":
+        bot.send_message(
+            message.chat.id,
+            "Вы вернулись в главное меню.",
+            reply_markup=get_main_keyboard()
+        )
+        return
+
     if message.photo or message.video:
         # Если пользователь отправил медиа, сохраняем его
         if message.photo:
@@ -93,25 +146,32 @@ def process_text(message):
             media_type = "video"
             file_id = message.video.file_id
             text = message.caption if message.caption else ""
-
-        bot.send_message(message.chat.id, "📋 Выберите сеть для публикации:", reply_markup=get_network_markup())
-        bot.register_next_step_handler(message, select_network, text, media_type, file_id)
     elif message.text:
         # Если пользователь отправил только текст
-        bot.send_message(message.chat.id, "📋 Выберите сеть для публикации:", reply_markup=get_network_markup())
-        bot.register_next_step_handler(message, select_network, text=message.text, media_type=None, file_id=None)
+        media_type = None
+        file_id = None
+        text = message.text
     else:
         bot.send_message(message.chat.id, "❌ Ошибка! Отправьте текст, фото или видео.")
         bot.register_next_step_handler(message, process_text)
+        return
+
+    # Спрашиваем подтверждение текста
+    confirm_text(message, text, media_type, file_id)
 
 # Функция для получения клавиатуры выбора сети
 def get_network_markup():
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-    markup.add("Мужской Клуб", "ПАРНИ 18+", "Обе сети")
+    markup.add("Мужской Клуб", "ПАРНИ 18+", "Обе сети", "Назад")
     return markup
 
 # Функция для выбора сети
 def select_network(message, text, media_type, file_id):
+    if message.text == "Назад":
+        bot.send_message(message.chat.id, "Напишите текст объявления:")
+        bot.register_next_step_handler(message, process_text)
+        return
+
     selected_network = message.text
     if selected_network in ["Мужской Клуб", "ПАРНИ 18+", "Обе сети"]:
         markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True, row_width=2)
@@ -120,7 +180,7 @@ def select_network(message, text, media_type, file_id):
                 list(chat_ids_mk.keys()) + list(chat_ids_parni.keys())
         for city in cities:
             markup.add(city)
-        markup.add("Выбрать другую сеть")
+        markup.add("Выбрать другую сеть", "Назад")
         bot.send_message(message.chat.id, "📍 Выберите город для публикации или нажмите 'Выбрать другую сеть':", reply_markup=markup)
         bot.register_next_step_handler(message, select_city_and_publish, text, selected_network, media_type, file_id)
     else:
@@ -129,6 +189,11 @@ def select_network(message, text, media_type, file_id):
 
 # Функция для выбора города и публикации объявления
 def select_city_and_publish(message, text, selected_network, media_type, file_id):
+    if message.text == "Назад":
+        bot.send_message(message.chat.id, "📋 Выберите сеть для публикации:", reply_markup=get_network_markup())
+        bot.register_next_step_handler(message, select_network, text, media_type, file_id)
+        return
+
     city = message.text
     if city == "Выбрать другую сеть":
         bot.send_message(message.chat.id, "📋 Выберите сеть для публикации:", reply_markup=get_network_markup())
@@ -154,11 +219,13 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                         chat_id = chat_dict[city]
                         try:
                             if media_type == "photo":
-                                bot.send_photo(chat_id, file_id, caption=full_text, parse_mode="Markdown")
+                                sent_message = bot.send_photo(chat_id, file_id, caption=full_text, parse_mode="Markdown")
                             elif media_type == "video":
-                                bot.send_video(chat_id, file_id, caption=full_text, parse_mode="Markdown")
+                                sent_message = bot.send_video(chat_id, file_id, caption=full_text, parse_mode="Markdown")
                             else:
-                                bot.send_message(chat_id, full_text, parse_mode="Markdown")
+                                sent_message = bot.send_message(chat_id, full_text, parse_mode="Markdown")
+                            # Сохраняем ID сообщения
+                            user_posts[message.chat.id] = {"message_id": sent_message.message_id, "chat_id": chat_id}
                             bot.send_message(message.chat.id, f"✅ Ваше объявление опубликовано в сети «{network}», городе {city}.")
                         except telebot.apihelper.ApiTelegramException as e:
                             bot.send_message(message.chat.id, f"❌ Ошибка: {e.description}")
