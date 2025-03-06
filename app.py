@@ -60,10 +60,25 @@ VIP_CHAT_ID = -1002446486648  # Ваш VIP-чат
 # Ссылка для верификации и оплаты
 VERIFICATION_LINK = "http://t.me/vip_znakbot"  # Ссылка на бота для верификации
 
+# Создаём клавиатуру с кнопкой "Создать новое объявление"
+def get_main_keyboard():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add("Создать новое объявление")
+    return markup
+
 # Обработчик команды /start
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(message.chat.id, "Привет! Я ElitePoster. 👋\nЯ помогу опубликовать ваше объявление.\nНапишите текст объявления:")
+    bot.send_message(
+        message.chat.id,
+        "Привет! Я ElitePoster. 👋\nНажмите кнопку ниже, чтобы создать новое объявление.",
+        reply_markup=get_main_keyboard()
+    )
+
+# Обработчик для кнопки "Создать новое объявление"
+@bot.message_handler(func=lambda message: message.text == "Создать новое объявление")
+def create_new_post(message):
+    bot.send_message(message.chat.id, "Напишите текст объявления:")
     bot.register_next_step_handler(message, process_text)
 
 # Функция для обработки текста объявления
@@ -149,6 +164,10 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                             bot.send_message(message.chat.id, f"❌ Ошибка: {e.description}")
                     else:
                         bot.send_message(message.chat.id, f"❌ Ошибка! Город '{city}' не найден в сети «{network}».")
+
+                # Предлагаем опубликовать ещё одно объявление
+                ask_for_new_post(message)
+
             else:
                 # Если пользователь не VIP, предлагаем верификацию
                 markup = types.InlineKeyboardMarkup()
@@ -157,6 +176,25 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                 bot.send_message(message.chat.id, "🔓 Вы не являетесь привилегированным участником. Для публикации объявлений пройдите верификацию:", reply_markup=markup)
         except telebot.apihelper.ApiTelegramException as e:
             bot.send_message(message.chat.id, f"⚠️ Ошибка при проверке VIP-статуса: {e.description}")
+
+# Функция для предложения нового объявления
+def ask_for_new_post(message):
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+    markup.add("Да", "Нет")
+    bot.send_message(message.chat.id, "Хотите опубликовать ещё одно объявление?", reply_markup=markup)
+    bot.register_next_step_handler(message, handle_new_post_choice)
+
+# Обработчик выбора (Да/Нет)
+def handle_new_post_choice(message):
+    if message.text.lower() == "да":
+        bot.send_message(message.chat.id, "Напишите текст объявления:")
+        bot.register_next_step_handler(message, process_text)
+    else:
+        bot.send_message(
+            message.chat.id,
+            "Спасибо за использование бота! 🙌\nЕсли хотите создать новое объявление, нажмите кнопку ниже.",
+            reply_markup=get_main_keyboard()
+        )
 
 # Вебхук для обработки входящих сообщений
 @app.route('/webhook', methods=['POST'])
