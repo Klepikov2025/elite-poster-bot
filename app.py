@@ -74,6 +74,15 @@ def get_main_keyboard():
 def format_time(timestamp):
     return timestamp.strftime("%H:%M, %d %B %Y")
 
+# Получаем имя пользователя с кликабельной ссылкой
+def get_user_name(user):
+    if user.username:
+        return f"[{user.first_name}](https://t.me/{user.username})"
+    elif user.id:
+        return f"[{user.first_name}](tg://user?id={user.id})"
+    else:
+        return user.first_name
+
 # Обработчик команды /start
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -243,7 +252,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
             if chat_member.status in ["member", "administrator", "creator"]:
                 vip_tag = "\n\n⭐️ Привилегированный участник ⭐️"
                 # Создаем кликабельное имя пользователя
-                user_name = f"[{message.from_user.first_name}](tg://user?id={message.from_user.id})"
+                user_name = get_user_name(message.from_user)
                 full_text = f"📢 Объявление от {user_name}:\n\n{text}{vip_tag}"
                 # Публикация в выбранных сетях
                 if selected_network == "Обе сети":
