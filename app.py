@@ -2,6 +2,7 @@ import os
 import telebot
 from telebot import types
 from flask import Flask, request
+from datetime import datetime
 
 # Получаем токен из переменной окружения
 TOKEN = os.getenv('BOT_TOKEN')
@@ -51,7 +52,7 @@ chat_ids_parni = {
     "ХМАО": -1002287709568,
     "Уфа": -1002448909000,
     "Новосибирск": -1002413764329,
-    "ЯМАЛ": -1002371438340
+    "ЯМАО": -1002371438340
 }
 
 # ID VIP-чата "Elite Lounge"
@@ -60,21 +61,25 @@ VIP_CHAT_ID = -1002446486648  # Ваш VIP-чат
 # Ссылка для верификации и оплаты
 VERIFICATION_LINK = "http://t.me/vip_znakbot"  # Ссылка на бота для верификации
 
-# Словарь для хранения ID сообщений пользователей
+# Словарь для хранения всех сообщений пользователей
 user_posts = {}
 
-# Создаём клавиатуру с кнопкой "Создать новое объявление"
+# Создаём клавиатуру с основными кнопками
 def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("Создать новое объявление")
+    markup.add("Создать новое объявление", "Удалить объявление", "Удалить все объявления")
     return markup
+
+# Форматируем время
+def format_time(timestamp):
+    return timestamp.strftime("%H:%M, %d %B %Y")
 
 # Обработчик команды /start
 @bot.message_handler(commands=['start'])
 def start(message):
     bot.send_message(
         message.chat.id,
-        "Привет! Я ElitePoster. 👋\nНажмите кнопку ниже, чтобы создать новое объявление.",
+        "Привет! Я ElitePoster. 👋\nВыберите действие:",
         reply_markup=get_main_keyboard()
     )
 
@@ -84,56 +89,70 @@ def create_new_post(message):
     bot.send_message(message.chat.id, "Напишите текст объявления:")
     bot.register_next_step_handler(message, process_text)
 
-# Обработчик команды /cancel
-@bot.message_handler(commands=['cancel'])
-def cancel(message):
-    bot.send_message(
-        message.chat.id,
-        "Публикация отменена. Вы вернулись в главное меню.",
-        reply_markup=get_main_keyboard()
-    )
+# Обработчик для кнопки "Удалить объявление"
+@bot.message_handler(func=lambda message: message.text == "Удалить объявление")
+def handle_delete_post(message):
+    if message.chat.id in user_posts and user_posts[message.chat.id]:
+        markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+        for post in user_posts[message.chat.id]:
+            time_formatted = format_time(post["time"])
+            button_text = f"Удалить: {time_formatted}, {post['city']}, {post['network']}"
+            markup.add(button_text)
+        markup.add("Отмена")
+        bot.send_message(message.chat.id, "Выберите объявление для удаления:", reply_markup=markup)
+        bot.register_next_step_handler(message, process_delete_choice)
+    else:
+        bot.send_message(message.chat.id, "❌ У вас нет опубликованных объявлений.")
 
-# Обработчик команды /delete
-@bot.message_handler(commands=['delete'])
-def delete_post(message):
-    if message.chat.id in user_posts:
+# Обработчик для кнопки "Удалить все объявления"
+@bot.message_handler(func=lambda message: message.text == "Удалить все объявления")
+def handle_delete_all_posts(message):
+    if message.chat.id in user_posts and user_posts[message.chat.id]:
+        markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+        markup.add("Да, удалить всё", "Нет, отменить")
+        bot.send_message(message.chat.id, "Вы уверены, что хотите удалить все свои объявления?", reply_markup=markup)
+        bot.register_next_step_handler(message, process_delete_all_choice)
+    else:
+        bot.send_message(message.chat.id, "❌ У вас нет опубликованных объявлений.")
+
+# Обработчик выбора объявления для удаления
+def process_delete_choice(message):
+    if message.text == "Отмена":
+        bot.send_message(message.chat.id, "Удаление отменено.", reply_markup=get_main_keyboard())
+    else:
         try:
-            chat_id = user_posts[message.chat.id]["chat_id"]
-            message_id = user_posts[message.chat.id]["message_id"]
-            bot.delete_message(chat_id, message_id)
-            bot.send_message(message.chat.id, "✅ Ваше объявление успешно удалено.")
-        except telebot.apihelper.ApiTelegramException as e:
-            bot.send_message(message.chat.id, f"❌ Ошибка при удалении: {e.description}")
-    else:
-        bot.send_message(message.chat.id, "❌ Вы не опубликовали ни одного объявления.")
+            # Ищем выбранное объявление
+            for post in user_posts[message.chat.id]:
+                time_formatted = format_time(post["time"])
+                if message.text == f"Удалить: {time_formatted}, {post['city']}, {post['network']}":
+                    # Удаляем объявление
+                    bot.delete_message(post["chat_id"], post["message_id"])
+                    user_posts[message.chat.id].remove(post)
+                    bot.send_message(message.chat.id, "✅ Объявление успешно удалено.", reply_markup=get_main_keyboard())
+                    return
+            bot.send_message(message.chat.id, "❌ Объявление не найдено.")
+        except (ValueError, IndexError):
+            bot.send_message(message.chat.id, "❌ Ошибка! Пожалуйста, выберите объявление из списка.")
 
-# Функция для подтверждения текста
-def confirm_text(message, text, media_type=None, file_id=None):
-    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-    markup.add("Да", "Нет")
-    bot.send_message(message.chat.id, f"Ваш текст:\n{text}\n\nВсё верно?", reply_markup=markup)
-    bot.register_next_step_handler(message, handle_confirmation, text, media_type, file_id)
-
-# Обработчик подтверждения
-def handle_confirmation(message, text, media_type, file_id):
-    if message.text.lower() == "да":
-        bot.send_message(message.chat.id, "📋 Выберите сеть для публикации:", reply_markup=get_network_markup())
-        bot.register_next_step_handler(message, select_network, text, media_type, file_id)
-    elif message.text.lower() == "нет":
-        bot.send_message(message.chat.id, "Хорошо, напишите текст объявления заново:")
-        bot.register_next_step_handler(message, process_text)
+# Обработчик подтверждения удаления всех объявлений
+def process_delete_all_choice(message):
+    if message.text == "Да, удалить всё":
+        # Удаляем все объявления
+        for post in user_posts[message.chat.id]:
+            try:
+                bot.delete_message(post["chat_id"], post["message_id"])
+            except telebot.apihelper.ApiTelegramException as e:
+                bot.send_message(message.chat.id, f"⚠️ Не удалось удалить одно из объявлений: {e.description}")
+        # Очищаем список объявлений пользователя
+        user_posts[message.chat.id] = []
+        bot.send_message(message.chat.id, "✅ Все ваши объявления успешно удалены.", reply_markup=get_main_keyboard())
     else:
-        bot.send_message(message.chat.id, "❌ Неверный ответ. Выберите 'Да' или 'Нет'.")
-        bot.register_next_step_handler(message, handle_confirmation, text, media_type, file_id)
+        bot.send_message(message.chat.id, "Удаление отменено.", reply_markup=get_main_keyboard())
 
 # Функция для обработки текста объявления
 def process_text(message):
     if message.text == "Назад":
-        bot.send_message(
-            message.chat.id,
-            "Вы вернулись в главное меню.",
-            reply_markup=get_main_keyboard()
-        )
+        bot.send_message(message.chat.id, "Вы вернулись в главное меню.", reply_markup=get_main_keyboard())
         return
 
     if message.photo or message.video:
@@ -158,6 +177,25 @@ def process_text(message):
 
     # Спрашиваем подтверждение текста
     confirm_text(message, text, media_type, file_id)
+
+# Функция для подтверждения текста
+def confirm_text(message, text, media_type=None, file_id=None):
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+    markup.add("Да", "Нет")
+    bot.send_message(message.chat.id, f"Ваш текст:\n{text}\n\nВсё верно?", reply_markup=markup)
+    bot.register_next_step_handler(message, handle_confirmation, text, media_type, file_id)
+
+# Обработчик подтверждения
+def handle_confirmation(message, text, media_type, file_id):
+    if message.text.lower() == "да":
+        bot.send_message(message.chat.id, "📋 Выберите сеть для публикации:", reply_markup=get_network_markup())
+        bot.register_next_step_handler(message, select_network, text, media_type, file_id)
+    elif message.text.lower() == "нет":
+        bot.send_message(message.chat.id, "Хорошо, напишите текст объявления заново:")
+        bot.register_next_step_handler(message, process_text)
+    else:
+        bot.send_message(message.chat.id, "❌ Неверный ответ. Выберите 'Да' или 'Нет'.")
+        bot.register_next_step_handler(message, handle_confirmation, text, media_type, file_id)
 
 # Функция для получения клавиатуры выбора сети
 def get_network_markup():
@@ -224,8 +262,16 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                                 sent_message = bot.send_video(chat_id, file_id, caption=full_text, parse_mode="Markdown")
                             else:
                                 sent_message = bot.send_message(chat_id, full_text, parse_mode="Markdown")
-                            # Сохраняем ID сообщения
-                            user_posts[message.chat.id] = {"message_id": sent_message.message_id, "chat_id": chat_id}
+                            # Сохраняем ID сообщения, время, город и сеть
+                            if message.chat.id not in user_posts:
+                                user_posts[message.chat.id] = []
+                            user_posts[message.chat.id].append({
+                                "message_id": sent_message.message_id,
+                                "chat_id": chat_id,
+                                "time": datetime.now(),  # Время публикации
+                                "city": city,            # Город
+                                "network": network       # Сеть
+                            })
                             bot.send_message(message.chat.id, f"✅ Ваше объявление опубликовано в сети «{network}», городе {city}.")
                         except telebot.apihelper.ApiTelegramException as e:
                             bot.send_message(message.chat.id, f"❌ Ошибка: {e.description}")
