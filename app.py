@@ -4,7 +4,14 @@ from telebot import types
 from flask import Flask, request
 from datetime import datetime
 import pytz
-from telebot.util import escape_md  # для экранирования символов Markdown
+
+# Собственная функция для экранирования спецсимволов Markdown
+def escape_md(text):
+    # Символы, которые нужно экранировать согласно Telegram Markdown
+    escape_chars = r'\_*[]()~`>#+-=|{}.!'
+    for ch in escape_chars:
+        text = text.replace(ch, f"\\{ch}")
+    return text
 
 # Получаем токен из переменной окружения
 TOKEN = os.getenv('BOT_TOKEN')
@@ -56,7 +63,7 @@ chat_ids_parni = {
     "Курган": -1002469285352,
     "ХМАО": -1002287709568,
     "Уфа": -1002448909000,
-    "Новосибирск": -1002261777025,  # Обновлённый ID для "Парни Новосибирск"
+    "Новосибирск": -1002261777025,  # Обновленный ID для группы "Парни Новосибирск"
     "ЯМАО": -1002371438340
 }
 
@@ -79,9 +86,9 @@ def get_main_keyboard():
 def format_time(timestamp):
     tz = pytz.timezone('Asia/Yekaterinburg')
     local_time = timestamp.astimezone(tz)
-    return local_time.strftime("%H:%M, %d %B %Y")  # Обратите внимание: месяц может быть на английском
+    return local_time.strftime("%H:%M, %d %B %Y")  # Месяц может быть на английском
 
-# Получаем имя пользователя с кликабельной ссылкой с экранированием Markdown
+# Получаем имя пользователя с кликабельной ссылкой и экранированием Markdown
 def get_user_name(user):
     name = escape_md(user.first_name)
     if user.username:
@@ -98,7 +105,7 @@ def start(message):
             bot.send_message(message.chat.id, "Пожалуйста, используйте ЛС для работы с ботом.")
             return
 
-        # Инициализируем состояние для пользователя, если его нет
+        # Инициализируем состояние пользователя, если его нет
         if message.chat.id not in user_posts:
             user_posts[message.chat.id] = []
 
@@ -275,7 +282,6 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
             if chat_member.status in ["member", "administrator", "creator"]:
                 vip_tag = "\n\n⭐️ Привилегированный участник ⭐️"
                 user_name = get_user_name(message.from_user)
-                # Экранируем текст объявления для Markdown
                 full_text = f"📢 Объявление от {user_name}:\n\n{escape_md(text)}{vip_tag}"
                 if selected_network == "Обе сети":
                     networks = ["Мужской Клуб", "ПАРНИ 18+"]
