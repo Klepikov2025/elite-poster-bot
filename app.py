@@ -3,6 +3,8 @@ import telebot
 from telebot import types
 from flask import Flask, request
 from datetime import datetime
+import pytz
+from telebot.util import escape_md  # для экранирования символов Markdown
 
 # Получаем токен из переменной окружения
 TOKEN = os.getenv('BOT_TOKEN')
@@ -10,6 +12,9 @@ bot = telebot.TeleBot(TOKEN)
 
 # Создаём Flask-приложение
 app = Flask(__name__)
+
+# ADMIN ID (ваш ID)
+ADMIN_CHAT_ID = 479938867  # Ваш ID
 
 # Списки chat_id для каждой сети и города
 chat_ids_mk = {
@@ -51,7 +56,7 @@ chat_ids_parni = {
     "Курган": -1002469285352,
     "ХМАО": -1002287709568,
     "Уфа": -1002448909000,
-    "Новосибирск": -1002413764329,
+    "Новосибирск": -1002261777025,  # Обновлённый ID для "Парни Новосибирск"
     "ЯМАО": -1002371438340
 }
 
@@ -59,7 +64,7 @@ chat_ids_parni = {
 VIP_CHAT_ID = -1002446486648  # Ваш VIP-чат
 
 # Ссылка для верификации и оплаты
-VERIFICATION_LINK = "http://t.me/vip_znakbot"  # Ссылка на бота для верификации
+VERIFICATION_LINK = "http://t.me/vip_znakbot"  # Ссылка для верификации
 
 # Словарь для хранения всех сообщений пользователей
 user_posts = {}
@@ -70,37 +75,56 @@ def get_main_keyboard():
     markup.add("Создать новое объявление", "Удалить объявление", "Удалить все объявления")
     return markup
 
-# Форматируем время
+# Форматируем время с учетом часового пояса (Екатеринбург)
 def format_time(timestamp):
-    return timestamp.strftime("%H:%M, %d %B %Y")
+    tz = pytz.timezone('Asia/Yekaterinburg')
+    local_time = timestamp.astimezone(tz)
+    return local_time.strftime("%H:%M, %d %B %Y")  # Обратите внимание: месяц может быть на английском
 
-# Получаем имя пользователя с кликабельной ссылкой
+# Получаем имя пользователя с кликабельной ссылкой с экранированием Markdown
 def get_user_name(user):
+    name = escape_md(user.first_name)
     if user.username:
-        return f"[{user.first_name}](https://t.me/{user.username})"
-    elif user.id:
-        return f"[{user.first_name}](tg://user?id={user.id})"
+        return f"[{name}](https://t.me/{user.username})"
     else:
-        return user.first_name
+        return f"[{name}](tg://user?id={user.id})"
 
 # Обработчик команды /start
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(
-        message.chat.id,
-        "Привет! Я ElitePoster. 👋\nВыберите действие:",
-        reply_markup=get_main_keyboard()
-    )
+    try:
+        # Работает только в личных сообщениях
+        if message.chat.type != "private":
+            bot.send_message(message.chat.id, "Пожалуйста, используйте ЛС для работы с ботом.")
+            return
+
+        # Инициализируем состояние для пользователя, если его нет
+        if message.chat.id not in user_posts:
+            user_posts[message.chat.id] = []
+
+        bot.send_message(
+            message.chat.id,
+            "Привет! Я ElitePoster. 👋\nВыберите действие:",
+            reply_markup=get_main_keyboard()
+        )
+    except Exception as e:
+        bot.send_message(ADMIN_CHAT_ID, f"Ошибка в /start: {e}")
 
 # Обработчик для кнопки "Создать новое объявление"
 @bot.message_handler(func=lambda message: message.text == "Создать новое объявление")
 def create_new_post(message):
+    if message.chat.type != "private":
+        bot.send_message(message.chat.id, "Пожалуйста, используйте ЛС для работы с ботом.")
+        return
     bot.send_message(message.chat.id, "Напишите текст объявления:")
     bot.register_next_step_handler(message, process_text)
 
 # Обработчик для кнопки "Удалить объявление"
 @bot.message_handler(func=lambda message: message.text == "Удалить объявление")
 def handle_delete_post(message):
+    if message.chat.type != "private":
+        bot.send_message(message.chat.id, "Пожалуйста, используйте ЛС для работы с ботом.")
+        return
     if message.chat.id in user_posts and user_posts[message.chat.id]:
         markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
         for post in user_posts[message.chat.id]:
@@ -116,6 +140,9 @@ def handle_delete_post(message):
 # Обработчик для кнопки "Удалить все объявления"
 @bot.message_handler(func=lambda message: message.text == "Удалить все объявления")
 def handle_delete_all_posts(message):
+    if message.chat.type != "private":
+        bot.send_message(message.chat.id, "Пожалуйста, используйте ЛС для работы с ботом.")
+        return
     if message.chat.id in user_posts and user_posts[message.chat.id]:
         markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
         markup.add("Да, удалить всё", "Нет, отменить")
@@ -130,12 +157,13 @@ def process_delete_choice(message):
         bot.send_message(message.chat.id, "Удаление отменено.", reply_markup=get_main_keyboard())
     else:
         try:
-            # Ищем выбранное объявление
             for post in user_posts[message.chat.id]:
                 time_formatted = format_time(post["time"])
                 if message.text == f"Удалить: {time_formatted}, {post['city']}, {post['network']}":
-                    # Удаляем объявление
-                    bot.delete_message(post["chat_id"], post["message_id"])
+                    try:
+                        bot.delete_message(post["chat_id"], post["message_id"])
+                    except Exception:
+                        pass
                     user_posts[message.chat.id].remove(post)
                     bot.send_message(message.chat.id, "✅ Объявление успешно удалено.", reply_markup=get_main_keyboard())
                     return
@@ -146,13 +174,11 @@ def process_delete_choice(message):
 # Обработчик подтверждения удаления всех объявлений
 def process_delete_all_choice(message):
     if message.text == "Да, удалить всё":
-        # Удаляем все объявления
         for post in user_posts[message.chat.id]:
             try:
                 bot.delete_message(post["chat_id"], post["message_id"])
-            except telebot.apihelper.ApiTelegramException as e:
-                bot.send_message(message.chat.id, f"⚠️ Не удалось удалить одно из объявлений: {e.description}")
-        # Очищаем список объявлений пользователя
+            except Exception:
+                pass
         user_posts[message.chat.id] = []
         bot.send_message(message.chat.id, "✅ Все ваши объявления успешно удалены.", reply_markup=get_main_keyboard())
     else:
@@ -165,17 +191,15 @@ def process_text(message):
         return
 
     if message.photo or message.video:
-        # Если пользователь отправил медиа, сохраняем его
         if message.photo:
             media_type = "photo"
-            file_id = message.photo[-1].file_id  # Берём самое большое фото
+            file_id = message.photo[-1].file_id
             text = message.caption if message.caption else ""
         elif message.video:
             media_type = "video"
             file_id = message.video.file_id
             text = message.caption if message.caption else ""
     elif message.text:
-        # Если пользователь отправил только текст
         media_type = None
         file_id = None
         text = message.text
@@ -184,10 +208,9 @@ def process_text(message):
         bot.register_next_step_handler(message, process_text)
         return
 
-    # Спрашиваем подтверждение текста
     confirm_text(message, text, media_type, file_id)
 
-# Функция для подтверждения текста
+# Функция для подтверждения текста объявления
 def confirm_text(message, text, media_type=None, file_id=None):
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
     markup.add("Да", "Нет")
@@ -223,8 +246,8 @@ def select_network(message, text, media_type, file_id):
     if selected_network in ["Мужской Клуб", "ПАРНИ 18+", "Обе сети"]:
         markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True, row_width=2)
         cities = chat_ids_mk.keys() if selected_network == "Мужской Клуб" else \
-                chat_ids_parni.keys() if selected_network == "ПАРНИ 18+" else \
-                list(chat_ids_mk.keys()) + list(chat_ids_parni.keys())
+                 chat_ids_parni.keys() if selected_network == "ПАРНИ 18+" else \
+                 list(chat_ids_mk.keys()) + list(chat_ids_parni.keys())
         for city in cities:
             markup.add(city)
         markup.add("Выбрать другую сеть", "Назад")
@@ -251,10 +274,9 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
             chat_member = bot.get_chat_member(VIP_CHAT_ID, message.from_user.id)
             if chat_member.status in ["member", "administrator", "creator"]:
                 vip_tag = "\n\n⭐️ Привилегированный участник ⭐️"
-                # Создаем кликабельное имя пользователя
                 user_name = get_user_name(message.from_user)
-                full_text = f"📢 Объявление от {user_name}:\n\n{text}{vip_tag}"
-                # Публикация в выбранных сетях
+                # Экранируем текст объявления для Markdown
+                full_text = f"📢 Объявление от {user_name}:\n\n{escape_md(text)}{vip_tag}"
                 if selected_network == "Обе сети":
                     networks = ["Мужской Клуб", "ПАРНИ 18+"]
                 else:
@@ -271,25 +293,21 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                                 sent_message = bot.send_video(chat_id, file_id, caption=full_text, parse_mode="Markdown")
                             else:
                                 sent_message = bot.send_message(chat_id, full_text, parse_mode="Markdown")
-                            # Сохраняем ID сообщения, время, город и сеть
                             if message.chat.id not in user_posts:
                                 user_posts[message.chat.id] = []
                             user_posts[message.chat.id].append({
                                 "message_id": sent_message.message_id,
                                 "chat_id": chat_id,
                                 "time": datetime.now(),  # Время публикации
-                                "city": city,            # Город
-                                "network": network       # Сеть
+                                "city": city,
+                                "network": network
                             })
                             bot.send_message(message.chat.id, f"✅ Ваше объявление опубликовано в сети «{network}», городе {city}.")
                         except telebot.apihelper.ApiTelegramException as e:
                             bot.send_message(message.chat.id, f"❌ Ошибка: {e.description}")
                     else:
                         bot.send_message(message.chat.id, f"❌ Ошибка! Город '{city}' не найден в сети «{network}».")
-
-                # Предлагаем опубликовать ещё одно объявление
                 ask_for_new_post(message)
-
             else:
                 # Если пользователь не VIP, предлагаем верификацию
                 markup = types.InlineKeyboardMarkup()
