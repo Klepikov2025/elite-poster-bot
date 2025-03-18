@@ -65,6 +65,20 @@ chat_ids_parni = {
     "ЯМАО": -1002371438340
 }
 
+# ДОБАВЛЯЕМ новую сеть НС с нужными группами
+chat_ids_ns = {
+    "Курган": -1001465465654,
+    "Новосибирск": -1001824149334,
+    "Челябинск": -1002233108474,
+    "Пермь": -1001753881279,
+    "Уфа": -1001823390636,
+    "Ямал": -1002145851794,
+    "Москва": -1001938448310,
+    "ХМАО": -1001442597049,
+    "Знакомства 66": -1002169473861,   # Привязано к Екатеринбургу
+    "Знакомства 74": -1002193127380    # Привязано к Челябинску
+}
+
 # ID VIP-чата "Elite Lounge"
 VIP_CHAT_ID = -1002446486648  # Ваш VIP-чат
 
@@ -74,7 +88,7 @@ VERIFICATION_LINK = "http://t.me/vip_znakbot"  # Ссылка для вериф�
 # Словарь для хранения всех сообщений пользователей
 user_posts = {}
 
-# Создаём клавиатуру с основными кнопками
+# Создаём основную клавиатуру
 def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add("Создать новое объявление", "Удалить объявление", "Удалить все объявления")
@@ -84,7 +98,7 @@ def get_main_keyboard():
 def format_time(timestamp):
     tz = pytz.timezone('Asia/Yekaterinburg')
     local_time = timestamp.astimezone(tz)
-    return local_time.strftime("%H:%M, %d %B %Y")  # Месяц может быть на английском
+    return local_time.strftime("%H:%M, %d %B %Y")
 
 # Получаем имя пользователя с кликабельной ссылкой и экранированием Markdown
 def get_user_name(user):
@@ -237,7 +251,8 @@ def handle_confirmation(message, text, media_type, file_id):
 # Функция для получения клавиатуры выбора сети
 def get_network_markup():
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-    markup.add("Мужской Клуб", "ПАРНИ 18+", "Обе сети", "Назад")
+    # Опции: отдельные сети и вариант публикации во все сети
+    markup.add("Мужской Клуб", "ПАРНИ 18+", "НС", "Все сети", "Назад")
     return markup
 
 # Функция для выбора сети
@@ -248,11 +263,17 @@ def select_network(message, text, media_type, file_id):
         return
 
     selected_network = message.text
-    if selected_network in ["Мужской Клуб", "ПАРНИ 18+", "Обе сети"]:
+    if selected_network in ["Мужской Клуб", "ПАРНИ 18+", "НС", "Все сети"]:
         markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True, row_width=2)
-        cities = chat_ids_mk.keys() if selected_network == "Мужской Клуб" else \
-                 chat_ids_parni.keys() if selected_network == "ПАРНИ 18+" else \
-                 list(chat_ids_mk.keys()) + list(chat_ids_parni.keys())
+        if selected_network == "Мужской Клуб":
+            cities = list(chat_ids_mk.keys())
+        elif selected_network == "ПАРНИ 18+":
+            cities = list(chat_ids_parni.keys())
+        elif selected_network == "НС":
+            cities = list(chat_ids_ns.keys())
+        elif selected_network == "Все сети":
+            # Объединяем города из всех сетей (убираем дубликаты)
+            cities = list(set(list(chat_ids_mk.keys()) + list(chat_ids_parni.keys()) + list(chat_ids_ns.keys())))
         for city in cities:
             markup.add(city)
         markup.add("Выбрать другую сеть", "Назад")
@@ -273,53 +294,62 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
     if city == "Выбрать другую сеть":
         bot.send_message(message.chat.id, "📋 Выберите сеть для публикации:", reply_markup=get_network_markup())
         bot.register_next_step_handler(message, select_network, text, media_type, file_id)
-    else:
-        try:
-            # Проверка на VIP-участника
-            chat_member = bot.get_chat_member(VIP_CHAT_ID, message.from_user.id)
-            if chat_member.status in ["member", "administrator", "creator"]:
-                vip_tag = "\n\n⭐️ Привилегированный участник ⭐️"
-                user_name = get_user_name(message.from_user)
-                full_text = f"📢 Объявление от {user_name}:\n\n{escape_md(text)}{vip_tag}"
-                if selected_network == "Обе сети":
-                    networks = ["Мужской Клуб", "ПАРНИ 18+"]
-                else:
-                    networks = [selected_network]
+        return
 
-                for network in networks:
-                    chat_dict = chat_ids_mk if network == "Мужской Клуб" else chat_ids_parni
-                    if city in chat_dict:
-                        chat_id = chat_dict[city]
-                        try:
-                            if media_type == "photo":
-                                sent_message = bot.send_photo(chat_id, file_id, caption=full_text, parse_mode="Markdown")
-                            elif media_type == "video":
-                                sent_message = bot.send_video(chat_id, file_id, caption=full_text, parse_mode="Markdown")
-                            else:
-                                sent_message = bot.send_message(chat_id, full_text, parse_mode="Markdown")
-                            if message.chat.id not in user_posts:
-                                user_posts[message.chat.id] = []
-                            user_posts[message.chat.id].append({
-                                "message_id": sent_message.message_id,
-                                "chat_id": chat_id,
-                                "time": datetime.now(),  # Время публикации
-                                "city": city,
-                                "network": network
-                            })
-                            bot.send_message(message.chat.id, f"✅ Ваше объявление опубликовано в сети «{network}», городе {city}.")
-                        except telebot.apihelper.ApiTelegramException as e:
-                            bot.send_message(message.chat.id, f"❌ Ошибка: {e.description}")
-                    else:
-                        bot.send_message(message.chat.id, f"❌ Ошибка! Город '{city}' не найден в сети «{network}».")
-                ask_for_new_post(message)
+    try:
+        # Проверка на VIP-участника
+        chat_member = bot.get_chat_member(VIP_CHAT_ID, message.from_user.id)
+        if chat_member.status in ["member", "administrator", "creator"]:
+            vip_tag = "\n\n⭐️ *Привилегированный участник* ⭐️\n✅ _Анкета проверена администрацией сети_"
+            user_name = get_user_name(message.from_user)
+            full_text = f"📢 Объявление от {user_name}:\n\n{escape_md(text)}{vip_tag}"
+            if selected_network == "Все сети":
+                networks = ["Мужской Клуб", "ПАРНИ 18+", "НС"]
             else:
-                # Если пользователь не VIP, предлагаем верификацию
-                markup = types.InlineKeyboardMarkup()
-                verify_button = types.InlineKeyboardButton(text="🛠️ Пройти верификацию", url=VERIFICATION_LINK)
-                markup.add(verify_button)
-                bot.send_message(message.chat.id, "🔓 Вы не являетесь привилегированным участником. Для публикации объявлений пройдите верификацию:", reply_markup=markup)
-        except telebot.apihelper.ApiTelegramException as e:
-            bot.send_message(message.chat.id, f"⚠️ Ошибка при проверке VIP-статуса: {e.description}")
+                networks = [selected_network]
+
+            for network in networks:
+                if network == "Мужской Клуб":
+                    chat_dict = chat_ids_mk
+                elif network == "ПАРНИ 18+":
+                    chat_dict = chat_ids_parni
+                elif network == "НС":
+                    chat_dict = chat_ids_ns
+                else:
+                    continue
+
+                if city in chat_dict:
+                    chat_id = chat_dict[city]
+                    try:
+                        if media_type == "photo":
+                            sent_message = bot.send_photo(chat_id, file_id, caption=full_text, parse_mode="Markdown")
+                        elif media_type == "video":
+                            sent_message = bot.send_video(chat_id, file_id, caption=full_text, parse_mode="Markdown")
+                        else:
+                            sent_message = bot.send_message(chat_id, full_text, parse_mode="Markdown")
+                        if message.chat.id not in user_posts:
+                            user_posts[message.chat.id] = []
+                        user_posts[message.chat.id].append({
+                            "message_id": sent_message.message_id,
+                            "chat_id": chat_id,
+                            "time": datetime.now(),  # Время публикации
+                            "city": city,
+                            "network": network
+                        })
+                        bot.send_message(message.chat.id, f"✅ Ваше объявление опубликовано в сети «{network}», городе {city}.")
+                    except telebot.apihelper.ApiTelegramException as e:
+                        bot.send_message(message.chat.id, f"❌ Ошибка: {e.description}")
+                else:
+                    bot.send_message(message.chat.id, f"❌ Ошибка! Город '{city}' не найден в сети «{network}».")
+            ask_for_new_post(message)
+        else:
+            # Если пользователь не VIP, предлагаем верификацию
+            markup = types.InlineKeyboardMarkup()
+            verify_button = types.InlineKeyboardButton(text="🛠️ Пройти верификацию", url=VERIFICATION_LINK)
+            markup.add(verify_button)
+            bot.send_message(message.chat.id, "🔓 Вы не являетесь привилегированным участником. Для публикации объявлений пройдите верификацию:", reply_markup=markup)
+    except telebot.apihelper.ApiTelegramException as e:
+        bot.send_message(message.chat.id, f"⚠️ Ошибка при проверке VIP-статуса: {e.description}")
 
 # Функция для предложения нового объявления
 def ask_for_new_post(message):
