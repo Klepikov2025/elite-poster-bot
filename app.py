@@ -285,7 +285,8 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
     try:
         chat_member = bot.get_chat_member(VIP_CHAT_ID, message.from_user.id)
         if chat_member.status in ["member", "administrator", "creator"]:
-            vip_tag = "\n\n⭐️ *Привилегированный участник* ⭐️\n✅ _Анкета проверена администрацией сети_"
+            vip_tag = "\n\n✅ *Анкета проверена администрацией сети*\n\n⭐️ *Привилегированный участник* ⭐️"
+
             user_name = get_user_name(message.from_user)
             full_text = f"📢 Объявление от {user_name}:\n\n{escape_md(text)}{vip_tag}"
             if selected_network == "Все сети":
