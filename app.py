@@ -107,8 +107,7 @@ def format_time(timestamp):
 
 def get_user_name(user):
     # Используем tg://user?id= для всех пользователей, независимо от наличия username
-    name = escape_md_v2(user.first_name)
-    return f"[{name}](tg://user?id={user.id})"
+    return f"[{user.first_name}](tg://user?id={user.id})"
 
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -311,7 +310,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                 f"🧿 *Внимание! VIP-сообщение от {user_name}*",
                 f"🏷️ *Объявление с особыми правами: {user_name}*"
             ]
-            full_text = f"{random.choice(headers)}\n\n{escape_md_v2(text)}{vip_tag}"
+            full_text = f"{random.choice(headers)}\n\n{text}{vip_tag}"
 
             # Создаём inline-кнопку «Откликнуться♥»
             markup_inline = types.InlineKeyboardMarkup()
@@ -424,7 +423,7 @@ def handle_respond(call):
 
     user = call.from_user
     # Формируем имя откликнувшегося с кликабельной ссылкой и выделением
-    name = f"[{escape_md_v2(get_user_name(user))}](tg://user?id={user.id})"
+    name = get_user_name(user)
 
     try:
         # Отправляем уведомление VIP, имя откликнувшегося кликабельное
