@@ -6,7 +6,8 @@ from datetime import datetime
 import pytz
 import random
 
-def escape_md_v2(text):
+# Собственная функция для экранирования спецсимволов Markdown
+def escape_md(text):
     escape_chars = r'\_*[]()~`>#+-=|{}.!'
     for ch in escape_chars:
         text = text.replace(ch, f"\\{ch}")
@@ -353,11 +354,11 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
 
                 try:
                     if media_type == "photo":
-                        sent_message = bot.send_photo(chat_id, file_id, caption=full_text, parse_mode="MarkdownV2", reply_markup=markup_inline)
+                        sent_message = bot.send_photo(chat_id, file_id, caption=full_text, parse_mode="Markdown", reply_markup=markup_inline)
                     elif media_type == "video":
-                        sent_message = bot.send_video(chat_id, file_id, caption=full_text, parse_mode="MarkdownV2", reply_markup=markup_inline)
+                        sent_message = bot.send_video(chat_id, file_id, caption=full_text, parse_mode="Markdown", reply_markup=markup_inline)
                     else:
-                        sent_message = bot.send_message(chat_id, full_text, parse_mode="MarkdownV2", reply_markup=markup_inline)
+                        sent_message = bot.send_message(chat_id, full_text, parse_mode="Markdown", reply_markup=markup_inline)
 
                     post_owner[(chat_id, sent_message.message_id)] = message.from_user.id
 
@@ -427,7 +428,7 @@ def handle_respond(call):
 
     try:
         # Отправляем уведомление VIP, имя откликнувшегося кликабельное
-        bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode="MarkdownV2")
+        bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode="Markdown")
     except Exception as e:
         bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP: {e}")
 
