@@ -6,7 +6,7 @@ from datetime import datetime
 import pytz
 import random
 
-def escape_md(text):
+def escape_md_v2(text):
     escape_chars = r'\_*[]()~`>#+-=|{}.!'
     for ch in escape_chars:
         text = text.replace(ch, f"\\{ch}")
@@ -105,7 +105,7 @@ def format_time(timestamp):
     return local_time.strftime("%H:%M, %d %B %Y")
 
 def get_user_name(user):
-    name = escape_md(user.first_name)
+    name = escape_md_v2(user.first_name)
     if user.username:
         return f"[{name}](https://t.me/{user.username})"
     else:
@@ -316,7 +316,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                 f"🧿 *Внимание! VIP-сообщение от {user_name}*",
                 f"🏷️ *Объявление с особыми правами: {user_name}*"
             ]
-            full_text = f"{random.choice(headers)}\n\n{escape_md(text)}{vip_tag}"
+            full_text = f"{random.choice(headers)}\n\n{escape_md_v2(text)}{vip_tag}"
 
             # Создаём inline-кнопку «Откликнуться♥»
             markup_inline = types.InlineKeyboardMarkup()
@@ -429,13 +429,14 @@ def handle_respond(call):
 
     user = call.from_user
     if user.username:
-        name = f"@{user.username}"
+        # Ссылка на username — экранируем имя, если нужно
+        name = f"[{escape_md_v2(get_user_name(user))}](https://t.me/{user.username})"
     else:
-        safe_name = escape_md(get_user_name(user))
-        name = f"[{safe_name}](tg://user?id={user.id})"
+        # Если username нет — ссылка через user ID
+        name = f"[{escape_md_v2(get_user_name(user))}](tg://user?id={user.id})"
 
     try:
-        bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode="Markdown")
+        bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode="MarkdownV2")
     except Exception as e:
         bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP: {e}")
 
