@@ -109,9 +109,9 @@ def format_time(timestamp):
 def get_user_name(user):
     name = escape_md(user.first_name)
     if user.username:
-        return f"[{name}]"
+        return f"[{name}](tg://user?id={user.id})"
     else:
-        return f"[{name}]"
+        return f"[{name}](tg://user?id={user.id})"
 
 @bot.message_handler(commands=['start'])
 def start(message):
