@@ -289,7 +289,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
             vip_tag = "\n\n✅ *Анкета проверена администрацией сети*\n\n⭐️ *Привилегированный участник* ⭐️"
 
             # Новый формат имени: жирное и кликабельное
-            user_name = f"[**{message.from_user.first_name}**](tg://user?id={message.from_user.id})"
+            user_name = get_user_name(message.from_user)
 
             # 🟡 ВСТАВЛЕН НОВЫЙ РАНДОМНЫЙ ЗАГОЛОВОК
             headers = [
