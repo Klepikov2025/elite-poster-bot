@@ -105,11 +105,9 @@ def format_time(timestamp):
     return local_time.strftime("%H:%M, %d %B %Y")
 
 def get_user_name(user):
-    name = escape_md_v2(user.first_name or "Пользователь")
-    if user.username:
-        return f"[{name}](https://t.me/{user.username})"
-    else:
-        return f"[{name}](tg://user?id={user.id})"
+    # Используем tg://user?id= для всех пользователей, независимо от наличия username
+    name = escape_md_v2(user.first_name)
+    return f"[{name}](tg://user?id={user.id})"
 
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -288,7 +286,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
         if chat_member.status in ["member", "administrator", "creator"]:
             vip_tag = "\n\n✅ *Анкета проверена администрацией сети*\n\n⭐️ *Привилегированный участник* ⭐️"
 
-            user_name = get_user_name(message.from_user)  # Передаем message.from_user вместо message
+            user_name = get_user_name(message.from_user)  # Получаем имя с ссылкой на личку
 
             # 🟡 ВСТАВЛЕН НОВЫЙ РАНДОМНЫЙ ЗАГОЛОВОК
             headers = [
@@ -401,7 +399,7 @@ def handle_new_post_choice(message):
             reply_markup=get_main_keyboard()
         )
 
-@bot.callback_query_handler(func=lambda call: call.data == "respond")
+@bot.callback_query_handler(func=lambda call: call.data == "respond") 
 def handle_respond(call):
     chat_id = call.message.chat.id
     msg_id = call.message.message_id
@@ -424,12 +422,8 @@ def handle_respond(call):
     vip_id = post_owner[key]
 
     user = call.from_user
-    if user.username:
-        # Ссылка на username — экранируем имя, если нужно
-        name = f"[{escape_md_v2(get_user_name(user))}](https://t.me/{user.username})"
-    else:
-        # Если username нет — ссылка через user ID
-        name = f"[{escape_md_v2(get_user_name(user))}](tg://user?id={user.id})"
+    # Генерируем ссылку только через tg://user?id={user.id}, независимо от наличия username
+    name = f"[{escape_md_v2(get_user_name(user))}](tg://user?id={user.id})"
 
     try:
         bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode="MarkdownV2")
