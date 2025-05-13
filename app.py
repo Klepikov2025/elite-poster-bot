@@ -7,7 +7,7 @@ import pytz
 import random
 
 def escape_md(text):
-    escape_chars = r'_*\[\]'
+    escape_chars = r'\_*[]()~`>#+-=|{}.!'
     for ch in escape_chars:
         text = text.replace(ch, f"\\{ch}")
     return text
@@ -431,7 +431,8 @@ def handle_respond(call):
     if user.username:
         name = f"@{user.username}"
     else:
-        name = f"[{escape_md(get_user_name(user))}](tg://user?id={user.id})"
+        safe_name = escape_md(get_user_name(user))
+        name = f"[{safe_name}](tg://user?id={user.id})"
 
     try:
         bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode="Markdown")
