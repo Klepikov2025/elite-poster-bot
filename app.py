@@ -103,8 +103,6 @@ def get_clickable_name(user):
     else:
         return f"[{name}](tg://user?id={user.id})"
 
-user_name_md = get_clickable_name(message.from_user)
-
 def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add("Создать новое объявление", "Удалить объявление", "Удалить все объявления")
