@@ -9,7 +9,7 @@ import re
 
 # Собственная функция для экранирования спецсимволов Markdown
 def escape_md(text):
-    escape_chars = r'\_*[]()~`>#+-=|{}!'
+    escape_chars = r'\_*[]()~`>#+-=|{}'
     for ch in escape_chars:
         text = text.replace(ch, f"\\{ch}")
     return text
@@ -288,7 +288,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
         if chat_member.status in ["member", "administrator", "creator"]:
             vip_tag = "\n\n✅ *Анкета проверена администрацией сети*\n\n⭐️ *Привилегированный участник* ⭐️"
 
-            user_name = get_user_name(message)  # Получаем имя с ссылкой на личку
+            user_name = get_user_name(message.from_user)
 
             # 🟡 ВСТАВЛЕН НОВЫЙ РАНДОМНЫЙ ЗАГОЛОВОК
             headers = [
@@ -401,14 +401,13 @@ def handle_new_post_choice(message):
             reply_markup=get_main_keyboard()
         )
 
-@bot.callback_query_handler(func=lambda call: call.data == "respond") 
+@bot.callback_query_handler(func=lambda call: call.data == "respond")
 def handle_respond(call):
     chat_id = call.message.chat.id
     msg_id = call.message.message_id
     user_id = call.from_user.id
 
     key = (chat_id, msg_id)
-
     if key not in post_owner:
         bot.answer_callback_query(call.id, "Ошибка объявления.")
         return
@@ -422,18 +421,13 @@ def handle_respond(call):
 
     responded[key].add(user_id)
     vip_id = post_owner[key]
-
-    user = call.from_user
-    # Формируем имя откликнувшегося с кликабельной ссылкой и выделением
-    bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode="Markdown")
+    name = get_user_name(call.from_user)
 
     try:
-        # Отправляем уведомление VIP, имя откликнувшегося кликабельное
-        bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode="Markdown")
+        bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode=\"Markdown\")
     except Exception as e:
         bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP: {e}")
 
-    # Ответ откликнувшемуся, что его отклик отправлен
     bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
 
 @app.route('/webhook', methods=['POST'])
