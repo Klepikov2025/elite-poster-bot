@@ -286,7 +286,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
         if chat_member.status in ["member", "administrator", "creator"]:
             vip_tag = "\n\n✅ *Анкета проверена администрацией сети*\n\n⭐️ *Привилегированный участник* ⭐️"
 
-            user_name = get_user_name(message.from_user)  # Получаем имя с ссылкой на личку
+            user_name = get_user_name(message)  # Получаем имя с ссылкой на личку
 
             # 🟡 ВСТАВЛЕН НОВЫЙ РАНДОМНЫЙ ЗАГОЛОВОК
             headers = [
@@ -353,11 +353,11 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
 
                 try:
                     if media_type == "photo":
-                        sent_message = bot.send_photo(chat_id, file_id, caption=full_text, parse_mode="Markdown", reply_markup=markup_inline)
+                        sent_message = bot.send_photo(chat_id, file_id, caption=full_text, parse_mode="MarkdownV2", reply_markup=markup_inline)
                     elif media_type == "video":
-                        sent_message = bot.send_video(chat_id, file_id, caption=full_text, parse_mode="Markdown", reply_markup=markup_inline)
+                        sent_message = bot.send_video(chat_id, file_id, caption=full_text, parse_mode="MarkdownV2", reply_markup=markup_inline)
                     else:
-                        sent_message = bot.send_message(chat_id, full_text, parse_mode="Markdown", reply_markup=markup_inline)
+                        sent_message = bot.send_message(chat_id, full_text, parse_mode="MarkdownV2", reply_markup=markup_inline)
 
                     post_owner[(chat_id, sent_message.message_id)] = message.from_user.id
 
@@ -422,14 +422,16 @@ def handle_respond(call):
     vip_id = post_owner[key]
 
     user = call.from_user
-    # Генерируем ссылку только через tg://user?id={user.id}, независимо от наличия username
+    # Формируем имя откликнувшегося с кликабельной ссылкой и выделением
     name = f"[{escape_md_v2(get_user_name(user))}](tg://user?id={user.id})"
 
     try:
+        # Отправляем уведомление VIP, имя откликнувшегося кликабельное
         bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode="MarkdownV2")
     except Exception as e:
         bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP: {e}")
 
+    # Ответ откликнувшемуся, что его отклик отправлен
     bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
 
 @app.route('/webhook', methods=['POST'])
