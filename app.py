@@ -272,7 +272,8 @@ def select_network(message, text, media_type, file_id):
         bot.register_next_step_handler(message, process_text)
 
 def get_user_name(message):
-    return f"**{message.from_user.first_name}**"  # Жирное имя, без ссылки на профиль
+    user_id = message.from_user.id  # Получаем ID пользователя
+    return f"*[{message.from_user.first_name}](tg://user?id={user_id})*"  # Жирное имя с ссылкой на личку
 
 def select_city_and_publish(message, text, selected_network, media_type, file_id):
     if message.text == "Назад":
@@ -291,7 +292,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
         if chat_member.status in ["member", "administrator", "creator"]:
             vip_tag = "\n\n✅ *Анкета проверена администрацией сети*\n\n⭐️ *Привилегированный участник* ⭐️"
 
-            user_name = get_user_name(message)  # Получаем жирное имя без ссылки
+            user_name = get_user_name(message)  # Получаем имя с ссылкой на личку
 
             # 🟡 ВСТАВЛЕН НОВЫЙ РАНДОМНЫЙ ЗАГОЛОВОК
             headers = [
