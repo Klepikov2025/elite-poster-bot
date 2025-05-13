@@ -412,34 +412,31 @@ def handle_respond(call):
     user_id = call.from_user.id
 
     key = (chat_id, msg_id)
-    print(f"Received callback: (chat_id={chat_id}, msg_id={msg_id}), user_id={user_id}")
 
     if key not in post_owner:
         bot.answer_callback_query(call.id, "Ошибка объявления.")
-        print(f"Error: No owner found for key {key}")
         return
 
     if key not in responded:
         responded[key] = set()
-    
-    print(f"Responded users: {responded[key]}")
 
     if user_id in responded[key]:
         bot.answer_callback_query(call.id, "Вы уже откликались на это объявление.")
-        print(f"User {user_id} has already responded.")
         return
 
     responded[key].add(user_id)
     vip_id = post_owner[key]
-    name = get_user_name(call.from_user)
 
-    print(f"Sending message to VIP {vip_id}: {name} has shown interest")
+    user = call.from_user
+    if user.username:
+        name = f"@{user.username}"
+    else:
+        name = f"[{escape_md(get_user_name(user))}](tg://user?id={user.id})"
 
     try:
         bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode="Markdown")
     except Exception as e:
         bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP: {e}")
-        print(f"Error sending message to VIP: {e}")
 
     bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
 
