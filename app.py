@@ -4,10 +4,10 @@ from telebot import types
 from flask import Flask, request
 from datetime import datetime
 import pytz
+import random
 
-# Собственная функция для экранирования спецсимволов Markdown
 def escape_md(text):
-    escape_chars = r'\_*[]()~`>#+-=|{}.!'
+    escape_chars = r'_*\[\]'
     for ch in escape_chars:
         text = text.replace(ch, f"\\{ch}")
     return text
@@ -289,7 +289,30 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
             vip_tag = "\n\n✅ *Анкета проверена администрацией сети*\n\n⭐️ *Привилегированный участник* ⭐️"
 
             user_name = get_user_name(message.from_user)
-            full_text = f"📢 Объявление от {user_name}:\n\n{escape_md(text)}{vip_tag}"
+
+            # 🟡 ВСТАВЛЕН НОВЫЙ РАНДОМНЫЙ ЗАГОЛОВОК
+            headers = [
+                f"💎 *VIP-СООБЩЕНИЕ от {user_name}!* 💎",
+                f"🚨 *🔥 Срочное объявление от {user_name}!* 🚨",
+                f"👑 *{user_name} публикует элитное объявление:* 👑",
+                f"🌟 *Особое сообщение от привилегированного пользователя {user_name}:* 🌟",
+                f"🔒 *Только для избранных: сообщение от {user_name}* 🔒",
+                f"📣 *Важное объявление от {user_name}!*",
+                f"🌐 *Объявление уровня PREMIUM от {user_name}!*",
+                f"📢 *Привилегированное сообщение от {user_name}:*",
+                f"🛑 *Эксклюзив! {user_name} пишет:*",
+                f"💼 *Серьёзное объявление от проверенного участника {user_name}*",
+                f"💠 *{user_name} публикует объявление с высоким приоритетом*",
+                f"🪙 *{user_name} использует привилегию VIP для объявления:*",
+                f"⚠️ *Срочно на всех экранах: {user_name} врывается с объявлением!*",
+                f"🔥 *{user_name} бросает вызов одиночеству!*",
+                f"🚀 *{user_name} не ждёт — он действует! Объявление внутри:*",
+                f"🥵 *Горячо! {user_name} делится откровенным сообщением:*",
+                f"⚡ *Найдено ВИП-сообщение! Проверь, что пишет {user_name}*"
+                f"🧿 *Внимание! VIP-сообщение от {user_name}*",
+                f"🏷️ *Объявление с особыми правами: {user_name}*"
+            ]
+            full_text = f"{random.choice(headers)}\n\n{escape_md(text)}{vip_tag}"
 
             # Создаём inline-кнопку «Откликнуться♥»
             markup_inline = types.InlineKeyboardMarkup()
@@ -310,7 +333,6 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                 else:
                     continue
 
-                # Если сеть НС, делаем замену названия города, если требуется
                 if network == "НС":
                     if city not in chat_dict and city in ns_city_substitution:
                         substitute_city = ns_city_substitution[city]
@@ -339,7 +361,6 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                     else:
                         sent_message = bot.send_message(chat_id, full_text, parse_mode="Markdown", reply_markup=markup_inline)
 
-                    # Сохраняем владельца поста
                     post_owner[(chat_id, sent_message.message_id)] = message.from_user.id
 
                     if message.chat.id not in user_posts:
