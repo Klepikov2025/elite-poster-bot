@@ -314,7 +314,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                 f"🧿 *Внимание! VIP-сообщение от {user_name}*",
                 f"🏷️ *Объявление с особыми правами: {user_name}*"
             ]
-            full_text = f"{random.choice(headers)}\n\n{text}{vip_tag}"
+            full_text = f"{user_name}{random.choice(headers)}\n\n{text}{vip_tag}"
 
             # Создаём inline-кнопку «Откликнуться♥»
             markup_inline = types.InlineKeyboardMarkup()
