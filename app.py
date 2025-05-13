@@ -290,7 +290,6 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
         if chat_member.status in ["member", "administrator", "creator"]:
             vip_tag = "\n\n✅ *Анкета проверена администрацией сети*\n\n⭐️ *Привилегированный участник* ⭐️"
 
-            # Новый формат имени: жирное и кликабельное
             user_name = get_user_name(message.from_user)
 
             # 🟡 ВСТАВЛЕН НОВЫЙ РАНДОМНЫЙ ЗАГОЛОВОК
@@ -315,7 +314,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                 f"🧿 *Внимание! VIP-сообщение от {user_name}*",
                 f"🏷️ *Объявление с особыми правами: {user_name}*"
             ]
-            full_text = f"{random.choice(headers)}\n\n{text}{vip_tag}"
+            full_text = f"{user_name}:\n\n{random.choice(headers)}\n\n{text}{vip_tag}"
 
             # Создаём inline-кнопку «Откликнуться♥»
             markup_inline = types.InlineKeyboardMarkup()
