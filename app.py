@@ -403,7 +403,7 @@ def handle_respond(call):
     name = get_user_name(call.from_user)
 
     try:
-        bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode=\"Markdown\")
+        bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode="Markdown")
     except Exception as e:
         bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP: {e}")
 
