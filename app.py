@@ -109,9 +109,9 @@ def format_time(timestamp):
 def get_user_name(user):
     name = escape_md(user.first_name)
     if user.username:
-        return f"[{name}](https://t.me/{user.username})"
+        return f"[{name}]"
     else:
-        return f"[{name}](tg://user?id={user.id})"
+        return f"[{name}]"
 
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -289,6 +289,8 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
         chat_member = bot.get_chat_member(VIP_CHAT_ID, message.from_user.id)
         if chat_member.status in ["member", "administrator", "creator"]:
             vip_tag = "\n\n✅ *Анкета проверена администрацией сети*\n\n⭐️ *Привилегированный участник* ⭐️"
+
+            user_name = get_user_name(message.from_user)
 
             # 🟡 ВСТАВЛЕН НОВЫЙ РАНДОМНЫЙ ЗАГОЛОВОК
             headers = [
