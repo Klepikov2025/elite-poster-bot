@@ -271,6 +271,9 @@ def select_network(message, text, media_type, file_id):
         bot.send_message(message.chat.id, "❌ Ошибка! Выберите правильную сеть.")
         bot.register_next_step_handler(message, process_text)
 
+def get_user_name(message):
+    return f"**{message.from_user.first_name}**"  # Жирное имя, без ссылки на профиль
+
 def select_city_and_publish(message, text, selected_network, media_type, file_id):
     if message.text == "Назад":
         bot.send_message(message.chat.id, "📋 Выберите сеть для публикации:", reply_markup=get_network_markup())
@@ -288,7 +291,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
         if chat_member.status in ["member", "administrator", "creator"]:
             vip_tag = "\n\n✅ *Анкета проверена администрацией сети*\n\n⭐️ *Привилегированный участник* ⭐️"
 
-            user_name = get_user_name(message.from_user)
+            user_name = get_user_name(message)  # Получаем жирное имя без ссылки
 
             # 🟡 ВСТАВЛЕН НОВЫЙ РАНДОМНЫЙ ЗАГОЛОВОК
             headers = [
@@ -308,7 +311,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                 f"🔥 *{user_name} бросает вызов одиночеству!*",
                 f"🚀 *{user_name} не ждёт — он действует! Объявление внутри:*",
                 f"🥵 *Горячо! {user_name} делится откровенным сообщением:*",
-                f"⚡ *Найдено ВИП-сообщение! Проверь, что пишет {user_name}*"
+                f"⚡ *Найдено ВИП-сообщение! Проверь, что пишет {user_name}*",
                 f"🧿 *Внимание! VIP-сообщение от {user_name}*",
                 f"🏷️ *Объявление с особыми правами: {user_name}*"
             ]
