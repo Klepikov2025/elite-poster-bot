@@ -105,7 +105,7 @@ def format_time(timestamp):
     return local_time.strftime("%H:%M, %d %B %Y")
 
 def get_user_name(user):
-    name = escape_md_v2(user.first_name)
+    name = escape_md_v2(user.first_name or "Пользователь")
     if user.username:
         return f"[{name}](https://t.me/{user.username})"
     else:
@@ -271,10 +271,6 @@ def select_network(message, text, media_type, file_id):
         bot.send_message(message.chat.id, "❌ Ошибка! Выберите правильную сеть.")
         bot.register_next_step_handler(message, process_text)
 
-def get_user_name(message):
-    user_id = message.from_user.id  # Получаем ID пользователя
-    return f"*[{message.from_user.first_name}](tg://user?id={user_id})*"  # Жирное имя с ссылкой на личку
-
 def select_city_and_publish(message, text, selected_network, media_type, file_id):
     if message.text == "Назад":
         bot.send_message(message.chat.id, "📋 Выберите сеть для публикации:", reply_markup=get_network_markup())
@@ -292,7 +288,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
         if chat_member.status in ["member", "administrator", "creator"]:
             vip_tag = "\n\n✅ *Анкета проверена администрацией сети*\n\n⭐️ *Привилегированный участник* ⭐️"
 
-            user_name = get_user_name(message)  # Получаем имя с ссылкой на личку
+            user_name = get_user_name(message.from_user)  # Передаем message.from_user вместо message
 
             # 🟡 ВСТАВЛЕН НОВЫЙ РАНДОМНЫЙ ЗАГОЛОВОК
             headers = [
