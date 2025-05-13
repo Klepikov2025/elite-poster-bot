@@ -41,7 +41,6 @@ chat_ids_mk = {
     "Волгоград": -1002167762598,
     "Нижний Новгород": -1001631628911,
     "Калининград": -1002217056197,
-    "Иркутск": -1002210419274,
     "Кемерово": -1002147522863,
     "Москва": -1002208434096,
     "Санкт Петербург": -1002485776859,
@@ -92,6 +91,8 @@ VERIFICATION_LINK = "http://t.me/vip_znakbot"  # Ссылка для вериф�
 
 # Словарь для хранения всех сообщений пользователей
 user_posts = {}
+post_owner = {}      # (chat_id, message_id) -> user_id
+responded = {}       # (chat_id, message_id) -> set(user_id)
 
 def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -289,6 +290,11 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
 
             user_name = get_user_name(message.from_user)
             full_text = f"📢 Объявление от {user_name}:\n\n{escape_md(text)}{vip_tag}"
+
+            # Создаём inline-кнопку «Откликнуться♥»
+            markup_inline = types.InlineKeyboardMarkup()
+            markup_inline.add(types.InlineKeyboardButton("Откликнуться♥", callback_data="respond"))
+
             if selected_network == "Все сети":
                 networks = ["Мужской Клуб", "ПАРНИ 18+", "НС"]
             else:
@@ -327,11 +333,15 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
 
                 try:
                     if media_type == "photo":
-                        sent_message = bot.send_photo(chat_id, file_id, caption=full_text, parse_mode="Markdown")
+                        sent_message = bot.send_photo(chat_id, file_id, caption=full_text, parse_mode="Markdown", reply_markup=markup_inline)
                     elif media_type == "video":
-                        sent_message = bot.send_video(chat_id, file_id, caption=full_text, parse_mode="Markdown")
+                        sent_message = bot.send_video(chat_id, file_id, caption=full_text, parse_mode="Markdown", reply_markup=markup_inline)
                     else:
-                        sent_message = bot.send_message(chat_id, full_text, parse_mode="Markdown")
+                        sent_message = bot.send_message(chat_id, full_text, parse_mode="Markdown", reply_markup=markup_inline)
+
+                    # Сохраняем владельца поста
+                    post_owner[(chat_id, sent_message.message_id)] = message.from_user.id
+
                     if message.chat.id not in user_posts:
                         user_posts[message.chat.id] = []
                     user_posts[message.chat.id].append({
@@ -369,6 +379,35 @@ def handle_new_post_choice(message):
             "Спасибо за использование бота! 🙌\nЕсли хотите создать новое объявление, нажмите кнопку ниже.",
             reply_markup=get_main_keyboard()
         )
+
+@bot.callback_query_handler(func=lambda call: call.data == "respond")
+def handle_respond(call):
+    chat_id = call.message.chat.id
+    msg_id = call.message.message_id
+    user_id = call.from_user.id
+
+    key = (chat_id, msg_id)
+    if key not in post_owner:
+        bot.answer_callback_query(call.id, "Ошибка объявления.")
+        return
+
+    if key not in responded:
+        responded[key] = set()
+
+    if user_id in responded[key]:
+        bot.answer_callback_query(call.id, "Вы уже откликались на это объявление.")
+        return
+
+    responded[key].add(user_id)
+    vip_id = post_owner[key]
+    name = get_user_name(call.from_user)
+
+    try:
+        bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode=\"Markdown\")
+    except Exception as e:
+        bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP: {e}")
+
+    bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
