@@ -5,10 +5,11 @@ from flask import Flask, request
 from datetime import datetime
 import pytz
 import random
+import re
 
 # Собственная функция для экранирования спецсимволов Markdown
 def escape_md(text):
-    escape_chars = r'\_*[]()~`>#+-=|{}.!'
+    escape_chars = r'\_*[]()~`>#+-=|{}!'
     for ch in escape_chars:
         text = text.replace(ch, f"\\{ch}")
     return text
@@ -106,8 +107,9 @@ def format_time(timestamp):
     return local_time.strftime("%H:%M, %d %B %Y")
 
 def get_user_name(user):
-    # Используем tg://user?id= для всех пользователей, независимо от наличия username
-    return f"[{user.first_name}](tg://user?id={user.id})"
+    # Удаляем из имени запрещённые для Markdown символы
+    name = re.sub(r'[\[\]\(\)\*\_`]', '', user.first_name or "Пользователь")
+    return f"[{name}](tg://user?id={user.id})"
 
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -423,7 +425,7 @@ def handle_respond(call):
 
     user = call.from_user
     # Формируем имя откликнувшегося с кликабельной ссылкой и выделением
-    name = get_user_name(user)
+    bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode="Markdown")
 
     try:
         # Отправляем уведомление VIP, имя откликнувшегося кликабельное
