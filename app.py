@@ -96,13 +96,6 @@ user_posts = {}
 post_owner = {}      # (chat_id, message_id) -> user_id
 responded = {}       # (chat_id, message_id) -> set(user_id)
 
-def get_clickable_name(user):
-    name = get_user_name(user)  # твоя функция генерации имени (например, имя + фамилия)
-    if user.username:
-        return f"[{name}](https://t.me/{user.username})"
-    else:
-        return f"[{name}](tg://user?id={user.id})"
-
 def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add("Создать новое объявление", "Удалить объявление", "Удалить все объявления")
@@ -297,7 +290,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
         if chat_member.status in ["member", "administrator", "creator"]:
             vip_tag = "\n\n✅ *Анкета проверена администрацией сети*\n\n⭐️ *Привилегированный участник* ⭐️"
 
-            user_name = get_user_name(message.from_user)
+            user_name_md = get_clickable_name(message.from_user)
 
             # 🟡 ВСТАВЛЕН НОВЫЙ РАНДОМНЫЙ ЗАГОЛОВОК
             headers = [
