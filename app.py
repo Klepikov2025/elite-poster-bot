@@ -107,9 +107,11 @@ def format_time(timestamp):
     return local_time.strftime("%H:%M, %d %B %Y")
 
 def get_user_name(user):
-    # Удаляем из имени запрещённые для Markdown символы
-    name = re.sub(r'[\[\]\(\)\*\_`]', '', user.first_name or "Пользователь")
-    return f"[{name}](tg://user?id={user.id})"
+    name = escape_md(user.first_name)
+    if user.username:
+        return f"[{name}](https://t.me/{user.username})"
+    else:
+        return f"[{name}](tg://user?id={user.id})"
 
 @bot.message_handler(commands=['start'])
 def start(message):
