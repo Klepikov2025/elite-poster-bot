@@ -14,6 +14,11 @@ def escape_md(text):
         text = text.replace(ch, f"\\{ch}")
     return text
 
+def clean_user_text(text):
+    # Заменяет 15*5 -> 15×5, но не трогает Markdown
+    text = re.sub(r'(?<=\d)\*(?=\d)', '×', text)
+    return text
+
 # Получаем токен из переменной окружения
 TOKEN = os.getenv('BOT_TOKEN')
 bot = telebot.TeleBot(TOKEN)
@@ -314,7 +319,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                 f"🧿 Внимание! VIP-сообщение от {user_name_md}",
                 f"🏷️ Объявление с особыми правами: {user_name_md}"
             ]
-            full_text = f"{random.choice(headers)}\n\n{text}{vip_tag}"
+            full_text = f"{random.choice(headers)}\n\n{escape_md(clean_user_text(text))}{vip_tag}"
 
             # Создаём inline-кнопку «Откликнуться♥»
             markup_inline = types.InlineKeyboardMarkup()
