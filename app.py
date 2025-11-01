@@ -6,7 +6,6 @@ from datetime import datetime
 import pytz
 import random
 import re
-import html  # Для escape_html, если нужно, но основное - Markdown
 
 # Собственная функция для экранирования спецсимволов Markdown
 def escape_md(text):
@@ -30,43 +29,7 @@ app = Flask(__name__)
 # ADMIN ID (ваш ID)
 ADMIN_CHAT_ID = 479938867  # Ваш ID
 
-# ID VIP-чата "Elite Lounge"
-VIP_CHAT_ID = -1002446486648  # Ваш VIP-чат
-
-# Ссылка для верификации и оплаты
-VERIFICATION_LINK = "http://t.me/vip_znakbot"  # Ссылка для верификации
-
-# Статичные подписи для каждой сети с новой строкой и дополнительной подписью
-network_signatures = {
-    "Мужской Клуб": (
-        "🕸️Реклама. Согласовано с администрацией сети МК.\n\n"
-        "*Администрация сети не рекомендует вносить какую-либо предоплату. Если ВАС обманули или развели, сообщите в бота поддержки!*\n"
-        "_Реклама. Не является публичной офертой._"
-    ),
-    "ПАРНИ 18+": (
-        "🟥🟦🟩🟨🟧🟪⬛️⬜️🟫\n\n"
-        "*Администрация сети не рекомендует вносить какую-либо предоплату. Если ВАС обманули или развели, сообщите в бота поддержки!*\n"
-        "_Реклама. Не является публичной офертой._"
-    ),
-    "НС": (
-        "🟥🟦🟩🟨🟧🟪⬛️⬜️🟫\n\n"
-        "*Администрация сети не рекомендует вносить какую-либо предоплату. Если ВАС обманули или развели, сообщите в бота поддержки!*\n"
-        "_Реклама. Не является публичной офертой._"
-    ),
-    "Радуга": (
-        "Рекламная интеграция согласована с администратором.\n\n"
-        "Администрация не несёт ответственности за объявления пользователей.\n"
-        "Не вносите предоплату незнакомым лицам.\n"
-        "_Реклама. Не является публичной офертой._"
-    ),
-    "Гей Знакомства": (
-        "Рекламная интеграция согласована с администратором.\n\n"
-        "Будьте осторожны при общении, не переводите деньги незнакомым людям.\n"
-        "_Реклама. Не является публичной офертой._"
-    )
-}
-
-# Старые словари:
+# Списки chat_id для каждой сети и города
 chat_ids_mk = {
     "Екатеринбург": -1002210043742,
     "Челябинск": -1002238514762,
@@ -110,6 +73,7 @@ chat_ids_parni = {
     "ЯМАО": -1002371438340
 }
 
+# ДОБАВЛЯЕМ новую сеть НС с нужными группами
 chat_ids_ns = {
     "Курган": -1001465465654,
     "Новосибирск": -1001824149334,
@@ -124,12 +88,10 @@ chat_ids_ns = {
     "Знакомства 74": -1002193127380
 }
 
-# Новая сеть: Радуга (один общий чат)
 chat_ids_rainbow = {
     "Екатеринбург": -1002419653224
 }
 
-# Новая сеть: ГЕЙ Знакомства (по городам)
 chat_ids_gayznak = {
     "Красноярск": -1002335149925,
     "Екатеринбург": -1002571605722,
@@ -145,7 +107,8 @@ chat_ids_gayznak = {
     "Волгоград": -1002476113714
 }
 
-# Нормализация названий (объединение Перми/Пермь, ЯМАО/Ямал и пр.)
+
+# --- Автогенерация all_cities (из всех chat_ids_*) ---
 def normalize_city_name(name):
     mapping = {
         "Перми": "Пермь",
@@ -156,17 +119,17 @@ def normalize_city_name(name):
     }
     return mapping.get(name, name)
 
-# Автоматическая сборка all_cities
 all_cities = {}
 
-def insert_to_all(city, net, real_name, chat_id):
+def insert_to_all(city, net_key, real_name, chat_id):
     norm = normalize_city_name(city)
     if norm not in all_cities:
         all_cities[norm] = {}
-    if net not in all_cities[norm]:
-        all_cities[norm][net] = []
-    all_cities[norm][net].append({"name": real_name, "chat_id": chat_id})
+    if net_key not in all_cities[norm]:
+        all_cities[norm][net_key] = []
+    all_cities[norm][net_key].append({"name": real_name, "chat_id": chat_id})
 
+# Заполняем all_cities из словарей
 for city, chat_id in chat_ids_mk.items():
     insert_to_all(city, "mk", city, chat_id)
 
@@ -176,19 +139,41 @@ for city, chat_id in chat_ids_parni.items():
 for city, chat_id in chat_ids_ns.items():
     insert_to_all(city, "ns", city, chat_id)
 
-# Новая сеть: Радуга
 for city, chat_id in chat_ids_rainbow.items():
     insert_to_all(city, "rainbow", city, chat_id)
 
-# Новая сеть: Гей Знакомства
 for city, chat_id in chat_ids_gayznak.items():
     insert_to_all(city, "gayznak", city, chat_id)
 
-# Добавим fallback-группу МК для Тюмени, Ямала и ХМАО если её там нет
+# Фallback МК для некоторых регионов (как в mpserv)
 fallback_mk = {"Тюмень", "Ямал", "ХМАО"}
 for city in fallback_mk:
     if "mk" not in all_cities.get(city, {}):
         insert_to_all(city, "mk", "Общая группа Тюмень и Север", -1002210623988)
+
+# Функция для получения русских названий сетей по ключам
+def net_key_to_name(key):
+    return {
+        "mk": "Мужской Клуб",
+        "parni": "ПАРНИ 18+",
+        "ns": "НС",
+        "rainbow": "Радуга",
+        "gayznak": "Гей Знакомства"
+    }.get(key, key)
+# --- конец генерации all_cities ---
+
+
+# Словарь для замены названий городов для сети НС
+ns_city_substitution = {
+    "Екатеринбург": "Знакомства 66",
+    "Челябинск": "Знакомства 74"
+}
+
+# ID VIP-чата "Elite Lounge"
+VIP_CHAT_ID = -1002446486648  # Ваш VIP-чат
+
+# Ссылка для верификации и оплаты
+VERIFICATION_LINK = "http://t.me/vip_znakbot"  # Ссылка для верификации
 
 # Словарь для хранения всех сообщений пользователей
 user_posts = {}
@@ -211,20 +196,6 @@ def get_user_name(user):
         return f"[{name}](https://t.me/{user.username})"
     else:
         return f"[{name}](tg://user?id={user.id})"
-
-def normalize_network_key(name):
-    """Приводим название сети к ключу all_cities: mk, parni, ns, rainbow, gayznak"""
-    if name == "Мужской Клуб":
-        return "mk"
-    elif name == "ПАРНИ 18+":
-        return "parni"
-    elif name in ["НС", "Знакомства 66", "Знакомства 74"]:
-        return "ns"
-    elif name == "Радуга":
-        return "rainbow"
-    elif name == "Гей Знакомства":
-        return "gayznak"
-    return None
 
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -355,18 +326,16 @@ def handle_confirmation(message, text, media_type, file_id):
         bot.send_message(message.chat.id, "❌ Неверный ответ. Выберите 'Да' или 'Нет'.")
         bot.register_next_step_handler(message, handle_confirmation, text, media_type, file_id)
 
+
 def get_network_markup():
-    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-    markup.add(
-        "Мужской Клуб",
-        "ПАРНИ 18+",
-        "НС",
-        "Радуга",
-        "Гей Знакомства",
-        "Все сети",
-        "Назад"
-    )
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add("Создать новое объявление", "Удалить объявление", "Удалить все объявления")
+    # добавляем сети
+    network_row = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+    markup.add("Мужской Клуб", "ПАРНИ 18+", "НС", "Радуга", "Гей Знакомства", "Все сети", "Назад")
     return markup
+
+
 
 def select_network(message, text, media_type, file_id):
     if message.text == "Назад":
@@ -374,36 +343,29 @@ def select_network(message, text, media_type, file_id):
         bot.register_next_step_handler(message, process_text)
         return
 
-    selected_network = message.text.strip()
-    valid_networks = ["Мужской Клуб", "ПАРНИ 18+", "НС", "Радуга", "Гей Знакомства", "Все сети"]
-
-    if selected_network in valid_networks:
+    selected_network = message.text
+    if selected_network in ["Мужской Клуб", "ПАРНИ 18+", "НС", "Радуга", "Гей Знакомства", "Все сети"]:
         markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True, row_width=2)
-
-        if selected_network == "Все сети":
-            # Только города, которые есть минимум в 2 сетях
-            cities = [city for city, nets in all_cities.items() if len(nets) >= 2]
-        else:
-            key = normalize_network_key(selected_network)
-            cities = [city for city, nets in all_cities.items() if key in nets]
-
+        if selected_network == "Мужской Клуб":
+            cities = list(chat_ids_mk.keys())
+        elif selected_network == "ПАРНИ 18+":
+            cities = list(chat_ids_parni.keys())
+        elif selected_network == "НС":
+            cities = list(chat_ids_ns.keys())
+        elif selected_network == "Радуга":
+            cities = list(chat_ids_rainbow.keys())
+        elif selected_network == "Гей Знакомства":
+            cities = list(chat_ids_gayznak.keys())
+        elif selected_network == "Все сети":
+            # только города где >= 2 сетей
+            cities = [city for city, data in all_cities.items() if len(data.keys()) >= 2]
         for city in cities:
             markup.add(city)
         markup.add("Выбрать другую сеть", "Назад")
-
-        bot.send_message(
-            message.chat.id,
-            "📍 *Выберите город* для публикации или нажмите «_Выбрать другую сеть_»:",
-            reply_markup=markup,
-            parse_mode="Markdown"
-        )
+        bot.send_message(message.chat.id, "📍 Выберите город для публикации или нажмите 'Выбрать другую сеть':", reply_markup=markup)
         bot.register_next_step_handler(message, select_city_and_publish, text, selected_network, media_type, file_id)
     else:
-        bot.send_message(
-            message.chat.id,
-            "❌ *Ошибка!* Пожалуйста, выберите одну из предложенных сетей.",
-            parse_mode="Markdown"
-        )
+        bot.send_message(message.chat.id, "❌ Ошибка! Выберите правильную сеть.")
         bot.register_next_step_handler(message, process_text)
 
 def select_city_and_publish(message, text, selected_network, media_type, file_id):
@@ -425,7 +387,6 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
 
             user_name_md = get_user_name(message.from_user)
 
-            # 🟡 ВСТАВЛЕН НОВЫЙ РАНДОМНЫЙ ЗАГОЛОВОК
             headers = [
                 f"💎 VIP-СООБЩЕНИЕ от {user_name_md}! 💎",
                 f"🚨 🔥 Срочное объявление от {user_name_md}! 🚨",
@@ -447,55 +408,89 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                 f"🧿 Внимание! VIP-сообщение от {user_name_md}",
                 f"🏷️ Объявление с особыми правами: {user_name_md}"
             ]
-            header = random.choice(headers)
+            full_text = f"{random.choice(headers)}\n\n{escape_md(clean_user_text(text))}{vip_tag}"
 
-            networks = ["Мужской Клуб", "ПАРНИ 18+", "НС", "Радуга", "Гей Знакомства"] if selected_network == "Все сети" else [selected_network]
+            markup_inline = types.InlineKeyboardMarkup()
+            markup_inline.add(types.InlineKeyboardButton("Откликнуться♥", callback_data="respond"))
 
-            was_published = False
+            if selected_network == "Все сети":
+                # формируем список доступных сетей по all_cities
+                norm_city = normalize_city_name(city)
+                nets = list(all_cities.get(norm_city, {}).keys())
+                networks = [net_key_to_name(k) for k in nets]
+            else:
+                networks = [selected_network]
 
             for network in networks:
-                net_key = normalize_network_key(network)
-                city_data = all_cities.get(city, {}).get(net_key)
-
-                if not city_data:
+                # выбираем словарь по названию сети
+                if network == "Мужской Клуб":
+                    chat_dict = chat_ids_mk
+                    net_key = "mk"
+                elif network == "ПАРНИ 18+":
+                    chat_dict = chat_ids_parni
+                    net_key = "parni"
+                elif network == "НС":
+                    chat_dict = chat_ids_ns
+                    net_key = "ns"
+                elif network == "Радуга":
+                    chat_dict = chat_ids_rainbow
+                    net_key = "rainbow"
+                elif network == "Гей Знакомства":
+                    chat_dict = chat_ids_gayznak
+                    net_key = "gayznak"
+                else:
                     continue
 
-                signature = network_signatures.get(network, "")  # Без escape_md
-                full_text = f"{header}\n\n{escape_md(clean_user_text(text))}{vip_tag}\n\n{signature}"
-
-                # Создаём inline-кнопку «Откликнуться♥»
-                markup_inline = types.InlineKeyboardMarkup()
-                markup_inline.add(types.InlineKeyboardButton("Откликнуться♥", callback_data="respond"))
-
-                for location in city_data:
-                    chat_id = location["chat_id"]
-                    try:
-                        if media_type == "photo":
-                            sent_message = bot.send_photo(chat_id, file_id, caption=full_text, parse_mode="Markdown", reply_markup=markup_inline)
-                        elif media_type == "video":
-                            sent_message = bot.send_video(chat_id, file_id, caption=full_text, parse_mode="Markdown", reply_markup=markup_inline)
+                # Для НС возможна подстановка городов (ns_city_substitution)
+                if net_key == "ns":
+                    if city not in chat_dict and city in ns_city_substitution:
+                        substitute_city = ns_city_substitution[city]
+                        if substitute_city in chat_dict:
+                            chat_id = chat_dict[substitute_city]
                         else:
-                            sent_message = bot.send_message(chat_id, full_text, parse_mode="Markdown", reply_markup=markup_inline)
+                            bot.send_message(message.chat.id, f"❌ Ошибка! Город '{city}' не найден в сети «{network}».")
+                            continue
+                    elif city in chat_dict:
+                        chat_id = chat_dict[city]
+                    else:
+                        bot.send_message(message.chat.id, f"❌ Ошибка! Город '{city}' не найден в сети «{network}».")
+                        continue
+                else:
+                    if city in chat_dict:
+                        chat_id = chat_dict[city]
+                    else:
+                        norm = normalize_city_name(city)
+                        found = False
+                        for entry in all_cities.get(norm, {}).get(net_key, []):
+                            chat_id = entry.get('chat_id')
+                            found = True
+                            break
+                        if not found:
+                            bot.send_message(message.chat.id, f"❌ Ошибка! Город '{city}' не найден в сети «{network}».")
+                            continue
 
-                        post_owner[(chat_id, sent_message.message_id)] = message.from_user.id
+                try:
+                    if media_type == "photo":
+                        sent_message = bot.send_photo(chat_id, file_id, caption=full_text, parse_mode="Markdown", reply_markup=markup_inline)
+                    elif media_type == "video":
+                        sent_message = bot.send_video(chat_id, file_id, caption=full_text, parse_mode="Markdown", reply_markup=markup_inline)
+                    else:
+                        sent_message = bot.send_message(chat_id, full_text, parse_mode="Markdown", reply_markup=markup_inline)
 
-                        if message.chat.id not in user_posts:
-                            user_posts[message.chat.id] = []
-                        user_posts[message.chat.id].append({
-                            "message_id": sent_message.message_id,
-                            "chat_id": chat_id,
-                            "time": datetime.now(),
-                            "city": location["name"],
-                            "network": network
-                        })
-                        bot.send_message(message.chat.id, f"✅ Ваше объявление опубликовано в сети «{network}», городе {location['name']}.")
-                        was_published = True
-                    except telebot.apihelper.ApiTelegramException as e:
-                        bot.send_message(message.chat.id, f"❌ Ошибка: {e.description}")
+                    post_owner[(chat_id, sent_message.message_id)] = message.from_user.id
 
-            if not was_published:
-                bot.send_message(message.chat.id, "❌ Нет подходящих чатов для публикации в выбранной сети/городе.")
-
+                    if message.chat.id not in user_posts:
+                        user_posts[message.chat.id] = []
+                    user_posts[message.chat.id].append({
+                        "message_id": sent_message.message_id,
+                        "chat_id": chat_id,
+                        "time": datetime.now(),
+                        "city": city,
+                        "network": network
+                    })
+                    bot.send_message(message.chat.id, f"✅ Ваше объявление опубликовано в сети «{network}», городе {city}.")
+                except telebot.apihelper.ApiTelegramException as e:
+                    bot.send_message(message.chat.id, f"❌ Ошибка: {e.description}")
             ask_for_new_post(message)
         else:
             markup = types.InlineKeyboardMarkup()
@@ -504,7 +499,6 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
             bot.send_message(message.chat.id, "🔓 Вы не являетесь привилегированным участником. Для публикации объявлений пройдите верификацию:", reply_markup=markup)
     except telebot.apihelper.ApiTelegramException as e:
         bot.send_message(message.chat.id, f"⚠️ Ошибка при проверке VIP-статуса: {e.description}")
-
 def ask_for_new_post(message):
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
     markup.add("Да", "Нет")
