@@ -546,55 +546,45 @@ def is_subscribed(user_id):
     except:
         return False
 
-# Приветствие новым участникам (кроме ПАРНИ)
-# Приветствие новым участникам (кроме ПАРНИ)
-@bot.chat_member_handler()
-def welcome_new_member(update: types.ChatMemberUpdated):
-    if update.new_chat_member.status not in ("member", "administrator", "creator"):
-        return
-    if update.old_chat_member and update.old_chat_member.status in ("member", "administrator", "creator"):
-        return
-
-    user = update.new_chat_member.user
-    if user.is_bot:
-        return
-
-    chat_id = update.chat.id
-    if chat_id in PARNI_CHATS:
-        return
-
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK))
-
-    bot.send_message(
-        chat_id=chat_id,
-        text=f"🔴 {user.mention_html()}, добро пожаловать!\n\n"
-             "Чтобы писать в группе — обязательна подписка на главный канал сети:\n"
-             f"{MAIN_CHANNEL_USERNAME}\n\n"
-             "После подписки ваше сообщение останется автоматически.",
-        reply_markup=markup,
-        parse_mode="HTML"
-    )
-
-# Удаление сообщений без подписки + напоминание раз в 5 минут (кроме ПАРНИ)
-last_warning = {}
-
-@bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact'])
+# Удаление сообщений без подписки + уведомление (кроме ПАРНИ)
+@bot.message_handler(content_types=[
+    'text', 'photo', 'video', 'document', 'audio',
+    'voice', 'sticker', 'animation', 'location', 'contact'
+])
 def check_subscription(message):
-    if message.chat.type == "private" or not message.from_user:
+
+    # Проверяем, что это не ЛС
+    if message.chat.type == "private":
         return
-    if message.sender_chat:  # админы от имени группы — не трогаем
-        return
+
+    # Игнорируем сеть ПАРНИ
     if message.chat.id in PARNI_CHATS:
-        return  # сеть ПАРНИ полностью игнорируем
-
-    user_id = message.from_user.id
-    chat_id = message.chat.id
-    key = (chat_id, user_id)
-
-    # Если подписан — пропускаем
-    if is_subscribed(user_id):
         return
+
+    # Если сообщение отправлено от имени канала/группы (админ)
+    # Например: “Написать от имени группы”
+    if message.sender_chat and message.sender_chat.id == message.chat.id:
+        return  # это админ → не трогаем
+
+    # Должен быть реальный пользователь
+    if not message.from_user:
+        return
+
+    user = message.from_user
+    user_id = user.id
+    chat_id = message.chat.id
+
+    # Администраторов НЕ трогаем даже если они не подписаны
+    try:
+        member = bot.get_chat_member(chat_id, user_id)
+        if member.status in ("administrator", "creator"):
+            return
+    except:
+        pass
+
+    # Проверка подписки
+    if is_subscribed(user_id):
+        return  # подписан → всё хорошо
 
     # Удаляем сообщение
     try:
@@ -602,21 +592,29 @@ def check_subscription(message):
     except:
         pass
 
-    # Напоминание раз в 5 минут (300 секунд)
-    now = time.time()
-    if key not in last_warning or now - last_warning[key] > 300:
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK))
+    # Мини-пауза — иначе Telegram иногда блокирует send_message
+    time.sleep(0.25)
+
+    # Отправляем предупреждение
+    username = user.mention_html()
+    text = (f"🔇 {username}, чтобы писать — подпишитесь на главный канал:\n"
+            f"{MAIN_CHANNEL_USERNAME}\n\n"
+            f"После подписки ваши сообщения перестанут удаляться.")
+
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton(
+        "Подписаться на главный канал", url=MAIN_CHANNEL_LINK
+    ))
+
+    try:
         bot.send_message(
-            chat_id=chat_id,
-            text=f"🔇 {message.from_user.mention_html()}, чтобы писать — подпишитесь на главный канал:\n"
-                 f"{MAIN_CHANNEL_USERNAME}\n\n"
-                 "После подписки ваше следующее сообщение останется.",
-            reply_markup=markup,
-            parse_mode="HTML"
-            # Убрал disable_notification полностью — теперь пинг и звук приходят гарантированно
+            chat_id,
+            text,
+            parse_mode="HTML",
+            reply_markup=markup
         )
-        last_warning[key] = now
+    except Exception as e:
+        bot.send_message(ADMIN_CHAT_ID, f"Ошибка при уведомлении: {e}")
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
