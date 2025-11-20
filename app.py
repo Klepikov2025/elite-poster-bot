@@ -546,45 +546,51 @@ def is_subscribed(user_id):
     except:
         return False
 
-# Удаление сообщений без подписки + уведомление (кроме ПАРНИ)
 @bot.message_handler(content_types=[
     'text', 'photo', 'video', 'document', 'audio',
     'voice', 'sticker', 'animation', 'location', 'contact'
 ])
 def check_subscription(message):
 
-    # Проверяем, что это не ЛС
+    # Не обрабатываем ЛС
     if message.chat.type == "private":
         return
 
-    # Игнорируем сеть ПАРНИ
+    # Не трогаем сеть ПАРНИ
     if message.chat.id in PARNI_CHATS:
         return
 
-    # Если сообщение отправлено от имени канала/группы (админ)
-    # Например: “Написать от имени группы”
-    if message.sender_chat and message.sender_chat.id == message.chat.id:
-        return  # это админ → не трогаем
+    # Обычный пользователь ВСЕГДА имеет message.from_user != None
+    # А вот message.sender_chat != None — это когда пользователь пишет от имени канала/топика
+    # Нам нужны только случаи, когда обычный человек пишет ОТ СЕБЯ
 
-    # Должен быть реальный пользователь
-    if not message.from_user:
+    # Если пишет "от имени группы" → админ → пропускаем
+    if message.sender_chat and message.sender_chat.id == message.chat.id:
+        # Это сообщение админа от имени группы
+        return
+
+    # Если пишет канал или бот → пропускаем
+    if message.sender_chat and message.sender_chat.id != message.chat.id:
         return
 
     user = message.from_user
+    if not user:
+        return
+
     user_id = user.id
     chat_id = message.chat.id
 
-    # Администраторов НЕ трогаем даже если они не подписаны
+    # Админы группы не проходят проверку
     try:
-        member = bot.get_chat_member(chat_id, user_id)
-        if member.status in ("administrator", "creator"):
+        member_status = bot.get_chat_member(chat_id, user_id).status
+        if member_status in ("administrator", "creator"):
             return
     except:
         pass
 
     # Проверка подписки
     if is_subscribed(user_id):
-        return  # подписан → всё хорошо
+        return  # всё ок
 
     # Удаляем сообщение
     try:
@@ -592,20 +598,26 @@ def check_subscription(message):
     except:
         pass
 
-    # Мини-пауза — иначе Telegram иногда блокирует send_message
-    time.sleep(0.25)
+    # ПАУЗА — критически важна!!!
+    time.sleep(0.5)
 
-    # Отправляем предупреждение
+    # Формируем предупреждение
     username = user.mention_html()
-    text = (f"🔇 {username}, чтобы писать — подпишитесь на главный канал:\n"
-            f"{MAIN_CHANNEL_USERNAME}\n\n"
-            f"После подписки ваши сообщения перестанут удаляться.")
+    text = (
+        f"🔇 {username}, чтобы писать — подпишитесь на главный канал:\n"
+        f"{MAIN_CHANNEL_USERNAME}\n\n"
+        f"После подписки ваши сообщения перестанут удаляться."
+    )
 
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton(
-        "Подписаться на главный канал", url=MAIN_CHANNEL_LINK
-    ))
+    markup.add(
+        types.InlineKeyboardButton(
+            "Подписаться на главный канал",
+            url=MAIN_CHANNEL_LINK
+        )
+    )
 
+    # Отправляем отбивку
     try:
         bot.send_message(
             chat_id,
@@ -614,7 +626,7 @@ def check_subscription(message):
             reply_markup=markup
         )
     except Exception as e:
-        bot.send_message(ADMIN_CHAT_ID, f"Ошибка при уведомлении: {e}")
+        bot.send_message(ADMIN_CHAT_ID, f"Ошибка отправки предупреждения: {e}")
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
