@@ -547,6 +547,7 @@ def is_subscribed(user_id):
         return False
 
 # Приветствие новым участникам (кроме ПАРНИ)
+# Приветствие новым участникам (кроме ПАРНИ)
 @bot.chat_member_handler()
 def welcome_new_member(update: types.ChatMemberUpdated):
     if update.new_chat_member.status not in ("member", "administrator", "creator"):
@@ -566,14 +567,13 @@ def welcome_new_member(update: types.ChatMemberUpdated):
     markup.add(types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK))
 
     bot.send_message(
-        chat_id,
-        f"🔴 {user.mention_html()}, добро пожаловать!\n\n"
-        "Чтобы писать в группе — обязательна подписка на главный канал сети:\n"
-        f"{MAIN_CHANNEL_USERNAME}\n\n"
-        "После подписки ваше сообщение останется автоматически.",
+        chat_id=chat_id,
+        text=f"🔴 {user.mention_html()}, добро пожаловать!\n\n"
+             "Чтобы писать в группе — обязательна подписка на главный канал сети:\n"
+             f"{MAIN_CHANNEL_USERNAME}\n\n"
+             "После подписки ваше сообщение останется автоматически.",
         reply_markup=markup,
         parse_mode="HTML"
-        # Убрал disable_notification полностью — теперь уведомление приходит с пингом
     )
 
 # Удаление сообщений без подписки + напоминание раз в 5 минут (кроме ПАРНИ)
@@ -583,7 +583,7 @@ last_warning = {}
 def check_subscription(message):
     if message.chat.type == "private" or not message.from_user:
         return
-    if message.sender_chat:  # админы от имени группы
+    if message.sender_chat:  # админы от имени группы — не трогаем
         return
     if message.chat.id in PARNI_CHATS:
         return  # сеть ПАРНИ полностью игнорируем
@@ -592,28 +592,29 @@ def check_subscription(message):
     chat_id = message.chat.id
     key = (chat_id, user_id)
 
-    # Сначала проверяем подписку — если подписан, ничего не делаем
+    # Если подписан — пропускаем
     if is_subscribed(user_id):
         return
 
-    # Если не подписан — удаляем сообщение
+    # Удаляем сообщение
     try:
         bot.delete_message(chat_id, message.message_id)
     except:
         pass
 
-    # Напоминание раз в 5 минут
+    # Напоминание раз в 5 минут (300 секунд)
     now = time.time()
     if key not in last_warning or now - last_warning[key] > 300:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK))
         bot.send_message(
-            chat_id,
-            f"🔇 {message.from_user.mention_html()}, чтобы писать — подпишитесь на, на главный канал:\n"
-            f"{MAIN_CHANNEL_USERNAME}\n\n"
-            "После подписки ваше следующее сообщение останется.",
+            chat_id=chat_id,
+            text=f"🔇 {message.from_user.mention_html()}, чтобы писать — подпишитесь на главный канал:\n"
+                 f"{MAIN_CHANNEL_USERNAME}\n\n"
+                 "После подписки ваше следующее сообщение останется.",
             reply_markup=markup,
             parse_mode="HTML"
+            # Убрал disable_notification полностью — теперь пинг и звук приходят гарантированно
         )
         last_warning[key] = now
 
