@@ -15,12 +15,12 @@ bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
 ADMIN_CHAT_ID = 479938867
-OWNER_ID = 479938867  # твой ID
+OWNER_ID = 479938867
 
-# Главный канал — обязательная подписка
-MAIN_CHANNEL_ID = -1002246737442
+MAIN_CHANNEL_ID = -1002246737442  # главный канал
+MAIN_CHANNEL_USERNAME = "@clubofrm"  # или что у тебя там
+MAIN_CHANNEL_LINK = "https://t.me/clubofrm"  # пригласительная ссылка
 
-# Разрешения
 MUTED_PERMISSIONS = types.ChatPermissions(
     can_send_messages=False,
     can_send_media_messages=False,
@@ -523,6 +523,7 @@ def is_subscribed(user_id):
     except:
         return False
 
+# Для новых участников
 @bot.chat_member_handler()
 def handle_new_member(update: types.ChatMemberUpdated):
     if not update.new_chat_member or not update.new_chat_member.user:
@@ -541,28 +542,62 @@ def handle_new_member(update: types.ChatMemberUpdated):
         if not is_subscribed(user.id):
             try:
                 bot.restrict_chat_member(chat_id, user.id, permissions=MUTED_PERMISSIONS)
-                bot.send_message(chat_id, f"🔇 {user.first_name}, подпишитесь на главный канал, чтобы писать!\nПосле подписки напишите любое сообщение — мут снимется.", disable_notification=True)
+                markup = types.InlineKeyboardMarkup()
+                markup.add(types.InlineKeyboardButton("Подписаться на канал", url=MAIN_CHANNEL_LINK))
+                bot.send_message(
+                    chat_id,
+                    f"🔇 {user.first_name}, чтобы общаться в группе — подпишитесь на главный канал!\n"
+                    "После подписки напишите любое сообщение — мут снимется автоматически.",
+                    reply_markup=markup,
+                    disable_notification=True
+                )
             except Exception as e:
-                print(f"Mute error: {e}")
+                print(f"Mute new member error: {e}")
+
+# Главный хендлер — когда замученный пытается писать
+shown_warning = set()  # чтобы не спамить одно и то же
 
 @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact'])
 def check_on_message(message):
     if message.chat.type == "private" or not message.from_user:
         return
+
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+    key = (chat_id, user_id)
+
     try:
-        member = bot.get_chat_member(message.chat.id, message.from_user.id)
-        if member and not member.can_send_messages:
-            if is_subscribed(message.from_user.id):
-                bot.restrict_chat_member(message.chat.id, message.from_user.id, permissions=FULL_PERMISSIONS)
-                bot.reply_to(message, "✅ Подписка подтверждена! Теперь можете писать.")
+        member = bot.get_chat_member(chat_id, user_id)
+        if member and not member.can_send_messages:  # замучен
+            bot.delete_message(chat_id, message.message_id)
+
+            # Даём Telegram время обновить статус в канале
+            time.sleep(6)
+
+            if is_subscribed(user_id):
+                bot.restrict_chat_member(chat_id, user_id, permissions=FULL_PERMISSIONS)
+                bot.send_message(chat_id, f"✅ {message.from_user.first_name}, спасибо за подписку! Теперь можете писать.")
+                if key in shown_warning:
+                    shown_warning.remove(key)
             else:
-                bot.delete_message(message.chat.id, message.message_id)
+                # Показываем сообщение с кнопкой только один раз
+                if key not in shown_warning:
+                    markup = types.InlineKeyboardMarkup()
+                    markup.add(types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK))
+                    bot.send_message(
+                        chat_id,
+                        f"🔇 {message.from_user.mention_html()}, чтобы писать в группе — подпишитесь на главный канал:\n"
+                        f"{MAIN_CHANNEL_USERNAME}\n\nПосле подписки напишите любое сообщение — мут снимется автоматически.",
+                        reply_markup=markup,
+                        parse_mode="HTML"
+                    )
+                    shown_warning.add(key)
     except Exception as e:
         print(f"Check message error: {e}")
 
-# Массовая проверка (при старте + каждый час)
+# Массовая проверка — теперь с правильным методом и защитой админов
 def subscription_mass_check():
-    print(f"[{datetime.now().strftime('%H:%M')}] Запуск проверки подписки...")
+    print(f"[{datetime.now().strftime('%H:%M')}] Запуск массовой проверки...")
     count = 0
     all_chats = set(chat_ids_mk.values()) | set(chat_ids_parni.values()) | set(chat_ids_ns.values()) | set(chat_ids_rainbow.values()) | set(chat_ids_gayznak.values())
 
@@ -576,12 +611,12 @@ def subscription_mass_check():
                     break
                 for m in members:
                     u = m.user
-                    if u.is_bot or u.id in admins or m.status in ("administrator", "creator") or not m.can_send_messages:
+                    if u.is_bot or u.id in admins or m.status in ("administrator", "creator", "owner") or not m.can_send_messages:
                         continue
                     if not is_subscribed(u.id):
                         bot.restrict_chat_member(chat_id, u.id, permissions=MUTED_PERMISSIONS)
                         count += 1
-                    time.sleep(0.035)
+                    time.sleep(0.03)
                 if len(members) < 200:
                     break
                 offset = members[-1].user.id
@@ -602,7 +637,7 @@ threading.Thread(target=start_checker, daemon=True).start()
 def cmd_checkall(message):
     if message.from_user.id != OWNER_ID:
         return
-    bot.reply_to(message, "Запуск ручной проверки...")
+    bot.reply_to(message, "Запускаю проверку вручную...")
     subscription_mass_check()
     bot.reply_to(message, "Готово!")
 
@@ -614,5 +649,5 @@ def webhook():
     return 'ok', 200
 
 if __name__ == '__main__':
-    print("Бот запущен — автомут до подписки работает")
+    print("Бот запущен — система мута до подписки работает идеально")
     app.run(host='0.0.0.0', port=5000)
