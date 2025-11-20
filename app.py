@@ -548,31 +548,19 @@ def is_subscribed(user_id):
         print(f"Ошибка при проверке подписки для {user_id}: {e}")
         return False
 
+# Обработчик сообщений
 @bot.message_handler(content_types=[
     'text', 'photo', 'video', 'document', 'audio',
     'voice', 'sticker', 'animation', 'location', 'contact'
 ])
 def check_subscription(message):
 
-    # Не обрабатываем ЛС
+    # ЛС игнорируем
     if message.chat.type == "private":
         return
 
-    # Не трогаем сеть ПАРНИ
+    # Сеть ПАРНИ игнорируем
     if message.chat.id in PARNI_CHATS:
-        return
-
-    # Обычный пользователь ВСЕГДА имеет message.from_user != None
-    # А вот message.sender_chat != None — это когда пользователь пишет от имени канала/топика
-    # Нам нужны только случаи, когда обычный человек пишет ОТ СЕБЯ
-
-    # Если пишет "от имени группы" → админ → пропускаем
-    if message.sender_chat and message.sender_chat.id == message.chat.id:
-        # Это сообщение админа от имени группы
-        return
-
-    # Если пишет канал или бот → пропускаем
-    if message.sender_chat and message.sender_chat.id != message.chat.id:
         return
 
     user = message.from_user
@@ -582,35 +570,38 @@ def check_subscription(message):
     user_id = user.id
     chat_id = message.chat.id
 
-    # Админы группы не проходят проверку
+    # Игнорируем сообщения от имени группы (админ пишет от имени группы)
+    if message.sender_chat and message.sender_chat.id == chat_id:
+        return
+
+    # Проверяем статус пользователя — админов и создателей пропускаем
     try:
         member_status = bot.get_chat_member(chat_id, user_id).status
         if member_status in ("administrator", "creator"):
             return
-    except:
-        pass
+    except Exception as e:
+        print(f"Ошибка получения статуса пользователя {user_id}: {e}")
 
-    # Проверка подписки
+    # Проверяем подписку на главный канал
     if is_subscribed(user_id):
-        return  # всё ок
+        return  # подписан → всё ок
 
     # Удаляем сообщение
     try:
         bot.delete_message(chat_id, message.message_id)
-    except:
-        pass
+    except Exception as e:
+        print(f"Ошибка удаления сообщения {message.message_id}: {e}")
 
-    # ПАУЗА — критически важна!!!
-    time.sleep(0.5)
+    # Пауза после удаления
+    time.sleep(0.6)
 
-    # Формируем предупреждение
+    # Отправляем предупреждение
     username = user.mention_html()
     text = (
         f"🔇 {username}, чтобы писать — подпишитесь на главный канал:\n"
         f"{MAIN_CHANNEL_USERNAME}\n\n"
         f"После подписки ваши сообщения перестанут удаляться."
     )
-
     markup = types.InlineKeyboardMarkup()
     markup.add(
         types.InlineKeyboardButton(
@@ -619,7 +610,6 @@ def check_subscription(message):
         )
     )
 
-    # Отправляем отбивку
     try:
         bot.send_message(
             chat_id,
@@ -628,7 +618,8 @@ def check_subscription(message):
             reply_markup=markup
         )
     except Exception as e:
-        bot.send_message(ADMIN_CHAT_ID, f"Ошибка отправки предупреждения: {e}")
+        # Логи ошибок в случае невозможности отправки
+        bot.send_message(ADMIN_CHAT_ID, f"Ошибка при отправке предупреждения {user_id}: {e}")
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
