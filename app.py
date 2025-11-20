@@ -583,7 +583,7 @@ last_warning = {}
 def check_subscription(message):
     if message.chat.type == "private" or not message.from_user:
         return
-    if message.sender_chat:  # админы от имени группы — не трогаем
+    if message.sender_chat:  # админы от имени группы
         return
     if message.chat.id in PARNI_CHATS:
         return  # сеть ПАРНИ полностью игнорируем
@@ -592,28 +592,28 @@ def check_subscription(message):
     chat_id = message.chat.id
     key = (chat_id, user_id)
 
+    # Сначала проверяем подписку — если подписан, ничего не делаем
     if is_subscribed(user_id):
-        return  # подписан — всё ок
+        return
 
-    # Удаляем сообщение
+    # Если не подписан — удаляем сообщение
     try:
         bot.delete_message(chat_id, message.message_id)
     except:
-        pass  # если уже удалено или нет прав — пропускаем
+        pass
 
-    # Напоминание раз в 5 минут (300 секунд)
+    # Напоминание раз в 5 минут
     now = time.time()
     if key not in last_warning or now - last_warning[key] > 300:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK))
         bot.send_message(
             chat_id,
-            f"🔇 {message.from_user.mention_html()}, чтобы писать — подпишитесь на главный канал:\n"
+            f"🔇 {message.from_user.mention_html()}, чтобы писать — подпишитесь на, на главный канал:\n"
             f"{MAIN_CHANNEL_USERNAME}\n\n"
             "После подписки ваше следующее сообщение останется.",
             reply_markup=markup,
             parse_mode="HTML"
-            # disable_notification убрал полностью — теперь пинг и звук приходят 100%
         )
         last_warning[key] = now
 
