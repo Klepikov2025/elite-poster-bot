@@ -548,7 +548,8 @@ def is_subscribed(user_id):
         return False
 
 # ==================== УДАЛЕНИЕ СООБЩЕНИЙ БЕЗ ПОДПИСКИ + ОТБИВКА ====================
-last_warning = {}  # (chat_id, user_id) -> время последнего напоминания
+# Отбивка один раз навсегда + самоудаление через 2 минуты
+warned_users = {}  # (chat_id, user_id) -> message_id отбивки (чтобы удалить)
 
 @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact'])
 def check_subscription(message):
@@ -557,43 +558,56 @@ def check_subscription(message):
     if message.sender_chat:  # админы от имени группы
         return
     if message.chat.id in PARNI_CHATS:
-        return  # сеть ПАРНИ полностью игнорируем
+        return
 
     user_id = message.from_user.id
     chat_id = message.chat.id
     key = (chat_id, user_id)
 
-    # Если подписан — пропускаем
     if is_subscribed(user_id):
+        # Подписался — если была отбивка, удаляем её
+        if key in warned_users:
+            try:
+                bot.delete_message(chat_id, warned_users[key])
+            except:
+                pass
+            del warned_users[key]
         return
 
-    # Удаляем сообщение
+    # Удаляем сообщение пользователя
     try:
         bot.delete_message(chat_id, message.message_id)
-    except Exception as e:
-        print(f"Не удалось удалить сообщение {message.message_id}: {e}")
+    except:
+        pass
 
-    # Отправляем отбивку раз в 5 минут
-    now = time.time()
-    if key not in last_warning or now - last_warning[key] > 300:
+    # Отбивка ТОЛЬКО ОДИН РАЗ + самоудаление через 120 секунд
+    if key not in warned_users:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK))
-        try:
-            bot.send_message(
-                chat_id=chat_id,
-                text=f"🔇 {message.from_user.mention_html()}, чтобы писать — подпишитесь на главный канал:\n"
-                     f"{MAIN_CHANNEL_USERNAME}\n\n"
-                     "После подписки ваши сообщения перестанут удаляться.",
-                reply_markup=markup,
-                parse_mode="HTML",
-                disable_web_page_preview=True
-            )
-            print(f"Отправлено напоминание пользователю {user_id} в группе {chat_id}")
-        except Exception as e:
-            print(f"ОШИБКА ОТПРАВКИ ОТБИВКИ пользователю {user_id} в группе {chat_id}: {e}")
-            bot.send_message(ADMIN_CHAT_ID, f"Не удалось отправить отбивку пользователю {user_id} в группе {chat_id}: {e}")
 
-        last_warning[key] = now
+        try:
+            sent = bot.send_message(
+                chat_id=chat_id,
+                text="❗ Внимание, чтобы писать в чате вам необходимо подписаться на наш основной канал.\n\n"
+                     "Без подписки на канал ваши сообщения будут удаляться автоматически.",
+                reply_markup=markup
+            )
+            warned_users[key] = sent.message_id  # запоминаем id сообщения
+
+            # Самоудаление через 2 минуты в фоне
+            def delete_warning():
+                time.sleep(120)  # 2 минуты
+                try:
+                    bot.delete_message(chat_id, sent.message_id)
+                except:
+                    pass
+                if key in warned_users:
+                    del warned_users[key]
+
+            threading.Thread(target=delete_warning, daemon=True).start()
+
+        except Exception as e:
+            print(f"Ошибка отправки отбивки {user_id}: {e}")
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
