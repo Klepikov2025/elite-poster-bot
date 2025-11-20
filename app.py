@@ -1,49 +1,35 @@
 import os
 import telebot
 from telebot import types
-import time
-import threading
 from flask import Flask, request
 from datetime import datetime
 import pytz
 import random
 import re
 
-# ==================== НАСТРОЙКИ ====================
+# Собственная функция для экранирования спецсимволов Markdown
+def escape_md(text):
+    escape_chars = r'\_*[]()~`>#+-=|{}'
+    for ch in escape_chars:
+        text = text.replace(ch, f"\\{ch}")
+    return text
+
+def clean_user_text(text):
+    # Заменяет 15*5 -> 15×5, но не трогает Markdown
+    text = re.sub(r'(?<=\d)\*(?=\d)', '×', text)
+    return text
+
+# Получаем токен из переменной окружения
 TOKEN = os.getenv('BOT_TOKEN')
 bot = telebot.TeleBot(TOKEN)
+
+# Создаём Flask-приложение
 app = Flask(__name__)
 
-ADMIN_CHAT_ID = 479938867
-OWNER_ID = 479938867
+# ADMIN ID (ваш ID)
+ADMIN_CHAT_ID = 479938867  # Ваш ID
 
-MAIN_CHANNEL_ID = -1002246737442  # главный канал
-MAIN_CHANNEL_USERNAME = "@clubofrm"  # или что у тебя там
-MAIN_CHANNEL_LINK = "https://t.me/clubofrm"  # пригласительная ссылка
-
-MUTED_PERMISSIONS = types.ChatPermissions(
-    can_send_messages=False,
-    can_send_media_messages=False,
-    can_send_other_messages=False,
-    can_send_polls=False,
-    can_add_web_page_previews=False,
-    can_invite_users=False,
-    can_pin_messages=False,
-    can_change_info=False
-)
-
-FULL_PERMISSIONS = types.ChatPermissions(
-    can_send_messages=True,
-    can_send_media_messages=True,
-    can_send_other_messages=True,
-    can_send_polls=True,
-    can_add_web_page_previews=True,
-    can_invite_users=True,
-    can_pin_messages=False,
-    can_change_info=False
-)
-
-# ==================== СПИСКИ ЧАТОВ ====================
+# Списки chat_id для каждой сети и города
 chat_ids_mk = {
     "Екатеринбург": -1002210043742,
     "Челябинск": -1002238514762,
@@ -87,6 +73,7 @@ chat_ids_parni = {
     "ЯМАО": -1002371438340
 }
 
+# ДОБАВЛЯЕМ новую сеть НС с нужными группами
 chat_ids_ns = {
     "Курган": -1001465465654,
     "Новосибирск": -1001824149334,
@@ -120,7 +107,8 @@ chat_ids_gayznak = {
     "Волгоград": -1002476113714
 }
 
-# ==================== АВТОГЕНЕРАЦИЯ all_cities ====================
+
+# --- Автогенерация all_cities (из всех chat_ids_*) ---
 def normalize_city_name(name):
     mapping = {
         "Перми": "Пермь",
@@ -141,22 +129,29 @@ def insert_to_all(city, net_key, real_name, chat_id):
         all_cities[norm][net_key] = []
     all_cities[norm][net_key].append({"name": real_name, "chat_id": chat_id})
 
+# Заполняем all_cities из словарей
 for city, chat_id in chat_ids_mk.items():
     insert_to_all(city, "mk", city, chat_id)
+
 for city, chat_id in chat_ids_parni.items():
     insert_to_all(city, "parni", city, chat_id)
+
 for city, chat_id in chat_ids_ns.items():
     insert_to_all(city, "ns", city, chat_id)
+
 for city, chat_id in chat_ids_rainbow.items():
     insert_to_all(city, "rainbow", city, chat_id)
+
 for city, chat_id in chat_ids_gayznak.items():
     insert_to_all(city, "gayznak", city, chat_id)
 
+# Фallback МК для некоторых регионов (как в mpserv)
 fallback_mk = {"Тюмень", "Ямал", "ХМАО"}
 for city in fallback_mk:
     if "mk" not in all_cities.get(city, {}):
         insert_to_all(city, "mk", "Общая группа Тюмень и Север", -1002210623988)
 
+# Функция для получения русских названий сетей по ключам
 def net_key_to_name(key):
     return {
         "mk": "Мужской Клуб",
@@ -165,28 +160,25 @@ def net_key_to_name(key):
         "rainbow": "Радуга",
         "gayznak": "Гей Знакомства"
     }.get(key, key)
+# --- конец генерации all_cities ---
 
+
+# Словарь для замены названий городов для сети НС
 ns_city_substitution = {
     "Екатеринбург": "Знакомства 66",
     "Челябинск": "Знакомства 74"
 }
 
-VIP_CHAT_ID = -1002446486648
-VERIFICATION_LINK = "http://t.me/vip_znakbot"
+# ID VIP-чата "Elite Lounge"
+VIP_CHAT_ID = -1002446486648  # Ваш VIP-чат
 
+# Ссылка для верификации и оплаты
+VERIFICATION_LINK = "http://t.me/vip_znakbot"  # Ссылка для верификации
+
+# Словарь для хранения всех сообщений пользователей
 user_posts = {}
-post_owner = {}
-responded = {}
-
-# ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
-def escape_md(text):
-    escape_chars = r'\_*[]()~`>#+-=|{}'
-    for ch in escape_chars:
-        text = text.replace(ch, f"\\{ch}")
-    return text
-
-def clean_user_text(text):
-    return re.sub(r'(?<=\d)\*(?=\d)', '×', text)
+post_owner = {}      # (chat_id, message_id) -> user_id
+responded = {}       # (chat_id, message_id) -> set(user_id)
 
 def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -205,7 +197,6 @@ def get_user_name(user):
     else:
         return f"[{name}](tg://user?id={user.id})"
 
-# ==================== СТАРЫЙ ФУНКЦИОНАЛ ОБЪЯВЛЕНИЙ ====================
 @bot.message_handler(commands=['start'])
 def start(message):
     try:
@@ -325,20 +316,26 @@ def confirm_text(message, text, media_type=None, file_id=None):
     bot.register_next_step_handler(message, handle_confirmation, text, media_type, file_id)
 
 def handle_confirmation(message, text, media_type, file_id):
-    if message.text and message.text.lower() == "да":
+    if message.text.lower() == "да":
         bot.send_message(message.chat.id, "📋 Выберите сеть для публикации:", reply_markup=get_network_markup())
         bot.register_next_step_handler(message, select_network, text, media_type, file_id)
-    elif message.text and message.text.lower() == "нет":
+    elif message.text.lower() == "нет":
         bot.send_message(message.chat.id, "Хорошо, напишите текст объявления заново:")
         bot.register_next_step_handler(message, process_text)
     else:
         bot.send_message(message.chat.id, "❌ Неверный ответ. Выберите 'Да' или 'Нет'.")
         bot.register_next_step_handler(message, handle_confirmation, text, media_type, file_id)
 
+
 def get_network_markup():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add("Создать новое объявление", "Удалить объявление", "Удалить все объявления")
+    # добавляем сети
+    network_row = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
     markup.add("Мужской Клуб", "ПАРНИ 18+", "НС", "Радуга", "Гей Знакомства", "Все сети", "Назад")
     return markup
+
+
 
 def select_network(message, text, media_type, file_id):
     if message.text == "Назад":
@@ -360,6 +357,7 @@ def select_network(message, text, media_type, file_id):
         elif selected_network == "Гей Знакомства":
             cities = list(chat_ids_gayznak.keys())
         elif selected_network == "Все сети":
+            # только города где >= 2 сетей
             cities = [city for city, data in all_cities.items() if len(data.keys()) >= 2]
         for city in cities:
             markup.add(city)
@@ -416,6 +414,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
             markup_inline.add(types.InlineKeyboardButton("Откликнуться♥", callback_data="respond"))
 
             if selected_network == "Все сети":
+                # формируем список доступных сетей по all_cities
                 norm_city = normalize_city_name(city)
                 nets = list(all_cities.get(norm_city, {}).keys())
                 networks = [net_key_to_name(k) for k in nets]
@@ -423,6 +422,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                 networks = [selected_network]
 
             for network in networks:
+                # выбираем словарь по названию сети
                 if network == "Мужской Клуб":
                     chat_dict = chat_ids_mk
                     net_key = "mk"
@@ -441,17 +441,33 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                 else:
                     continue
 
+                # Для НС возможна подстановка городов (ns_city_substitution)
                 if net_key == "ns":
-                    substitute_city = ns_city_substitution.get(city, city)
-                    chat_id = chat_dict.get(substitute_city) or chat_dict.get(city)
+                    if city not in chat_dict and city in ns_city_substitution:
+                        substitute_city = ns_city_substitution[city]
+                        if substitute_city in chat_dict:
+                            chat_id = chat_dict[substitute_city]
+                        else:
+                            bot.send_message(message.chat.id, f"❌ Ошибка! Город '{city}' не найден в сети «{network}».")
+                            continue
+                    elif city in chat_dict:
+                        chat_id = chat_dict[city]
+                    else:
+                        bot.send_message(message.chat.id, f"❌ Ошибка! Город '{city}' не найден в сети «{network}».")
+                        continue
                 else:
-                    norm = normalize_city_name(city)
-                    entry = next((e for e in all_cities.get(norm, {}).get(net_key, [])), None)
-                    chat_id = entry["chat_id"] if entry else chat_dict.get(city)
-
-                if not chat_id:
-                    bot.send_message(message.chat.id, f"❌ Город не найден в сети «{network}».")
-                    continue
+                    if city in chat_dict:
+                        chat_id = chat_dict[city]
+                    else:
+                        norm = normalize_city_name(city)
+                        found = False
+                        for entry in all_cities.get(norm, {}).get(net_key, []):
+                            chat_id = entry.get('chat_id')
+                            found = True
+                            break
+                        if not found:
+                            bot.send_message(message.chat.id, f"❌ Ошибка! Город '{city}' не найден в сети «{network}».")
+                            continue
 
                 try:
                     if media_type == "photo":
@@ -472,17 +488,17 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                         "city": city,
                         "network": network
                     })
-                    bot.send_message(message.chat.id, f"✅ Опубликовано в «{network}» — {city}")
-                except Exception as e:
-                    bot.send_message(message.chat.id, f"Ошибка: {e}")
+                    bot.send_message(message.chat.id, f"✅ Ваше объявление опубликовано в сети «{network}», городе {city}.")
+                except telebot.apihelper.ApiTelegramException as e:
+                    bot.send_message(message.chat.id, f"❌ Ошибка: {e.description}")
             ask_for_new_post(message)
         else:
             markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🛠️ Пройти верификацию", url=VERIFICATION_LINK))
-            bot.send_message(message.chat.id, "🔓 Для публикации нужна верификация:", reply_markup=markup)
-    except Exception as e:
-        bot.send_message(message.chat.id, f"Ошибка VIP-проверки: {e}")
-
+            verify_button = types.InlineKeyboardButton(text="🛠️ Пройти верификацию", url=VERIFICATION_LINK)
+            markup.add(verify_button)
+            bot.send_message(message.chat.id, "🔓 Вы не являетесь привилегированным участником. Для публикации объявлений пройдите верификацию:", reply_markup=markup)
+    except telebot.apihelper.ApiTelegramException as e:
+        bot.send_message(message.chat.id, f"⚠️ Ошибка при проверке VIP-статуса: {e.description}")
 def ask_for_new_post(message):
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
     markup.add("Да", "Нет")
@@ -490,171 +506,45 @@ def ask_for_new_post(message):
     bot.register_next_step_handler(message, handle_new_post_choice)
 
 def handle_new_post_choice(message):
-    if message.text and message.text.lower() == "да":
+    if message.text.lower() == "да":
         bot.send_message(message.chat.id, "Напишите текст объявления:")
         bot.register_next_step_handler(message, process_text)
     else:
-        bot.send_message(message.chat.id, "Спасибо за использование бота! 🙌", reply_markup=get_main_keyboard())
+        bot.send_message(
+            message.chat.id,
+            "Спасибо за использование бота! 🙌\nЕсли хотите создать новое объявление, нажмите кнопку ниже.",
+            reply_markup=get_main_keyboard()
+        )
 
 @bot.callback_query_handler(func=lambda call: call.data == "respond")
 def handle_respond(call):
-    key = (call.message.chat.id, call.message.message_id)
+    chat_id = call.message.chat.id
+    msg_id = call.message.message_id
+    user_id = call.from_user.id
+
+    key = (chat_id, msg_id)
     if key not in post_owner:
+        bot.answer_callback_query(call.id, "Ошибка объявления.")
         return
+
     if key not in responded:
         responded[key] = set()
-    if call.from_user.id in responded[key]:
-        bot.answer_callback_query(call.id, "Вы уже откликались.")
+
+    if user_id in responded[key]:
+        bot.answer_callback_query(call.id, "Вы уже откликались на это объявление.")
         return
-    responded[key].add(call.from_user.id)
+
+    responded[key].add(user_id)
     vip_id = post_owner[key]
     name = get_user_name(call.from_user)
+
     try:
         bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode="Markdown")
-        bot.answer_callback_query(call.id, "Отклик отправлен!")
-    except:
-        bot.send_message(ADMIN_CHAT_ID, "Не удалось отправить отклик VIP")
-
-# ==================== НОВАЯ ФУНКЦИЯ МУТА ДО ПОДПИСКИ ====================
-def is_subscribed(user_id):
-    try:
-        member = bot.get_chat_member(MAIN_CHANNEL_ID, user_id)
-        return member.status in ("member", "administrator", "creator")
-    except:
-        return False
-
-# Для новых участников
-@bot.chat_member_handler()
-def handle_new_member(update: types.ChatMemberUpdated):
-    if not update.new_chat_member or not update.new_chat_member.user:
-        return
-    user = update.new_chat_member.user
-    chat_id = update.chat.id
-
-    if update.new_chat_member.status not in ("member", "administrator", "creator"):
-        return
-    if user.is_bot or update.new_chat_member.status in ("administrator", "creator"):
-        return
-
-    old_status = update.old_chat_member.status if update.old_chat_member else "left"
-    if old_status in ("left", "kicked"):
-        time.sleep(3)
-        if not is_subscribed(user.id):
-            try:
-                bot.restrict_chat_member(chat_id, user.id, permissions=MUTED_PERMISSIONS)
-                markup = types.InlineKeyboardMarkup()
-                markup.add(types.InlineKeyboardButton("Подписаться на канал", url=MAIN_CHANNEL_LINK))
-                bot.send_message(
-                    chat_id,
-                    f"🔇 {user.first_name}, чтобы общаться в группе — подпишитесь на главный канал!\n"
-                    "После подписки напишите любое сообщение — мут снимется автоматически.",
-                    reply_markup=markup,
-                    disable_notification=True
-                )
-            except Exception as e:
-                print(f"Mute new member error: {e}")
-
-# Главный хендлер — когда замученный пытается писать
-shown_warning = set()  # чтобы не спамить одно и то же
-
-# Главный хендлер — когда замученный пытается писать
-shown_warning = set()  # чтобы не спамить одно и то же
-
-@bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact'])
-def check_on_message(message):
-    if message.chat.type == "private" or not message.from_user:
-        return
-
-    # ← ВАЖНАЯ ПРАВКА: сообщения от имени группы (анонимные админы) — не трогаем
-    if message.sender_chat:
-        return
-
-    user_id = message.from_user.id
-    chat_id = message.chat.id
-    key = (chat_id, user_id)
-
-    try:
-        member = bot.get_chat_member(chat_id, user_id)
-        if member and not member.can_send_messages:  # замучен
-            bot.delete_message(chat_id, message.message_id)
-
-            # Умная проверка с несколькими попытками (до 16 секунд)
-            subscribed = False
-            for _ in range(4):
-                time.sleep(4)
-                if is_subscribed(user_id):
-                    subscribed = True
-                    break
-
-            if subscribed:
-                bot.restrict_chat_member(chat_id, user_id, permissions=FULL_PERMISSIONS)
-                bot.send_message(chat_id, f"✅ {message.from_user.first_name}, спасибо за подписку! Теперь можете писать.")
-                if key in shown_warning:
-                    shown_warning.remove(key)
-            else:
-                # Показываем кнопку только один раз
-                if key not in shown_warning:
-                    markup = types.InlineKeyboardMarkup()
-                    markup.add(types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK))
-                    bot.send_message(
-                        chat_id,
-                        f"🔇 {message.from_user.mention_html()}, чтобы писать — подпишитесь на главный канал:\n"
-                        f"{MAIN_CHANNEL_USERNAME}\n\n"
-                        "После подписки подождите 10–15 секунд и напишите ещё раз (или перезайдите в чат).",
-                        reply_markup=markup,
-                        parse_mode="HTML"
-                    )
-                    shown_warning.add(key)
     except Exception as e:
-        print(f"Check message error: {e}")
+        bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP: {e}")
 
-# Массовая проверка — теперь с правильным методом и защитой админов
-def subscription_mass_check():
-    print(f"[{datetime.now().strftime('%H:%M')}] Запуск массовой проверки...")
-    count = 0
-    all_chats = set(chat_ids_mk.values()) | set(chat_ids_parni.values()) | set(chat_ids_ns.values()) | set(chat_ids_rainbow.values()) | set(chat_ids_gayznak.values())
+    bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
 
-    for chat_id in all_chats:
-        try:
-            admins = {a.user.id for a in bot.get_chat_administrators(chat_id)}
-            offset = 0
-            while True:
-                members = bot.get_chat_members(chat_id, offset=offset, limit=200)
-                if not members:
-                    break
-                for m in members:
-                    u = m.user
-                    if u.is_bot or u.id in admins or m.status in ("administrator", "creator", "owner") or not m.can_send_messages:
-                        continue
-                    if not is_subscribed(u.id):
-                        bot.restrict_chat_member(chat_id, u.id, permissions=MUTED_PERMISSIONS)
-                        count += 1
-                    time.sleep(0.03)
-                if len(members) < 200:
-                    break
-                offset = members[-1].user.id
-            time.sleep(0.8)
-        except Exception as e:
-            print(f"Error in group {chat_id}: {e}")
-    print(f"Проверка завершена. Замучено: {count}")
-
-def start_checker():
-    subscription_mass_check()
-    while True:
-        time.sleep(3600)
-        subscription_mass_check()
-
-threading.Thread(target=start_checker, daemon=True).start()
-
-@bot.message_handler(commands=['checkall'])
-def cmd_checkall(message):
-    if message.from_user.id != OWNER_ID:
-        return
-    bot.reply_to(message, "Запускаю проверку вручную...")
-    subscription_mass_check()
-    bot.reply_to(message, "Готово!")
-
-# ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
 def webhook():
     update = telebot.types.Update.de_json(request.stream.read().decode('utf-8'))
@@ -662,5 +552,4 @@ def webhook():
     return 'ok', 200
 
 if __name__ == '__main__':
-    print("Бот запущен — система мута до подписки работает идеально")
     app.run(host='0.0.0.0', port=5000)
