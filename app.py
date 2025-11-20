@@ -557,9 +557,16 @@ def handle_new_member(update: types.ChatMemberUpdated):
 # Главный хендлер — когда замученный пытается писать
 shown_warning = set()  # чтобы не спамить одно и то же
 
+# Главный хендлер — когда замученный пытается писать
+shown_warning = set()  # чтобы не спамить одно и то же
+
 @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact'])
 def check_on_message(message):
     if message.chat.type == "private" or not message.from_user:
+        return
+
+    # ← ВАЖНАЯ ПРАВКА: сообщения от имени группы (анонимные админы) — не трогаем
+    if message.sender_chat:
         return
 
     user_id = message.from_user.id
@@ -571,23 +578,29 @@ def check_on_message(message):
         if member and not member.can_send_messages:  # замучен
             bot.delete_message(chat_id, message.message_id)
 
-            # Даём Telegram время обновить статус в канале
-            time.sleep(6)
+            # Умная проверка с несколькими попытками (до 16 секунд)
+            subscribed = False
+            for _ in range(4):
+                time.sleep(4)
+                if is_subscribed(user_id):
+                    subscribed = True
+                    break
 
-            if is_subscribed(user_id):
+            if subscribed:
                 bot.restrict_chat_member(chat_id, user_id, permissions=FULL_PERMISSIONS)
                 bot.send_message(chat_id, f"✅ {message.from_user.first_name}, спасибо за подписку! Теперь можете писать.")
                 if key in shown_warning:
                     shown_warning.remove(key)
             else:
-                # Показываем сообщение с кнопкой только один раз
+                # Показываем кнопку только один раз
                 if key not in shown_warning:
                     markup = types.InlineKeyboardMarkup()
                     markup.add(types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK))
                     bot.send_message(
                         chat_id,
-                        f"🔇 {message.from_user.mention_html()}, чтобы писать в группе — подпишитесь на главный канал:\n"
-                        f"{MAIN_CHANNEL_USERNAME}\n\nПосле подписки напишите любое сообщение — мут снимется автоматически.",
+                        f"🔇 {message.from_user.mention_html()}, чтобы писать — подпишитесь на главный канал:\n"
+                        f"{MAIN_CHANNEL_USERNAME}\n\n"
+                        "После подписки подождите 10–15 секунд и напишите ещё раз (или перезайдите в чат).",
                         reply_markup=markup,
                         parse_mode="HTML"
                     )
