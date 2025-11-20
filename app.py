@@ -542,84 +542,58 @@ def handle_respond(call):
 def is_subscribed(user_id):
     try:
         member = bot.get_chat_member(MAIN_CHANNEL_ID, user_id)
-        print(f"Проверка подписки: user {user_id}, статус {member.status}")  # Лог для отладки
         return member.status in ("member", "administrator", "creator")
     except Exception as e:
-        print(f"Ошибка при проверке подписки для {user_id}: {e}")
+        print(f"Ошибка проверки подписки user {user_id}: {e}")
         return False
 
-# Обработчик сообщений
-@bot.message_handler(content_types=[
-    'text', 'photo', 'video', 'document', 'audio',
-    'voice', 'sticker', 'animation', 'location', 'contact'
-])
+# ==================== УДАЛЕНИЕ СООБЩЕНИЙ БЕЗ ПОДПИСКИ + ОТБИВКА ====================
+last_warning = {}  # (chat_id, user_id) -> время последнего напоминания
+
+@bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact'])
 def check_subscription(message):
-
-    # ЛС игнорируем
-    if message.chat.type == "private":
+    if message.chat.type == "private" or not message.from_user:
         return
-
-    # Сеть ПАРНИ игнорируем
+    if message.sender_chat:  # админы от имени группы
+        return
     if message.chat.id in PARNI_CHATS:
-        return
+        return  # сеть ПАРНИ полностью игнорируем
 
-    user = message.from_user
-    if not user:
-        return
-
-    user_id = user.id
+    user_id = message.from_user.id
     chat_id = message.chat.id
+    key = (chat_id, user_id)
 
-    # Игнорируем сообщения от имени группы (админ пишет от имени группы)
-    if message.sender_chat and message.sender_chat.id == chat_id:
-        return
-
-    # Проверяем статус пользователя — админов и создателей пропускаем
-    try:
-        member_status = bot.get_chat_member(chat_id, user_id).status
-        if member_status in ("administrator", "creator"):
-            return
-    except Exception as e:
-        print(f"Ошибка получения статуса пользователя {user_id}: {e}")
-
-    # Проверяем подписку на главный канал
+    # Если подписан — пропускаем
     if is_subscribed(user_id):
-        return  # подписан → всё ок
+        return
 
     # Удаляем сообщение
     try:
         bot.delete_message(chat_id, message.message_id)
     except Exception as e:
-        print(f"Ошибка удаления сообщения {message.message_id}: {e}")
+        print(f"Не удалось удалить сообщение {message.message_id}: {e}")
 
-    # Пауза после удаления
-    time.sleep(0.6)
+    # Отправляем отбивку раз в 5 минут
+    now = time.time()
+    if key not in last_warning or now - last_warning[key] > 300:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK))
+        try:
+            bot.send_message(
+                chat_id=chat_id,
+                text=f"🔇 {message.from_user.mention_html()}, чтобы писать — подпишитесь на главный канал:\n"
+                     f"{MAIN_CHANNEL_USERNAME}\n\n"
+                     "После подписки ваши сообщения перестанут удаляться.",
+                reply_markup=markup,
+                parse_mode="HTML",
+                disable_web_page_preview=True
+            )
+            print(f"Отправлено напоминание пользователю {user_id} в группе {chat_id}")
+        except Exception as e:
+            print(f"ОШИБКА ОТПРАВКИ ОТБИВКИ пользователю {user_id} в группе {chat_id}: {e}")
+            bot.send_message(ADMIN_CHAT_ID, f"Не удалось отправить отбивку пользователю {user_id} в группе {chat_id}: {e}")
 
-    # Отправляем предупреждение
-    username = user.mention_html()
-    text = (
-        f"🔇 {username}, чтобы писать — подпишитесь на главный канал:\n"
-        f"{MAIN_CHANNEL_USERNAME}\n\n"
-        f"После подписки ваши сообщения перестанут удаляться."
-    )
-    markup = types.InlineKeyboardMarkup()
-    markup.add(
-        types.InlineKeyboardButton(
-            "Подписаться на главный канал",
-            url=MAIN_CHANNEL_LINK
-        )
-    )
-
-    try:
-        bot.send_message(
-            chat_id,
-            text,
-            parse_mode="HTML",
-            reply_markup=markup
-        )
-    except Exception as e:
-        # Логи ошибок в случае невозможности отправки
-        bot.send_message(ADMIN_CHAT_ID, f"Ошибка при отправке предупреждения {user_id}: {e}")
+        last_warning[key] = now
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
