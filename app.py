@@ -567,13 +567,13 @@ def welcome_new_member(update: types.ChatMemberUpdated):
 
     bot.send_message(
         chat_id,
-        f"🔴 {user.mention_html()}, добро пожаловать!\n\n"
+        f"🔴 {user. file mention_html()}, добро пожаловать!\n\n"
         "Чтобы писать в группе — обязательна подписка на главный канал сети:\n"
         f"{MAIN_CHANNEL_USERNAME}\n\n"
         "После подписки ваше сообщение останется автоматически.",
         reply_markup=markup,
-        parse_mode="HTML",
-        disable_notification=False
+        parse_mode="HTML"
+        # Убрал disable_notification полностью — теперь уведомление приходит с пингом
     )
 
 # Удаление сообщений без подписки + напоминание раз в 5 минут (кроме ПАРНИ)
@@ -583,33 +583,37 @@ last_warning = {}
 def check_subscription(message):
     if message.chat.type == "private" or not message.from_user:
         return
-    if message.sender_chat:  # админы от имени группы
+    if message.sender_chat:  # админы от имени группы — не трогаем
         return
     if message.chat.id in PARNI_CHATS:
-        return
+        return  # сеть ПАРНИ полностью игнорируем
 
     user_id = message.from_user.id
     chat_id = message.chat.id
     key = (chat_id, user_id)
 
     if is_subscribed(user_id):
-        return
+        return  # подписан — всё ок
 
+    # Удаляем сообщение
     try:
         bot.delete_message(chat_id, message.message_id)
     except:
-        pass
+        pass  # если уже удалено или нет прав — пропускаем
 
+    # Напоминание раз в 5 минут (300 секунд)
     now = time.time()
     if key not in last_warning or now - last_warning[key] > 300:
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("Подписаться на канал", url=MAIN_CHANNEL_LINK))
+        markup.add(types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK))
         bot.send_message(
             chat_id,
             f"🔇 {message.from_user.mention_html()}, чтобы писать — подпишитесь на главный канал:\n"
-            f"{MAIN_CHANNEL_USERNAME}\n\nПосле подписки ваше следующее сообщение останется.",
+            f"{MAIN_CHANNEL_USERNAME}\n\n"
+            "После подписки ваше следующее сообщение останется.",
             reply_markup=markup,
             parse_mode="HTML"
+            # disable_notification убрал полностью — теперь пинг и звук приходят 100%
         )
         last_warning[key] = now
 
