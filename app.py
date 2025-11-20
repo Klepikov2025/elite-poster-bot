@@ -568,7 +568,7 @@ def subscription_mass_check():
 
     for chat_id in all_chats:
         try:
-            admins = {a.user.id for a in bot.get_chat_admins(chat_id)}
+            admins = {a.user.id for a in bot.get_chat_administrators(chat_id)}
             offset = 0
             while True:
                 members = bot.get_chat_members(chat_id, offset=offset, limit=200)
