@@ -542,8 +542,10 @@ def handle_respond(call):
 def is_subscribed(user_id):
     try:
         member = bot.get_chat_member(MAIN_CHANNEL_ID, user_id)
+        print(f"Проверка подписки: user {user_id}, статус {member.status}")  # Лог для отладки
         return member.status in ("member", "administrator", "creator")
-    except:
+    except Exception as e:
+        print(f"Ошибка при проверке подписки для {user_id}: {e}")
         return False
 
 @bot.message_handler(content_types=[
