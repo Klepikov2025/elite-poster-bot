@@ -548,14 +548,14 @@ def is_subscribed(user_id):
         return False
 
 # ==================== УДАЛЕНИЕ СООБЩЕНИЙ БЕЗ ПОДПИСКИ + ОТБИВКА ====================
-# Отбивка один раз навсегда + самоудаление через 2 минуты
-warned_users = {}  # (chat_id, user_id) -> message_id отбивки (чтобы удалить)
+# Отбивка один раз + автоудаление через 2 минуты (120 секунд)
+warned_users = {}  # (chat_id, user_id) -> message_id отбивки
 
 @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact'])
 def check_subscription(message):
     if message.chat.type == "private" or not message.from_user:
         return
-    if message.sender_chat:  # админы от имени группы
+    if message.sender_chat:
         return
     if message.chat.id in PARNI_CHATS:
         return
@@ -565,7 +565,7 @@ def check_subscription(message):
     key = (chat_id, user_id)
 
     if is_subscribed(user_id):
-        # Подписался — если была отбивка, удаляем её
+        # Подписался — удаляем отбивку, если она была
         if key in warned_users:
             try:
                 bot.delete_message(chat_id, warned_users[key])
@@ -580,7 +580,7 @@ def check_subscription(message):
     except:
         pass
 
-    # Отбивка ТОЛЬКО ОДИН РАЗ + самоудаление через 120 секунд
+    # Отбивка ТОЛЬКО ОДИН РАЗ
     if key not in warned_users:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK))
@@ -592,22 +592,27 @@ def check_subscription(message):
                      "Без подписки на канал ваши сообщения будут удаляться автоматически.",
                 reply_markup=markup
             )
-            warned_users[key] = sent.message_id  # запоминаем id сообщения
+            msg_id = sent.message_id
+            print(f"Отбивка отправ Event, id {msg_id} пользователю {user_id}")
 
-            # Самоудаление через 2 минуты в фоне
-            def delete_warning():
-                time.sleep(120)  # 2 минуты
+            # Сохраняем id сообщения
+            warned_users[key] = msg_id
+
+            # Автоудаление через 120 секунд в фоне
+            def auto_delete():
+                time.sleep(120)
                 try:
-                    bot.delete_message(chat_id, sent.message_id)
-                except:
-                    pass
+                    bot.delete_message(chat_id, msg_id)
+                    print(f"Отбивка {msg_id} удалена (2 минуты прошли)")
+                except Exception as e:
+                    print(f"Не удалось удалить отбивку {msg_id}: {e}")
                 if key in warned_users:
                     del warned_users[key]
 
-            threading.Thread(target=delete_warning, daemon=True).start()
+            threading.Thread(target=auto_delete, daemon=True).start()
 
         except Exception as e:
-            print(f"Ошибка отправки отбивки {user_id}: {e}")
+            print(f"Ошибка отправки отбивки пользователю {user_id}: {e}")
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
