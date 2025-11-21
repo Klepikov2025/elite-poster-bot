@@ -7,6 +7,7 @@ import pytz
 import random
 import re
 import time
+import threading
 
 # ==================== НАСТРОЙКИ ====================
 TOKEN = os.getenv('BOT_TOKEN')
@@ -551,7 +552,10 @@ def is_subscribed(user_id):
 # Отбивка один раз + автоудаление через 2 минуты (120 секунд)
 warned_users = {}  # (chat_id, user_id) -> message_id отбивки
 
-@bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact'])
+@bot.message_handler(content_types=[
+    'text', 'photo', 'video', 'document', 'audio', 'voice',
+    'sticker', 'animation', 'location', 'contact'
+])
 def check_subscription(message):
     if message.chat.type == "private" or not message.from_user:
         return
@@ -564,8 +568,8 @@ def check_subscription(message):
     chat_id = message.chat.id
     key = (chat_id, user_id)
 
+    # Если подписан — просто очищаем отбивку (если была)
     if is_subscribed(user_id):
-        # Подписался — удаляем отбивку, если она была
         if key in warned_users:
             try:
                 bot.delete_message(chat_id, warned_users[key])
@@ -583,7 +587,10 @@ def check_subscription(message):
     # Отбивка ТОЛЬКО ОДИН РАЗ
     if key not in warned_users:
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK))
+        markup.add(
+            types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK),
+            types.InlineKeyboardButton("Резервный канал", url="https://t.me/gaysexchatrur")
+        )
 
         try:
             sent = bot.send_message(
@@ -593,12 +600,12 @@ def check_subscription(message):
                 reply_markup=markup
             )
             msg_id = sent.message_id
-            print(f"Отбивка отправ Event, id {msg_id} пользователю {user_id}")
+            print(f"Отбивка отправлена, id {msg_id} пользователю {user_id}")
 
-            # Сохраняем id сообщения
+            # Сохраняем id отбивки
             warned_users[key] = msg_id
 
-            # Автоудаление через 120 секунд в фоне
+            # Автоудаление через 120 секунд
             def auto_delete():
                 time.sleep(120)
                 try:
