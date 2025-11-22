@@ -515,6 +515,7 @@ def handle_respond(call):
     chat_id = call.message.chat.id
     msg_id = call.message.message_id
     user_id = call.from_user.id
+    responder = call.from_user  # полный объект User
 
     key = (chat_id, msg_id)
     if key not in post_owner:
@@ -528,25 +529,36 @@ def handle_respond(call):
         bot.answer_callback_query(call.id, "Вы уже откликались на это объявление.")
         return
 
+    # === БЛОКИРОВКА ОТКЛИКА БЕЗ @username ===
+    if not responder.username:
+        bot.answer_callback_query(
+            callback_query_id=call.id,
+            text="❌ Отклик запрещён!\n\n"
+                 "У вас скрыт @username в настройках приватности.\n\n"
+                 "Чтобы откликаться на VIP-объявления — откройте его:\n"
+                 "Настройки → Конфиденциальность и безопасность → "
+                 "«Пересылка сообщений» → выбрать «Всем»",
+            show_alert=True
+        )
+        return
+    # ========================================
+
     responded[key].add(user_id)
     vip_id = post_owner[key]
-    name = get_user_name(call.from_user)
+
+    # Теперь username точно есть → делаем красивую кликабельную ссылку
+    name = f"[{escape_md(responder.first_name)}](https://t.me/{responder.username})"
 
     try:
-        bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode="Markdown")
+        bot.send_message(
+            vip_id,
+            f"Вами заинтересовался {name}",
+            parse_mode="MarkdownV2"  # MarkdownV2, потому что мы используем escape_md
+        )
     except Exception as e:
         bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP: {e}")
 
     bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
-
-# ==================== ПОДПИСКА НА КАНАЛ — МЯГКАЯ ВЕРСИЯ ====================
-def is_subscribed(user_id):
-    try:
-        member = bot.get_chat_member(MAIN_CHANNEL_ID, user_id)
-        return member.status in ("member", "administrator", "creator")
-    except Exception as e:
-        print(f"Ошибка проверки подписки user {user_id}: {e}")
-        return False
 
 # ==================== УДАЛЕНИЕ СООБЩЕНИЙ БЕЗ ПОДПИСКИ + ОТБИВКА ====================
 # Отбивка один раз + автоудаление через 2 минуты (120 секунд)
