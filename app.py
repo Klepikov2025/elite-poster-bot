@@ -560,6 +560,14 @@ def handle_respond(call):
 
     bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
 
+def is_subscribed(user_id):
+    try:
+        member = bot.get_chat_member(MAIN_CHANNEL_ID, user_id)
+        return member.status in ("member", "administrator", "creator")
+    except Exception as e:
+        print(f"Ошибка при проверке подписки для {user_id}: {e}")
+        return False
+
 # ==================== УДАЛЕНИЕ СООБЩЕНИЙ БЕЗ ПОДПИСКИ + ОТБИВКА ====================
 # Отбивка один раз + автоудаление через 2 минуты (120 секунд)
 warned_users = {}  # (chat_id, user_id) -> message_id отбивки
