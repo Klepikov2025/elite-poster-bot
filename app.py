@@ -588,58 +588,60 @@ def check_subscription(message):
     chat_id = message.chat.id
     key = (chat_id, user_id)
 
-    # Если подписан — просто очищаем отбивку (если была)
     if is_subscribed(user_id):
+        # Подписан → очищаем отбивку (если была), НО НЕ return!
+        # Сообщение должно дойти до city_redirect_handler
         if key in warned_users:
             try:
                 bot.delete_message(chat_id, warned_users[key])
             except:
                 pass
             del warned_users[key]
-        return
-
-    # Удаляем сообщение пользователя
-    try:
-        bot.delete_message(chat_id, message.message_id)
-    except:
-        pass
-
-    # Отбивка ТОЛЬКО ОДИН РАЗ
-    if key not in warned_users:
-        markup = types.InlineKeyboardMarkup()
-        markup.add(
-            types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK),
-            types.InlineKeyboardButton("Резервный канал", url="https://t.me/gaysexchatrur")
-        )
-
+        # Здесь НЕ return — продолжаем цепочку обработчиков
+    else:
+        # Не подписан → удаляем сообщение
         try:
-            sent = bot.send_message(
-                chat_id=chat_id,
-                text="❗ Внимание, чтобы писать в чате вам необходимо подписаться на наш основной канал.\n\n"
-                     "Без подписки на канал ваши сообщения будут удаляться автоматически.",
-                reply_markup=markup
+            bot.delete_message(chat_id, message.message_id)
+        except:
+            pass
+
+        # Отбивка ТОЛЬКО ОДИН РАЗ
+        if key not in warned_users:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(
+                types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK),
+                types.InlineKeyboardButton("Резервный канал", url="https://t.me/gaysexchatrur")
             )
-            msg_id = sent.message_id
-            print(f"Отбивка отправлена, id {msg_id} пользователю {user_id}")
 
-            # Сохраняем id отбивки
-            warned_users[key] = msg_id
+            try:
+                sent = bot.send_message(
+                    chat_id=chat_id,
+                    text="❗ Внимание, чтобы писать в чате вам необходимо подписаться на наш основной канал.\n\n"
+                         "Без подписки на канал ваши сообщения будут удаляться автоматически.",
+                    reply_markup=markup
+                )
+                msg_id = sent.message_id
+                print(f"Отбивка отправлена, id {msg_id} пользователю {user_id}")
 
-            # Автоудаление через 120 секунд
-            def auto_delete():
-                time.sleep(120)
-                try:
-                    bot.delete_message(chat_id, msg_id)
-                    print(f"Отбивка {msg_id} удалена (2 минуты прошли)")
-                except Exception as e:
-                    print(f"Не удалось удалить отбивку {msg_id}: {e}")
-                if key in warned_users:
-                    del warned_users[key]
+                warned_users[key] = msg_id
 
-            threading.Thread(target=auto_delete, daemon=True).start()
+                def auto_delete():
+                    time.sleep(120)
+                    try:
+                        bot.delete_message(chat_id, msg_id)
+                        print(f"Отбивка {msg_id} удалена (2 минуты прошли)")
+                    except Exception as e:
+                        print(f"Не удалось удалить отбивку {msg_id}: {e}")
+                    if key in warned_users:
+                        del warned_users[key]
 
-        except Exception as e:
-            print(f"Ошибка отправки отбивки пользователю {user_id}: {e}")
+                threading.Thread(target=auto_delete, daemon=True).start()
+
+            except Exception as e:
+                print(f"Ошибка отправки отбивки пользователю {user_id}: {e}")
+
+        # Здесь НЕ return — но поскольку сообщение уже удалено, дальше ничего не произойдёт
+
 
 # ───────────────────────────────────────────────
 # АВТООТВЕТЫ ПО ГОРОДАМ ТОЛЬКО В ДВУХ БИГ-ЧАТАХ
@@ -657,14 +659,12 @@ AUTO_DELETE_AFTER  = 180        # 3 минуты — автоудаление о
 
 last_city_reply = {}            # (chat_id, norm_city) → timestamp
 
-# ─── Экранирование для MarkdownV2 ────────────────────────────────────────
 def escape_md_v2(text):
     chars = r'_*[]()~`>#+-=|{}.!'
     for c in chars:
         text = text.replace(c, f'\\{c}')
     return text
 
-# ─── Генерация / получение invite-ссылки ─────────────────────────────────
 def get_or_create_invite_link(chat_id):
     if chat_id in CITY_INVITE_LINKS:
         return CITY_INVITE_LINKS[chat_id]
@@ -684,7 +684,6 @@ def get_or_create_invite_link(chat_id):
         print(f"[Invite Error] {chat_id}: {e}")
         return None
 
-# ─── Расширенные словари ──────────────────────────────────────────────────
 CITY_ALIASES = {
     "мск": "Москва", "москва": "Москва", "мос": "Москва", "мскв": "Москва", "мск": "Москва",
     "спб": "Санкт Петербург", "питер": "Санкт Петербург", "птб": "Санкт Петербург", "петербург": "Санкт Петербург",
@@ -754,15 +753,15 @@ SMALL_TOWN_TO_CENTER = {
     "россошь": "Воронеж", "лиски": "Воронеж", "борисоглебск": "Воронеж",
 }
 
-# ─── Сам обработчик ───────────────────────────────────────────────────────
 @bot.message_handler(content_types=['text'])
 def city_redirect_handler(message):
+    # отладка (можно убрать после теста)
+    print(f"[DEBUG city] сообщение в чате {message.chat.id}: {message.text}")
+
     if message.chat.type not in ["group", "supergroup"]:
         return
-
     if message.chat.id not in CITY_REDIRECT_CHATS:
         return
-
     if message.from_user.is_bot:
         return
 
@@ -776,24 +775,20 @@ def city_redirect_handler(message):
 
     # Поиск города
     found_city = None
-
     for alias, city in CITY_ALIASES.items():
         if alias in text_lower:
             found_city = city
             break
-
     if not found_city:
         for c in all_cities:
             if c.lower() in text_lower:
                 found_city = c
                 break
-
     if not found_city:
         for small, center in SMALL_TOWN_TO_CENTER.items():
             if small in text_lower:
                 found_city = center
                 break
-
     if not found_city:
         return
 
@@ -807,19 +802,16 @@ def city_redirect_handler(message):
         return
     last_city_reply[key] = now
 
-    # Сбор кликабельных строк
     lines = []
     networks = all_cities.get(norm_city, {})
-
     for net_key, entries in networks.items():
         net_name = net_key_to_name(net_key)
         for entry in entries:
             chat_id = entry["chat_id"]
             real_name = entry.get("name", norm_city)
-
             link = get_or_create_invite_link(chat_id)
             if link:
-                escaped_net  = escape_md_v2(net_name)
+                escaped_net = escape_md_v2(net_name)
                 escaped_city = escape_md_v2(real_name)
                 line = f"• [{escaped_net} → {escaped_city}]({link})"
                 lines.append(line)
@@ -856,7 +848,6 @@ def city_redirect_handler(message):
             disable_notification=True
         )
 
-        # Автоудаление через 3 минуты
         def delete_later():
             time.sleep(AUTO_DELETE_AFTER)
             try:
