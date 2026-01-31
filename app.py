@@ -6,30 +6,30 @@ from datetime import datetime
 import pytz
 import random
 import re
+import time
+import threading
 
-# Собственная функция для экранирования спецсимволов Markdown
-def escape_md(text):
-    escape_chars = r'\_*[]()~`>#+-=|{}'
-    for ch in escape_chars:
-        text = text.replace(ch, f"\\{ch}")
-    return text
-
-def clean_user_text(text):
-    # Заменяет 15*5 -> 15×5, но не трогает Markdown
-    text = re.sub(r'(?<=\d)\*(?=\d)', '×', text)
-    return text
-
-# Получаем токен из переменной окружения
+# ==================== НАСТРОЙКИ ====================
 TOKEN = os.getenv('BOT_TOKEN')
 bot = telebot.TeleBot(TOKEN)
-
-# Создаём Flask-приложение
 app = Flask(__name__)
 
-# ADMIN ID (ваш ID)
-ADMIN_CHAT_ID = 479938867  # Ваш ID
+ADMIN_CHAT_ID = 479938867
+OWNER_ID = 479938867
 
-# Списки chat_id для каждой сети и города
+# Главный канал
+MAIN_CHANNEL_ID = -1002246737442
+MAIN_CHANNEL_USERNAME = "@clubofrm"
+MAIN_CHANNEL_LINK = "https://t.me/clubofrm"
+
+# Сеть ПАРНИ — полностью исключаем из всех проверок
+PARNI_CHATS = {
+    -1002413948841, -1002255622479, -1002274367832, -1002406302365,
+    -1002280860973, -1002469285352, -1002287709568, -1002448909000,
+    -1002261777025, -1002371438340
+}
+
+# ==================== СПИСКИ ЧАТОВ ====================
 chat_ids_mk = {
     "Екатеринбург": -1002210043742,
     "Челябинск": -1002238514762,
@@ -73,7 +73,6 @@ chat_ids_parni = {
     "ЯМАО": -1002371438340
 }
 
-# ДОБАВЛЯЕМ новую сеть НС с нужными группами
 chat_ids_ns = {
     "Курган": -1001465465654,
     "Новосибирск": -1001824149334,
@@ -107,14 +106,13 @@ chat_ids_gayznak = {
     "Волгоград": -1002476113714
 }
 
-
-# --- Автогенерация all_cities (из всех chat_ids_*) ---
+# ==================== АВТОГЕНЕРАЦИЯ all_cities ====================
 def normalize_city_name(name):
     mapping = {
         "Перми": "Пермь",
         "ЯМАО": "Ямал",
         "Знакомства 66": "Екатеринбург",
-        "Знакомства 72": "Тюмень",
+        "ЗНАКОМСТВА 72": "Тюмень",
         "Знакомства 74": "Челябинск"
     }
     return mapping.get(name, name)
@@ -129,29 +127,22 @@ def insert_to_all(city, net_key, real_name, chat_id):
         all_cities[norm][net_key] = []
     all_cities[norm][net_key].append({"name": real_name, "chat_id": chat_id})
 
-# Заполняем all_cities из словарей
 for city, chat_id in chat_ids_mk.items():
     insert_to_all(city, "mk", city, chat_id)
-
 for city, chat_id in chat_ids_parni.items():
     insert_to_all(city, "parni", city, chat_id)
-
 for city, chat_id in chat_ids_ns.items():
     insert_to_all(city, "ns", city, chat_id)
-
 for city, chat_id in chat_ids_rainbow.items():
     insert_to_all(city, "rainbow", city, chat_id)
-
 for city, chat_id in chat_ids_gayznak.items():
     insert_to_all(city, "gayznak", city, chat_id)
 
-# Фallback МК для некоторых регионов (как в mpserv)
 fallback_mk = {"Тюмень", "Ямал", "ХМАО"}
 for city in fallback_mk:
     if "mk" not in all_cities.get(city, {}):
         insert_to_all(city, "mk", "Общая группа Тюмень и Север", -1002210623988)
 
-# Функция для получения русских названий сетей по ключам
 def net_key_to_name(key):
     return {
         "mk": "Мужской Клуб",
@@ -160,25 +151,28 @@ def net_key_to_name(key):
         "rainbow": "Радуга",
         "gayznak": "Гей Знакомства"
     }.get(key, key)
-# --- конец генерации all_cities ---
 
-
-# Словарь для замены названий городов для сети НС
 ns_city_substitution = {
     "Екатеринбург": "Знакомства 66",
     "Челябинск": "Знакомства 74"
 }
 
-# ID VIP-чата "Elite Lounge"
-VIP_CHAT_ID = -1002446486648  # Ваш VIP-чат
+VIP_CHAT_ID = -1002446486648
+VERIFICATION_LINK = "http://t.me/vip_znakbot"
 
-# Ссылка для верификации и оплаты
-VERIFICATION_LINK = "http://t.me/vip_znakbot"  # Ссылка для верификации
-
-# Словарь для хранения всех сообщений пользователей
 user_posts = {}
-post_owner = {}      # (chat_id, message_id) -> user_id
-responded = {}       # (chat_id, message_id) -> set(user_id)
+post_owner = {}
+responded = {}
+
+# ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
+def escape_md(text):
+    escape_chars = r'\_*[]()~`>#+-=|{}'
+    for ch in escape_chars:
+        text = text.replace(ch, f"\\{ch}")
+    return text
+
+def clean_user_text(text):
+    return re.sub(r'(?<=\d)\*(?=\d)', '×', text)
 
 def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -521,6 +515,7 @@ def handle_respond(call):
     chat_id = call.message.chat.id
     msg_id = call.message.message_id
     user_id = call.from_user.id
+    responder = call.from_user  # полный объект User
 
     key = (chat_id, msg_id)
     if key not in post_owner:
@@ -534,17 +529,120 @@ def handle_respond(call):
         bot.answer_callback_query(call.id, "Вы уже откликались на это объявление.")
         return
 
+    # === БЛОКИРОВКА ОТКЛИКА БЕЗ @username ===
+    if not responder.username:
+        bot.answer_callback_query(
+            callback_query_id=call.id,
+            text="❌ Отклик запрещён!\n\n"
+                 "У вас скрыт @username в настройках приватности.\n\n"
+                 "Чтобы откликаться на VIP-объявления — откройте его:\n"
+                 "Настройки → Конфиденциальность и безопасность → "
+                 "«Пересылка сообщений» → выбрать «Всем»",
+            show_alert=True
+        )
+        return
+    # ========================================
+
     responded[key].add(user_id)
     vip_id = post_owner[key]
-    name = get_user_name(call.from_user)
+
+    # Теперь username точно есть → делаем красивую кликабельную ссылку
+    name = f"[{escape_md(responder.first_name)}](https://t.me/{responder.username})"
 
     try:
-        bot.send_message(vip_id, f"Вами заинтересовался {name}", parse_mode="Markdown")
+        bot.send_message(
+            vip_id,
+            f"Вами заинтересовался {name}",
+            parse_mode="MarkdownV2"  # MarkdownV2, потому что мы используем escape_md
+        )
     except Exception as e:
         bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP: {e}")
 
     bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
 
+def is_subscribed(user_id):
+    try:
+        member = bot.get_chat_member(MAIN_CHANNEL_ID, user_id)
+        return member.status in ("member", "administrator", "creator")
+    except Exception as e:
+        print(f"Ошибка при проверке подписки для {user_id}: {e}")
+        return False
+
+# ==================== УДАЛЕНИЕ СООБЩЕНИЙ БЕЗ ПОДПИСКИ + ОТБИВКА ====================
+# Отбивка один раз + автоудаление через 2 минуты (120 секунд)
+warned_users = {}  # (chat_id, user_id) -> message_id отбивки
+
+@bot.message_handler(content_types=[
+    'text', 'photo', 'video', 'document', 'audio', 'voice',
+    'sticker', 'animation', 'location', 'contact'
+])
+def check_subscription(message):
+    if message.chat.type == "private" or not message.from_user:
+        return
+    if message.sender_chat:
+        return
+    if message.chat.id in PARNI_CHATS:
+        return
+
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+    key = (chat_id, user_id)
+
+    # Если подписан — просто очищаем отбивку (если была)
+    if is_subscribed(user_id):
+        if key in warned_users:
+            try:
+                bot.delete_message(chat_id, warned_users[key])
+            except:
+                pass
+            del warned_users[key]
+        return
+
+    # Удаляем сообщение пользователя
+    try:
+        bot.delete_message(chat_id, message.message_id)
+    except:
+        pass
+
+    # Отбивка ТОЛЬКО ОДИН РАЗ
+    if key not in warned_users:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(
+            types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK),
+            types.InlineKeyboardButton("Резервный канал", url="https://t.me/gaysexchatrur"),
+            types.InlineKeyboardButton("ПРАВИЛА МК", url="https://t.me/MensClubRules")
+        )
+
+        try:
+            sent = bot.send_message(
+                chat_id=chat_id,
+                text="❗ Внимание, чтобы писать в чате вам необходимо подписаться на наш основной канал.\n\n"
+                     "Без подписки на канал ваши сообщения будут удаляться автоматически. Вступая в чат, я подтверждаю совершеннолетие и обязуюсь соблюдать правила, с которыми ознакомлен и согласен.",
+                reply_markup=markup
+            )
+            msg_id = sent.message_id
+            print(f"Отбивка отправлена, id {msg_id} пользователю {user_id}")
+
+            # Сохраняем id отбивки
+            warned_users[key] = msg_id
+
+            # Автоудаление через 120 секунд
+            def auto_delete():
+                time.sleep(120)
+                try:
+                    bot.delete_message(chat_id, msg_id)
+                    print(f"Отбивка {msg_id} удалена (2 минуты прошли)")
+                except Exception as e:
+                    print(f"Не удалось удалить отбивку {msg_id}: {e}")
+                if key in warned_users:
+                    del warned_users[key]
+
+            threading.Thread(target=auto_delete, daemon=True).start()
+
+        except Exception as e:
+            print(f"Ошибка отправки отбивки пользователю {user_id}: {e}")
+
+# ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
 def webhook():
     update = telebot.types.Update.de_json(request.stream.read().decode('utf-8'))
@@ -552,4 +650,5 @@ def webhook():
     return 'ok', 200
 
 if __name__ == '__main__':
+    print("Бот запущен — мягкая версия с приветствием и удалением сообщений (кроме сети ПАРНИ)")
     app.run(host='0.0.0.0', port=5000)
