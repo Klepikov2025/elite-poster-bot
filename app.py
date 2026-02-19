@@ -715,23 +715,27 @@ def check_subscription(message):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("start_chat_"))
 def start_chat(call):
+    bot.send_message(ADMIN_CHAT_ID, f"[DEBUG] Кнопка 'Написать в ответ' нажата от ID {call.from_user.id}")
+
     try:
+        bot.send_message(ADMIN_CHAT_ID, "[DEBUG] 1. Парсим callback_data")
+
         responder_id = int(call.data.split("_")[2])
         vip_id = call.from_user.id
 
-        # Запоминаем пару и время
+        bot.send_message(ADMIN_CHAT_ID, f"[DEBUG] 2. Получили IDs: VIP={vip_id}, Responder={responder_id}")
+
+        # Запоминаем пару
         active_chats[vip_id] = responder_id
         chat_last_activity[vip_id] = time.time()
 
-        # Безопасное имя VIP
-        first_name = call.from_user.first_name or ""
-        username = call.from_user.username or None
+        bot.send_message(ADMIN_CHAT_ID, "[DEBUG] 3. Записали в словари")
 
-        display_name = escape_md(first_name.strip()) if first_name.strip() else "Пользователь"
-        if username:
-            display_name += f" (@{username})"
-        if not display_name.strip():
-            display_name = f"ID {vip_id}"
+        # Безопасное имя
+        first_name = call.from_user.first_name or "Пользователь"
+        username = call.from_user.username or "нет"
+
+        bot.send_message(ADMIN_CHAT_ID, f"[DEBUG] 4. Имя VIP: {first_name} (@{username})")
 
         # Сообщение VIP'у
         bot.send_message(
@@ -741,22 +745,28 @@ def start_chat(call):
             "Чтобы завершить чат — нажмите кнопку ниже."
         )
 
-        # Уведомление админу
+        bot.send_message(ADMIN_CHAT_ID, "[DEBUG] 5. Отправили инструкцию VIP")
+
+        # Уведомление тебе
         bot.send_message(
             ADMIN_CHAT_ID,
             f"💬 *Чат начат*\n"
-            f"VIP: {display_name} ID: {vip_id}\n"
+            f"VIP: {first_name} (@{username}) ID: {vip_id}\n"
             f"С пользователем ID: {responder_id}\n"
             f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}",
             parse_mode="Markdown",
             disable_web_page_preview=True
         )
 
+        bot.send_message(ADMIN_CHAT_ID, "[DEBUG] 6. Отправили уведомление админу")
+
         bot.answer_callback_query(call.id, "Чат запущен", show_alert=False)
 
     except Exception as e:
-        bot.answer_callback_query(call.id, "Ошибка запуска чата", show_alert=True)
-        print(f"Ошибка в start_chat: {str(e)}")
+        error_text = f"Ошибка в start_chat: {type(e).__name__}: {str(e)}"
+        print(error_text)
+        bot.send_message(ADMIN_CHAT_ID, f"[ERROR] {error_text}")
+        bot.answer_callback_query(call.id, "Ошибка запуска чата (проверьте админ-чат)", show_alert=True)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("end_chat_"))
 def end_chat(call):
