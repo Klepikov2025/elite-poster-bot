@@ -574,65 +574,54 @@ def handle_respond(call):
 
     bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
 
-@bot.callback_query_handler(func=lambda call: call.data == "respond")
-def handle_respond(call):
-    chat_id = call.message.chat.id
-    msg_id = call.message.message_id
-    user_id = call.from_user.id
-    responder = call.from_user  # полный объект User
-
-    key = (chat_id, msg_id)
-    if key not in post_owner:
-        bot.answer_callback_query(call.id, "Ошибка объявления.")
-        return
-
-    if key not in responded:
-        responded[key] = set()
-
-    if user_id in responded[key]:
-        bot.answer_callback_query(call.id, "Вы уже откликались на это объявление.")
-        return
-
-    # === БЛОКИРОВКА ОТКЛИКА БЕЗ @username ===
-    if not responder.username:
-        bot.answer_callback_query(
-            callback_query_id=call.id,
-            text="❌ Отклик запрещён!\n\n"
-                 "У вас скрыт @username в настройках приватности.\n\n"
-                 "Чтобы откликаться на VIP-объявления — откройте его:\n"
-                 "Настройки → Конфиденциальность и безопасность → "
-                 "«Пересылка сообщений» → выбрать «Всем»",
-            show_alert=True
-        )
-        return
-    # ========================================
-
-    responded[key].add(user_id)
-    vip_id = post_owner[key]
-
-    # Теперь username точно есть → делаем красивую кликабельную ссылку
-    name = f"[{escape_md(responder.first_name)}](https://t.me/{responder.username})"
-
-    # Добавляем кнопку жалобы
-    markup = types.InlineKeyboardMarkup()
-    markup.add(
-        types.InlineKeyboardButton(
-            "🚨 Это спам / скам / мошенник",
-            callback_data=f"report_scam_{chat_id}_{msg_id}_{user_id}"
-        )
-    )
+@bot.callback_query_handler(func=lambda call: call.data.startswith("report_scam_"))
+def handle_report_scam(call):
+    print(f"[ЖАЛОБА] Получен callback: {call.data} от пользователя {call.from_user.id}")
 
     try:
-        bot.send_message(
-            vip_id,
-            f"Вами заинтересовался {name}",
-            parse_mode="MarkdownV2",
-            reply_markup=markup
-        )
-    except Exception as e:
-        bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP {vip_id}: {e}")
+        # Разбираем report_scam_CHATID_MSGID_USERID
+        parts = call.data.split("_")
+        chat_id     = int(parts[1])
+        msg_id      = int(parts[2])
+        responder_id = int(parts[3])
 
-    bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
+        reporter_name = get_user_name(call.from_user)
+
+        # Ссылка на объявление
+        channel_id_short = str(chat_id)[4:] if str(chat_id).startswith("-100") else str(chat_id)
+        ann_link = f"https://t.me/c/{channel_id_short}/{msg_id}"
+
+        # Ссылка на пользователя, на которого жалуются
+        user_link = f"tg://user?id={responder_id}"
+
+        report_msg = (
+            f"🚨 **ЖАЛОБА НА СПАМ/СКАМ**\n\n"
+            f"От VIP: {reporter_name}\n"
+            f"На пользователя: [{responder_id}]({user_link})\n"
+            f"Объявление: {ann_link}\n"
+            f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg')).strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+
+        bot.send_message(
+            ADMIN_CHAT_ID,
+            report_msg,
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
+
+        bot.answer_callback_query(
+            call.id,
+            "Жалоба отправлена администрации. Спасибо за бдительность!",
+            show_alert=False
+        )
+
+    except Exception as e:
+        print(f"[ОШИБКА ЖАЛОБЫ] {str(e)}")
+        bot.answer_callback_query(
+            call.id,
+            "Не удалось отправить жалобу. Попробуйте позже.",
+            show_alert=True
+        )
 
 # ==================== УДАЛЕНИЕ СООБЩЕНИЙ БЕЗ ПОДПИСКИ + ОТБИВКА ====================
 # Отбивка один раз + автоудаление через 2 минуты (120 секунд)
