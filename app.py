@@ -172,7 +172,7 @@ chat_last_activity = {}    # vip_id: timestamp последней активно
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 def escape_md(text):
-    escape_chars = r'\_*[]()~`>#+-=|{}'
+    escape_chars = r'\_*[]~`>#+=|{}'
     for ch in escape_chars:
         text = text.replace(ch, f"\\{ch}")
     return text
@@ -750,7 +750,7 @@ def start_chat(call):
         # Уведомление тебе
         bot.send_message(
             ADMIN_CHAT_ID,
-            f"💬 *Чат начат*\n"
+            f"💬 Чат начат\n"
             f"VIP: {first_name} (@{username}) ID: {vip_id}\n"
             f"С пользователем ID: {responder_id}\n"
             f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}",
