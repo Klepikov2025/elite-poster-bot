@@ -833,7 +833,7 @@ def forward_chat_msg(message):
         forwarded = bot.forward_message(ADMIN_CHAT_ID, message.chat.id, message.message_id)
         bot.send_message(
             ADMIN_CHAT_ID,
-            f"**[{direction}]**\n"
+            f"[{direction}]\n"
             f"От: {get_user_name(message.from_user)} (@{message.from_user.username or 'нет'}) ID: {sender_id}\n"
             f"Кому ID: {receiver_id}\n"
             f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}\n"
