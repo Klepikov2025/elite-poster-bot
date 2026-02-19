@@ -737,7 +737,7 @@ def start_chat(call):
 
         bot.send_message(ADMIN_CHAT_ID, f"[DEBUG] 4. Имя VIP: {first_name} (@{username})")
 
-        # Сообщение VIP'у
+        # Сообщение VIP'у (это сообщение пользователю — тут Markdown можно оставить, если нужно)
         bot.send_message(
             vip_id,
             "Чат запущен!\n\n"
@@ -747,14 +747,13 @@ def start_chat(call):
 
         bot.send_message(ADMIN_CHAT_ID, "[DEBUG] 5. Отправили инструкцию VIP")
 
-        # Уведомление тебе
+        # Уведомление админу — БЕЗ Markdown
         bot.send_message(
             ADMIN_CHAT_ID,
-            f"💬 Чат начат\n"
-            f"VIP: {first_name} (@{username}) ID: {vip_id}\n"
+            "💬 Чат начат\n"
+            f"VIP: {first_name} (@{username})  ID: {vip_id}\n"
             f"С пользователем ID: {responder_id}\n"
             f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}",
-            parse_mode="Markdown",
             disable_web_page_preview=True
         )
 
@@ -767,6 +766,7 @@ def start_chat(call):
         print(error_text)
         bot.send_message(ADMIN_CHAT_ID, f"[ERROR] {error_text}")
         bot.answer_callback_query(call.id, "Ошибка запуска чата (проверьте админ-чат)", show_alert=True)
+
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("end_chat_"))
 def end_chat(call):
@@ -793,12 +793,14 @@ def end_chat(call):
             "Чат завершён. Вы можете начать новый в любой момент."
         )
 
+        # Уведомление админу — БЕЗ Markdown
         bot.send_message(
             ADMIN_CHAT_ID,
-            f"💬 Чат завершён по кнопке\n"
-            f"VIP: {get_user_name(call.from_user)} (@{call.from_user.username or 'нет'}) ID: {vip_id}\n"
+            "💬 Чат завершён по кнопке\n"
+            f"VIP: {get_user_name(call.from_user)} (@{call.from_user.username or 'нет'})  ID: {vip_id}\n"
             f"С ID: {responder_id}\n"
-            f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}"
+            f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}",
+            disable_web_page_preview=True
         )
 
         bot.answer_callback_query(call.id, "Чат завершён", show_alert=False)
@@ -806,6 +808,7 @@ def end_chat(call):
     except Exception as e:
         bot.answer_callback_query(call.id, "Ошибка завершения", show_alert=True)
         print(f"Ошибка end_chat: {str(e)}")
+
 
 @bot.message_handler(func=lambda m: m.chat.type == "private")
 def forward_chat_msg(message):
@@ -821,7 +824,7 @@ def forward_chat_msg(message):
             return  # сообщение не из нашего чата
         direction = "откликнувшийся → VIP"
 
-    # Обновляем время активности (для автоочистки)
+    # Обновляем время активности
     if sender_id in chat_last_activity:
         chat_last_activity[sender_id] = time.time()
 
@@ -829,16 +832,17 @@ def forward_chat_msg(message):
         # Пересылаем получателю
         bot.forward_message(receiver_id, message.chat.id, message.message_id)
 
-        # Копируем тебе в админ-чат
+        # Копируем в админ-чат
         forwarded = bot.forward_message(ADMIN_CHAT_ID, message.chat.id, message.message_id)
+
+        # Уведомление админу — БЕЗ Markdown
         bot.send_message(
             ADMIN_CHAT_ID,
             f"[{direction}]\n"
-            f"От: {get_user_name(message.from_user)} (@{message.from_user.username or 'нет'}) ID: {sender_id}\n"
+            f"От: {get_user_name(message.from_user)} (@{message.from_user.username or 'нет'})  ID: {sender_id}\n"
             f"Кому ID: {receiver_id}\n"
             f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}\n"
             f"Msg ID у админа: {forwarded.message_id}",
-            parse_mode="Markdown",
             disable_web_page_preview=True
         )
 
@@ -846,6 +850,7 @@ def forward_chat_msg(message):
         bot.send_message(ADMIN_CHAT_ID, f"Ошибка пересылки {direction}: {str(e)}")
 
 
+# auto_clean_chats уже без Markdown — оставляем как есть
 def auto_clean_chats():
     while True:
         time.sleep(3600)  # проверяем каждый час
@@ -862,7 +867,8 @@ def auto_clean_chats():
                 f"💬 Авто-очистка чата (72 ч без активности)\n"
                 f"VIP ID: {vip}\n"
                 f"С ID: {resp}\n"
-                f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}"
+                f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}",
+                disable_web_page_preview=True   # можно добавить для единообразия
             )
 
 # Запускаем фоновую задачу
