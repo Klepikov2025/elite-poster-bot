@@ -65,12 +65,16 @@ chat_ids_parni = {
     "Тюмень": -1002255622479,
     "Омск": -1002274367832,
     "Челябинск": -1002406302365,
-    "Перми": -1002280860973,
+    "Пермь": -1002280860973,
     "Курган": -1002469285352,
     "ХМАО": -1002287709568,
     "Уфа": -1002448909000,
     "Новосибирск": -1002261777025,
     "ЯМАО": -1002371438340
+    "Оренбург": -1003888335997,
+    "Москва": -1003856528145,
+    "Питер": -1003519420984,
+    "Красноярск": -1003347456711
 }
 
 chat_ids_ns = {
@@ -549,16 +553,69 @@ def handle_respond(call):
     # Теперь username точно есть → делаем красивую кликабельную ссылку
     name = f"[{escape_md(responder.first_name)}](https://t.me/{responder.username})"
 
+    # Добавляем кнопку жалобы
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        types.InlineKeyboardButton(
+            "🚨 Это спам / скам / мошенник",
+            callback_data=f"report_scam_{chat_id}_{msg_id}_{user_id}"
+        )
+    )
+
     try:
         bot.send_message(
             vip_id,
             f"Вами заинтересовался {name}",
-            parse_mode="MarkdownV2"  # MarkdownV2, потому что мы используем escape_md
+            parse_mode="MarkdownV2",
+            reply_markup=markup
         )
     except Exception as e:
-        bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP: {e}")
+        bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP {vip_id}: {e}")
 
     bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("report_scam_"))
+def handle_report_scam(call):
+    try:
+        parts = call.data.split("_")
+        if len(parts) != 4:
+            bot.answer_callback_query(call.id, "Ошибка формата жалобы", show_alert=True)
+            return
+
+        chat_id = int(parts[1])
+        msg_id = int(parts[2])
+        responder_id = int(parts[3])
+
+        reporter = get_user_name(call.from_user)
+        channel_part = str(chat_id)[4:] if str(chat_id).startswith("-100") else str(chat_id)
+        ann_link = f"https://t.me/c/{channel_part}/{msg_id}"
+        user_link = f"tg://user?id={responder_id}"
+
+        text = (
+            f"🚨 ЖАЛОБА НА СПАМ/СКАМ\n\n"
+            f"От: {reporter}\n"
+            f"На пользователя: [{responder_id}]({user_link})\n"
+            f"Объявление: {ann_link}\n"
+            f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg')).strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+
+        bot.send_message(
+            ADMIN_CHAT_ID,
+            text,
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
+
+        bot.answer_callback_query(call.id, "Жалоба отправлена администрации", show_alert=False)
+
+    except Exception as e:
+        bot.answer_callback_query(
+            call.id,
+            "Не удалось обработать жалобу",
+            show_alert=True
+        )
+
 
 def is_subscribed(user_id):
     try:
