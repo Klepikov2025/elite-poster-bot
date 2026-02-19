@@ -606,9 +606,13 @@ def check_subscription(message):
 
     # Отбивка ТОЛЬКО ОДИН РАЗ
     if key not in warned_users:
-        markup = types.InlineKeyboardMarkup()
+        markup = types.InlineKeyboardMarkup(row_width=2)
+
         markup.add(
-            types.InlineKeyboardButton("Подписаться на главный канал", url=MAIN_CHANNEL_LINK),
+            types.InlineKeyboardButton("Подписаться на МК", url=MAIN_CHANNEL_LINK),
+            types.InlineKeyboardButton("ПАРНИ 18+", url="https://t.me/znakparni"),
+        )
+        markup.add(
             types.InlineKeyboardButton("Резервный канал", url="https://t.me/gaysexchatrur"),
             types.InlineKeyboardButton("ПРАВИЛА МК", url="https://t.me/MensClubRules")
         )
@@ -617,7 +621,9 @@ def check_subscription(message):
             sent = bot.send_message(
                 chat_id=chat_id,
                 text="❗ Внимание, чтобы писать в чате вам необходимо подписаться на наш основной канал.\n\n"
-                     "Без подписки на канал ваши сообщения будут удаляться автоматически. Вступая в чат, я подтверждаю совершеннолетие и обязуюсь соблюдать правила, с которыми ознакомлен и согласен.",
+                     "Без подписки на канал ваши сообщения будут удаляться автоматически. "
+                     "Вступая в чат, я подтверждаю совершеннолетие и обязуюсь соблюдать правила, "
+                     "с которыми ознакомлен и согласен.",
                 reply_markup=markup
             )
             msg_id = sent.message_id
