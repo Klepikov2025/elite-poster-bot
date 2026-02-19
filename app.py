@@ -65,12 +65,16 @@ chat_ids_parni = {
     "Тюмень": -1002255622479,
     "Омск": -1002274367832,
     "Челябинск": -1002406302365,
-    "Перми": -1002280860973,
+    "Пермь": -1002280860973,
     "Курган": -1002469285352,
     "ХМАО": -1002287709568,
     "Уфа": -1002448909000,
     "Новосибирск": -1002261777025,
-    "ЯМАО": -1002371438340
+    "ЯМАО": -1002371438340,
+    "Оренбург": -1003888335997,
+    "Москва": -1003856528145,
+    "Питер": -1003519420984,
+    "Красноярск": -1003347456711
 }
 
 chat_ids_ns = {
@@ -549,24 +553,86 @@ def handle_respond(call):
     # Теперь username точно есть → делаем красивую кликабельную ссылку
     name = f"[{escape_md(responder.first_name)}](https://t.me/{responder.username})"
 
+    # Добавляем кнопку жалобы
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        types.InlineKeyboardButton(
+            "🚨 Это спам / скам / мошенник",
+            callback_data=f"report_scam_{chat_id}_{msg_id}_{user_id}"
+        )
+    )
+
     try:
         bot.send_message(
             vip_id,
             f"Вами заинтересовался {name}",
-            parse_mode="MarkdownV2"  # MarkdownV2, потому что мы используем escape_md
+            parse_mode="MarkdownV2",
+            reply_markup=markup
         )
     except Exception as e:
-        bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP: {e}")
+        bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP {vip_id}: {e}")
 
     bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
 
-def is_subscribed(user_id):
+@bot.callback_query_handler(func=lambda call: call.data == "respond")
+def handle_respond(call):
+    chat_id = call.message.chat.id
+    msg_id = call.message.message_id
+    user_id = call.from_user.id
+    responder = call.from_user  # полный объект User
+
+    key = (chat_id, msg_id)
+    if key not in post_owner:
+        bot.answer_callback_query(call.id, "Ошибка объявления.")
+        return
+
+    if key not in responded:
+        responded[key] = set()
+
+    if user_id in responded[key]:
+        bot.answer_callback_query(call.id, "Вы уже откликались на это объявление.")
+        return
+
+    # === БЛОКИРОВКА ОТКЛИКА БЕЗ @username ===
+    if not responder.username:
+        bot.answer_callback_query(
+            callback_query_id=call.id,
+            text="❌ Отклик запрещён!\n\n"
+                 "У вас скрыт @username в настройках приватности.\n\n"
+                 "Чтобы откликаться на VIP-объявления — откройте его:\n"
+                 "Настройки → Конфиденциальность и безопасность → "
+                 "«Пересылка сообщений» → выбрать «Всем»",
+            show_alert=True
+        )
+        return
+    # ========================================
+
+    responded[key].add(user_id)
+    vip_id = post_owner[key]
+
+    # Теперь username точно есть → делаем красивую кликабельную ссылку
+    name = f"[{escape_md(responder.first_name)}](https://t.me/{responder.username})"
+
+    # Добавляем кнопку жалобы
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        types.InlineKeyboardButton(
+            "🚨 Это спам / скам / мошенник",
+            callback_data=f"report_scam_{chat_id}_{msg_id}_{user_id}"
+        )
+    )
+
     try:
-        member = bot.get_chat_member(MAIN_CHANNEL_ID, user_id)
-        return member.status in ("member", "administrator", "creator")
+        bot.send_message(
+            vip_id,
+            f"Вами заинтересовался {name}",
+            parse_mode="MarkdownV2",
+            reply_markup=markup
+        )
     except Exception as e:
-        print(f"Ошибка при проверке подписки для {user_id}: {e}")
-        return False
+        bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP {vip_id}: {e}")
+
+    bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
 
 # ==================== УДАЛЕНИЕ СООБЩЕНИЙ БЕЗ ПОДПИСКИ + ОТБИВКА ====================
 # Отбивка один раз + автоудаление через 2 минуты (120 секунд)
