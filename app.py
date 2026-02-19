@@ -65,16 +65,12 @@ chat_ids_parni = {
     "Тюмень": -1002255622479,
     "Омск": -1002274367832,
     "Челябинск": -1002406302365,
-    "Пермь": -1002280860973,
+    "Перми": -1002280860973,
     "Курган": -1002469285352,
     "ХМАО": -1002287709568,
     "Уфа": -1002448909000,
     "Новосибирск": -1002261777025,
-    "ЯМАО": -1002371438340,
-    "Оренбург": -1003888335997,
-    "Москва": -1003856528145,
-    "Питер": -1003519420984,
-    "Красноярск": -1003347456711
+    "ЯМАО": -1002371438340
 }
 
 chat_ids_ns = {
@@ -519,7 +515,7 @@ def handle_respond(call):
     chat_id = call.message.chat.id
     msg_id = call.message.message_id
     user_id = call.from_user.id
-    responder = call.from_user
+    responder = call.from_user  # полный объект User
 
     key = (chat_id, msg_id)
     if key not in post_owner:
@@ -533,6 +529,7 @@ def handle_respond(call):
         bot.answer_callback_query(call.id, "Вы уже откликались на это объявление.")
         return
 
+    # === БЛОКИРОВКА ОТКЛИКА БЕЗ @username ===
     if not responder.username:
         bot.answer_callback_query(
             callback_query_id=call.id,
@@ -544,88 +541,33 @@ def handle_respond(call):
             show_alert=True
         )
         return
+    # ========================================
 
     responded[key].add(user_id)
     vip_id = post_owner[key]
 
+    # Теперь username точно есть → делаем красивую кликабельную ссылку
     name = f"[{escape_md(responder.first_name)}](https://t.me/{responder.username})"
-
-    markup = types.InlineKeyboardMarkup()
-    markup.add(
-        types.InlineKeyboardButton(
-            "🚨 Это спам / скам / мошенник",
-            callback_data=f"report_scam_{chat_id}_{msg_id}_{user_id}"
-        )
-    )
 
     try:
         bot.send_message(
             vip_id,
             f"Вами заинтересовался {name}",
-            parse_mode="MarkdownV2",
-            reply_markup=markup
+            parse_mode="MarkdownV2"  # MarkdownV2, потому что мы используем escape_md
         )
     except Exception as e:
-        bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP {vip_id}: {e}")
+        bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP: {e}")
 
     bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
 
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith("report_scam_"))
-def handle_report_scam(call):
-    print(f"[ЖАЛОБА DEBUG] Получен callback: '{call.data}' от {call.from_user.id}")
-
+def is_subscribed(user_id):
     try:
-        parts = call.data.split("_")
-        print(f"[ЖАЛОБА DEBUG] Разбито на части: {parts}")
-
-        if len(parts) != 4:
-            raise ValueError(f"Ожидалось 4 части, получено {len(parts)}")
-
-        chat_id = int(parts[1])
-        msg_id = int(parts[2])
-        responder_id = int(parts[3])
-
-        print(f"[ЖАЛОБА DEBUG] chat_id={chat_id}, msg_id={msg_id}, responder_id={responder_id}")
-
-        reporter_name = get_user_name(call.from_user)
-        print(f"[ЖАЛОБА DEBUG] reporter_name = {reporter_name}")
-
-        channel_id_short = str(chat_id)[4:] if str(chat_id).startswith("-100") else str(chat_id)
-        ann_link = f"https://t.me/c/{channel_id_short}/{msg_id}"
-        user_link = f"tg://user?id={responder_id}"
-
-        report_msg = (
-            f"🚨 **ЖАЛОБА НА СПАМ/СКАМ**\n\n"
-            f"От VIP: {reporter_name}\n"
-            f"На пользователя: [{responder_id}]({user_link})\n"
-            f"Объявление: {ann_link}\n"
-            f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg')).strftime('%Y-%m-%d %H:%M:%S')}"
-        )
-        print(f"[ЖАЛОБА DEBUG] Сообщение сформировано:\n{report_msg}")
-
-        bot.send_message(
-            ADMIN_CHAT_ID,
-            report_msg,
-            parse_mode="Markdown",
-            disable_web_page_preview=True
-        )
-        print("[ЖАЛОБА DEBUG] Сообщение успешно отправлено админу")
-
-        bot.answer_callback_query(
-            call.id,
-            "Жалоба отправлена администрации. Спасибо за бдительность!",
-            show_alert=False
-        )
-
+        member = bot.get_chat_member(MAIN_CHANNEL_ID, user_id)
+        return member.status in ("member", "administrator", "creator")
     except Exception as e:
-        print(f"[ОШИБКА ЖАЛОБЫ] {type(e).__name__}: {str(e)}")
-        print(f"[ОШИБКА ЖАЛОБЫ] Полный callback_data: {call.data}")
-        bot.answer_callback_query(
-            call.id,
-            "Не удалось отправить жалобу. Попробуйте позже.",
-            show_alert=True
-        )
+        print(f"Ошибка при проверке подписки для {user_id}: {e}")
+        return False
+
 # ==================== УДАЛЕНИЕ СООБЩЕНИЙ БЕЗ ПОДПИСКИ + ОТБИВКА ====================
 # Отбивка один раз + автоудаление через 2 минуты (120 секунд)
 warned_users = {}  # (chat_id, user_id) -> message_id отбивки
