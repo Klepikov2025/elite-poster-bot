@@ -577,15 +577,21 @@ def handle_respond(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("report_scam_"))
 def handle_report_scam(call):
+    # Временно выводим в лог, что именно пришло (потом можно убрать)
+    print(f"ЖАЛОБА: callback_data = {call.data}")
+
     try:
-        parts = call.data.split("_")
-        if len(parts) != 4:
+        # Разбиваем и пропускаем первую часть "report_scam"
+        parts = call.data.split("_")[1:]  # отбрасываем 'report_scam'
+
+        if len(parts) != 3:
+            print(f"ЖАЛОБА: неверное количество частей после split: {len(parts)} (ожидается 3)")
             bot.answer_callback_query(call.id, "Ошибка формата жалобы", show_alert=True)
             return
 
-        chat_id = int(parts[1])
-        msg_id = int(parts[2])
-        responder_id = int(parts[3])
+        chat_id = int(parts[0])
+        msg_id = int(parts[1])
+        responder_id = int(parts[2])
 
         reporter = get_user_name(call.from_user)
         channel_part = str(chat_id)[4:] if str(chat_id).startswith("-100") else str(chat_id)
@@ -609,13 +615,13 @@ def handle_report_scam(call):
 
         bot.answer_callback_query(call.id, "Жалоба отправлена администрации", show_alert=False)
 
-    except Exception as e:
-        bot.answer_callback_query(
-            call.id,
-            "Не удалось обработать жалобу",
-            show_alert=True
-        )
+    except ValueError as ve:
+        print(f"ЖАЛОБА: ValueError при преобразовании ID: {ve}")
+        bot.answer_callback_query(call.id, "Ошибка обработки данных жалобы", show_alert=True)
 
+    except Exception as e:
+        print(f"ЖАЛОБА: неожиданная ошибка {type(e).__name__}: {str(e)}")
+        bot.answer_callback_query(call.id, "Не удалось обработать жалобу", show_alert=True)
 
 def is_subscribed(user_id):
     try:
