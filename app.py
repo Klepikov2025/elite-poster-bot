@@ -576,22 +576,26 @@ def handle_respond(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("report_scam_"))
 def handle_report_scam(call):
-    print(f"[ЖАЛОБА] Получен callback: {call.data} от пользователя {call.from_user.id}")
+    print(f"[ЖАЛОБА DEBUG] Получен callback: '{call.data}'")
+    print(f"[ЖАЛОБА DEBUG] От пользователя: ID={call.from_user.id}, username=@{call.from_user.username}")
 
     try:
-        # Разбираем report_scam_CHATID_MSGID_USERID
         parts = call.data.split("_")
-        chat_id     = int(parts[1])
-        msg_id      = int(parts[2])
+        print(f"[ЖАЛОБА DEBUG] Разбито на части: {parts}")
+
+        if len(parts) != 4:
+            raise ValueError(f"Неверное количество частей: {len(parts)} вместо 4")
+
+        chat_id = int(parts[1])
+        msg_id = int(parts[2])
         responder_id = int(parts[3])
+        print(f"[ЖАЛОБА DEBUG] chat_id={chat_id}, msg_id={msg_id}, responder_id={responder_id}")
 
         reporter_name = get_user_name(call.from_user)
+        print(f"[ЖАЛОБА DEBUG] reporter_name = {reporter_name}")
 
-        # Ссылка на объявление
         channel_id_short = str(chat_id)[4:] if str(chat_id).startswith("-100") else str(chat_id)
         ann_link = f"https://t.me/c/{channel_id_short}/{msg_id}"
-
-        # Ссылка на пользователя, на которого жалуются
         user_link = f"tg://user?id={responder_id}"
 
         report_msg = (
@@ -601,6 +605,7 @@ def handle_report_scam(call):
             f"Объявление: {ann_link}\n"
             f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg')).strftime('%Y-%m-%d %H:%M:%S')}"
         )
+        print(f"[ЖАЛОБА DEBUG] Сообщение сформировано:\n{report_msg}")
 
         bot.send_message(
             ADMIN_CHAT_ID,
@@ -608,6 +613,7 @@ def handle_report_scam(call):
             parse_mode="Markdown",
             disable_web_page_preview=True
         )
+        print("[ЖАЛОБА DEBUG] Сообщение успешно отправлено админу")
 
         bot.answer_callback_query(
             call.id,
@@ -616,7 +622,8 @@ def handle_report_scam(call):
         )
 
     except Exception as e:
-        print(f"[ОШИБКА ЖАЛОБЫ] {str(e)}")
+        print(f"[ОШИБКА ЖАЛОБЫ] {type(e).__name__}: {str(e)}")
+        print(f"[ОШИБКА ЖАЛОБЫ] Полный callback_data: {call.data}")
         bot.answer_callback_query(
             call.id,
             "Не удалось отправить жалобу. Попробуйте позже.",
