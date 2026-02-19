@@ -167,8 +167,6 @@ VERIFICATION_LINK = "http://t.me/vip_znakbot"
 user_posts = {}
 post_owner = {}
 responded = {}
-active_chats = {}          # vip_id: responder_id
-chat_last_activity = {}    # vip_id: timestamp последней активности
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 def escape_md(text):
@@ -558,16 +556,12 @@ def handle_respond(call):
     else:
         name = f"[{escape_md(responder.first_name)}](tg://user?id={user_id})"
 
-    # Две кнопки в одну строку
+    # Кнопка Жалобы
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton(
             "🚨 Это спам / скам / мошенник",
             callback_data=f"report_scam_{chat_id}_{msg_id}_{user_id}"
-        ),
-        types.InlineKeyboardButton(
-            "💬 Написать в ответ",
-            callback_data=f"start_chat_{user_id}"
         )
     )
 
@@ -712,179 +706,6 @@ def check_subscription(message):
 
         except Exception as e:
             print(f"Ошибка отправки отбивки пользователю {user_id}: {e}")
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith("start_chat_"))
-def start_chat(call):
-    bot.send_message(ADMIN_CHAT_ID, f"[DEBUG] Кнопка 'Написать в ответ' нажата от ID {call.from_user.id}")
-
-    try:
-        bot.send_message(ADMIN_CHAT_ID, "[DEBUG] 1. Парсим callback_data")
-
-        responder_id = int(call.data.split("_")[2])
-        vip_id = call.from_user.id
-
-        bot.send_message(ADMIN_CHAT_ID, f"[DEBUG] 2. Получили IDs: VIP={vip_id}, Responder={responder_id}")
-
-        # Запоминаем пару
-        active_chats[vip_id] = responder_id
-        chat_last_activity[vip_id] = time.time()
-
-        bot.send_message(ADMIN_CHAT_ID, "[DEBUG] 3. Записали в словари")
-
-        # Безопасное имя
-        first_name = call.from_user.first_name or "Пользователь"
-        username = call.from_user.username or "нет"
-
-        bot.send_message(ADMIN_CHAT_ID, f"[DEBUG] 4. Имя VIP: {first_name} (@{username})")
-
-        # Сообщение VIP'у (это сообщение пользователю — тут Markdown можно оставить, если нужно)
-        bot.send_message(
-            vip_id,
-            "Чат запущен!\n\n"
-            "Пишите мне любое сообщение (текст, фото, видео, голосовое) — оно будет передано собеседнику.\n"
-            "Чтобы завершить чат — нажмите кнопку ниже."
-        )
-
-        bot.send_message(ADMIN_CHAT_ID, "[DEBUG] 5. Отправили инструкцию VIP")
-
-        # Уведомление админу — БЕЗ Markdown
-        bot.send_message(
-            ADMIN_CHAT_ID,
-            "💬 Чат начат\n"
-            f"VIP: {first_name} (@{username})  ID: {vip_id}\n"
-            f"С пользователем ID: {responder_id}\n"
-            f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}",
-            disable_web_page_preview=True
-        )
-
-        bot.send_message(ADMIN_CHAT_ID, "[DEBUG] 6. Отправили уведомление админу")
-
-        bot.answer_callback_query(call.id, "Чат запущен", show_alert=False)
-
-    except Exception as e:
-        error_text = f"Ошибка в start_chat: {type(e).__name__}: {str(e)}"
-        print(error_text)
-        bot.send_message(ADMIN_CHAT_ID, f"[ERROR] {error_text}")
-        bot.answer_callback_query(call.id, "Ошибка запуска чата (проверьте админ-чат)", show_alert=True)
-
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith("end_chat_"))
-def end_chat(call):
-    try:
-        parts = call.data.split("_")
-        if len(parts) != 4:
-            bot.answer_callback_query(call.id, "Неверный формат", show_alert=True)
-            return
-
-        vip_id = int(parts[2])
-        responder_id = int(parts[3])
-
-        # Проверяем, что кнопку нажал именно VIP этого чата
-        if vip_id != call.from_user.id or vip_id not in active_chats:
-            bot.answer_callback_query(call.id, "Этот чат уже завершён или не ваш", show_alert=True)
-            return
-
-        # Завершаем чат
-        active_chats.pop(vip_id, None)
-        chat_last_activity.pop(vip_id, None)
-
-        bot.send_message(
-            vip_id,
-            "Чат завершён. Вы можете начать новый в любой момент."
-        )
-
-        # Уведомление админу — БЕЗ Markdown
-        bot.send_message(
-            ADMIN_CHAT_ID,
-            "💬 Чат завершён по кнопке\n"
-            f"VIP: {get_user_name(call.from_user)} (@{call.from_user.username or 'нет'})  ID: {vip_id}\n"
-            f"С ID: {responder_id}\n"
-            f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}",
-            disable_web_page_preview=True
-        )
-
-        bot.answer_callback_query(call.id, "Чат завершён", show_alert=False)
-
-    except Exception as e:
-        bot.answer_callback_query(call.id, "Ошибка завершения", show_alert=True)
-        print(f"Ошибка end_chat: {str(e)}")
-
-
-@bot.message_handler(func=lambda m: m.chat.type == "private")
-def forward_chat_msg(message):
-    sender_id = message.from_user.id if message.from_user else None
-    
-    if not sender_id:
-        bot.send_message(ADMIN_CHAT_ID, "[DEBUG forward] Нет from_user — игнор")
-        return
-
-    bot.send_message(ADMIN_CHAT_ID, f"[DEBUG forward] Получено приватное сообщение от {sender_id} (text: {message.text[:50] if message.text else 'не текст'})")
-
-    # Проверяем, участвует ли вообще этот пользователь в чате
-    is_vip = sender_id in active_chats
-    is_responder = any(sender_id == resp for resp in active_chats.values())
-
-    bot.send_message(ADMIN_CHAT_ID, f"[DEBUG forward] is_vip={is_vip}, is_responder={is_responder}, active_chats={active_chats}")
-
-    if not (is_vip or is_responder):
-        bot.send_message(ADMIN_CHAT_ID, f"[DEBUG forward] Пользователь {sender_id} не в активных чатах → игнор")
-        return
-
-    # Определяем получателя
-    if is_vip:
-        receiver_id = active_chats[sender_id]
-        direction = "VIP → responder"
-    else:
-        receiver_id = next((vip for vip, resp in active_chats.items() if resp == sender_id), None)
-        if not receiver_id:
-            bot.send_message(ADMIN_CHAT_ID, f"[DEBUG forward] НЕ НАЙДЕН VIP для responder {sender_id}")
-            return
-        direction = "responder → VIP"
-
-    bot.send_message(ADMIN_CHAT_ID, f"[DEBUG forward] direction={direction}, receiver={receiver_id}")
-
-    if sender_id == receiver_id:
-        bot.send_message(sender_id, "Нельзя писать самому себе")
-        return
-
-    try:
-        bot.forward_message(receiver_id, message.chat.id, message.message_id)
-        bot.send_message(ADMIN_CHAT_ID, f"[DEBUG forward] Успешно forwarded → {receiver_id}")
-
-        forwarded = bot.forward_message(ADMIN_CHAT_ID, message.chat.id, message.message_id)
-        bot.send_message(ADMIN_CHAT_ID,
-            f"[{direction}]\n"
-            f"От {sender_id} → {receiver_id}\n"
-            f"Msg ID админа: {forwarded.message_id}",
-            disable_web_page_preview=True
-        )
-    except Exception as e:
-        bot.send_message(ADMIN_CHAT_ID, f"[ERROR forward] {direction} от {sender_id} → {receiver_id}: {type(e).__name__}: {str(e)}")
-
-
-# auto_clean_chats уже без Markdown — оставляем как есть
-def auto_clean_chats():
-    while True:
-        time.sleep(3600)  # проверяем каждый час
-        now = time.time()
-        expired = []
-        for vip_id, ts in list(chat_last_activity.items()):
-            if now - ts > 72 * 3600:  # 72 часа
-                resp_id = active_chats.pop(vip_id, None)
-                chat_last_activity.pop(vip_id, None)
-                expired.append((vip_id, resp_id))
-        for vip, resp in expired:
-            bot.send_message(
-                ADMIN_CHAT_ID,
-                f"💬 Авто-очистка чата (72 ч без активности)\n"
-                f"VIP ID: {vip}\n"
-                f"С ID: {resp}\n"
-                f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}",
-                disable_web_page_preview=True   # можно добавить для единообразия
-            )
-
-# Запускаем фоновую задачу
-threading.Thread(target=auto_clean_chats, daemon=True).start()
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
