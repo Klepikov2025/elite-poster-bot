@@ -812,42 +812,54 @@ def end_chat(call):
 
 @bot.message_handler(func=lambda m: m.chat.type == "private")
 def forward_chat_msg(message):
-    sender_id = message.from_user.id
+    sender_id = message.from_user.id if message.from_user else None
+    
+    if not sender_id:
+        bot.send_message(ADMIN_CHAT_ID, "[DEBUG forward] Нет from_user — игнор")
+        return
+
+    bot.send_message(ADMIN_CHAT_ID, f"[DEBUG forward] Получено приватное сообщение от {sender_id} (text: {message.text[:50] if message.text else 'не текст'})")
+
+    # Проверяем, участвует ли вообще этот пользователь в чате
+    is_vip = sender_id in active_chats
+    is_responder = any(sender_id == resp for resp in active_chats.values())
+
+    bot.send_message(ADMIN_CHAT_ID, f"[DEBUG forward] is_vip={is_vip}, is_responder={is_responder}, active_chats={active_chats}")
+
+    if not (is_vip or is_responder):
+        bot.send_message(ADMIN_CHAT_ID, f"[DEBUG forward] Пользователь {sender_id} не в активных чатах → игнор")
+        return
 
     # Определяем получателя
-    if sender_id in active_chats:
+    if is_vip:
         receiver_id = active_chats[sender_id]
-        direction = "VIP → откликнувшийся"
+        direction = "VIP → responder"
     else:
         receiver_id = next((vip for vip, resp in active_chats.items() if resp == sender_id), None)
         if not receiver_id:
-            return  # сообщение не из нашего чата
-        direction = "откликнувшийся → VIP"
+            bot.send_message(ADMIN_CHAT_ID, f"[DEBUG forward] НЕ НАЙДЕН VIP для responder {sender_id}")
+            return
+        direction = "responder → VIP"
 
-    # Обновляем время активности
-    if sender_id in chat_last_activity:
-        chat_last_activity[sender_id] = time.time()
+    bot.send_message(ADMIN_CHAT_ID, f"[DEBUG forward] direction={direction}, receiver={receiver_id}")
+
+    if sender_id == receiver_id:
+        bot.send_message(sender_id, "Нельзя писать самому себе")
+        return
 
     try:
-        # Пересылаем получателю
         bot.forward_message(receiver_id, message.chat.id, message.message_id)
+        bot.send_message(ADMIN_CHAT_ID, f"[DEBUG forward] Успешно forwarded → {receiver_id}")
 
-        # Копируем в админ-чат
         forwarded = bot.forward_message(ADMIN_CHAT_ID, message.chat.id, message.message_id)
-
-        # Уведомление админу — БЕЗ Markdown
-        bot.send_message(
-            ADMIN_CHAT_ID,
+        bot.send_message(ADMIN_CHAT_ID,
             f"[{direction}]\n"
-            f"От: {get_user_name(message.from_user)} (@{message.from_user.username or 'нет'})  ID: {sender_id}\n"
-            f"Кому ID: {receiver_id}\n"
-            f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}\n"
-            f"Msg ID у админа: {forwarded.message_id}",
+            f"От {sender_id} → {receiver_id}\n"
+            f"Msg ID админа: {forwarded.message_id}",
             disable_web_page_preview=True
         )
-
     except Exception as e:
-        bot.send_message(ADMIN_CHAT_ID, f"Ошибка пересылки {direction}: {str(e)}")
+        bot.send_message(ADMIN_CHAT_ID, f"[ERROR forward] {direction} от {sender_id} → {receiver_id}: {type(e).__name__}: {str(e)}")
 
 
 # auto_clean_chats уже без Markdown — оставляем как есть
