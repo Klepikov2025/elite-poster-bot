@@ -519,7 +519,7 @@ def handle_respond(call):
     chat_id = call.message.chat.id
     msg_id = call.message.message_id
     user_id = call.from_user.id
-    responder = call.from_user  # полный объект User
+    responder = call.from_user
 
     key = (chat_id, msg_id)
     if key not in post_owner:
@@ -533,7 +533,6 @@ def handle_respond(call):
         bot.answer_callback_query(call.id, "Вы уже откликались на это объявление.")
         return
 
-    # === БЛОКИРОВКА ОТКЛИКА БЕЗ @username ===
     if not responder.username:
         bot.answer_callback_query(
             callback_query_id=call.id,
@@ -545,15 +544,12 @@ def handle_respond(call):
             show_alert=True
         )
         return
-    # ========================================
 
     responded[key].add(user_id)
     vip_id = post_owner[key]
 
-    # Теперь username точно есть → делаем красивую кликабельную ссылку
     name = f"[{escape_md(responder.first_name)}](https://t.me/{responder.username})"
 
-    # Добавляем кнопку жалобы
     markup = types.InlineKeyboardMarkup()
     markup.add(
         types.InlineKeyboardButton(
@@ -574,21 +570,22 @@ def handle_respond(call):
 
     bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
 
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith("report_scam_"))
 def handle_report_scam(call):
-    print(f"[ЖАЛОБА DEBUG] Получен callback: '{call.data}'")
-    print(f"[ЖАЛОБА DEBUG] От пользователя: ID={call.from_user.id}, username=@{call.from_user.username}")
+    print(f"[ЖАЛОБА DEBUG] Получен callback: '{call.data}' от {call.from_user.id}")
 
     try:
         parts = call.data.split("_")
         print(f"[ЖАЛОБА DEBUG] Разбито на части: {parts}")
 
         if len(parts) != 4:
-            raise ValueError(f"Неверное количество частей: {len(parts)} вместо 4")
+            raise ValueError(f"Ожидалось 4 части, получено {len(parts)}")
 
         chat_id = int(parts[1])
         msg_id = int(parts[2])
         responder_id = int(parts[3])
+
         print(f"[ЖАЛОБА DEBUG] chat_id={chat_id}, msg_id={msg_id}, responder_id={responder_id}")
 
         reporter_name = get_user_name(call.from_user)
@@ -629,7 +626,6 @@ def handle_report_scam(call):
             "Не удалось отправить жалобу. Попробуйте позже.",
             show_alert=True
         )
-
 # ==================== УДАЛЕНИЕ СООБЩЕНИЙ БЕЗ ПОДПИСКИ + ОТБИВКА ====================
 # Отбивка один раз + автоудаление через 2 минуты (120 секунд)
 warned_users = {}  # (chat_id, user_id) -> message_id отбивки
