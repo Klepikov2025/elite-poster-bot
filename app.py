@@ -719,23 +719,33 @@ def start_chat(call):
         responder_id = int(call.data.split("_")[2])
         vip_id = call.from_user.id
 
-        # Запоминаем пару и время активности
+        # Запоминаем пару и время
         active_chats[vip_id] = responder_id
         chat_last_activity[vip_id] = time.time()
 
-        # Сообщение VIP'у в личку
+        # Безопасное имя VIP
+        first_name = call.from_user.first_name or ""
+        username = call.from_user.username or None
+
+        display_name = escape_md(first_name.strip()) if first_name.strip() else "Пользователь"
+        if username:
+            display_name += f" (@{username})"
+        if not display_name.strip():
+            display_name = f"ID {vip_id}"
+
+        # Сообщение VIP'у
         bot.send_message(
             vip_id,
             "Чат запущен!\n\n"
             "Пишите мне любое сообщение (текст, фото, видео, голосовое) — оно будет передано собеседнику.\n"
-            "Чтобы завершить чат — напишите команду /stopchat в личку мне."
+            "Чтобы завершить чат — нажмите кнопку ниже."
         )
 
-        # Улучшенное уведомление админу с Markdown и без превью
+        # Уведомление админу
         bot.send_message(
             ADMIN_CHAT_ID,
             f"💬 *Чат начат*\n"
-            f"VIP: {get_user_name(call.from_user)} (@{call.from_user.username or 'нет'}) ID: {vip_id}\n"
+            f"VIP: {display_name} ID: {vip_id}\n"
             f"С пользователем ID: {responder_id}\n"
             f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}",
             parse_mode="Markdown",
