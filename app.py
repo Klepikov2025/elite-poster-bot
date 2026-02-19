@@ -172,7 +172,7 @@ chat_last_activity = {}    # vip_id: timestamp последней активно
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 def escape_md(text):
-    escape_chars = r'\_*[]~`>#+=|{}'
+    escape_chars = r'\_*[]()~`>#+=|{}'
     for ch in escape_chars:
         text = text.replace(ch, f"\\{ch}")
     return text
@@ -575,7 +575,7 @@ def handle_respond(call):
         bot.send_message(
             vip_id,
             f"Вами заинтересовался {name}",
-            parse_mode="MarkdownV2",
+            parse_mode="Markdown",
             reply_markup=markup
         )
     except Exception as e:
