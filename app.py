@@ -167,6 +167,8 @@ VERIFICATION_LINK = "http://t.me/vip_znakbot"
 user_posts = {}
 post_owner = {}
 responded = {}
+active_chats = {}          # vip_id: responder_id
+chat_last_activity = {}    # vip_id: timestamp последней активности
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 def escape_md(text):
@@ -550,15 +552,22 @@ def handle_respond(call):
     responded[key].add(user_id)
     vip_id = post_owner[key]
 
-    # Теперь username точно есть → делаем красивую кликабельную ссылку
-    name = f"[{escape_md(responder.first_name)}](https://t.me/{responder.username})"
+    # Формируем имя + ссылку на профиль (работает даже без @username)
+    if responder.username:
+        name = f"[{escape_md(responder.first_name)}](https://t.me/{responder.username})"
+    else:
+        name = f"[{escape_md(responder.first_name)}](tg://user?id={user_id})"
 
-    # Добавляем кнопку жалобы
-    markup = types.InlineKeyboardMarkup()
+    # Две кнопки в одну строку
+    markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton(
             "🚨 Это спам / скам / мошенник",
             callback_data=f"report_scam_{chat_id}_{msg_id}_{user_id}"
+        ),
+        types.InlineKeyboardButton(
+            "💬 Написать в ответ",
+            callback_data=f"start_chat_{user_id}"
         )
     )
 
@@ -573,7 +582,6 @@ def handle_respond(call):
         bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP {vip_id}: {e}")
 
     bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
-
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("report_scam_"))
 def handle_report_scam(call):
@@ -704,6 +712,141 @@ def check_subscription(message):
 
         except Exception as e:
             print(f"Ошибка отправки отбивки пользователю {user_id}: {e}")
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("start_chat_"))
+def start_chat(call):
+    try:
+        responder_id = int(call.data.split("_")[2])
+        vip_id = call.from_user.id
+
+        # Запоминаем пару и время активности
+        active_chats[vip_id] = responder_id
+        chat_last_activity[vip_id] = time.time()
+
+        # Сообщение VIP'у в личку
+        bot.send_message(
+            vip_id,
+            "Чат запущен!\n\n"
+            "Пишите мне любое сообщение (текст, фото, видео, голосовое) — оно будет передано собеседнику.\n"
+            "Чтобы завершить чат — напишите команду /stopchat в личку мне."
+        )
+
+        # Улучшенное уведомление админу с Markdown и без превью
+        bot.send_message(
+            ADMIN_CHAT_ID,
+            f"💬 *Чат начат*\n"
+            f"VIP: {get_user_name(call.from_user)} (@{call.from_user.username or 'нет'}) ID: {vip_id}\n"
+            f"С пользователем ID: {responder_id}\n"
+            f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}",
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
+
+        bot.answer_callback_query(call.id, "Чат запущен", show_alert=False)
+
+    except Exception as e:
+        bot.answer_callback_query(call.id, "Ошибка запуска чата", show_alert=True)
+        print(f"Ошибка в start_chat: {str(e)}")
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("end_chat_"))
+def end_chat(call):
+    try:
+        parts = call.data.split("_")
+        if len(parts) != 4:
+            bot.answer_callback_query(call.id, "Неверный формат", show_alert=True)
+            return
+
+        vip_id = int(parts[2])
+        responder_id = int(parts[3])
+
+        # Проверяем, что кнопку нажал именно VIP этого чата
+        if vip_id != call.from_user.id or vip_id not in active_chats:
+            bot.answer_callback_query(call.id, "Этот чат уже завершён или не ваш", show_alert=True)
+            return
+
+        # Завершаем чат
+        active_chats.pop(vip_id, None)
+        chat_last_activity.pop(vip_id, None)
+
+        bot.send_message(
+            vip_id,
+            "Чат завершён. Вы можете начать новый в любой момент."
+        )
+
+        bot.send_message(
+            ADMIN_CHAT_ID,
+            f"💬 Чат завершён по кнопке\n"
+            f"VIP: {get_user_name(call.from_user)} (@{call.from_user.username or 'нет'}) ID: {vip_id}\n"
+            f"С ID: {responder_id}\n"
+            f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}"
+        )
+
+        bot.answer_callback_query(call.id, "Чат завершён", show_alert=False)
+
+    except Exception as e:
+        bot.answer_callback_query(call.id, "Ошибка завершения", show_alert=True)
+        print(f"Ошибка end_chat: {str(e)}")
+
+@bot.message_handler(func=lambda m: m.chat.type == "private")
+def forward_chat_msg(message):
+    sender_id = message.from_user.id
+
+    # Определяем получателя
+    if sender_id in active_chats:
+        receiver_id = active_chats[sender_id]
+        direction = "VIP → откликнувшийся"
+    else:
+        receiver_id = next((vip for vip, resp in active_chats.items() if resp == sender_id), None)
+        if not receiver_id:
+            return  # сообщение не из нашего чата
+        direction = "откликнувшийся → VIP"
+
+    # Обновляем время активности (для автоочистки)
+    if sender_id in chat_last_activity:
+        chat_last_activity[sender_id] = time.time()
+
+    try:
+        # Пересылаем получателю
+        bot.forward_message(receiver_id, message.chat.id, message.message_id)
+
+        # Копируем тебе в админ-чат
+        forwarded = bot.forward_message(ADMIN_CHAT_ID, message.chat.id, message.message_id)
+        bot.send_message(
+            ADMIN_CHAT_ID,
+            f"**[{direction}]**\n"
+            f"От: {get_user_name(message.from_user)} (@{message.from_user.username or 'нет'}) ID: {sender_id}\n"
+            f"Кому ID: {receiver_id}\n"
+            f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}\n"
+            f"Msg ID у админа: {forwarded.message_id}",
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
+
+    except Exception as e:
+        bot.send_message(ADMIN_CHAT_ID, f"Ошибка пересылки {direction}: {str(e)}")
+
+
+def auto_clean_chats():
+    while True:
+        time.sleep(3600)  # проверяем каждый час
+        now = time.time()
+        expired = []
+        for vip_id, ts in list(chat_last_activity.items()):
+            if now - ts > 72 * 3600:  # 72 часа
+                resp_id = active_chats.pop(vip_id, None)
+                chat_last_activity.pop(vip_id, None)
+                expired.append((vip_id, resp_id))
+        for vip, resp in expired:
+            bot.send_message(
+                ADMIN_CHAT_ID,
+                f"💬 Авто-очистка чата (72 ч без активности)\n"
+                f"VIP ID: {vip}\n"
+                f"С ID: {resp}\n"
+                f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg'))}"
+            )
+
+# Запускаем фоновую задачу
+threading.Thread(target=auto_clean_chats, daemon=True).start()
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
