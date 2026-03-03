@@ -725,6 +725,18 @@ def handle_scam_admin_response(call):
 # Отбивка один раз + автоудаление через 2 минуты (120 секунд)
 warned_users = {}  # (chat_id, user_id) -> message_id отбивки
 
+def is_subscribed(user_id):
+    try:
+        member = bot.get_chat_member(MAIN_CHANNEL_ID, user_id)
+        return member.status in ("member", "administrator", "creator")
+    except telebot.apihelper.ApiTelegramException as e:
+        # Самые частые ошибки: нет прав, пользователь не в чате, бот не админ и т.д.
+        print(f"Ошибка проверки подписки для {user_id}: {e.description}")
+        return False
+    except Exception as e:
+        print(f"Неизвестная ошибка при проверке подписки {user_id}: {e}")
+        return False
+
 @bot.message_handler(content_types=[
     'text', 'photo', 'video', 'document', 'audio', 'voice',
     'sticker', 'animation', 'location', 'contact'
