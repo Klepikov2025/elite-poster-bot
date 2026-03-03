@@ -14,7 +14,7 @@ TOKEN = os.getenv('BOT_TOKEN')
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
-ADMIN_CHAT_ID = 479938867
+ADMIN_CHAT_IDS = [479938867, 7235010425]
 OWNER_ID = 479938867
 
 # Главный канал
@@ -167,6 +167,7 @@ VERIFICATION_LINK = "http://t.me/vip_znakbot"
 user_posts = {}
 post_owner = {}
 responded = {}
+scam_reports = {}  # ключ: report_id (случайный или timestamp+random), значение: {reporter_id, vip_id, chat_id, msg_id, responder_id, message_id_in_admin_chat}
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 def escape_md(text):
@@ -211,7 +212,12 @@ def start(message):
             reply_markup=get_main_keyboard()
         )
     except Exception as e:
-        bot.send_message(ADMIN_CHAT_ID, f"Ошибка в /start: {e}")
+        error_text = f"Ошибка в /start: {e}"
+        for admin_id in ADMIN_CHAT_IDS:
+            try:
+                bot.send_message(admin_id, error_text)
+            except Exception:
+                pass  # или print, если хочется видеть в консоли
 
 @bot.message_handler(func=lambda message: message.text == "Создать новое объявление")
 def create_new_post(message):
@@ -573,7 +579,12 @@ def handle_respond(call):
             reply_markup=markup
         )
     except Exception as e:
-        bot.send_message(ADMIN_CHAT_ID, f"❗️Не удалось уведомить VIP {vip_id}: {e}")
+        error_text = f"❗️Не удалось уведомить VIP {vip_id}: {e}"
+        for admin_id in ADMIN_CHAT_IDS:
+            try:
+                bot.send_message(admin_id, error_text)
+            except Exception:
+                pass
 
     bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
 
@@ -581,51 +592,134 @@ def handle_respond(call):
 def handle_report_scam(call):
     try:
         parts = call.data.split("_")
-        
-        # Проверяем структуру: report + scam + chat_id + msg_id + user_id → минимум 5 частей
         if len(parts) < 5 or parts[0] != "report" or parts[1] != "scam":
-            bot.answer_callback_query(call.id, "Неверный формат данных жалобы", show_alert=True)
+            bot.answer_callback_query(call.id, "Неверный формат", show_alert=True)
             return
 
-        chat_id = int(parts[2])
-        msg_id = int(parts[3])
-        responder_id = int(parts[4])
+        chat_id     = int(parts[2])
+        msg_id      = int(parts[3])
+        responder_id = int(parts[4])   # тот, на кого жалуются
 
-        reporter = get_user_name(call.from_user)
+        reporter = call.from_user
+        reporter_link = get_user_name(reporter)
+
         channel_part = str(chat_id)[4:] if str(chat_id).startswith("-100") else str(chat_id)
         ann_link = f"https://t.me/c/{channel_part}/{msg_id}"
         user_link = f"tg://user?id={responder_id}"
 
+        report_time = datetime.now(pytz.timezone('Asia/Yekaterinburg')).strftime('%Y-%m-%d %H:%M:%S')
+
         text = (
             f"🚨 ЖАЛОБА НА СПАМ/СКАМ\n\n"
-            f"От: {reporter}\n"
+            f"От: {reporter_link}\n"
             f"На пользователя: [{responder_id}]({user_link})\n"
             f"Объявление: {ann_link}\n"
-            f"Время: {datetime.now(pytz.timezone('Asia/Yekaterinburg')).strftime('%Y-%m-%d %H:%M:%S')}"
+            f"Время: {report_time}\n\n"
+            f"👇 Выберите действие:"
         )
 
-        bot.send_message(
-            ADMIN_CHAT_ID,
-            text,
-            parse_mode="Markdown",
-            disable_web_page_preview=True
+        # Уникальный идентификатор жалобы
+        report_id = f"{chat_id}_{msg_id}_{responder_id}_{int(time.time())}"
+
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        markup.add(
+            types.InlineKeyboardButton("✅ Принять жалобу", callback_data=f"scam_accept_{report_id}"),
+            types.InlineKeyboardButton("❌ Отклонить",      callback_data=f"scam_reject_{report_id}"),
         )
+        markup.add(
+            types.InlineKeyboardButton("ℹ️ Нужны детали",   callback_data=f"scam_details_{report_id}"),
+        )
+
+        # Сохраняем информацию о жалобе
+        scam_reports[report_id] = {
+            "reporter_id": reporter.id,
+            "vip_id": post_owner.get((chat_id, msg_id), None),   # кто опубликовал объявление
+            "chat_id": chat_id,
+            "msg_id": msg_id,
+            "responder_id": responder_id,
+            "reporter_link": reporter_link,
+            "ann_link": ann_link,
+            "time": report_time
+        }
+
+        # Отправляем жалобу всем админам
+        for admin_id in ADMIN_CHAT_IDS:
+            try:
+                bot.send_message(
+                    admin_id,
+                    text,
+                    parse_mode="Markdown",
+                    disable_web_page_preview=True,
+                    reply_markup=markup
+                )
+            except Exception as e:
+                print(f"Не удалось отправить жалобу админу {admin_id}: {e}")
 
         bot.answer_callback_query(call.id, "Жалоба отправлена администрации", show_alert=False)
 
-    except ValueError:
-        bot.answer_callback_query(call.id, "Ошибка в ID (не число)", show_alert=True)
-
     except Exception as e:
-        bot.answer_callback_query(call.id, "Не удалось обработать жалобу", show_alert=True)
+        bot.answer_callback_query(call.id, f"Ошибка обработки жалобы\n{e}", show_alert=True)
 
-def is_subscribed(user_id):
+@bot.callback_query_handler(func=lambda call: call.data.startswith(("scam_accept_", "scam_reject_", "scam_details_")))
+def handle_scam_admin_response(call):
     try:
-        member = bot.get_chat_member(MAIN_CHANNEL_ID, user_id)
-        return member.status in ("member", "administrator", "creator")
+        parts = call.data.split("_", 2)
+        action = parts[1]         # accept / reject / details
+        report_id = parts[2]
+
+        if report_id not in scam_reports:
+            bot.answer_callback_query(call.id, "Жалоба уже обработана или не найдена", show_alert=True)
+            return
+
+        report = scam_reports[report_id]
+        vip_id = report.get("vip_id")
+
+        if not vip_id:
+            bot.answer_callback_query(call.id, "Не удалось определить автора объявления", show_alert=True)
+            return
+
+        reporter_name = report["reporter_link"]
+        ann_link = report["ann_link"]
+
+        if action == "accept":
+            reply_text = (
+                f"✅ Жалоба на пользователя в объявлении {ann_link} **принята**.\n"
+                f"Спасибо, {reporter_name}! Мы занимаемся этим вопросом."
+            )
+        elif action == "reject":
+            reply_text = (
+                f"❌ Жалоба на пользователя в объявлении {ann_link} **отклонена**.\n"
+                f"Спасибо за сигнал, но оснований для действий недостаточно."
+            )
+        elif action == "details":
+            reply_text = (
+                f"ℹ️ По жалобе на объявление {ann_link} нужны дополнительные детали.\n"
+                f"Пожалуйста, напишите @FAQMKBOT или @elite_loungebot что именно вызывает подозрения."
+            )
+        else:
+            reply_text = "Неизвестное действие."
+
+        # Отправляем ответ VIP-юзеру
+        try:
+            bot.send_message(vip_id, reply_text, parse_mode="Markdown", disable_web_page_preview=True)
+        except Exception as e:
+            print(f"Не удалось уведомить VIP {vip_id}: {e}")
+
+        # Уведомляем админа, что действие выполнено
+        bot.answer_callback_query(call.id, f"Действие «{action}» выполнено", show_alert=False)
+
+        # Можно удалить клавиатуру жалобы (опционально)
+        bot.edit_message_reply_markup(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=None
+        )
+
+        # Удаляем запись (чтобы не накапливать)
+        del scam_reports[report_id]
+
     except Exception as e:
-        print(f"Ошибка при проверке подписки для {user_id}: {e}")
-        return False
+        bot.answer_callback_query(call.id, f"Ошибка: {str(e)}", show_alert=True)
 
 # ==================== УДАЛЕНИЕ СООБЩЕНИЙ БЕЗ ПОДПИСКИ + ОТБИВКА ====================
 # Отбивка один раз + автоудаление через 2 минуты (120 секунд)
