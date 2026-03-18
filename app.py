@@ -777,6 +777,13 @@ def check_subscription(message):
             types.InlineKeyboardButton("Резервный канал", url="https://t.me/gaysexchatrur"),
             types.InlineKeyboardButton("ПРАВИЛА МК", url="https://t.me/MensClubRules")
         )
+        # === Кнопка БЕСПЛАТНЫЙ VPN (в отдельной строке) ===
+        markup.add(
+            types.InlineKeyboardButton(
+                "🌐 БЕСПЛАТНЫЙ VPN ДЛЯ ВСЕХ", 
+                url="https://t.me/perec?start=ref_2BBPF35H"
+            )
+        )
 
         try:
             sent = bot.send_message(
