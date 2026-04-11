@@ -414,11 +414,17 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
             ]
             full_text = f"{random.choice(headers)}\n\n{escape_md(clean_user_text(text))}{vip_tag}"
 
+            # === ЦВЕТНАЯ КНОПКА ОТКЛИКА ===
             markup_inline = types.InlineKeyboardMarkup()
-            markup_inline.add(types.InlineKeyboardButton("Откликнуться♥", callback_data="respond"))
+            markup_inline.add(
+                types.InlineKeyboardButton(
+                    text="Откликнуться ♥",
+                    callback_data="respond",
+                    style="success"          # ЗЕЛЁНАЯ
+                )
+            )
 
             if selected_network == "Все сети":
-                # формируем список доступных сетей по all_cities
                 norm_city = normalize_city_name(city)
                 nets = list(all_cities.get(norm_city, {}).keys())
                 networks = [net_key_to_name(k) for k in nets]
@@ -426,7 +432,6 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                 networks = [selected_network]
 
             for network in networks:
-                # выбираем словарь по названию сети
                 if network == "Мужской Клуб":
                     chat_dict = chat_ids_mk
                     net_key = "mk"
@@ -445,7 +450,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                 else:
                     continue
 
-                # Для НС возможна подстановка городов (ns_city_substitution)
+                # Для НС возможна подстановка городов
                 if net_key == "ns":
                     if city not in chat_dict and city in ns_city_substitution:
                         substitute_city = ns_city_substitution[city]
@@ -495,19 +500,22 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                     bot.send_message(message.chat.id, f"✅ Ваше объявление опубликовано в сети «{network}», городе {city}.")
                 except telebot.apihelper.ApiTelegramException as e:
                     bot.send_message(message.chat.id, f"❌ Ошибка: {e.description}")
+
             ask_for_new_post(message)
+
         else:
+            # === КРАСНАЯ КНОПКА ВЕРИФИКАЦИИ ===
             markup = types.InlineKeyboardMarkup()
-            verify_button = types.InlineKeyboardButton(text="🛠️ Пройти верификацию", url=VERIFICATION_LINK)
+            verify_button = types.InlineKeyboardButton(
+                text="🛠️ Пройти верификацию",
+                url=VERIFICATION_LINK,
+                style="danger"          # КРАСНАЯ
+            )
             markup.add(verify_button)
             bot.send_message(message.chat.id, "🔓 Вы не являетесь привилегированным участником. Для публикации объявлений пройдите верификацию:", reply_markup=markup)
+
     except telebot.apihelper.ApiTelegramException as e:
         bot.send_message(message.chat.id, f"⚠️ Ошибка при проверке VIP-статуса: {e.description}")
-def ask_for_new_post(message):
-    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-    markup.add("Да", "Нет")
-    bot.send_message(message.chat.id, "Хотите опубликовать ещё одно объявление?", reply_markup=markup)
-    bot.register_next_step_handler(message, handle_new_post_choice)
 
 def handle_new_post_choice(message):
     if message.text.lower() == "да":
@@ -556,18 +564,19 @@ def handle_respond(call):
     responded[key].add(user_id)
     vip_id = post_owner[key]
 
-    # Формируем имя + ссылку на профиль (работает даже без @username)
+    # Формируем имя + ссылку на профиль
     if responder.username:
         name = f"[{escape_md(responder.first_name)}](https://t.me/{responder.username})"
     else:
         name = f"[{escape_md(responder.first_name)}](tg://user?id={user_id})"
 
-    # Кнопка Жалобы
+    # === КРАСНАЯ КНОПКА ЖАЛОБЫ ===
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton(
-            "🚨 Это спам / скам / мошенник",
-            callback_data=f"report_scam_{chat_id}_{msg_id}_{user_id}"
+            text="🚨 Это спам / скам / мошенник",
+            callback_data=f"report_scam_{chat_id}_{msg_id}_{user_id}",
+            style="danger"          # КРАСНАЯ кнопка
         )
     )
 
@@ -730,7 +739,6 @@ def is_subscribed(user_id):
         return False
 
 # ==================== УДАЛЕНИЕ СООБЩЕНИЙ БЕЗ ПОДПИСКИ + ОТБИВКА ====================
-# Отбивка один раз + автоудаление через 2 минуты (120 секунд)
 warned_users = {}  # (chat_id, user_id) -> message_id отбивки
 
 @bot.message_handler(content_types=[
@@ -749,7 +757,6 @@ def check_subscription(message):
     chat_id = message.chat.id
     key = (chat_id, user_id)
 
-    # Если подписан — просто очищаем отбивку (если была)
     if is_subscribed(user_id):
         if key in warned_users:
             try:
@@ -759,29 +766,35 @@ def check_subscription(message):
             del warned_users[key]
         return
 
-    # Удаляем сообщение пользователя
     try:
         bot.delete_message(chat_id, message.message_id)
     except:
         pass
 
-    # Отбивка ТОЛЬКО ОДИН РАЗ
     if key not in warned_users:
         markup = types.InlineKeyboardMarkup(row_width=2)
 
         markup.add(
-            types.InlineKeyboardButton("Подписаться на МК", url=MAIN_CHANNEL_LINK),
-            types.InlineKeyboardButton("ПАРНИ 18+", url="https://t.me/znakparni"),
+            types.InlineKeyboardButton(
+                text="Подписаться на МК",
+                url=MAIN_CHANNEL_LINK,
+                style="success"          # ЗЕЛЁНАЯ
+            ),
+            types.InlineKeyboardButton(
+                text="ПАРНИ 18+",
+                url="https://t.me/znakparni"
+            )
         )
         markup.add(
             types.InlineKeyboardButton("Резервный канал", url="https://t.me/gaysexchatrur"),
             types.InlineKeyboardButton("ПРАВИЛА МК", url="https://t.me/MensClubRules")
         )
-        # === Кнопка БЕСПЛАТНЫЙ VPN (в отдельной строке) ===
+
         markup.add(
             types.InlineKeyboardButton(
-                "🌐 БЕСПЛАТНЫЙ VPN ДЛЯ ВСЕХ", 
-                url="https://t.me/perec?start=ref_2BBPF35H"
+                text="🚀 БЕСПЛАТНЫЙ VPN ДЛЯ ВСЕХ",
+                url="https://t.me/perec?start=ref_2BBPF35H",
+                style="primary"          # СИНЯЯ
             )
         )
 
@@ -794,27 +807,21 @@ def check_subscription(message):
                      "с которыми ознакомлен и согласен.",
                 reply_markup=markup
             )
-            msg_id = sent.message_id
-            print(f"Отбивка отправлена, id {msg_id} пользователю {user_id}")
+            warned_users[key] = sent.message_id
 
-            # Сохраняем id отбивки
-            warned_users[key] = msg_id
-
-            # Автоудаление через 120 секунд
             def auto_delete():
                 time.sleep(120)
                 try:
-                    bot.delete_message(chat_id, msg_id)
-                    print(f"Отбивка {msg_id} удалена (2 минуты прошли)")
-                except Exception as e:
-                    print(f"Не удалось удалить отбивку {msg_id}: {e}")
+                    bot.delete_message(chat_id, sent.message_id)
+                except:
+                    pass
                 if key in warned_users:
                     del warned_users[key]
 
             threading.Thread(target=auto_delete, daemon=True).start()
 
         except Exception as e:
-            print(f"Ошибка отправки отбивки пользователю {user_id}: {e}")
+            print(f"Ошибка отправки отбивки: {e}")
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])

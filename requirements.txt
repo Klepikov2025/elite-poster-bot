@@ -1,5 +1,4 @@
 Flask==2.3.2
-python-dotenv==1.0.0
-pyTelegramBotAPI==4.12.0
+pyTelegramBotAPI==4.33.0   # ← обновляем до свежей версии
 gunicorn==20.1.0
-pytz
+pytz==2023.3
