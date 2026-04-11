@@ -1,4 +1,4 @@
 Flask==2.3.2
-pyTelegramBotAPI==4.33.0   # ← обновляем до свежей версии
+pyTelegramBotAPI==4.32.0   # ← обновляем до свежей версии
 gunicorn==20.1.0
 pytz==2023.3
