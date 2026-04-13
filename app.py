@@ -774,27 +774,37 @@ def check_subscription(message):
     if key not in warned_users:
         markup = types.InlineKeyboardMarkup(row_width=2)
 
+        # Кнопка "Подписаться на МК" + анимированный стикер в начале кнопки
         markup.add(
             types.InlineKeyboardButton(
-                text="Подписаться на МК",
+                text="Подписаться на МК",   # текст остаётся
                 url=MAIN_CHANNEL_LINK,
-                style="success"          # ЗЕЛЁНАЯ
-            ),
+                icon_custom_emoji_id="5215330331711775720",   # ← твой стикер для МК
+                style="success"                              # зелёная кнопка (как было)
+            )
+        )
+
+        # Кнопка ПАРНИ 18+ (без изменений)
+        markup.add(
             types.InlineKeyboardButton(
                 text="ПАРНИ 18+",
                 url="https://t.me/znakparni"
             )
         )
+
+        # Резервный канал и ПРАВИЛА (без изменений)
         markup.add(
             types.InlineKeyboardButton("Резервный канал", url="https://t.me/gaysexchatrur"),
             types.InlineKeyboardButton("ПРАВИЛА МК", url="https://t.me/MensClubRules")
         )
 
+        # Кнопка БЕСПЛАТНЫЙ VPN + анимированный стикер
         markup.add(
             types.InlineKeyboardButton(
                 text="🚀 БЕСПЛАТНЫЙ VPN ДЛЯ ВСЕХ",
                 url="https://t.me/perec?start=ref_2BBPF35H",
-                style="primary"          # СИНЯЯ
+                icon_custom_emoji_id="5981123193862098366",   # ← твой стикер для VPN
+                style="primary"                              # синяя кнопка (как было)
             )
         )
 
