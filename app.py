@@ -34,7 +34,7 @@ chat_ids_mk = {
     "Екатеринбург": -1002210043742,
     "Челябинск": -1002238514762,
     "БЕЗ ПРЕДРАССУДКОВ": -1001219669239,
-    "RAINBOW MAN": -1001415498051,
+    "RAINBOW MAN": -1003496028436,
     "Пермь": -1002205127231,
     "Ижевск": -1001604781452,
     "Казань": -1002228881675,
@@ -420,6 +420,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                 types.InlineKeyboardButton(
                     text="Откликнуться ♥",
                     callback_data="respond",
+                    icon_custom_emoji_id="6088882892526587287",   # твой эмодзи
                     style="success"          # ЗЕЛЁНАЯ
                 )
             )
