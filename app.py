@@ -27,7 +27,7 @@ STAFF_GROUP_ID = -1002196190507
 JOURNAL_CHAT_ID = -1002158861390
 
 # ==================== БАЗА ДАННЫХ MONGODB ====================
-MONGO_URI = "mongodb+srv://klepikov1994_db_user:5WRqFASTgkXYO203@cluster0.mweyqnk.mongodb.net/?appName=Cluster0"
+MONGO_URI = os.getenv('MONGO_URI')
 mongo_client = pymongo.MongoClient(MONGO_URI)
 db = mongo_client['elite_bot_db']
 
