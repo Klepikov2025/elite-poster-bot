@@ -3,6 +3,8 @@ import telebot
 from telebot import types
 from flask import Flask, request
 from datetime import datetime
+import pymongo
+from pymongo import MongoClient
 import pytz
 import random
 import re
@@ -20,10 +22,43 @@ OWNER_ID = 479938867
 # ==================== НАСТРОЙКИ VIP И РЕФЕРАЛКИ ====================
 VIP_PRICE_STARS = 250
 
-# Словари для хранения данных (пока в памяти бота)
-pending_refs = {}                 # Кто по чьей реф. ссылке пришел
-ref_stats = {}                    # Статистика рефоводов {user_id: {'invites': 0, 'balance': 0}}
-pending_verification_users = {}   # Кто сейчас записывает кружок
+# ==================== НАСТРОЙКИ СЛУЖЕБНЫХ ЧАТОВ ====================
+STAFF_GROUP_ID = -1002196190507
+JOURNAL_CHAT_ID = -1002158861390
+
+# ==================== БАЗА ДАННЫХ MONGODB ====================
+MONGO_URI = "mongodb+srv://klepikov1994_db_user:5WRqFASTgkXYO203@cluster0.mweyqnk.mongodb.net/?appName=Cluster0"
+mongo_client = pymongo.MongoClient(MONGO_URI)
+db = mongo_client['elite_bot_db']
+
+users_collection = db['users']               # Статистика и балансы рефералов
+pending_refs_collection = db['pending_refs'] # Клики и ожидающие оплаты
+banned_collection = db['banned']             # Черный список (забаненные)
+
+# --- Функции общения с базой ---
+def update_user_stats(user_id, invites_add=0, balance_add=0, clicks_add=0):
+    users_collection.update_one(
+        {"_id": user_id},
+        {"$inc": {"invites": invites_add, "balance": balance_add, "clicks": clicks_add}},
+        upsert=True
+    )
+withdrawals_collection = db['withdrawals']   # Заявки на вывод средств
+
+def get_user_stats(user_id):
+    user = users_collection.find_one({"_id": user_id})
+    if user: return {'invites': user.get('invites', 0), 'balance': user.get('balance', 0), 'clicks': user.get('clicks', 0)}
+    return {'invites': 0, 'balance': 0, 'clicks': 0}
+
+def set_pending_ref(new_user_id, ref_id):
+    pending_refs_collection.update_one({"_id": new_user_id}, {"$set": {"ref_id": ref_id}}, upsert=True)
+
+def get_pending_ref(new_user_id):
+    doc = pending_refs_collection.find_one({"_id": new_user_id})
+    return doc['ref_id'] if doc else None
+
+def delete_pending_ref(new_user_id):
+    pending_refs_collection.delete_one({"_id": new_user_id})
+# ==============================================================
 
 def get_referral_bonus(invites_count):
     """Лестница бонусов: чем больше пригласил, тем выше процент"""
@@ -184,6 +219,7 @@ user_posts = {}
 post_owner = {}
 responded = {}
 scam_reports = {}  # ключ: report_id (случайный или timestamp+random), значение: {reporter_id, vip_id, chat_id, msg_id, responder_id, message_id_in_admin_chat}
+pending_verification_users = {}
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 def escape_md(text):
@@ -227,11 +263,13 @@ def start(message):
         if len(start_params) > 1 and start_params[1].startswith('ref_'):
             ref_id = int(start_params[1].replace('ref_', ''))
             if ref_id != message.from_user.id:
-                pending_refs[message.from_user.id] = ref_id
+                # ПИШЕМ КЛИК В БАЗУ!
+                set_pending_ref(message.from_user.id, ref_id)
+                update_user_stats(ref_id, clicks_add=1)
                 is_referral = True
-                try:
-                    bot.send_message(ref_id, "🔔 По вашей ссылке перешел новый человек! Ждем его оплату.")
-                except:
+                try: 
+                    bot.send_message(ref_id, "🔔 По вашей ссылке перешел новый человек! Ждем его оплату.") 
+                except: 
                     pass
 
         if message.chat.id not in user_posts:
@@ -282,19 +320,107 @@ def send_vip_welcome(chat_id, first_name):
 @bot.message_handler(func=lambda message: message.text == "👤 Партнерская программа")
 def show_profile(message):
     user_id = message.from_user.id
-    stats = ref_stats.get(user_id, {'invites': 0, 'balance': 0})
-    current_percent, _ = get_referral_bonus(stats['invites'] + 1)
+    stats = get_user_stats(user_id)
     
+    invites = stats['invites']
+    balance = stats['balance']
+    clicks = stats['clicks']
+    
+    current_percent, _ = get_referral_bonus(invites + 1)
     ref_link = f"https://t.me/{bot.get_me().username}?start=ref_{user_id}"
+    
     text = (
         f"📊 **Твой профиль партнера**\n\n"
-        f"👥 Успешных приглашений: **{stats['invites']}**\n"
-        f"💰 Твой баланс: **{stats['balance']} звезд**\n"
+        f"👣 Переходов по ссылке: **{clicks}**\n"
+        f"👥 Успешных оплат: **{invites}**\n"
+        f"💰 Твой баланс: **{balance} звезд**\n"
         f"📈 Текущая ставка: **{int(current_percent * 100)}%**\n\n"
-        f"🔗 **Твоя персональная ссылка:**\n`{ref_link}`\n\n"
-        f"*(Отправляй ссылку друзьям и зарабатывай на их вступлении в VIP!)*"
+        f"🔗 **Твоя персональная ссылка:**\n`{ref_link}`"
     )
-    bot.send_message(message.chat.id, text, parse_mode="Markdown")
+    
+    markup = types.InlineKeyboardMarkup()
+    if balance > 0:
+        markup.add(types.InlineKeyboardButton("💸 Запросить вывод средств", callback_data="request_withdrawal"))
+    
+    bot.send_message(message.chat.id, text, reply_markup=markup, parse_mode="Markdown")
+
+# Юзер нажал "Запросить вывод"
+@bot.callback_query_handler(func=lambda call: call.data == "request_withdrawal")
+def start_withdrawal(call):
+    stats = get_user_stats(call.from_user.id)
+    if stats['balance'] <= 0:
+        bot.answer_callback_query(call.id, "❌ Ваш баланс пуст", show_alert=True)
+        return
+
+    bot.edit_message_text(
+        chat_id=call.message.chat.id,
+        message_id=call.message.message_id,
+        text=f"💰 Ваш баланс: **{stats['balance']} звезд**.\n\nВведите номер карты и название банка для вывода:",
+        parse_mode="Markdown"
+    )
+    bot.register_next_step_handler(call.message, process_withdrawal_details, stats['balance'])
+
+def process_withdrawal_details(message, amount):
+    if message.text == "Назад" or len(message.text) < 10:
+        bot.send_message(message.chat.id, "❌ Некорректные данные. Попробуйте еще раз через меню профиля.")
+        return
+
+    user_info = get_user_name(message.from_user)
+    details = message.text
+
+    # Создаем заявку в БД
+    withdrawal_id = f"w_{int(time.time())}_{message.from_user.id}"
+    withdrawals_collection.insert_one({
+        "_id": withdrawal_id,
+        "user_id": message.from_user.id,
+        "amount": amount,
+        "details": details,
+        "status": "pending"
+    })
+
+    bot.send_message(message.chat.id, "✅ Заявка принята! Администратор проверит её в ближайшее время.")
+
+    # Уведомляем админов в STAFF_GROUP
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        types.InlineKeyboardButton("✅ Оплачено", callback_data=f"wd_pay_{withdrawal_id}"),
+        types.InlineKeyboardButton("❌ Отклонить", callback_data=f"wd_reject_{withdrawal_id}")
+    )
+
+    bot.send_message(
+        STAFF_GROUP_ID,
+        f"💸 **НОВАЯ ЗАЯВКА НА ВЫВОД**\n\n"
+        f"👤 **От:** {user_info}\n"
+        f"💰 **Сумма:** {amount} звезд\n"
+        f"💳 **Реквизиты:** `{details}`",
+        reply_markup=markup,
+        parse_mode="Markdown"
+    )
+
+@bot.message_handler(commands=['ban'])
+def handle_manual_ban(message):
+    if message.chat.id != STAFF_GROUP_ID: return
+    args = message.text.split(maxsplit=3)
+    if len(args) < 3:
+        bot.send_message(message.chat.id, "❌ Формат: `/ban [ID] [V или ALL] [Причина]`")
+        return
+    
+    target_id = int(args[1])
+    prefix = args[2].upper()
+    reason = args[3] if len(args) > 3 else "Не указана"
+    admin_info = get_user_name(message.from_user)
+    
+    if prefix == 'ALL':
+        bot.send_message(message.chat.id, "🚀 Массовый бан запущен...")
+        count = ban_user_everywhere(target_id, reason, admin_info)
+        bot.send_message(message.chat.id, f"✅ Готово! Забанен в {count} чатах. Отчет в Журнале.")
+    elif prefix == 'V':
+        try:
+            bot.ban_chat_member(VIP_CHAT_ID, target_id)
+            bot.send_message(JOURNAL_CHAT_ID, f"🚫 **#BAN (VIP)**\n• **Кто:** {admin_info}\n• **Кому:** `[{target_id}]`\n• **Причина:** {reason}", parse_mode="Markdown")
+            bot.send_message(message.chat.id, f"✅ Юзер удален из VIP.")
+        except: 
+            bot.send_message(message.chat.id, "❌ Ошибка бана в VIP.")
 
 # ==================== ВОРОНКА ВЕРИФИКАЦИИ ====================
 @bot.callback_query_handler(func=lambda call: call.data == "start_verification")
@@ -328,38 +454,98 @@ def handle_video_note(message):
             bot.send_message(admin_id, f"🚨 **Заявка в VIP!**\nОт: {get_user_name(message.from_user)}\nID: `{message.from_user.id}`", parse_mode="Markdown")
             bot.forward_message(admin_id, message.chat.id, message.message_id)
             bot.send_message(admin_id, "Действие:", reply_markup=markup)
-        except: pass
+        except:
+            pass
     
     pending_verification_users[message.from_user.id] = False
+
+def ban_user_everywhere(target_id, reason="Без причины", admin_name="Система"):
+    banned_collection.update_one({"_id": target_id}, {"$set": {"reason": reason}}, upsert=True)
+    
+    # Список всех чатов сети
+    chats_to_ban = {VIP_CHAT_ID: "VIP Клуб"}
+    for city, cid in chat_ids_parni.items(): chats_to_ban[cid] = f"ПАРНИ 18+ | {city}"
+    for city, cid in chat_ids_mk.items(): chats_to_ban[cid] = f"МК | {city}"
+    for city, cid in chat_ids_ns.items(): chats_to_ban[cid] = f"НС | {city}"
+    for city, cid in chat_ids_rainbow.items(): chats_to_ban[cid] = f"Радуга | {city}"
+    for city, cid in chat_ids_gayznak.items(): chats_to_ban[cid] = f"Гей Знакомства | {city}"
+                
+    banned_in = []
+    for cid, name in chats_to_ban.items():
+        try:
+            bot.ban_chat_member(cid, target_id)
+            banned_in.append(f"🔸 {name}")
+        except:
+            pass
+            
+    report_text = (
+        f"🚫 **#BAN**\n"
+        f"• **Кто:** {admin_name}\n"
+        f"• **Кому:** `[{target_id}]`\n"
+        f"• **Причина:** {reason}\n"
+        f"• **Группы:**\n" + "\n".join(banned_in)
+    )
+    try:
+        bot.send_message(JOURNAL_CHAT_ID, report_text, parse_mode="Markdown")
+    except: pass
+    return len(banned_in)
 
 # Действия админа (Одобрить/Отказать/Забанить)
 @bot.callback_query_handler(func=lambda call: call.data.startswith("vip_approve_") or call.data.startswith("vip_reject_") or call.data.startswith("vip_ban_"))
 def handle_vip_decision(call):
     action, user_id_str = call.data.rsplit("_", 1)
     user_id = int(user_id_str)
-    
     bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+    admin_info = get_user_name(call.from_user)
     
     if "approve" in action:
-        bot.send_message(call.message.chat.id, f"✅ Выставлен счет на {VIP_PRICE_STARS}⭐️ пользователю {user_id}.")
         try:
             bot.send_invoice(user_id, title="Вход в VIP Клуб 👑", description="Оплата доступа в закрытый чат.", invoice_payload="vip_access_payment", provider_token="", currency="XTR", prices=[types.LabeledPrice(label="VIP Доступ", amount=VIP_PRICE_STARS)])
-        except Exception as e: bot.send_message(call.message.chat.id, f"Ошибка инвойса: {e}")
+            bot.send_message(call.message.chat.id, f"✅ Счет отправлен пользователю {user_id}.")
+        except Exception as e:
+            if "bot was blocked by the user" in str(e):
+                bot.send_message(call.message.chat.id, f"🚨 Юзер {user_id} заблокировал бота! Авто-бан активирован.")
+                ban_user_everywhere(user_id, reason="Блокировка бота при верификации", admin_name="Auto-Defender")
+            else:
+                bot.send_message(call.message.chat.id, f"❌ Ошибка: {e}")
             
     elif "reject" in action:
-        bot.send_message(call.message.chat.id, "❌ Отказано.")
+        bot.send_message(call.message.chat.id, f"❌ Вы отклонили заявку {user_id}.")
         try:
-            bot.send_message(user_id, "К сожалению, вы не соответствуете требованиям сообщества. У вас имеются нарушения.\nУзнать за что: https://t.me/MK_MensClubSUPPORT")
+            bot.send_message(user_id, "К сожалению, ваша заявка отклонена из-за нарушений.")
         except:
             pass
 
     elif "ban" in action:
-        bot.send_message(call.message.chat.id, "🔨 Пользователь забанен.")
-        # Авто-бан по чатам допишем в Этапе 3, пока просто пишем юзеру:
-        try:
-            bot.send_message(user_id, "Вы заблокированы за нарушение правил.")
-        except:
-            pass
+        bot.send_message(call.message.chat.id, "🔨 Запускаю массовый бан...")
+        count = ban_user_everywhere(user_id, reason="Не прошел модерацию кружка", admin_name=admin_info)
+        bot.send_message(call.message.chat.id, f"✅ Пользователь забанен в {count} чатах.")
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith(("wd_pay_", "wd_reject_")))
+def handle_withdrawal_admin(call):
+    action, _, wd_id = call.data.split("_")
+    wd_request = withdrawals_collection.find_one({"_id": wd_id})
+
+    if not wd_request or wd_request['status'] != "pending":
+        bot.answer_callback_query(call.id, "Заявка уже обработана")
+        return
+
+    user_id = wd_request['user_id']
+    amount = wd_request['amount']
+    admin_info = get_user_name(call.from_user)
+
+    if action == "pay":
+        # Списываем баланс в БД
+        update_user_stats(user_id, balance_add=-amount)
+        withdrawals_collection.update_one({"_id": wd_id}, {"$set": {"status": "paid"}})
+        
+        bot.send_message(user_id, f"✅ Ваш запрос на вывод {amount} звезд одобрен! Деньги отправлены на ваши реквизиты.")
+        bot.edit_message_text(call.message.text + f"\n\n✅ **ОПЛАЧЕНО:** {admin_info}", STAFF_GROUP_ID, call.message.message_id)
+        
+    elif action == "reject":
+        withdrawals_collection.update_one({"_id": wd_id}, {"$set": {"status": "rejected"}})
+        bot.send_message(user_id, "❌ Ваш запрос на вывод средств был отклонен администрацией.")
+        bot.edit_message_text(call.message.text + f"\n\n❌ **ОТКЛОНЕНО:** {admin_info}", STAFF_GROUP_ID, call.message.message_id)
 
 # ==================== ОПЛАТА И ССЫЛКА ====================
 @bot.pre_checkout_query_handler(func=lambda query: query.invoice_payload == "vip_access_payment")
@@ -376,22 +562,26 @@ def successful_payment(message):
         bot.send_message(new_user_id, f"🎉 **Оплата получена! Добро пожаловать в элиту.**\n\nТвоя ссылка для входа:\n{invite.invite_link}", parse_mode="Markdown")
     except Exception as e:
         bot.send_message(new_user_id, "Оплата прошла, но возникла ошибка со ссылкой. Напиши админу!")
-        for admin_id in ADMIN_CHAT_IDS: bot.send_message(admin_id, f"🚨 Ошибка создания ссылки: {e}")
+        for admin_id in ADMIN_CHAT_IDS: 
+            try:
+                bot.send_message(admin_id, f"🚨 Ошибка создания ссылки: {e}")
+            except:
+                pass
 
-    # 2. Бонус рефоводу
-    if new_user_id in pending_refs:
-        ref_id = pending_refs[new_user_id]
-        if ref_id not in ref_stats: ref_stats[ref_id] = {'invites': 0, 'balance': 0}
-            
-        ref_stats[ref_id]['invites'] += 1
-        percent, bonus_stars = get_referral_bonus(ref_stats[ref_id]['invites'])
-        ref_stats[ref_id]['balance'] += bonus_stars
+    # 2. Бонус рефоводу (ЧЕРЕЗ БАЗУ ДАННЫХ)
+    ref_id = get_pending_ref(new_user_id)
+    if ref_id:
+        update_user_stats(ref_id, invites_add=1) # Прибавили успешную оплату
+        stats = get_user_stats(ref_id)           # Взяли свежие данные
+        percent, bonus_stars = get_referral_bonus(stats['invites']) # Посчитали бонус
+        
+        update_user_stats(ref_id, balance_add=bonus_stars) # Начислили звезды на баланс
         
         try:
             bot.send_message(ref_id, f"🥳 **Твой друг оплатил VIP!**\nТебе начислено: **{bonus_stars} звезд** ⭐️", parse_mode="Markdown")
         except:
             pass
-        del pending_refs[new_user_id]
+        delete_pending_ref(new_user_id) # Очистили ожидание
 
 @bot.message_handler(func=lambda message: message.text == "Создать новое объявление")
 def create_new_post(message):
@@ -870,31 +1060,40 @@ def handle_scam_admin_response(call):
 
         report = scam_reports[report_id]
         vip_id = report.get("vip_id")
+        responder_id = report.get("responder_id") # Тот, на кого пожаловались
+        admin_info = get_user_name(call.from_user) # Кто из админов нажал кнопку
 
         if not vip_id:
             bot.answer_callback_query(call.id, "Не удалось определить автора объявления", show_alert=True)
             return
 
-        reporter_name = report["reporter_link"]
         ann_link = report["ann_link"]
 
         if action == "accept":
+            # --- МАГИЯ АВТОМАТИЗАЦИИ ---
+            bot.answer_callback_query(call.id, "🚀 Запускаю массовый бан скамера...")
+            
+            # 1. Запускаем наш "ядерный чемоданчик" банов
+            reason = f"Жалоба на скам в объявлении {ann_link}"
+            count = ban_user_everywhere(responder_id, reason=reason, admin_name=f"Admin: {admin_info}")
+            
+            # 2. Текст для VIP-пользователя
             reply_text = (
-                f"✅ Жалоба на пользователя в объявлении {ann_link} **принята**.\n"
-                f"Спасибо, {reporter_name}! Мы занимаемся этим вопросом."
+                f"✅ Ваша жалоба на пользователя в объявлении {ann_link} **принята**.\n\n"
+                f"Мошенник заблокирован в {count} чатах сети! Спасибо за бдительность. 🛡️"
             )
+            
         elif action == "reject":
             reply_text = (
                 f"❌ Жалоба на пользователя в объявлении {ann_link} **отклонена**.\n"
-                f"Спасибо за сигнал, но оснований для действий недостаточно."
+                f"Спасибо за сигнал, но оснований для блокировки недостаточно."
             )
+            
         elif action == "details":
             reply_text = (
-                f"ℹ️ По жалобе на объявление {ann_link} нужны дополнительные детали.\n"
-                f"Пожалуйста, напишите @FAQMKBOT или @elite_loungebot что именно вызывает подозрения."
+                f"ℹ️ По жалобе на объявление {ann_link} нужны детали.\n"
+                f"Пожалуйста, напишите нам в саппорт, что именно вызвал подозрения."
             )
-        else:
-            reply_text = "Неизвестное действие."
 
         # Отправляем ответ VIP-юзеру
         try:
@@ -902,17 +1101,16 @@ def handle_scam_admin_response(call):
         except Exception as e:
             print(f"Не удалось уведомить VIP {vip_id}: {e}")
 
-        # Уведомляем админа, что действие выполнено
-        bot.answer_callback_query(call.id, f"Действие «{action}» выполнено", show_alert=False)
-
-        # Можно удалить клавиатуру жалобы (опционально)
-        bot.edit_message_reply_markup(
+        # Уведомляем админа в чате, что всё готово
+        bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            reply_markup=None
+            text=call.message.text + f"\n\n✅ **Обработано админом:** {admin_info}\n**Результат:** {action.upper()}",
+            parse_mode="Markdown",
+            disable_web_page_preview=True
         )
 
-        # Удаляем запись (чтобы не накапливать)
+        # Удаляем запись из памяти
         del scam_reports[report_id]
 
     except Exception as e:
