@@ -499,6 +499,25 @@ def handle_vip_decision(call):
     admin_info = get_user_name(call.from_user)
     
     if "approve" in action:
+        # --- НАЧАЛО: ЛАЙФХАК С ДЕШЕВЫМИ ЗВЕЗДАМИ ---
+        cheap_stars_text = (
+            "💡 **Лайфхак: Как купить звёзды ДЕШЕВЛЕ официального курса?**\n\n"
+            "Перед оплатой рекомендуем приобрести звёзды через проверенный сервис. "
+            "Это выйдет значительно выгоднее, чем покупать их напрямую через Telegram.\n\n"
+            "**Инструкция:**\n"
+            "1️⃣ Перейдите по ссылке: https://t.me/Avrrorkastarbot?start=7924963993\n"
+            "2️⃣ Нажмите кнопку «⭐️ Купить звезды»\n"
+            "3️⃣ Выберите пункт «👤 Себе»\n"
+            "4️⃣ Выберите пакет «⭐️ 250 звезд»\n"
+            "5️⃣ Оплатите удобным способом\n\n"
+            "После покупки возвращайтесь сюда и оплачивайте VIP-доступ счетом ниже! 👇"
+        )
+        try:
+            bot.send_message(user_id, cheap_stars_text, parse_mode="Markdown", disable_web_page_preview=True)
+        except:
+            pass
+        # --- КОНЕЦ: ЛАЙФХАК С ДЕШЕВЫМИ ЗВЕЗДАМИ ---
+
         try:
             bot.send_invoice(user_id, title="Вход в VIP Клуб 👑", description="Оплата доступа в закрытый чат.", invoice_payload="vip_access_payment", provider_token="", currency="XTR", prices=[types.LabeledPrice(label="VIP Доступ", amount=VIP_PRICE_STARS)])
             bot.send_message(call.message.chat.id, f"✅ Счет отправлен пользователю {user_id}.")
