@@ -229,7 +229,10 @@ def start(message):
             if ref_id != message.from_user.id:
                 pending_refs[message.from_user.id] = ref_id
                 is_referral = True
-                try: bot.send_message(ref_id, "🔔 По вашей ссылке перешел новый человек! Ждем его оплату.") except: pass
+                try:
+                    bot.send_message(ref_id, "🔔 По вашей ссылке перешел новый человек! Ждем его оплату.")
+                except:
+                    pass
 
         if message.chat.id not in user_posts:
             user_posts[message.chat.id] = []
@@ -345,12 +348,18 @@ def handle_vip_decision(call):
             
     elif "reject" in action:
         bot.send_message(call.message.chat.id, "❌ Отказано.")
-        try: bot.send_message(user_id, "К сожалению, вы не соответствуете требованиям сообщества. У вас имеются нарушения.\nУзнать за что: https://t.me/MK_MensClubSUPPORT") except: pass
+        try:
+            bot.send_message(user_id, "К сожалению, вы не соответствуете требованиям сообщества. У вас имеются нарушения.\nУзнать за что: https://t.me/MK_MensClubSUPPORT")
+        except:
+            pass
 
     elif "ban" in action:
         bot.send_message(call.message.chat.id, "🔨 Пользователь забанен.")
         # Авто-бан по чатам допишем в Этапе 3, пока просто пишем юзеру:
-        try: bot.send_message(user_id, "Вы заблокированы за нарушение правил.") except: pass
+        try:
+            bot.send_message(user_id, "Вы заблокированы за нарушение правил.")
+        except:
+            pass
 
 # ==================== ОПЛАТА И ССЫЛКА ====================
 @bot.pre_checkout_query_handler(func=lambda query: query.invoice_payload == "vip_access_payment")
@@ -378,7 +387,10 @@ def successful_payment(message):
         percent, bonus_stars = get_referral_bonus(ref_stats[ref_id]['invites'])
         ref_stats[ref_id]['balance'] += bonus_stars
         
-        try: bot.send_message(ref_id, f"🥳 **Твой друг оплатил VIP!**\nТебе начислено: **{bonus_stars} звезд** ⭐️", parse_mode="Markdown") except: pass
+        try:
+            bot.send_message(ref_id, f"🥳 **Твой друг оплатил VIP!**\nТебе начислено: **{bonus_stars} звезд** ⭐️", parse_mode="Markdown")
+        except:
+            pass
         del pending_refs[new_user_id]
 
 @bot.message_handler(func=lambda message: message.text == "Создать новое объявление")
