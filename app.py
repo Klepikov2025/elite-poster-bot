@@ -17,6 +17,22 @@ app = Flask(__name__)
 ADMIN_CHAT_IDS = [479938867, 7235010425]
 OWNER_ID = 479938867
 
+# ==================== НАСТРОЙКИ VIP И РЕФЕРАЛКИ ====================
+VIP_PRICE_STARS = 250
+
+# Словари для хранения данных (пока в памяти бота)
+pending_refs = {}                 # Кто по чьей реф. ссылке пришел
+ref_stats = {}                    # Статистика рефоводов {user_id: {'invites': 0, 'balance': 0}}
+pending_verification_users = {}   # Кто сейчас записывает кружок
+
+def get_referral_bonus(invites_count):
+    """Лестница бонусов: чем больше пригласил, тем выше процент"""
+    if invites_count <= 10:   return 0.10, int(VIP_PRICE_STARS * 0.10)
+    elif invites_count <= 30: return 0.13, int(VIP_PRICE_STARS * 0.13)
+    elif invites_count <= 50: return 0.15, int(VIP_PRICE_STARS * 0.15)
+    elif invites_count <= 100:return 0.17, int(VIP_PRICE_STARS * 0.17)
+    else:                     return 0.20, int(VIP_PRICE_STARS * 0.20)
+
 # Главный канал
 MAIN_CHANNEL_ID = -1002246737442
 MAIN_CHANNEL_USERNAME = "@clubofrm"
@@ -180,8 +196,10 @@ def clean_user_text(text):
     return re.sub(r'(?<=\d)\*(?=\d)', '×', text)
 
 def get_main_keyboard():
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("Создать новое объявление", "Удалить объявление", "Удалить все объявления")
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    markup.add(types.KeyboardButton("Создать новое объявление"))
+    markup.add(types.KeyboardButton("Удалить объявление"), types.KeyboardButton("Удалить все объявления"))
+    markup.add(types.KeyboardButton("👑 Вступить в VIP-чат"), types.KeyboardButton("👤 Партнерская программа"))
     return markup
 
 def format_time(timestamp):
@@ -203,61 +221,165 @@ def start(message):
             bot.send_message(message.chat.id, "Пожалуйста, используйте ЛС для работы с ботом.")
             return
 
+        # 1. Ловим реферальную ссылку (t.me/bot?start=ref_12345)
+        start_params = message.text.split()
+        is_referral = False
+        if len(start_params) > 1 and start_params[1].startswith('ref_'):
+            ref_id = int(start_params[1].replace('ref_', ''))
+            if ref_id != message.from_user.id:
+                pending_refs[message.from_user.id] = ref_id
+                is_referral = True
+                try: bot.send_message(ref_id, "🔔 По вашей ссылке перешел новый человек! Ждем его оплату.") except: pass
+
         if message.chat.id not in user_posts:
             user_posts[message.chat.id] = []
 
+        # 2. Выдаем меню
         bot.send_message(
             message.chat.id,
-            "Привет! Я ElitePoster. 👋\nВыберите действие:",
-            reply_markup=get_main_keyboard()
+            f"Привет, {escape_md(message.from_user.first_name)}! Я ElitePoster. 👋\n\n"
+            "Здесь ты можешь опубликовать объявление в наших сетях-партнерах, "
+            "а также подать заявку в закрытый VIP-клуб.\n\n"
+            "Выберите действие в меню ниже:",
+            reply_markup=get_main_keyboard(),
+            parse_mode="Markdown"
         )
+
+        # 3. Если пришел от друга — сразу запускаем приветствие VIP
+        if is_referral:
+            send_vip_welcome(message.chat.id, message.from_user.first_name)
+
     except Exception as e:
-        error_text = f"Ошибка в /start: {e}"
         for admin_id in ADMIN_CHAT_IDS:
-            try:
-                bot.send_message(admin_id, error_text)
-            except Exception:
-                pass  # или print, если хочется видеть в консоли
+            try: bot.send_message(admin_id, f"Ошибка в /start: {e}")
+            except: pass
 
-# ==================== ТЕСТОВАЯ ОПЛАТА ЗВЕЗДАМИ ====================
+# ==================== VIP И ПАРТНЕРКА ====================
+@bot.message_handler(func=lambda message: message.text == "👑 Вступить в VIP-чат")
+def handle_vip_join_button(message):
+    send_vip_welcome(message.chat.id, message.from_user.first_name)
 
-@bot.message_handler(commands=['teststar'])
-def send_test_star_invoice(message):
-    # Разрешаем эту команду только тебе (админу)
-    if message.from_user.id not in ADMIN_CHAT_IDS:
-        return
+def send_vip_welcome(chat_id, first_name):
+    welcome_text = (
+        f"Приветствую, {escape_md(first_name)}! 👋\n\n"
+        "Это бот отбора в ВИП-чат, вход после верификации (кружок с лицом) "
+        f"и оплаты взноса {VIP_PRICE_STARS}⭐️ единоразово!\n\n"
+        "В случае, если вы заблокируете бот и не укажете фразу «Я отказываюсь от продолжения», "
+        "вы будете заблокированы во всех сетях-партнерах.\n\n"
+        "**ПРЕИМУЩЕСТВА УЧАСТИЯ В ВИП-ЧАТЕ:**\n"
+        "1) лояльное отношение администраций сетей-партнеров;\n"
+        "2) «золотой билет» - вступление в разные города сети;\n"
+        "3) бесплатная публикация объявлений через специальный бот.\n\n"
+        "Нажмите кнопку ниже, чтобы начать верификацию:"
+    )
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("✅ Готов пройти верификацию", callback_data="start_verification"))
+    bot.send_message(chat_id, welcome_text, reply_markup=markup, parse_mode="Markdown")
 
-    try:
-        # Отправляем счет на 1 звезду (1 XTR)
-        bot.send_invoice(
-            chat_id=message.chat.id,
-            title="Тестовая Звезда ⭐️",
-            description="Оплата 1 звезды для проверки баланса в BotFather.",
-            invoice_payload="test_star_payload",
-            provider_token="",  # ДЛЯ ЗВЕЗД ВСЕГДА ОСТАВЛЯЕМ ПУСТЫМ!
-            currency="XTR",     # Внутренний код Telegram Stars
-            prices=[types.LabeledPrice(label="1 Звезда", amount=1)]
-        )
-    except Exception as e:
-        bot.send_message(message.chat.id, f"❌ Ошибка отправки счета: {e}")
+@bot.message_handler(func=lambda message: message.text == "👤 Партнерская программа")
+def show_profile(message):
+    user_id = message.from_user.id
+    stats = ref_stats.get(user_id, {'invites': 0, 'balance': 0})
+    current_percent, _ = get_referral_bonus(stats['invites'] + 1)
+    
+    ref_link = f"https://t.me/{bot.get_me().username}?start=ref_{user_id}"
+    text = (
+        f"📊 **Твой профиль партнера**\n\n"
+        f"👥 Успешных приглашений: **{stats['invites']}**\n"
+        f"💰 Твой баланс: **{stats['balance']} звезд**\n"
+        f"📈 Текущая ставка: **{int(current_percent * 100)}%**\n\n"
+        f"🔗 **Твоя персональная ссылка:**\n`{ref_link}`\n\n"
+        f"*(Отправляй ссылку друзьям и зарабатывай на их вступлении в VIP!)*"
+    )
+    bot.send_message(message.chat.id, text, parse_mode="Markdown")
 
-# Telegram требует ОБЯЗАТЕЛЬНО подтвердить готовность принять платеж
-@bot.pre_checkout_query_handler(func=lambda query: True)
+# ==================== ВОРОНКА ВЕРИФИКАЦИИ ====================
+@bot.callback_query_handler(func=lambda call: call.data == "start_verification")
+def ask_for_video(call):
+    bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+    instruction_text = (
+        f"{escape_md(call.from_user.first_name)}, запишите видеосообщение (кружок) с лицом и скажите в нем:\n\n"
+        "💬 *«Привет админам вип-чата, сегодня [назовите дату], на часах [назовите время], хочу стать вип-участником»*\n\n"
+        "Просто отправьте кружок сюда и ожидайте ответа."
+    )
+    pending_verification_users[call.from_user.id] = True
+    bot.send_message(call.message.chat.id, instruction_text, parse_mode="Markdown")
+
+@bot.message_handler(content_types=['video_note'])
+def handle_video_note(message):
+    if message.chat.type != "private": return
+    if not pending_verification_users.get(message.from_user.id):
+        return # Игнорируем кружки, если человек не нажимал кнопку верификации
+
+    bot.send_message(message.chat.id, f"⏳ {escape_md(message.from_user.first_name)}, проверяем вашу анкету, подождите...")
+
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        types.InlineKeyboardButton("✅ Одобрить (Счет на 250⭐️)", callback_data=f"vip_approve_{message.from_user.id}"),
+        types.InlineKeyboardButton("❌ Отказать (Нарушения)", callback_data=f"vip_reject_{message.from_user.id}"),
+        types.InlineKeyboardButton("🔨 Забанить везде", callback_data=f"vip_ban_{message.from_user.id}")
+    )
+
+    for admin_id in ADMIN_CHAT_IDS:
+        try:
+            bot.send_message(admin_id, f"🚨 **Заявка в VIP!**\nОт: {get_user_name(message.from_user)}\nID: `{message.from_user.id}`", parse_mode="Markdown")
+            bot.forward_message(admin_id, message.chat.id, message.message_id)
+            bot.send_message(admin_id, "Действие:", reply_markup=markup)
+        except: pass
+    
+    pending_verification_users[message.from_user.id] = False
+
+# Действия админа (Одобрить/Отказать/Забанить)
+@bot.callback_query_handler(func=lambda call: call.data.startswith("vip_approve_") or call.data.startswith("vip_reject_") or call.data.startswith("vip_ban_"))
+def handle_vip_decision(call):
+    action, user_id_str = call.data.rsplit("_", 1)
+    user_id = int(user_id_str)
+    
+    bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+    
+    if "approve" in action:
+        bot.send_message(call.message.chat.id, f"✅ Выставлен счет на {VIP_PRICE_STARS}⭐️ пользователю {user_id}.")
+        try:
+            bot.send_invoice(user_id, title="Вход в VIP Клуб 👑", description="Оплата доступа в закрытый чат.", invoice_payload="vip_access_payment", provider_token="", currency="XTR", prices=[types.LabeledPrice(label="VIP Доступ", amount=VIP_PRICE_STARS)])
+        except Exception as e: bot.send_message(call.message.chat.id, f"Ошибка инвойса: {e}")
+            
+    elif "reject" in action:
+        bot.send_message(call.message.chat.id, "❌ Отказано.")
+        try: bot.send_message(user_id, "К сожалению, вы не соответствуете требованиям сообщества. У вас имеются нарушения.\nУзнать за что: https://t.me/MK_MensClubSUPPORT") except: pass
+
+    elif "ban" in action:
+        bot.send_message(call.message.chat.id, "🔨 Пользователь забанен.")
+        # Авто-бан по чатам допишем в Этапе 3, пока просто пишем юзеру:
+        try: bot.send_message(user_id, "Вы заблокированы за нарушение правил.") except: pass
+
+# ==================== ОПЛАТА И ССЫЛКА ====================
+@bot.pre_checkout_query_handler(func=lambda query: query.invoice_payload == "vip_access_payment")
 def checkout_process(pre_checkout_query):
-    try:
-        bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
-    except Exception as e:
-        print(f"Ошибка в pre_checkout_query: {e}")
+    bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
 
-# Обработка успешного платежа
 @bot.message_handler(content_types=['successful_payment'])
 def successful_payment(message):
-    bot.send_message(
-        message.chat.id, 
-        "✅ Ура! Оплата в 1 звезду прошла успешно.\n\n"
-        "Теперь переходи в @BotFather, отправь команду /mybots, "
-        "выбери @Elitepost_bot, и там должна появиться кнопка **Balance**!"
-    )
+    new_user_id = message.from_user.id
+    
+    # 1. Генерируем ссылку
+    try:
+        invite = bot.create_chat_invite_link(VIP_CHAT_ID, member_limit=1)
+        bot.send_message(new_user_id, f"🎉 **Оплата получена! Добро пожаловать в элиту.**\n\nТвоя ссылка для входа:\n{invite.invite_link}", parse_mode="Markdown")
+    except Exception as e:
+        bot.send_message(new_user_id, "Оплата прошла, но возникла ошибка со ссылкой. Напиши админу!")
+        for admin_id in ADMIN_CHAT_IDS: bot.send_message(admin_id, f"🚨 Ошибка создания ссылки: {e}")
+
+    # 2. Бонус рефоводу
+    if new_user_id in pending_refs:
+        ref_id = pending_refs[new_user_id]
+        if ref_id not in ref_stats: ref_stats[ref_id] = {'invites': 0, 'balance': 0}
+            
+        ref_stats[ref_id]['invites'] += 1
+        percent, bonus_stars = get_referral_bonus(ref_stats[ref_id]['invites'])
+        ref_stats[ref_id]['balance'] += bonus_stars
+        
+        try: bot.send_message(ref_id, f"🥳 **Твой друг оплатил VIP!**\nТебе начислено: **{bonus_stars} звезд** ⭐️", parse_mode="Markdown") except: pass
+        del pending_refs[new_user_id]
 
 @bot.message_handler(func=lambda message: message.text == "Создать новое объявление")
 def create_new_post(message):
@@ -545,18 +667,31 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
             ask_for_new_post(message)
 
         else:
-            # === КРАСНАЯ КНОПКА ВЕРИФИКАЦИИ ===
+            # === КРАСНАЯ КНОПКА ВЕРИФИКАЦИИ (ЗАПУСКАЕТ НАШУ ВОРОНКУ) ===
             markup = types.InlineKeyboardMarkup()
             verify_button = types.InlineKeyboardButton(
                 text="🛠️ Пройти верификацию",
-                url=VERIFICATION_LINK,
-                style="danger"          # КРАСНАЯ
+                callback_data="start_verification", # <--- Магия здесь!
+                style="danger"          # КРАСНАЯ (оставил твой стиль)
             )
             markup.add(verify_button)
-            bot.send_message(message.chat.id, "🔓 Вы не являетесь привилегированным участником. Для публикации объявлений пройдите верификацию:", reply_markup=markup)
+            
+            bot.send_message(
+                message.chat.id, 
+                "🔓 Вы не являетесь привилегированным участником.\n\n"
+                "Для публикации элитных объявлений необходимо получить статус VIP. "
+                "Пройдите быструю верификацию прямо здесь:", 
+                reply_markup=markup
+            )
 
     except telebot.apihelper.ApiTelegramException as e:
         bot.send_message(message.chat.id, f"⚠️ Ошибка при проверке VIP-статуса: {e.description}")
+
+def ask_for_new_post(message):
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+    markup.add("Да", "Нет")
+    bot.send_message(message.chat.id, "Хотите создать еще одно объявление?", reply_markup=markup)
+    bot.register_next_step_handler(message, handle_new_post_choice)
 
 def handle_new_post_choice(message):
     if message.text.lower() == "да":
