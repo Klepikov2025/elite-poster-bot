@@ -863,35 +863,45 @@ def pre_checkout_query(pre_checkout_query):
     """Обязательный обработчик для всех платежей"""
     bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
 
+# ==================== ТЕСТОВАЯ ОПЛАТА ЗВЕЗДАМИ ====================
 
+@bot.message_handler(commands=['teststar'])
+def send_test_star_invoice(message):
+    # Разрешаем эту команду только тебе (админу)
+    if message.from_user.id not in ADMIN_CHAT_IDS:
+        return
+
+    try:
+        # Отправляем счет на 1 звезду (1 XTR)
+        bot.send_invoice(
+            chat_id=message.chat.id,
+            title="Тестовая Звезда ⭐️",
+            description="Оплата 1 звезды для проверки баланса в BotFather.",
+            invoice_payload="test_star_payload",
+            provider_token="",  # ДЛЯ ЗВЕЗД ВСЕГДА ОСТАВЛЯЕМ ПУСТЫМ!
+            currency="XTR",     # Внутренний код Telegram Stars
+            prices=[types.LabeledPrice(label="1 Звезда", amount=1)]
+        )
+    except Exception as e:
+        bot.send_message(message.chat.id, f"❌ Ошибка отправки счета: {e}")
+
+# Telegram требует ОБЯЗАТЕЛЬНО подтвердить готовность принять платеж
+@bot.pre_checkout_query_handler(func=lambda query: True)
+def checkout_process(pre_checkout_query):
+    try:
+        bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+    except Exception as e:
+        print(f"Ошибка в pre_checkout_query: {e}")
+
+# Обработка успешного платежа
 @bot.message_handler(content_types=['successful_payment'])
-def successful_payment_handler(message):
-    """Обработка успешной оплаты Stars"""
-    payment = message.successful_payment
-    user_id = message.from_user.id
-    amount = payment.total_amount
-    payload = payment.invoice_payload or "unknown"
-
-    success_text = f"✅ Оплата прошла успешно!\n\n" \
-                   f"Сумма: **{amount}** ⭐\n" \
-                   f"Payload: `{payload}`"
-
-    bot.send_message(user_id, success_text, parse_mode="Markdown")
-
-    # Уведомляем всех админов
-    admin_text = f"💰 Новая оплата Stars!\n" \
-                 f"Пользователь: {user_id}\n" \
-                 f"Сумма: {amount} ⭐\n" \
-                 f"Payload: {payload}"
-
-    for admin_id in ADMIN_CHAT_IDS:
-        try:
-            bot.send_message(admin_id, admin_text)
-        except:
-            pass
-
-    # Здесь позже будем добавлять VIP и реферальные начисления
-    print(f"[PAYMENT] User {user_id} paid {amount} Stars. Payload: {payload}")
+def successful_payment(message):
+    bot.send_message(
+        message.chat.id, 
+        "✅ Ура! Оплата в 1 звезду прошла успешно.\n\n"
+        "Теперь переходи в @BotFather, отправь команду /mybots, "
+        "выбери @Elitepost_bot, и там должна появиться кнопка **Balance**!"
+    )
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
