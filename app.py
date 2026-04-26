@@ -1163,6 +1163,35 @@ def is_subscribed(user_id):
         print(f"Ошибка при проверке подписки для {user_id}: {e}")
         return False
 
+# --- МГНОВЕННЫЙ РАДАР БЛОКИРОВОК (Ловит тех, кто кинул в ЧС) ---
+@bot.my_chat_member_handler()
+def catch_bot_block(message):
+    if message.chat.type == "private":
+        new_status = message.new_chat_member.status
+        if new_status == "kicked": 
+            user_id = message.from_user.id
+            
+            # 1. ПРОВЕРКА: СВОИХ НЕ ТРОГАЕМ (VIP-ЗАЩИТА)
+            try:
+                chat_member = bot.get_chat_member(VIP_CHAT_ID, user_id)
+                if chat_member.status in ["member", "administrator", "creator"]:
+                    return 
+            except:
+                pass 
+                
+            # 2. ПРОВЕРКА: ИММУНИТЕТ (ФРАЗА ОТКАЗА)
+            if user_id in safe_from_autoban:
+                try: safe_from_autoban.remove(user_id)
+                except: pass
+                
+            # 3. ЛИКВИДАЦИЯ ХИТРЕЦА
+            else:
+                try:
+                    bot.send_message(STAFF_GROUP_ID, f"⚡️ **РАДАР СРАБОТАЛ** ⚡️\nЮзер `{user_id}` заблокировал бота без предупреждения! Запускаю ликвидацию...")
+                except: pass
+                
+                ban_user_everywhere(user_id, reason="Мгновенный перехват блокировки бота", admin_name="Auto-Radar ⚡️")
+
 # ==================== УДАЛЕНИЕ СООБЩЕНИЙ БЕЗ ПОДПИСКИ + ОТБИВКА ====================
 warned_users = {}  # (chat_id, user_id) -> message_id отбивки
 
