@@ -299,10 +299,18 @@ def get_user_name(user):
         return f"[{name}](tg://user?id={user.id})"
 
 # ==================== МОДУЛЬ 2: УМНАЯ ТАМОЖНЯ ====================
+# ==================== МОДУЛЬ 2: УМНАЯ ТАМОЖНЯ + СТАТИСТИКА ====================
 @bot.chat_join_request_handler()
 def handle_join_requests(message: telebot.types.ChatJoinRequest):
     user_id = message.from_user.id
     chat_id = message.chat.id
+    
+    # 1. ФИКСИРУЕМ ЗАЯВКУ В СТАТИСТИКЕ (Общая и по конкретному чату)
+    db['network_stats'].update_one(
+        {"_id": "current_period"}, 
+        {"$inc": {"total": 1, f"chats.{chat_id}.total": 1}}, 
+        upsert=True
+    )
     
     try:
         # --- ФАЗА -1: Проверка Глобального Черного Списка ---
@@ -314,15 +322,11 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
         user_info = bot.get_chat(user_id)
         bio = user_info.bio.lower() if user_info.bio else ""
         
-        # Ссылки (Белый список анонимок)
         allowed_links = ["anonquebot", "secretmessagebot", "askbot", "contactme"]
         has_bad_link = ("t.me/" in bio or "http" in bio) and not any(allowed in bio for allowed in allowed_links)
-        
-        # Дети (10-17 лет и года рождения 2009-2016)
         has_bad_age = bool(re.search(r'\b(1[0-7])\s*(лет|год|y\.?o\.?)?\b', bio))
         has_bad_year = bool(re.search(r'\b(200[9]|201[0-6])\b', bio))
         
-        # Наказание: Ребенка — в бан, Спамера — в мут для массовки
         if has_bad_age or has_bad_year:
             bot.decline_chat_join_request(chat_id, user_id)
             bot.send_message(STAFF_GROUP_ID, f"🚨 **СКАЙНЕТ: ТАМОЖНЯ**\nОтклонена заявка от малолетки (`{user_id}`).\nЗапускаю глобальный БАН...")
@@ -330,7 +334,9 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
             return
 
         if has_bad_link:
-            bot.approve_chat_join_request(chat_id, user_id) # Пускаем для статистики
+            bot.approve_chat_join_request(chat_id, user_id) 
+            # Считаем спамера как одобренного для массовки
+            db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
             bot.send_message(STAFF_GROUP_ID, f"⚠️ **СКАЙНЕТ: ТАМОЖНЯ**\nПустил спамера со ссылкой в БИО (`{user_id}`) для массовки.\nЗатыкаю рот глобальным МУТОМ 🤐...")
             mute_user_everywhere(user_id, reason="Рекламная ссылка в БИО", admin_name="Скайнет 🛂")
             return
@@ -347,6 +353,12 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
         
         if is_privileged:
             bot.approve_chat_join_request(chat_id, user_id)
+            # Считаем в общую статку + в счетчик Золотых билетов
+            db['network_stats'].update_one(
+                {"_id": "current_period"}, 
+                {"$inc": {"approved": 1, "vip_tickets": 1, f"chats.{chat_id}.approved": 1}}, 
+                upsert=True
+            )
             return
 
         # --- ФАЗА 2: Биг-чаты (Открытые котлы) ---
@@ -355,11 +367,12 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
             chat_ids_mk.get("Секс Туризм"),
             chat_ids_mk.get("Галерея"),
             chat_ids_mk.get("Мужской Чат"),
-            chat_ids_mk.get("Фетиши")
+            chat_ids_mk.get("Фетиши"),  # <--- ВОТ ЗДЕСЬ НУЖНА ЗАПЯТАЯ!
             chat_ids_mk.get("Аренда Жилья")
         ]
         if chat_id in big_chats:
             bot.approve_chat_join_request(chat_id, user_id)
+            db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
             return
 
         # --- ФАЗА 3: Гео-контроль (Городские чаты) ---
@@ -372,10 +385,11 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
         
         if target_city and user_has_city_passport(user_id, target_city):
             bot.approve_chat_join_request(chat_id, user_id)
+            db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
             return
 
         # --- ФАЗА 4: Новички ---
-        # Заявка остается висеть для ручного одобрения Александром (1-го или 15-го числа)
+        # Оставляем висеть в списке (ты одобришь их кнопкой "Одобрить все" 1-го или 15-го числа)
         pass
 
     except Exception as e:
@@ -654,6 +668,45 @@ def handle_manual_ban(message):
             bot.send_message(message.chat.id, f"✅ Юзер удален из VIP.")
         except: 
             bot.send_message(message.chat.id, "❌ Ошибка бана в VIP.")
+
+@bot.message_handler(commands=['get_report'])
+def get_detailed_report(message):
+    if message.from_user.id != OWNER_ID: return
+    
+    stats = db['network_stats'].find_one({"_id": "current_period"})
+    if not stats:
+        bot.send_message(message.chat.id, "📊 Статистика за этот период пуста.")
+        return
+
+    total = stats.get('total', 0)
+    approved = stats.get('approved', 0)
+    vip_tickets = stats.get('vip_tickets', 0)
+    
+    # Формируем детализацию по городам
+    city_details = ""
+    chats_data = stats.get('chats', {})
+    
+    # Собираем все названия чатов из твоих словарей для сопоставления
+    all_known_chats = {**chat_ids_mk, **chat_ids_parni, **chat_ids_ns, **chat_ids_gayznak, **chat_ids_rainbow}
+    chat_names = {v: k for k, v in all_known_chats.items()} # реверс словаря: id -> имя
+
+    for cid_str, data in chats_data.items():
+        cid = int(cid_str)
+        name = chat_names.get(cid, f"Чат {cid}")
+        c_total = data.get('total', 0)
+        c_appr = data.get('approved', 0)
+        city_details += f"📍 {name}: {c_total} заявок (авто-вход: {c_appr})\n"
+
+    report_text = (
+        f"📋 **Z-ОТЧЕТ СЕТИ (Период)**\n\n"
+        f"📈 **ВСЕГО ЗАЯВОК:** {total}\n"
+        f"✅ **АВТО-ОДОБРЕНО:** {approved}\n"
+        f"👑 **ЗОЛОТОЙ БИЛЕТ:** {vip_tickets}\n\n"
+        f"🏙 **ДЕТАЛИЗАЦИЯ:**\n{city_details}\n"
+        f"📅 *Следующая выгрузка: 01.05.2026*"
+    )
+    
+    bot.send_message(message.chat.id, report_text)
 
 # ==================== ВОРОНКА ВЕРИФИКАЦИИ ====================
 @bot.callback_query_handler(func=lambda call: call.data == "start_verification")
