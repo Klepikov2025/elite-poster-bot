@@ -713,7 +713,8 @@ def ban_user_everywhere(target_id, reason="Без причины", admin_name="�
             banned_in.append(f"🔸 {name}")
         except: pass
             
-    who_is_it = user_link if user_link else f"`[{target_id}]`"
+    # Используем твою ссылку, если её нет — делаем резервную
+    who_is_it = user_link if user_link else f"[{target_id}](tg://user?id={target_id})"
     
     report_text = (
         f"🚫 **#BAN**\n"
@@ -721,15 +722,14 @@ def ban_user_everywhere(target_id, reason="Без причины", admin_name="�
         f"• **Кому:** {who_is_it} (ID: `{target_id}`)\n"
         f"• **Причина:** {reason}\n"
     )
-    
     if trigger_text:
         report_text += f"• **Улика:** _{escape_md(trigger_text[:150])}_\n"
         
     report_text += f"• **Группы:** ({len(banned_in)} шт.)\n" + "\n".join(banned_in)
     
-    try:
-        bot.send_message(JOURNAL_CHAT_ID, report_text, parse_mode="Markdown")
-        bot.send_message(STAFF_GROUP_ID, report_text, parse_mode="Markdown")
+    try: bot.send_message(JOURNAL_CHAT_ID, report_text, parse_mode="Markdown")
+    except: pass
+    try: bot.send_message(STAFF_GROUP_ID, report_text, parse_mode="Markdown")
     except: pass
     return len(banned_in)
 
@@ -749,7 +749,7 @@ def mute_user_everywhere(target_id, reason="Без причины", admin_name="
             muted_in.append(f"🔸 {name}")
         except: pass
             
-    who_is_it = user_link if user_link else f"`[{target_id}]`"
+    who_is_it = user_link if user_link else f"[{target_id}](tg://user?id={target_id})"
     
     report_text = (
         f"🤐 **#MUTE (Глобальный)**\n"
@@ -757,15 +757,14 @@ def mute_user_everywhere(target_id, reason="Без причины", admin_name="
         f"• **Кому:** {who_is_it} (ID: `{target_id}`)\n"
         f"• **Причина:** {reason}\n"
     )
-    
     if trigger_text:
         report_text += f"• **Улика:** _{escape_md(trigger_text[:150])}_\n"
         
     report_text += f"• **Замучен в группах:** {len(muted_in)} шт."
     
-    try:
-        bot.send_message(STAFF_GROUP_ID, report_text, parse_mode="Markdown")
-        bot.send_message(JOURNAL_CHAT_ID, report_text, parse_mode="Markdown")
+    try: bot.send_message(JOURNAL_CHAT_ID, report_text, parse_mode="Markdown")
+    except: pass
+    try: bot.send_message(STAFF_GROUP_ID, report_text, parse_mode="Markdown")
     except: pass
     return len(muted_in)
 
@@ -1540,16 +1539,17 @@ WC_WORDS = ["туалет", "кабинка", "тц", "в кабинке", "в �
 warned_users = {}  # (chat_id, user_id) -> message_id отбивки
 
 # Ловим вообще ВСЁ в группах (текст, фото, видео и т.д.)
+# Ловим вообще ВСЁ в группах (текст, фото, видео и т.д.)
 @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact'], func=lambda message: message.chat.type in ['group', 'supergroup'])
 def skynet_core_handler(message):
     chat_id = message.chat.id
     user_id = message.from_user.id
     
-    # Сразу собираем улики для отчетов
+    # Собираем данные и генерируем твою Markdown-ссылку
     raw_text = message.text or message.caption or ""
     text = raw_text.lower()
+    trigger_text = raw_text if raw_text else "Без текста (медиа)"
     user_link = get_user_name(message.from_user)
-    trigger_text = raw_text if raw_text else "Без текста (медиа файл)"
 
     try:
         # 1. СИНХРОНИЗАЦИЯ СТАТУСОВ И ТЕГОВ ИЗ БАЗЫ
@@ -1576,7 +1576,6 @@ def skynet_core_handler(message):
                     is_queer = True
                     users_collection.update_one({"_id": user_id}, {"$set": {"is_queer": True}}, upsert=True)
             except: pass
-        # ---------------------------------------------------
 
         # --- МАГИЯ: ПЕРЕХВАТ РУЧНЫХ ТЕГОВ ИЗ ИНТЕРФЕЙСА ---
         try:
@@ -1600,19 +1599,17 @@ def skynet_core_handler(message):
         try: safe_set_tag(chat_id, user_id, final_tag)
         except: pass
 
-        # 2. КРАСНАЯ ЗОНА (Проверяем ВСЕХ, даже VIP)
+        # 2. КРАСНАЯ ЗОНА (Проверяем ВСЕХ)
         if any(re.search(word, text) for word in RED_WORDS):
             bot.delete_message(chat_id, message.message_id)
             ban_user_everywhere(user_id, reason="Мясорубка: Красная зона", admin_name="Скайнет ⚔️", user_link=user_link, trigger_text=trigger_text)
             return
 
-        # Если это VIP или ручной тег — отпускаем его от дальнейших проверок
-        if any([is_vip, is_queer, is_verified, custom_tag]):
-            return 
+        # ИММУНИТЕТ ДЛЯ ЭЛИТЫ И ВЕРИФИЦИРОВАННЫХ
+        if any([is_vip, is_queer, is_verified, custom_tag]): return 
 
-        # === ИСКЛЮЧЕНИЕ "ПАРНИ" ===
-        if chat_id in PARNI_CHATS:
-            return 
+        # ИСКЛЮЧЕНИЕ "ПАРНИ"
+        if chat_id in PARNI_CHATS: return 
 
         # 3. ПРОВЕРКА ПОДПИСКИ
         if not is_subscribed(user_id):
@@ -1635,22 +1632,21 @@ def skynet_core_handler(message):
                 threading.Thread(target=auto_delete, daemon=True).start()
             return
 
-        # 4. КОММЕРЦИЯ 
+        # 4. КОММЕРЦИЯ (Теперь ГЛОБАЛЬНЫЙ МУТ!)
         if any(re.search(pattern, text) for pattern in YELLOW_COMMERCE_REGEX):
             bot.delete_message(chat_id, message.message_id)
-            bot.restrict_chat_member(chat_id, user_id, until_date=0, can_send_messages=False)
-            report_msg = f"🤑 **#MUTE: Коммерция (Локальный)**\n• **Кто:** {user_link} (`{user_id}`)\n• **Текст:** _{escape_md(trigger_text[:150])}_"
-            bot.send_message(STAFF_GROUP_ID, report_msg, parse_mode="Markdown")
-            bot.send_message(JOURNAL_CHAT_ID, report_msg, parse_mode="Markdown")
+            mute_user_everywhere(user_id, reason="Желтая зона: Коммерция", admin_name="Скайнет ⚔️", user_link=user_link, trigger_text=trigger_text)
             return
 
-        # 5. ПОПРОШАЙКИ (Мут на 2 часа)
+        # 5. ПОПРОШАЙКИ (Мут на 2 часа, отправляем локальный отчет)
         if any(word in text for word in YELLOW_BEGGARS):
             bot.delete_message(chat_id, message.message_id)
             bot.restrict_chat_member(chat_id, user_id, until_date=int(time.time())+7200, can_send_messages=False)
             report_msg = f"🤫 **#MUTE: Попрошайка (на 2 часа)**\n• **Кто:** {user_link} (`{user_id}`)\n• **Текст:** _{escape_md(trigger_text[:150])}_"
-            bot.send_message(STAFF_GROUP_ID, report_msg, parse_mode="Markdown")
-            bot.send_message(JOURNAL_CHAT_ID, report_msg, parse_mode="Markdown")
+            try: bot.send_message(STAFF_GROUP_ID, report_msg, parse_mode="Markdown")
+            except: pass
+            try: bot.send_message(JOURNAL_CHAT_ID, report_msg, parse_mode="Markdown")
+            except: pass
             return
 
         # 5.5. ОРАНЖЕВАЯ ЗОНА: ВОЗРАСТ 18 ЛЕТ
@@ -1660,21 +1656,16 @@ def skynet_core_handler(message):
             
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("🛠 Пройти верификацию 🔞", url="https://t.me/FAQMKBOT"))
-            bot.send_message(
-                chat_id, 
-                f"🚨 **Внимание!**\nПользователь указал пограничный возраст (18 лет).\n\n"
-                f"В нашей сети это повод для обязательной проверки. Вы были временно ограничены в общении. "
-                f"Подтвердите свой возраст через администрацию.",
-                reply_markup=markup,
-                parse_mode="Markdown"
-            )
+            bot.send_message(chat_id, f"🚨 **Внимание!**\nПользователь указал пограничный возраст (18 лет).\n\nВ нашей сети это повод для обязательной проверки. Вы были временно ограничены в общении. Подтвердите свой возраст через администрацию.", reply_markup=markup, parse_mode="Markdown")
             
             report_msg = f"🟠 **#MUTE: Подозрение (18 лет)**\n• **Кто:** {user_link} (`{user_id}`)\n• **Текст:** _{escape_md(trigger_text[:150])}_"
-            bot.send_message(STAFF_GROUP_ID, report_msg, parse_mode="Markdown")
-            bot.send_message(JOURNAL_CHAT_ID, report_msg, parse_mode="Markdown")
+            try: bot.send_message(STAFF_GROUP_ID, report_msg, parse_mode="Markdown")
+            except: pass
+            try: bot.send_message(JOURNAL_CHAT_ID, report_msg, parse_mode="Markdown")
+            except: pass
             return
 
-        # 6. СИНЯЯ ЗОНА: ТЕГИ (Без отчетов, бот работает как ниндзя)
+        # 6. СИНЯЯ ЗОНА: ТЕГИ (Без отчетов)
         new_tag = None
         if "вирт" in text and "не вирт" not in text: new_tag = "РИСК/ВИРТ/ОБМЕН"
         elif any(re.search(fr'\b{word}\b', text) for word in ["вз", "обмен", "слить", "тц"]): 
