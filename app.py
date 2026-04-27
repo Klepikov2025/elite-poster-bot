@@ -1,5 +1,6 @@
 import os
 import telebot
+import requests
 from telebot import types
 from flask import Flask, request
 from datetime import datetime
@@ -298,7 +299,16 @@ def get_user_name(user):
     else:
         return f"[{name}](tg://user?id={user.id})"
 
-# ==================== МОДУЛЬ 2: УМНАЯ ТАМОЖНЯ ====================
+def safe_set_tag(chat_id, user_id, tag):
+    """Безопасная выдача тегов без прав админа (обновление Telegram от Марта 2026)"""
+    try:
+        # Пробуем нативный метод (если библиотека обновлена)
+        bot.set_chat_member_tag(chat_id, user_id, tag)
+    except AttributeError:
+        # Если библиотека старая, бьем напрямую в API Телеграма
+        url = f"https://api.telegram.org/bot{TOKEN}/setChatMemberTag"
+        requests.post(url, json={"chat_id": chat_id, "user_id": user_id, "tag": tag})
+
 # ==================== МОДУЛЬ 2: УМНАЯ ТАМОЖНЯ + СТАТИСТИКА ====================
 @bot.chat_join_request_handler()
 def handle_join_requests(message: telebot.types.ChatJoinRequest):
@@ -456,91 +466,6 @@ def start(message):
         for admin_id in ADMIN_CHAT_IDS:
             try: bot.send_message(admin_id, f"Ошибка в /start: {e}")
             except: pass
-
-# ==================== НАСТРОЙКИ МЯСОРУБКИ ====================
-
-# 🔴 Красная зона (Глобал бан)
-RED_WORDS = [r"фен", r"меф", r"кристаллы", r"соли", r"стафф", r"цп", r"детское"]
-
-# 🟡 Желтая зона: Коммерция (Мут навсегда + отчет)
-YELLOW_COMMERCE = ["мп", "мат помощь", "спонсор", "содержу", "коммерция", "вознаграждение", "бабки"]
-
-# 🟡 Желтая зона: Попрошайки (Мут на 2 часа)
-YELLOW_BEGGARS = ["у меня бан", "пиши первым", "напишите первым", "жду в лс", "пиши в лс", "ставь реакцию", "ставьте реакции"]
-
-# 🔵 Синяя зона: Теги (Без мута)
-VIRT_WORDS = ["обмен", "вирт", "вз", "дроч", "видеозвонок", "слить", "фотками"]
-CAR_WORDS = ["в машине", "на авто", "на заднем", "тачка", "в тачке"]
-WC_WORDS = ["туалет", "кабинка", "тц", "в кабинке", "в туалете", "глори", "glory"]
-
-# ==================== МОДУЛЬ 3 и 4: ОБРАБОТЧИК ====================
-
-@bot.message_handler(func=lambda message: message.chat.type in ['group', 'supergroup'])
-def meat_grinder(message):
-    chat_id = message.chat.id
-    user_id = message.from_user.id
-    text = (message.text or message.caption or "").lower()
-
-    try:
-        # 1. СИНХРОНИЗАЦИЯ СТАТУСОВ (VIP/BEYOND/VERIFIED)
-        # Проверяем базу и вешаем короны автоматически
-        user_data = users_collection.find_one({"_id": user_id}) or {}
-        
-        is_vip = user_data.get("is_vip", False)
-        is_queer = user_data.get("is_queer", False)
-        is_verified = user_data.get("is_verified", False)
-
-        # Приоритет тегов Элиты
-        elite_tag = None
-        if is_vip and is_queer: elite_tag = "𝓟𝓡𝓔𝓜𝓘𝓤𝓜"
-        elif is_queer: elite_tag = "𝐐𝐔𝐄𝐄𝐑 ♛"
-        elif is_vip: elite_tag = "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕"
-        elif is_verified: elite_tag = "Верифицирован МК"
-
-        if elite_tag:
-            try:
-                # Вешаем тег, если его еще нет (синхронизация по всем чатам)
-                bot.set_chat_user_tag(chat_id, user_id, elite_tag)
-            except: pass
-            return # Элиту не фильтруем!🛡️
-
-        # 2. ФИЛЬТР НОВИЧКОВ (Если нет статуса - вешаем Not Verified)
-        try:
-            bot.set_chat_user_tag(chat_id, user_id, "Not verified")
-        except: pass
-
-        # 3. КРАСНАЯ ЗОНА (Бан везде)
-        if any(re.search(word, text) for word in RED_WORDS):
-            bot.delete_message(chat_id, message.message_id)
-            ban_user_everywhere(user_id, reason=f"Мясорубка: Красная зона ({text[:20]}...)", admin_name="Скайнет ⚔️")
-            return
-
-        # 4. ЖЕЛТАЯ ЗОНА: КОММЕРЦИЯ (Мут навсегда)
-        if any(word in text for word in YELLOW_COMMERCE):
-            bot.delete_message(chat_id, message.message_id)
-            bot.restrict_chat_member(chat_id, user_id, until_date=0, can_send_messages=False)
-            bot.send_message(STAFF_GROUP_ID, f"🤑 **#MUTE: Коммерция**\nЮзер: `{user_id}`\nТекст: {text[:50]}")
-            return
-
-        # 5. ЖЕЛТАЯ ЗОНА: ПОПРОШАЙКИ (Мут на 2 часа)
-        if any(word in text for word in YELLOW_BEGGARS):
-            bot.delete_message(chat_id, message.message_id)
-            bot.restrict_chat_member(chat_id, user_id, until_date=int(time.time())+7200, can_send_messages=False)
-            return
-
-        # 6. СИНЯЯ ЗОНА: ВЫДАЧА ОБИДНЫХ ТЕГОВ (Без мута)
-        new_tag = None
-        if any(word in text for word in VIRT_WORDS): new_tag = "РИСК/ВИРТ/ОБМЕН"
-        elif any(word in text for word in CAR_WORDS): new_tag = "автососка"
-        elif any(word in text for word in WC_WORDS): new_tag = "туалетная соска"
-
-        if new_tag:
-            try:
-                bot.set_chat_user_tag(chat_id, user_id, new_tag)
-            except: pass
-
-    except Exception as e:
-        print(f"Ошибка Мясорубки: {e}")
 
 # ==================== VIP И ПАРТНЕРКА ====================
 @bot.message_handler(func=lambda message: message.text == "👑 Вступить в VIP-чат")
@@ -706,7 +631,31 @@ def get_detailed_report(message):
         f"📅 *Следующая выгрузка: 01.05.2026*"
     )
     
-    bot.send_message(message.chat.id, report_text)
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("🗑 Сбросить счетчики для нового периода", callback_data="reset_stats"))
+    bot.send_message(message.chat.id, report_text, reply_markup=markup)
+
+@bot.message_handler(commands=['globaltag'])
+def set_custom_user_tag(message):
+    if message.from_user.id not in ADMIN_CHAT_IDS: return
+    args = message.text.split(maxsplit=2)
+    if len(args) < 3:
+        bot.send_message(message.chat.id, "❌ Формат: `/globaltag [ID] [ТЕГ]`\nЧтобы убрать: `/globaltag [ID] none`", parse_mode="Markdown")
+        return
+    target_id = int(args[1])
+    new_tag = args[2]
+    if new_tag.lower() == "none":
+        users_collection.update_one({"_id": target_id}, {"$unset": {"custom_tag": ""}})
+        bot.send_message(message.chat.id, f"✅ Глобальный тег для `{target_id}` удален.")
+    else:
+        users_collection.update_one({"_id": target_id}, {"$set": {"custom_tag": new_tag}}, upsert=True)
+        bot.send_message(message.chat.id, f"✅ Юзеру `{target_id}` присвоен вечный глобальный тег: `{new_tag}`")
+
+@bot.callback_query_handler(func=lambda call: call.data == "reset_stats")
+def reset_network_stats(call):
+    if call.from_user.id != OWNER_ID: return
+    db['network_stats'].delete_one({"_id": "current_period"})
+    bot.edit_message_text("✅ Статистика обнулена. Начинаем новый отсчет!", call.message.chat.id, call.message.message_id)
 
 # ==================== ВОРОНКА ВЕРИФИКАЦИИ ====================
 @bot.callback_query_handler(func=lambda call: call.data == "start_verification")
@@ -1561,100 +1510,126 @@ def catch_bot_block(message):
                 
                 ban_user_everywhere(user_id, reason="Мгновенный перехват блокировки бота", admin_name="Auto-Radar ⚡️")
 
-# ==================== УДАЛЕНИЕ СООБЩЕНИЙ БЕЗ ПОДПИСКИ + ОТБИВКА ====================
+# ==================== НАСТРОЙКИ И ЕДИНОЕ ЯДРО СКАЙНЕТА ====================
+
+# 🔴 Красная зона (Глобал бан)
+RED_WORDS = [r"фен", r"меф", r"кристаллы", r"соли", r"стафф", r"цп", r"детское"]
+
+# 🟡 Желтая зона: Коммерция (Умный Regex, чтобы не банить "симпатичных")
+YELLOW_COMMERCE_REGEX = [r'\bмп\b', r'\bм\.п\b', r'\bмат\s*помощь\b', r'\bспонсор\b', r'\bсодержу\b', r'\bкоммерция\b', r'\bвознаграждение\b', r'\bбабки\b']
+
+# 🟡 Желтая зона: Попрошайки (Мут на 2 часа)
+YELLOW_BEGGARS = ["у меня бан", "пиши первым", "напишите первым", "жду в лс", "пиши в лс", "ставь реакцию", "ставьте реакции"]
+
+# 🔵 Синяя зона: Теги (Без мута)
+VIRT_WORDS = ["обмен", "вирт", "вз", "дроч", "видеозвонок", "слить", "фотками"]
+CAR_WORDS = ["в машине", "на авто", "на заднем", "тачка", "в тачке"]
+WC_WORDS = ["туалет", "кабинка", "тц", "в кабинке", "в туалете", "глори", "glory"]
+
 warned_users = {}  # (chat_id, user_id) -> message_id отбивки
 
-@bot.message_handler(content_types=[
-    'text', 'photo', 'video', 'document', 'audio', 'voice',
-    'sticker', 'animation', 'location', 'contact'
-])
-def check_subscription(message):
-    if message.chat.type == "private" or not message.from_user:
-        return
-    if message.sender_chat:
-        return
-    if message.chat.id in PARNI_CHATS:
-        return
-
-    user_id = message.from_user.id
+# Ловим вообще ВСЁ в группах (текст, фото, видео и т.д.)
+@bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact'], func=lambda message: message.chat.type in ['group', 'supergroup'])
+def skynet_core_handler(message):
     chat_id = message.chat.id
-    key = (chat_id, user_id)
-
-    if is_subscribed(user_id):
-        if key in warned_users:
-            try:
-                bot.delete_message(chat_id, warned_users[key])
-            except:
-                pass
-            del warned_users[key]
-        return
+    user_id = message.from_user.id
+    text = (message.text or message.caption or "").lower()
 
     try:
-        bot.delete_message(chat_id, message.message_id)
-    except:
-        pass
+        # 1. СИНХРОНИЗАЦИЯ СТАТУСОВ И ТЕГОВ
+        user_data = users_collection.find_one({"_id": user_id}) or {}
+        is_vip = user_data.get("is_vip", False)
+        is_queer = user_data.get("is_queer", False)
+        is_verified = user_data.get("is_verified", False)
+        shame_tag = user_data.get("shame_tag")
+        custom_tag = user_data.get("custom_tag") 
 
-    if key not in warned_users:
-        markup = types.InlineKeyboardMarkup(row_width=2)
-
-        # Кнопка "Подписаться на МК" + анимированный стикер в начале кнопки
-        markup.add(
-            types.InlineKeyboardButton(
-                text="Подписаться на МК",   # текст остаётся
-                url=MAIN_CHANNEL_LINK,
-                icon_custom_emoji_id="5215330331711775720",   # ← твой стикер для МК
-                style="success"                              # зелёная кнопка (как было)
-            )
-        )
-
-        # Кнопка ПАРНИ 18+ (без изменений)
-        markup.add(
-            types.InlineKeyboardButton(
-                text="ПАРНИ 18+",
-                url="https://t.me/znakparni"
-            )
-        )
-
-        # Резервный канал и ПРАВИЛА (без изменений)
-        markup.add(
-            types.InlineKeyboardButton("Резервный канал", url="https://t.me/gaysexchatrur"),
-            types.InlineKeyboardButton("ПРАВИЛА МК", url="https://t.me/MensClubRules")
-        )
-
-        # Кнопка БЕСПЛАТНЫЙ VPN + анимированный стикер
-        markup.add(
-            types.InlineKeyboardButton(
-                text="🚀 БЕСПЛАТНЫЙ VPN ДЛЯ ВСЕХ",
-                url="https://t.me/perec?start=ref_2BBPF35H",
-                icon_custom_emoji_id="5981123193862098366",   # ← твой стикер для VPN
-                style="primary"                              # синяя кнопка (как было)
-            )
-        )
-
+        # --- МАГИЯ: ПЕРЕХВАТ РУЧНЫХ ТЕГОВ ИЗ ИНТЕРФЕЙСА ---
         try:
-            sent = bot.send_message(
-                chat_id=chat_id,
-                text="❗ Внимание, чтобы писать в чате вам необходимо подписаться на наш основной канал.\n\n"
-                     "Без подписки на канал ваши сообщения будут удаляться автоматически. "
-                     "Вступая в чат, я подтверждаю совершеннолетие и обязуюсь соблюдать правила, "
-                     "с которыми ознакомлен и согласен.",
-                reply_markup=markup
-            )
-            warned_users[key] = sent.message_id
+            member = bot.get_chat_member(chat_id, user_id)
+            current_tag = getattr(member, 'custom_title', None)
+            bot_tags = ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "𝐐𝐔𝐄𝐄𝐑 ♛", "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕", "Верифицирован МК", "Not verified", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска"]
+            if current_tag and current_tag not in bot_tags:
+                users_collection.update_one({"_id": user_id}, {"$set": {"custom_tag": current_tag}}, upsert=True)
+                custom_tag = current_tag 
+        except: pass
 
-            def auto_delete():
-                time.sleep(120)
-                try:
-                    bot.delete_message(chat_id, sent.message_id)
-                except:
-                    pass
-                if key in warned_users:
-                    del warned_users[key]
+        # Определяем итоговый тег
+        final_tag = "Not verified"
+        if custom_tag: final_tag = custom_tag
+        elif is_vip and is_queer: final_tag = "𝓟𝓡𝓔𝓜𝓘𝓤𝓜"
+        elif is_queer: final_tag = "𝐐𝐔𝐄𝐄𝐑 ♛"
+        elif is_vip: final_tag = "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕"
+        elif is_verified: final_tag = "Верифицирован МК"
+        elif shame_tag: final_tag = shame_tag
 
-            threading.Thread(target=auto_delete, daemon=True).start()
+        try: safe_set_tag(chat_id, user_id, final_tag)
+        except: pass
 
-        except Exception as e:
-            print(f"Ошибка отправки отбивки: {e}")
+        # 2. КРАСНАЯ ЗОНА (Проверяем ВСЕХ, даже VIP)
+        if any(re.search(word, text) for word in RED_WORDS):
+            bot.delete_message(chat_id, message.message_id)
+            ban_user_everywhere(user_id, reason=f"Мясорубка: Красная зона", admin_name="Скайнет ⚔️")
+            return
+
+        # Если это VIP или ручной тег — отпускаем его от дальнейших проверок
+        if any([is_vip, is_queer, is_verified, custom_tag]):
+            return 
+
+        # === ИСКЛЮЧЕНИЕ "ПАРНИ" ===
+        if chat_id in PARNI_CHATS:
+            return 
+
+        # 3. ПРОВЕРКА ПОДПИСКИ
+        if not is_subscribed(user_id):
+            try: bot.delete_message(chat_id, message.message_id)
+            except: pass
+            key = (chat_id, user_id)
+            if key not in warned_users:
+                markup = types.InlineKeyboardMarkup(row_width=2)
+                markup.add(types.InlineKeyboardButton(text="Подписаться на МК", url=MAIN_CHANNEL_LINK, icon_custom_emoji_id="5215330331711775720", style="success"))
+                markup.add(types.InlineKeyboardButton(text="ПАРНИ 18+", url="https://t.me/znakparni"))
+                markup.add(types.InlineKeyboardButton("Резервный канал", url="https://t.me/gaysexchatrur"), types.InlineKeyboardButton("ПРАВИЛА МК", url="https://t.me/MensClubRules"))
+                markup.add(types.InlineKeyboardButton(text="🚀 БЕСПЛАТНЫЙ VPN ДЛЯ ВСЕХ", url="https://t.me/perec?start=ref_2BBPF35H", icon_custom_emoji_id="5981123193862098366", style="primary"))
+                sent = bot.send_message(chat_id, "❗ Внимание, подпишитесь на канал для общения.", reply_markup=markup)
+                warned_users[key] = sent.message_id
+                def auto_delete():
+                    time.sleep(120)
+                    try: bot.delete_message(chat_id, sent.message_id)
+                    except: pass
+                    if key in warned_users: del warned_users[key]
+                threading.Thread(target=auto_delete, daemon=True).start()
+            return
+
+        # 4. КОММЕРЦИЯ 
+        if any(re.search(pattern, text) for pattern in YELLOW_COMMERCE_REGEX):
+            bot.delete_message(chat_id, message.message_id)
+            bot.restrict_chat_member(chat_id, user_id, until_date=0, can_send_messages=False)
+            bot.send_message(STAFF_GROUP_ID, f"🤑 **#MUTE: Коммерция**\nЮзер: `{user_id}`\nТекст: {text[:50]}")
+            bot.send_message(JOURNAL_CHAT_ID, f"🤑 **#MUTE: Коммерция**\nЮзер: `{user_id}`\nТекст: {text[:50]}")
+            return
+
+        # 5. ПОПРОШАЙКИ
+        if any(word in text for word in YELLOW_BEGGARS):
+            bot.delete_message(chat_id, message.message_id)
+            bot.restrict_chat_member(chat_id, user_id, until_date=int(time.time())+7200, can_send_messages=False)
+            return
+
+        # 6. СИНЯЯ ЗОНА: ВЫДАЧА ОБИДНЫХ ТЕГОВ
+        new_tag = None
+        if "вирт" in text and "не вирт" not in text: new_tag = "РИСК/ВИРТ/ОБМЕН"
+        elif any(word in text for word in VIRT_WORDS if word != "вирт"): new_tag = "РИСК/ВИРТ/ОБМЕН"
+        elif any(word in text for word in CAR_WORDS): new_tag = "автососка"
+        elif any(word in text for word in WC_WORDS): new_tag = "туалетная соска"
+
+        if new_tag:
+            try: 
+                safe_set_tag(chat_id, user_id, new_tag)
+                users_collection.update_one({"_id": user_id}, {"$set": {"shame_tag": new_tag}}, upsert=True)
+            except: pass
+
+    except Exception as e:
+        print(f"Ошибка Единого Ядра: {e}")
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
