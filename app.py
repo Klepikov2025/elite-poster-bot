@@ -1536,13 +1536,31 @@ def skynet_core_handler(message):
     text = (message.text or message.caption or "").lower()
 
     try:
-        # 1. СИНХРОНИЗАЦИЯ СТАТУСОВ И ТЕГОВ
+        # 1. СИНХРОНИЗАЦИЯ СТАТУСОВ И ТЕГОВ ИЗ БАЗЫ
         user_data = users_collection.find_one({"_id": user_id}) or {}
         is_vip = user_data.get("is_vip", False)
         is_queer = user_data.get("is_queer", False)
         is_verified = user_data.get("is_verified", False)
         shame_tag = user_data.get("shame_tag")
         custom_tag = user_data.get("custom_tag") 
+
+        # --- АВТО-СИНХРОНИЗАЦИЯ ФИЗИЧЕСКОГО ПРИСУТСТВИЯ ---
+        if not is_vip:
+            try:
+                m_vip = bot.get_chat_member(VIP_CHAT_ID, user_id)
+                if m_vip.status in ['member', 'administrator', 'creator']:
+                    is_vip = True
+                    users_collection.update_one({"_id": user_id}, {"$set": {"is_vip": True}}, upsert=True)
+            except: pass
+
+        if not is_queer:
+            try:
+                m_beyond = bot.get_chat_member(BEYOND_CHAT_ID, user_id)
+                if m_beyond.status in ['member', 'administrator', 'creator']:
+                    is_queer = True
+                    users_collection.update_one({"_id": user_id}, {"$set": {"is_queer": True}}, upsert=True)
+            except: pass
+        # ---------------------------------------------------
 
         # --- МАГИЯ: ПЕРЕХВАТ РУЧНЫХ ТЕГОВ ИЗ ИНТЕРФЕЙСА ---
         try:
@@ -1591,7 +1609,7 @@ def skynet_core_handler(message):
                 markup.add(types.InlineKeyboardButton(text="ПАРНИ 18+", url="https://t.me/znakparni"))
                 markup.add(types.InlineKeyboardButton("Резервный канал", url="https://t.me/gaysexchatrur"), types.InlineKeyboardButton("ПРАВИЛА МК", url="https://t.me/MensClubRules"))
                 markup.add(types.InlineKeyboardButton(text="🚀 БЕСПЛАТНЫЙ VPN ДЛЯ ВСЕХ", url="https://t.me/perec?start=ref_2BBPF35H", icon_custom_emoji_id="5981123193862098366", style="primary"))
-                sent = bot.send_message(chat_id, "❗ Внимание, подпишитесь на канал для общения.", reply_markup=markup)
+                sent = bot.send_message(chat_id, "❗ Внимание, чтобы писать в чате вам необходимо подписаться на наш основной канал.\n\nБез подписки на канал ваши сообщения будут удаляться автоматически. Вступая в чат, я подтверждаю совершеннолетие и обязуюсь соблюдать правила, с которыми ознакомлен и согласен.", reply_markup=markup)
                 warned_users[key] = sent.message_id
                 def auto_delete():
                     time.sleep(120)
@@ -1615,12 +1633,25 @@ def skynet_core_handler(message):
             bot.restrict_chat_member(chat_id, user_id, until_date=int(time.time())+7200, can_send_messages=False)
             return
 
-        # 6. СИНЯЯ ЗОНА: ВЫДАЧА ОБИДНЫХ ТЕГОВ
+        # 6. СИНЯЯ ЗОНА: ВЫДАЧА ОБИДНЫХ ТЕГОВ (УМНАЯ)
         new_tag = None
-        if "вирт" in text and "не вирт" not in text: new_tag = "РИСК/ВИРТ/ОБМЕН"
-        elif any(word in text for word in VIRT_WORDS if word != "вирт"): new_tag = "РИСК/ВИРТ/ОБМЕН"
-        elif any(word in text for word in CAR_WORDS): new_tag = "автососка"
-        elif any(word in text for word in WC_WORDS): new_tag = "туалетная соска"
+        
+        # 1. Вирт (с исключением "не вирт")
+        if "вирт" in text and "не вирт" not in text: 
+            new_tag = "РИСК/ВИРТ/ОБМЕН"
+        # 2. Строгие слова (ищем только как самостоятельные слова)
+        elif any(re.search(fr'\b{word}\b', text) for word in ["вз", "обмен", "слить", "тц"]): 
+            if "тц" in text:
+                new_tag = "туалетная соска"
+            else:
+                new_tag = "РИСК/ВИРТ/ОБМЕН"
+        # 3. Корни и фразы (ищем везде)
+        elif any(word in text for word in ["дроч", "фотками"]): 
+            new_tag = "РИСК/ВИРТ/ОБМЕН"
+        elif any(word in text for word in ["в машине", "на авто", "на заднем", "тачка", "в тачке"]): 
+            new_tag = "автососка"
+        elif any(word in text for word in ["туалет", "кабинка", "в кабинке", "глори", "glory"]): 
+            new_tag = "туалетная соска"
 
         if new_tag:
             try: 
