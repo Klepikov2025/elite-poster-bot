@@ -1681,8 +1681,8 @@ def catch_bot_block(message):
 
 # ==================== НАСТРОЙКИ И ЕДИНОЕ ЯДРО СКАЙНЕТА ====================
 
-# 🔴 Красная зона (Глобал бан)
-RED_WORDS = [r"фен", r"меф", r"кристаллы", r"соли", r"стафф", r"цп", r"детское"]
+# 🔴 Красная зона (Глобал бан) - добавлены \b для точного поиска коротких слов
+RED_WORDS = [r"фен\b", r"\bмеф\b", r"кристаллы", r"\bсоли\b", r"стафф", r"\bцп\b", r"детское"]
 
 # 🟡 Желтая зона: Коммерция (Умный Regex, чтобы не банить "симпатичных")
 YELLOW_COMMERCE_REGEX = [r'\bмп\b', r'\bм\.п\b', r'\bмат\s*помощь\b', r'\bспонсор\b', r'\bсодержу\b', r'\bкоммерция\b', r'\bвознаграждение\b', r'\bбабки\b']
@@ -1771,11 +1771,29 @@ def skynet_core_handler(message):
             ban_user_everywhere(user_id, reason="Мясорубка: Красная зона", admin_name="Скайнет ⚔️", user_link=user_link, trigger_text=trigger_text)
             return
 
-        # ИММУНИТЕТ ДЛЯ ЭЛИТЫ И ВЕРИФИЦИРОВАННЫХ
+        # 2.5. ЧЕРНАЯ ЗОНА: НЕСОВЕРШЕННОЛЕТНИЕ (< 18) - МГНОВЕННЫЙ БАН
+        # Сначала вырезаем сантиметры (15 см, 17 см), чтобы не забанить взрослых парней за размеры
+        safe_minor = re.sub(r'\b(1[0-7])\s*(см|cm)\b', '', text)
+        
+        minor_patterns = [
+            r'\b(мне|я)\s*(1[0-7])\b',                   # Ловит: "мне 15", "я 17"
+            r'\b(мне|я)\s*18\s*-\s*[1-9]\b',             # Ловит математиков: "мне 18-2", "я 18 - 1"
+            r'\b(1[0-7]|18\s*-\s*[1-9])\s*(лет|годик)\b',# Ловит: "16 лет", "18-3 годика"
+            r'\b(1[0-7])\s*[/\\-]\s*1\d{2}\b',           # Ловит короткие анкеты: "16/170/60" (возраст/рост)
+            r'\b(200[9]|201[0-9])\s*(г|год|года|г\.р)\b' # Ловит года рождения: 2009 и младше (в 2026 году это <18)
+        ]
+        
+        if any(re.search(p, safe_minor) for p in minor_patterns):
+            bot.delete_message(chat_id, message.message_id)
+            # Баним пермачом во всех 80 чатах без суда и следствия
+            ban_user_everywhere(user_id, reason="Черная зона: Несовершеннолетний (<18)", admin_name="Скайнет 🔞", user_link=user_link, trigger_text=trigger_text)
+            return
+
+        # ИММУНИТЕТ ДЛЯ ЭЛИТЫ И ВЕРИФИЦИРОВАННЫХ (Срабатывает только если юзер старше 18 и без наркотиков)
         if any([is_vip, is_queer, is_verified, custom_tag]): return 
 
         # ИСКЛЮЧЕНИЕ "ПАРНИ"
-        if chat_id in PARNI_CHATS: return 
+        if chat_id in PARNI_CHATS: return
 
         # 3. ПРОВЕРКА ПОДПИСКИ
         if not is_subscribed(user_id):
@@ -1832,7 +1850,8 @@ def skynet_core_handler(message):
             
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("🛠 Пройти верификацию 🔞", url="https://t.me/FAQMKBOT"))
-            bot.send_message(chat_id, f"🚨 **Внимание!**\nПользователь указал пограничный возраст (18 лет).\n\nВ нашей сети это повод для обязательной проверки. Вы были временно ограничены в общении. Подтвердите свой возраст через администрацию.", reply_markup=markup, parse_mode="Markdown")
+            # --- СКРЫТНЫЙ ТЕКСТ ДЛЯ ЮЗЕРА ---
+            bot.send_message(chat_id, "🚨 **Внимание!**\nВаша анкета попала под автоматический фильтр безопасности сети.\n\nДля защиты участников чата, вам необходимо пройти обязательную верификацию. Вы временно ограничены в общении до подтверждения профиля администрацией.", reply_markup=markup, parse_mode="Markdown")
             
             report_msg = f"🟠 **#MUTE: Подозрение (18 лет)**\n• **Кто:** {user_link} (`{user_id}`)\n• **Текст:** _{escape_md(trigger_text[:150])}_"
             try: bot.send_message(STAFF_GROUP_ID, report_msg, parse_mode="Markdown")
