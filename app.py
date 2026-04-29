@@ -675,6 +675,54 @@ def set_custom_user_tag(message):
         
         bot.send_message(message.chat.id, f"✅ Юзер `{target_id}` верифицирован как `{new_tag}` и глобально размучен в {unmuted_count} чатах!")
 
+@bot.message_handler(commands=['globalunban'])
+def global_unban_user(message):
+    # --- ДИНАМИЧЕСКАЯ ПРОВЕРКА ПРАВ (только для админов Staff-группы) ---
+    try:
+        staff_member = bot.get_chat_member(STAFF_GROUP_ID, message.from_user.id)
+        if staff_member.status not in ['administrator', 'creator']:
+            bot.send_message(message.chat.id, "❌ Отказано. Вы не можете отдавать приказы Скайнету.")
+            return
+    except Exception:
+        return 
+    # -------------------------------------------------------------------
+
+    # maxsplit=2 означает, что бот разобьет текст на 3 части: [команда, ID, всё_остальное_как_тег]
+    args = message.text.split(maxsplit=2)
+    
+    if len(args) < 2:
+        bot.send_message(message.chat.id, "❌ Формат: `/globalunban [ID] [НЕОБЯЗАТЕЛЬНО: ТЕГ]`\nПример: `/globalunban 123456 𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕`", parse_mode="Markdown")
+        return
+    
+    try:
+        target_id = int(args[1])
+    except ValueError:
+        bot.send_message(message.chat.id, "❌ Ошибка: ID должен состоять только из цифр!")
+        return
+
+    bot.send_message(message.chat.id, f"🔄 Запускаю протокол амнистии для `{target_id}`...")
+    
+    # 1. Глобальный разбан
+    unbanned_count = unban_user_everywhere(target_id)
+    
+    # 2. Если админ передал тег — сразу вешаем его в базу!
+    tag_info = ""
+    if len(args) == 3:
+        new_tag = args[2]
+        if new_tag.lower() == "none":
+            users_collection.update_one({"_id": target_id}, {"$unset": {"custom_tag": ""}})
+            tag_info = "\n🔖 Глобальный тег очищен."
+        else:
+            users_collection.update_one({"_id": target_id}, {"$set": {"custom_tag": new_tag}}, upsert=True)
+            tag_info = f"\n🔖 Присвоен новый тег: `{new_tag}`"
+    
+    bot.send_message(
+        message.chat.id, 
+        f"✅ **Амнистия завершена!**\nЮзер `{target_id}` вычеркнут из Черного Списка в {unbanned_count} чатах.{tag_info}\n\n"
+        f"⚠️ *Передайте ему, что он может заново вступать в группы по ссылкам.*",
+        parse_mode="Markdown"
+    )
+
 @bot.callback_query_handler(func=lambda call: call.data == "reset_stats")
 def reset_network_stats(call):
     if call.from_user.id != OWNER_ID: return
@@ -787,6 +835,30 @@ def unmute_user_everywhere(target_id):
             pass
             
     return unmuted_count
+
+def unban_user_everywhere(target_id):
+    """Снимает глобальный бан с пользователя во всех чатах сети"""
+    # 1. Удаляем метку бана из памяти Скайнета
+    banned_collection.delete_one({"_id": target_id})
+    
+    # 2. Собираем все чаты
+    all_chats = [VIP_CHAT_ID, BEYOND_CHAT_ID]
+    all_chats.extend(chat_ids_parni.values())
+    all_chats.extend(chat_ids_mk.values())
+    all_chats.extend(chat_ids_ns.values())
+    all_chats.extend(chat_ids_rainbow.values())
+    all_chats.extend(chat_ids_gayznak.values())
+    
+    unbanned_count = 0
+    for cid in all_chats:
+        try:
+            # only_if_banned=True - важно, чтобы бот просто вычеркнул из ЧС, а не кикнул случайно
+            bot.unban_chat_member(cid, target_id, only_if_banned=True)
+            unbanned_count += 1
+        except:
+            pass
+            
+    return unbanned_count
 
 # --- ФУНКЦИЯ: ГЛОБАЛЬНЫЙ МУТ (ДЛЯ РЕКЛАМЩИКОВ) ---
 def mute_user_everywhere(target_id, reason="Без причины", admin_name="Система", user_link=None, trigger_text=None):
@@ -1753,8 +1825,8 @@ def skynet_core_handler(message):
         safe_age = re.sub(r'\b18\s*\+', '', safe_age) # убираем 18+
         safe_age = re.sub(r'\b18\s*(см|cm)\b', '', safe_age) # убираем 18 см
         
-        # 2. Ищем "18 лет" ИЛИ анкету "18/180/75" (где 18 - возраст, а дальше идет рост на 1ХХ)
-        if re.search(r'\b18\s*(лет|год|годик|y\.?o\.?)\b|\b18\s*[/\\-]\s*1\d{2}\b', safe_age):
+        # 2. Ищем "18 лет", анкету "18/180/75", ИЛИ прямые заявления "мне 18", "я 18"
+        if re.search(r'\b18\s*(лет|год|годик|y\.?o\.?)\b|\b18\s*[/\\-]\s*1\d{2}\b|\b(мне|я)\s*18\b', safe_age):
             bot.delete_message(chat_id, message.message_id)
             bot.restrict_chat_member(chat_id, user_id, until_date=0, can_send_messages=False)
             
