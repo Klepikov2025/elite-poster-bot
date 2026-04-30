@@ -105,9 +105,15 @@ chat_ids_mk = {
     "Иркутск": -1002685095003,
     "Кемерово": -1002147522863,
     "Москва": -1002208434096,
-    "Санкт Петербург": -1002485776859,
+    "Санкт-Петербург": -1002485776859, # <-- Добавлен дефис
     "Общая группа Юга": -1001814693664,
-    "Общая группа Тюмень и Север": -1002210623988,
+    
+    # === ТРЮК С РЕГИОНАМИ ===
+    "Тюмень": -1002210623988, # Заменили "Общую группу Тюмень и Север"
+    "ХМАО": -1002210623988,   # Дублируем ID для серверных городов
+    "ЯМАЛ": -1002210623988,   # Дублируем ID для серверных городов
+    # ========================
+
     "Казахстан": -1003091556050,
     "Мужской Чат": -1002169723426,
     "Фетиши": -1002197215824,
@@ -139,14 +145,17 @@ chat_ids_ns = {
     "Челябинск": -1002233108474,
     "Пермь": -1001753881279,
     "Уфа": -1001823390636,
-    "Ямал": -1002145851794,
+    "ЯМАЛ": -1002145851794, # <-- Сделали капсом
     "Москва": -1001938448310,
     "ХМАО": -1001442597049,
-    "Знакомства 66": -1002169473861,
-    "Знакомства 72": -1002170955867,
+    "Екатеринбург": -1002169473861, # Заменили "Знакомства 66"
+    "Тюмень": -1002170955867,       # Заменили "Знакомства 72"
     "Санкт-Петербург": -1002335014334,
-    "Секс Знакомства Тюмень": -1001427433513,
-    "Знакомства 74": -1002193127380
+    
+    # Так как в НС оказалось два Челябинска и две Тюмени, 
+    # вторые группы называем с цифрой 2:
+    "Тюмень 2": -1001427433513,     # Заменили "Секс Знакомства Тюмень"
+    "Челябинск 2": -1002193127380   # Заменили "Знакомства 74"
 }
 
 chat_ids_rainbow = {
@@ -183,25 +192,22 @@ chat_ids_gayznak = {
 }
 
 # ==================== АВТОГЕНЕРАЦИЯ all_cities ====================
+# Уничтожили логику маппинга, так как теперь всё стандартизировано!
 def normalize_city_name(name):
-    mapping = {
-        "Перми": "Пермь",
-        "ЯМАО": "Ямал",
-        "Знакомства 66": "Екатеринбург",
-        "ЗНАКОМСТВА 72": "Тюмень",
-        "Знакомства 74": "Челябинск"
-    }
-    return mapping.get(name, name)
+    return name 
 
 all_cities = {}
 
 def insert_to_all(city, net_key, real_name, chat_id):
-    norm = normalize_city_name(city)
-    if norm not in all_cities:
-        all_cities[norm] = {}
-    if net_key not in all_cities[norm]:
-        all_cities[norm][net_key] = []
-    all_cities[norm][net_key].append({"name": real_name, "chat_id": chat_id})
+    # Чтобы в "Все сети" не дублировались кнопки (Тюмень и Тюмень 2),
+    # обрезаем " 2" и кладем всё в одну общую категорию для кнопок.
+    clean_city = city.replace(" 2", "")
+    
+    if clean_city not in all_cities:
+        all_cities[clean_city] = {}
+    if net_key not in all_cities[clean_city]:
+        all_cities[clean_city][net_key] = []
+    all_cities[clean_city][net_key].append({"name": real_name, "chat_id": chat_id})
 
 for city, chat_id in chat_ids_mk.items():
     insert_to_all(city, "mk", city, chat_id)
@@ -214,11 +220,6 @@ for city, chat_id in chat_ids_rainbow.items():
 for city, chat_id in chat_ids_gayznak.items():
     insert_to_all(city, "gayznak", city, chat_id)
 
-fallback_mk = {"Тюмень", "Ямал", "ХМАО"}
-for city in fallback_mk:
-    if "mk" not in all_cities.get(city, {}):
-        insert_to_all(city, "mk", "Общая группа Тюмень и Север", -1002210623988)
-
 def net_key_to_name(key):
     return {
         "mk": "Мужской Клуб",
@@ -228,10 +229,8 @@ def net_key_to_name(key):
         "gayznak": "Гей Знакомства"
     }.get(key, key)
 
-ns_city_substitution = {
-    "Екатеринбург": "Знакомства 66",
-    "Челябинск": "Знакомства 74"
-}
+# Оставляем этот словарь пустым, чтобы не сломать функцию публикации!
+ns_city_substitution = {}
 
 VIP_CHAT_ID = -1002446486648
 BEYOND_CHAT_ID = -1002873115881
@@ -1279,8 +1278,6 @@ def get_network_markup():
     markup.add("Мужской Клуб", "ПАРНИ 18+", "НС", "Радуга", "Гей Знакомства", "Все сети", "Назад")
     return markup
 
-
-
 def select_network(message, text, media_type, file_id):
     if message.text == "Назад":
         bot.send_message(message.chat.id, "Напишите текст объявления:")
@@ -1365,60 +1362,32 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                 )
             )
 
+            # === НОВАЯ ИДЕАЛЬНАЯ ЛОГИКА РАССЫЛКИ ===
+            target_chats = []
+
             if selected_network == "Все сети":
-                norm_city = normalize_city_name(city)
-                nets = list(all_cities.get(norm_city, {}).keys())
-                networks = [net_key_to_name(k) for k in nets]
+                # Достаем все чаты для этого города из всех сетей (включая дубли типа Тюмень 2)
+                for net_key, groups in all_cities.get(city, {}).items():
+                    for group in groups:
+                        target_chats.append((group['chat_id'], net_key_to_name(net_key)))
             else:
-                networks = [selected_network]
-
-            for network in networks:
-                if network == "Мужской Клуб":
-                    chat_dict = chat_ids_mk
-                    net_key = "mk"
-                elif network == "ПАРНИ 18+":
-                    chat_dict = chat_ids_parni
-                    net_key = "parni"
-                elif network == "НС":
-                    chat_dict = chat_ids_ns
-                    net_key = "ns"
-                elif network == "Радуга":
-                    chat_dict = chat_ids_rainbow
-                    net_key = "rainbow"
-                elif network == "Гей Знакомства":
-                    chat_dict = chat_ids_gayznak
-                    net_key = "gayznak"
+                chat_id = None
+                # Ищем chat_id напрямую в выбранном словаре
+                if selected_network == "Мужской Клуб": chat_id = chat_ids_mk.get(city)
+                elif selected_network == "ПАРНИ 18+": chat_id = chat_ids_parni.get(city)
+                elif selected_network == "НС": chat_id = chat_ids_ns.get(city)
+                elif selected_network == "Радуга": chat_id = chat_ids_rainbow.get(city)
+                elif selected_network == "Гей Знакомства": chat_id = chat_ids_gayznak.get(city)
+                
+                if chat_id:
+                    target_chats.append((chat_id, selected_network))
                 else:
-                    continue
+                    bot.send_message(message.chat.id, f"❌ Ошибка! Город '{city}' не найден в сети «{selected_network}».")
+                    ask_for_new_post(message)
+                    return
 
-                # Для НС возможна подстановка городов
-                if net_key == "ns":
-                    if city not in chat_dict and city in ns_city_substitution:
-                        substitute_city = ns_city_substitution[city]
-                        if substitute_city in chat_dict:
-                            chat_id = chat_dict[substitute_city]
-                        else:
-                            bot.send_message(message.chat.id, f"❌ Ошибка! Город '{city}' не найден в сети «{network}».")
-                            continue
-                    elif city in chat_dict:
-                        chat_id = chat_dict[city]
-                    else:
-                        bot.send_message(message.chat.id, f"❌ Ошибка! Город '{city}' не найден в сети «{network}».")
-                        continue
-                else:
-                    if city in chat_dict:
-                        chat_id = chat_dict[city]
-                    else:
-                        norm = normalize_city_name(city)
-                        found = False
-                        for entry in all_cities.get(norm, {}).get(net_key, []):
-                            chat_id = entry.get('chat_id')
-                            found = True
-                            break
-                        if not found:
-                            bot.send_message(message.chat.id, f"❌ Ошибка! Город '{city}' не найден в сети «{network}».")
-                            continue
-
+            # Рассылаем по всем собранным чатам
+            for chat_id, network_name in target_chats:
                 try:
                     if media_type == "photo":
                         sent_message = bot.send_photo(chat_id, file_id, caption=full_text, parse_mode="Markdown", reply_markup=markup_inline)
@@ -1431,26 +1400,28 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
 
                     if message.chat.id not in user_posts:
                         user_posts[message.chat.id] = []
+                        
                     user_posts[message.chat.id].append({
                         "message_id": sent_message.message_id,
                         "chat_id": chat_id,
                         "time": datetime.now(),
                         "city": city,
-                        "network": network
+                        "network": network_name
                     })
-                    bot.send_message(message.chat.id, f"✅ Ваше объявление опубликовано в сети «{network}», городе {city}.")
+                    bot.send_message(message.chat.id, f"✅ Ваше объявление опубликовано в сети «{network_name}», городе {city}.")
                 except telebot.apihelper.ApiTelegramException as e:
-                    bot.send_message(message.chat.id, f"❌ Ошибка: {e.description}")
+                    bot.send_message(message.chat.id, f"❌ Ошибка отправки в {network_name}: {e.description}")
 
             ask_for_new_post(message)
+            # =======================================================
 
         else:
             # === КРАСНАЯ КНОПКА ВЕРИФИКАЦИИ (ЗАПУСКАЕТ НАШУ ВОРОНКУ) ===
             markup = types.InlineKeyboardMarkup()
             verify_button = types.InlineKeyboardButton(
                 text="🛠️ Пройти верификацию",
-                callback_data="start_verification", # <--- Магия здесь!
-                style="danger"          # КРАСНАЯ (оставил твой стиль)
+                callback_data="start_verification", 
+                style="danger"          
             )
             markup.add(verify_button)
             
@@ -1729,6 +1700,38 @@ def catch_bot_block(message):
                 
                 ban_user_everywhere(user_id, reason="Мгновенный перехват блокировки бота", admin_name="Auto-Radar ⚡️")
 
+# ==================== ПЕРЕХВАТЧИК "МЕРТВЫХ ДУШ" (Защита от старых заявок) ====================
+@bot.message_handler(content_types=['new_chat_members'])
+def catch_illegal_entry(message):
+    for new_user in message.new_chat_members:
+        user_id = new_user.id
+        
+        # 1. Проверяем, есть ли он в черном списке Скайнета
+        banned_info = banned_collection.find_one({"_id": user_id})
+        
+        if banned_info:
+            chat_id = message.chat.id
+            
+            # 2. Мгновенно баним обратно (стирать сообщение о входе не нужно, их у вас нет)
+            try:
+                bot.ban_chat_member(chat_id, user_id, revoke_messages=True)
+            except:
+                pass
+            
+            # 3. Гордо отчитываемся в Staff-чат
+            user_link = f"[{escape_md(new_user.first_name)}](tg://user?id={user_id})"
+            chat_title = escape_md(message.chat.title) if message.chat.title else str(chat_id)
+            
+            report = (
+                f"🚨 **ПЕРЕХВАТ ПРОНИКНОВЕНИЯ!**\n"
+                f"Кто-то одобрил старую заявку забаненного юзера {user_link} (`{user_id}`).\n"
+                f"📍 **Где:** {chat_title}\n"
+                f"🤖 Скайнет мгновенно вернул его в бан! 🛡"
+            )
+            try: bot.send_message(STAFF_GROUP_ID, report, parse_mode="Markdown")
+            except: pass
+# ===========================================================================================
+
 # ==================== НАСТРОЙКИ И ЕДИНОЕ ЯДРО СКАЙНЕТА ====================
 
 # 🔴 Красная зона (Глобал бан) - добавлены \b для точного поиска коротких слов
@@ -1912,16 +1915,48 @@ def skynet_core_handler(message):
 
         # 6. СИНЯЯ ЗОНА: ТЕГИ (Без отчетов)
         new_tag = None
-        if "вирт" in text and "не вирт" not in text: new_tag = "РИСК/ВИРТ/ОБМЕН"
-        elif any(re.search(fr'\b{word}\b', text) for word in ["вз", "обмен", "слить", "тц"]): 
-            new_tag = "туалетная соска" if "тц" in text else "РИСК/ВИРТ/ОБМЕН"
-        elif any(word in text for word in ["дроч", "фотками"]): new_tag = "РИСК/ВИРТ/ОБМЕН"
-        elif any(word in text for word in ["в машине", "на авто", "на заднем", "тачка", "в тачке"]): new_tag = "автососка"
-        elif any(word in text for word in ["туалет", "кабинка", "в кабинке", "глори", "glory"]): new_tag = "туалетная соска"
 
+        # --- ДЕТЕКТОР "ПАРАМЕТРЫ FAKE" (Ловец изменения возраста) ---
+        # Ищем возраст в форматах: "мне 25", "я 25", "25 лет", "25/180/75"
+        age_match = re.search(r'\b(?:мне|я)\s*([1-9]\d)\b|\b([1-9]\d)\s*(?:лет|год|годик)\b|\b([1-9]\d)\s*[/\\-]\s*1\d{2}\b', text)
+        
+        if age_match:
+            found_age = None
+            for group in age_match.groups():
+                if group:
+                    found_age = int(group)
+                    break
+                    
+            if found_age and found_age >= 18: 
+                saved_age = user_data.get("saved_age")
+                
+                # Если возраста в базе еще нет — запоминаем
+                if not saved_age:
+                    users_collection.update_one({"_id": user_id}, {"$set": {"saved_age": found_age}})
+                # Если возраст есть, но отличается больше чем на 1 год (запас на День Рождения)
+                elif abs(saved_age - found_age) > 1: 
+                    new_tag = "Параметры FAKE"
+        # -------------------------------------------------------------
+
+        # Если он не попался на фейковом возрасте, проверяем остальные слова
+        if not new_tag:
+            if "вирт" in text and "не вирт" not in text: new_tag = "РИСК/ВИРТ/ОБМЕН"
+            elif any(re.search(fr'\b{word}\b', text) for word in ["вз", "обмен", "слить", "тц"]): 
+                new_tag = "туалетная соска" if "тц" in text else "РИСК/ВИРТ/ОБМЕН"
+            elif any(word in text for word in ["дроч", "фотками"]): new_tag = "РИСК/ВИРТ/ОБМЕН"
+            elif any(word in text for word in ["в машине", "на авто", "на заднем", "тачка", "в тачке"]): new_tag = "автососка"
+            elif any(word in text for word in ["туалет", "кабинка", "в кабинке", "глори", "glory"]): new_tag = "туалетная соска"
+            
+            # --- НОВЫЙ ТЕГ ДЛЯ ИСКАТЕЛЕЙ ЭКЗОТИКИ ---
+            elif any(word in text for word in ["нерусск", "кавказ", "восточн", "узбек", "таджик", "дагестан", "чечен", "чурк"]): 
+                new_tag = "чернильница"
+            # ----------------------------------------
+
+        # Присваиваем найденный тег
         if new_tag:
             try: 
                 safe_set_tag(chat_id, user_id, new_tag)
+                # Записываем позорный тег в базу, чтобы он висел перманентно
                 users_collection.update_one({"_id": user_id}, {"$set": {"shame_tag": new_tag}}, upsert=True)
             except: pass
 
