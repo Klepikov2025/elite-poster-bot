@@ -35,6 +35,7 @@ db = mongo_client['elite_bot_db']
 users_collection = db['users']               # Статистика и балансы рефералов
 pending_refs_collection = db['pending_refs'] # Клики и ожидающие оплаты
 banned_collection = db['banned']             # Черный список (забаненные)
+posts_collection = db['posts']
 
 # --- Функции общения с базой ---
 def update_user_stats(user_id, invites_add=0, balance_add=0, clicks_add=0):
@@ -236,8 +237,6 @@ VIP_CHAT_ID = -1002446486648
 BEYOND_CHAT_ID = -1002873115881
 VERIFICATION_LINK = "http://t.me/vip_znakbot"
 
-user_posts = {}
-post_owner = {}
 responded = {}
 scam_reports = {}  # ключ: report_id (случайный или timestamp+random), значение: {reporter_id, vip_id, chat_id, msg_id, responder_id, message_id_in_admin_chat}
 pending_verification_users = {}
@@ -743,6 +742,93 @@ def global_unban_user(message):
         parse_mode="Markdown"
     )
 
+@bot.message_handler(commands=['admin'])
+def promote_to_admin_global(message):
+    # --- ДИНАМИЧЕСКАЯ ПРОВЕРКА ПРАВ (только для руководства) ---
+    try:
+        staff_member = bot.get_chat_member(STAFF_GROUP_ID, message.from_user.id)
+        if staff_member.status not in ['administrator', 'creator']:
+            bot.send_message(message.chat.id, "❌ Отказано. Только руководство может раздавать погоны.")
+            return
+    except Exception:
+        return 
+    # ------------------------------------------------------------
+
+    args = message.text.split(maxsplit=2)
+    if len(args) < 3:
+        bot.send_message(message.chat.id, "❌ Формат: `/admin [ID] [Должность]`\nПример: `/admin 123456789 прЫнц`", parse_mode="Markdown")
+        return
+
+    try:
+        target_id = int(args[1])
+    except ValueError:
+        bot.send_message(message.chat.id, "❌ Ошибка: ID должен состоять только из цифр!")
+        return
+
+    custom_title = args[2]
+    
+    # Ограничение самого Телеграма: тег админа не может быть длиннее 16 символов
+    if len(custom_title) > 16:
+        bot.send_message(message.chat.id, "❌ Ошибка: Телеграм не позволяет делать тег админа длиннее 16 символов. Сократите название.")
+        return
+        
+    bot.send_message(message.chat.id, f"🔄 Запускаю протокол «Коронация» для `{target_id}`.\nНазначаю права и должность «{custom_title}» по всей сети...", parse_mode="Markdown")
+
+    # Собираем все чаты сети в единый список
+    all_chats = [VIP_CHAT_ID, BEYOND_CHAT_ID]
+    all_chats.extend(chat_ids_parni.values())
+    all_chats.extend(chat_ids_mk.values())
+    all_chats.extend(chat_ids_ns.values())
+    all_chats.extend(chat_ids_rainbow.values())
+    all_chats.extend(chat_ids_gayznak.values())
+
+    # Превращаем в set, чтобы убрать дубли (например, Тюмень и ХМАО с одинаковым ID)
+    unique_chats = set(all_chats)
+    
+    success_count = 0
+    error_count = 0
+
+    for cid in unique_chats:
+        try:
+            # 1. Выдаем базовые права модератора строго по скриншоту
+            bot.promote_chat_member(
+                chat_id=cid,
+                user_id=target_id,
+                can_manage_chat=True,        # (Обязательная галочка для API Телеграма)
+                can_change_info=False,       # Изменение профиля группы: НЕТ ❌
+                can_delete_messages=True,    # Удаление сообщений: ДА ✅
+                can_restrict_members=True,   # Блокировка пользователей: ДА ✅
+                can_invite_users=True,       # Добавление участников: ДА ✅
+                can_pin_messages=False,      # Закрепление сообщений: НЕТ ❌
+                can_manage_video_chats=True, # Управление видеочатами: ДА ✅
+                is_anonymous=True,           # Анонимность: ДА ✅
+                can_promote_members=False    # Добавление администраторов: НЕТ ❌
+            )
+            
+            # 2. Устанавливаем кастомный тег (Должность)
+            bot.set_chat_administrator_custom_title(
+                chat_id=cid,
+                user_id=target_id,
+                custom_title=custom_title
+            )
+            success_count += 1
+            
+        except Exception as e:
+            error_count += 1
+            
+        # Небольшая пауза, чтобы Телеграм не забанил бота за спам запросами
+        time.sleep(0.1)
+
+    bot.send_message(
+        message.chat.id, 
+        f"✅ **Коронация завершена!** 👑\n\n"
+        f"Пользователь `{target_id}` назначен модератором в **{success_count}** чатах.\n"
+        f"🔖 Выдана должность: `{custom_title}`\n\n"
+        f"⚠️ *Ошибок/Пропусков: {error_count} (юзера нет в чате или у бота не хватает прав).*\n\n"
+        f"**Важно:** Пусть новый админ добавится во все нужные чаты, если он еще не там, чтобы права применились корректно.",
+        parse_mode="Markdown"
+    )
+
 @bot.callback_query_handler(func=lambda call: call.data == "reset_stats")
 def reset_network_stats(call):
     if call.from_user.id != OWNER_ID: return
@@ -1155,7 +1241,14 @@ def successful_payment(message):
     # 1. Генерируем ссылку
     try:
         invite = bot.create_chat_invite_link(VIP_CHAT_ID, member_limit=1)
-        bot.send_message(new_user_id, f"🎉 **Оплата получена! Добро пожаловать в элиту.**\n\nТвоя ссылка для входа:\n{invite.invite_link}", parse_mode="Markdown")
+        
+        # Прячем ссылку в красивый Markdown-формат [Текст](URL)
+        bot.send_message(
+            new_user_id, 
+            f"🎉 *Оплата получена! Добро пожаловать в элиту.*\n\n👉 [НАЖМИТЕ СЮДА ДЛЯ ВХОДА В VIP-КЛУБ]({invite.invite_link})", 
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
     except Exception as e:
         bot.send_message(new_user_id, "Оплата прошла, но возникла ошибка со ссылкой. Напиши админу!")
         for admin_id in ADMIN_CHAT_IDS: 
@@ -1169,7 +1262,7 @@ def successful_payment(message):
     if ref_id:
         update_user_stats(ref_id, invites_add=1) # Прибавили успешную оплату
         stats = get_user_stats(ref_id)           # Взяли свежие данные
-        percent, bonus_stars = get_referral_bonus(stats['invites']) # Посчитали бонус
+        _, bonus_stars = get_referral_bonus(stats['invites']) # Посчитали бонус (percent не используем, заменил на _)
         
         update_user_stats(ref_id, balance_add=bonus_stars) # Начислили звезды на баланс
         
@@ -1185,23 +1278,23 @@ def create_new_post(message):
         bot.send_message(message.chat.id, "Пожалуйста, используйте ЛС для работы с ботом.")
         return
 
-    # --- ЖЕСТКИЙ ФЕЙСКОНТРОЛЬ ---
     if is_banned_in_network(message.from_user.id):
         bot.send_message(message.chat.id, "🚫 Вы не можете публиковать объявления. Ваш аккаунт заблокирован в сети.")
         return
-    # ----------------------------
 
     bot.send_message(message.chat.id, "Напишите текст объявления:")
     bot.register_next_step_handler(message, process_text)
 
 @bot.message_handler(func=lambda message: message.text == "Удалить объявление")
 def handle_delete_post(message):
-    if message.chat.type != "private":
-        bot.send_message(message.chat.id, "Пожалуйста, используйте ЛС для работы с ботом.")
-        return
-    if message.chat.id in user_posts and user_posts[message.chat.id]:
+    if message.chat.type != "private": return
+    
+    user_id = message.from_user.id
+    posts = list(posts_collection.find({"user_id": user_id}))
+    
+    if posts:
         markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-        for post in user_posts[message.chat.id]:
+        for post in posts:
             time_formatted = format_time(post["time"])
             button_text = f"Удалить: {time_formatted}, {post['city']}, {post['network']}"
             markup.add(button_text)
@@ -1213,10 +1306,12 @@ def handle_delete_post(message):
 
 @bot.message_handler(func=lambda message: message.text == "Удалить все объявления")
 def handle_delete_all_posts(message):
-    if message.chat.type != "private":
-        bot.send_message(message.chat.id, "Пожалуйста, используйте ЛС для работы с ботом.")
-        return
-    if message.chat.id in user_posts and user_posts[message.chat.id]:
+    if message.chat.type != "private": return
+    
+    user_id = message.from_user.id
+    posts = list(posts_collection.find({"user_id": user_id}))
+    
+    if posts:
         markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
         markup.add("Да, удалить всё", "Нет, отменить")
         bot.send_message(message.chat.id, "Вы уверены, что хотите удалить все свои объявления?", reply_markup=markup)
@@ -1227,30 +1322,34 @@ def handle_delete_all_posts(message):
 def process_delete_choice(message):
     if message.text == "Отмена":
         bot.send_message(message.chat.id, "Удаление отменено.", reply_markup=get_main_keyboard())
-    else:
-        try:
-            for post in user_posts[message.chat.id]:
-                time_formatted = format_time(post["time"])
-                if message.text == f"Удалить: {time_formatted}, {post['city']}, {post['network']}":
-                    try:
-                        bot.delete_message(post["chat_id"], post["message_id"])
-                    except Exception:
-                        pass
-                    user_posts[message.chat.id].remove(post)
-                    bot.send_message(message.chat.id, "✅ Объявление успешно удалено.", reply_markup=get_main_keyboard())
-                    return
-            bot.send_message(message.chat.id, "❌ Объявление не найдено.")
-        except (ValueError, IndexError):
-            bot.send_message(message.chat.id, "❌ Ошибка! Пожалуйста, выберите объявление из списка.")
+        return
 
-def process_delete_all_choice(message):
-    if message.text == "Да, удалить всё":
-        for post in user_posts[message.chat.id]:
+    user_id = message.from_user.id
+    posts = list(posts_collection.find({"user_id": user_id}))
+    
+    for post in posts:
+        time_formatted = format_time(post["time"])
+        if message.text == f"Удалить: {time_formatted}, {post['city']}, {post['network']}":
             try:
                 bot.delete_message(post["chat_id"], post["message_id"])
-            except Exception:
-                pass
-        user_posts[message.chat.id] = []
+            except: pass
+            
+            posts_collection.delete_one({"_id": post["_id"]})
+            bot.send_message(message.chat.id, "✅ Объявление успешно удалено.", reply_markup=get_main_keyboard())
+            return
+            
+    bot.send_message(message.chat.id, "❌ Объявление не найдено.")
+
+def process_delete_all_choice(message):
+    user_id = message.from_user.id
+    if message.text == "Да, удалить всё":
+        posts = list(posts_collection.find({"user_id": user_id}))
+        for post in posts:
+            try:
+                bot.delete_message(post["chat_id"], post["message_id"])
+            except: pass
+        
+        posts_collection.delete_many({"user_id": user_id})
         bot.send_message(message.chat.id, "✅ Все ваши объявления успешно удалены.", reply_markup=get_main_keyboard())
     else:
         bot.send_message(message.chat.id, "Удаление отменено.", reply_markup=get_main_keyboard())
@@ -1297,11 +1396,9 @@ def handle_confirmation(message, text, media_type, file_id):
         bot.send_message(message.chat.id, "❌ Неверный ответ. Выберите 'Да' или 'Нет'.")
         bot.register_next_step_handler(message, handle_confirmation, text, media_type, file_id)
 
-
 def get_network_markup():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add("Создать новое объявление", "Удалить объявление", "Удалить все объявления")
-    # добавляем сети
     network_row = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
     markup.add("Мужской Клуб", "ПАРНИ 18+", "НС", "Радуга", "Гей Знакомства", "Все сети", "Назад")
     return markup
@@ -1326,7 +1423,6 @@ def select_network(message, text, media_type, file_id):
         elif selected_network == "Гей Знакомства":
             cities = list(chat_ids_gayznak.keys())
         elif selected_network == "Все сети":
-            # только города где >= 2 сетей
             cities = [city for city, data in all_cities.items() if len(data.keys()) >= 2]
         for city in cities:
             markup.add(city)
@@ -1350,8 +1446,21 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
         return
 
     try:
-        chat_member = bot.get_chat_member(VIP_CHAT_ID, message.from_user.id)
-        if chat_member.status in ["member", "administrator", "creator"]:
+        user_id = message.from_user.id
+        is_privileged = False
+
+        user_data = users_collection.find_one({"_id": user_id}) or {}
+        if user_data.get("custom_tag"):
+            is_privileged = True
+
+        if not is_privileged:
+            try:
+                status = bot.get_chat_member(VIP_CHAT_ID, user_id).status
+                if status in ["member", "administrator", "creator", "restricted"]:
+                    is_privileged = True
+            except: pass
+
+        if is_privileged:
             vip_tag = "\n\n✅ *Анкета проверена администрацией сети*\n\n⭐️ *Привилегированный участник* ⭐️"
 
             user_name_md = get_user_name(message.from_user)
@@ -1379,28 +1488,24 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
             ]
             full_text = f"{random.choice(headers)}\n\n{escape_md(clean_user_text(text))}{vip_tag}"
 
-            # === ЦВЕТНАЯ КНОПКА ОТКЛИКА ===
             markup_inline = types.InlineKeyboardMarkup()
             markup_inline.add(
                 types.InlineKeyboardButton(
                     text="Откликнуться ♥",
                     callback_data="respond",
-                    icon_custom_emoji_id="6088882892526587287",   # твой эмодзи
-                    style="success"          # ЗЕЛЁНАЯ
+                    icon_custom_emoji_id="6088882892526587287",   
+                    style="success"          
                 )
             )
 
-            # === НОВАЯ ИДЕАЛЬНАЯ ЛОГИКА РАССЫЛКИ ===
             target_chats = []
 
             if selected_network == "Все сети":
-                # Достаем все чаты для этого города из всех сетей (включая дубли типа Тюмень 2)
                 for net_key, groups in all_cities.get(city, {}).items():
                     for group in groups:
                         target_chats.append((group['chat_id'], net_key_to_name(net_key)))
             else:
                 chat_id = None
-                # Ищем chat_id напрямую в выбранном словаре
                 if selected_network == "Мужской Клуб": chat_id = chat_ids_mk.get(city)
                 elif selected_network == "ПАРНИ 18+": chat_id = chat_ids_parni.get(city)
                 elif selected_network == "НС": chat_id = chat_ids_ns.get(city)
@@ -1414,7 +1519,6 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                     ask_for_new_post(message)
                     return
 
-            # Рассылаем по всем собранным чатам
             for chat_id, network_name in target_chats:
                 try:
                     if media_type == "photo":
@@ -1424,27 +1528,23 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
                     else:
                         sent_message = bot.send_message(chat_id, full_text, parse_mode="Markdown", reply_markup=markup_inline)
 
-                    post_owner[(chat_id, sent_message.message_id)] = message.from_user.id
-
-                    if message.chat.id not in user_posts:
-                        user_posts[message.chat.id] = []
-                        
-                    user_posts[message.chat.id].append({
+                    post_data = {
+                        "user_id": user_id,
                         "message_id": sent_message.message_id,
                         "chat_id": chat_id,
                         "time": datetime.now(),
                         "city": city,
                         "network": network_name
-                    })
+                    }
+                    posts_collection.insert_one(post_data)
+                    
                     bot.send_message(message.chat.id, f"✅ Ваше объявление опубликовано в сети «{network_name}», городе {city}.")
                 except telebot.apihelper.ApiTelegramException as e:
                     bot.send_message(message.chat.id, f"❌ Ошибка отправки в {network_name}: {e.description}")
 
             ask_for_new_post(message)
-            # =======================================================
 
         else:
-            # === КРАСНАЯ КНОПКА ВЕРИФИКАЦИИ (ЗАПУСКАЕТ НАШУ ВОРОНКУ) ===
             markup = types.InlineKeyboardMarkup()
             verify_button = types.InlineKeyboardButton(
                 text="🛠️ Пройти верификацию",
@@ -1486,13 +1586,17 @@ def handle_respond(call):
     chat_id = call.message.chat.id
     msg_id = call.message.message_id
     user_id = call.from_user.id
-    responder = call.from_user  # полный объект User
+    responder = call.from_user  
 
-    key = (chat_id, msg_id)
-    if key not in post_owner:
-        bot.answer_callback_query(call.id, "Ошибка объявления.")
+    post = posts_collection.find_one({"chat_id": chat_id, "message_id": msg_id})
+    
+    if not post:
+        bot.answer_callback_query(call.id, "Ошибка: Объявление устарело или было удалено.", show_alert=True)
         return
 
+    vip_id = post["user_id"]
+
+    key = (chat_id, msg_id)
     if key not in responded:
         responded[key] = set()
 
@@ -1500,7 +1604,6 @@ def handle_respond(call):
         bot.answer_callback_query(call.id, "Вы уже откликались на это объявление.")
         return
 
-    # === БЛОКИРОВКА ОТКЛИКА БЕЗ @username ===
     if not responder.username:
         bot.answer_callback_query(
             callback_query_id=call.id,
@@ -1512,24 +1615,20 @@ def handle_respond(call):
             show_alert=True
         )
         return
-    # ========================================
 
     responded[key].add(user_id)
-    vip_id = post_owner[key]
 
-    # Формируем имя + ссылку на профиль
     if responder.username:
         name = f"[{escape_md(responder.first_name)}](https://t.me/{responder.username})"
     else:
         name = f"[{escape_md(responder.first_name)}](tg://user?id={user_id})"
 
-    # === КРАСНАЯ КНОПКА ЖАЛОБЫ ===
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton(
             text="🚨 Это спам / скам / мошенник",
             callback_data=f"report_scam_{chat_id}_{msg_id}_{user_id}",
-            style="danger"          # КРАСНАЯ кнопка
+            style="danger"          
         )
     )
 
@@ -1541,12 +1640,9 @@ def handle_respond(call):
             reply_markup=markup
         )
     except Exception as e:
-        error_text = f"❗️Не удалось уведомить VIP {vip_id}: {e}"
         for admin_id in ADMIN_CHAT_IDS:
-            try:
-                bot.send_message(admin_id, error_text)
-            except Exception:
-                pass
+            try: bot.send_message(admin_id, f"❗️Не удалось уведомить VIP {vip_id}: {e}")
+            except Exception: pass
 
     bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
 
@@ -1915,7 +2011,7 @@ def skynet_core_handler(message):
                 mute_user_everywhere(user_id, reason="Нет параметров или неверный формат (1 Мая)", admin_name="Скайнет 📏", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
                 
                 markup = types.InlineKeyboardMarkup()
-                markup.add(types.InlineKeyboardButton("🛠 Пройти верификацию", url="https://t.me/FAQMKBOT"))
+                markup.add(types.InlineKeyboardButton("🛠 Пройти верификацию", url="https://t.me/MK_MensClubSUPPORT"))
                 warning_msg = bot.send_message(
                     chat_id, 
                     f"🚨 {user_link}, **ВНИМАНИЕ!**\n\n"
