@@ -334,18 +334,29 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
         
         allowed_links = ["anonquebot", "secretmessagebot", "askbot", "contactme", "voprosy"]
         has_bad_link = ("t.me/" in bio or "http" in bio) and not any(allowed in bio for allowed in allowed_links)
-        has_bad_age = bool(re.search(r'\b(1[0-7])\s*(лет|год|y\.?o\.?)?\b', bio))
-        has_bad_year = bool(re.search(r'\b(200[9]|201[0-6])\b', bio))
         
-        if has_bad_age or has_bad_year:
+        # Убираем маску параметров из БИО, чтобы "15" (размер) не считалось за 15 лет
+        safe_bio = re.sub(r'(?<!\d)[1-9]\d/1\d{2}/\d{2,3}(?:/\d{1,2}(?:[.,*xхX]\d{1,2})?)?(?!\d)', '', bio)
+        safe_bio = re.sub(r'\b(1[0-7])\s*(см|cm)\b', '', safe_bio)
+        
+        minor_bio_patterns = [
+            r'\b(мне|я)\s*(1[0-7])\b',                   
+            r'\b(мне|я)\s*18\s*-\s*[1-9]\b',             
+            r'\b(1[0-7]|18\s*-\s*[1-9])\s*(лет|годик)\b',
+            r'\b(1[0-7])\s*[/\\-]\s*1\d{2}\b',           
+            r'\b(200[9]|201[0-9])\s*(г|год|года|г\.р)\b',
+            r'\bочень молод(ой|енький)\b'  # <--- ЛОВИМ "ОЧЕНЬ МОЛОДОГО"
+        ]
+        has_bad_age = any(re.search(p, safe_bio) for p in minor_bio_patterns)
+        
+        if has_bad_age:
             bot.decline_chat_join_request(chat_id, user_id)
             bot.send_message(STAFF_GROUP_ID, f"🚨 **СКАЙНЕТ: ТАМОЖНЯ**\nОтклонена заявка от малолетки (`{user_id}`).\nЗапускаю глобальный БАН...")
-            ban_user_everywhere(user_id, reason="Возраст <18 в БИО", admin_name="Скайнет 🛂")
+            ban_user_everywhere(user_id, reason="Возраст <18 (или 'очень молодой') в БИО", admin_name="Скайнет 🛂")
             return
 
         if has_bad_link:
             bot.approve_chat_join_request(chat_id, user_id) 
-            # Считаем спамера как одобренного для массовки
             db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
             bot.send_message(STAFF_GROUP_ID, f"⚠️ **СКАЙНЕТ: ТАМОЖНЯ**\nПустил спамера со ссылкой в БИО (`{user_id}`) для массовки.\nЗатыкаю рот глобальным МУТОМ 🤐...")
             mute_user_everywhere(user_id, reason="Рекламная ссылка в БИО", admin_name="Скайнет 🛂")
@@ -648,23 +659,21 @@ def get_detailed_report(message):
     markup.add(types.InlineKeyboardButton("🗑 Сбросить счетчики", callback_data="reset_stats"))
     bot.send_message(message.chat.id, report_text, reply_markup=markup)
 
-@bot.message_handler(commands=['globaltag'])
+@bot.message_handler(commands=['tag'])
 def set_custom_user_tag(message):
     # --- ДИНАМИЧЕСКАЯ ПРОВЕРКА ПРАВ ---
-    # Бот проверяет, является ли отправитель админом в STAFF-группе
     try:
         staff_member = bot.get_chat_member(STAFF_GROUP_ID, message.from_user.id)
         if staff_member.status not in ['administrator', 'creator']:
             bot.send_message(message.chat.id, "❌ Отказано. У вас нет прав доступа Скайнета.")
             return
     except Exception:
-        # Если произошла ошибка (например, кто-то пишет боту в ЛС, а не в группу)
         return 
     # ----------------------------------
 
     args = message.text.split(maxsplit=2)
     if len(args) < 3:
-        bot.send_message(message.chat.id, "❌ Формат: `/globaltag [ID] [ТЕГ]`\nЧтобы убрать: `/globaltag [ID] none`", parse_mode="Markdown")
+        bot.send_message(message.chat.id, "❌ Формат: `/tag [ID] [ТЕГ]`\nЧтобы убрать: `/tag [ID] none`", parse_mode="Markdown")
         return
     
     try:
@@ -687,7 +696,7 @@ def set_custom_user_tag(message):
         
         bot.send_message(message.chat.id, f"✅ Юзер `{target_id}` верифицирован как `{new_tag}` и глобально размучен в {unmuted_count} чатах!")
 
-@bot.message_handler(commands=['globalunban'])
+@bot.message_handler(commands=['unban'])
 def global_unban_user(message):
     # --- ДИНАМИЧЕСКАЯ ПРОВЕРКА ПРАВ (только для админов Staff-группы) ---
     try:
@@ -699,11 +708,10 @@ def global_unban_user(message):
         return 
     # -------------------------------------------------------------------
 
-    # maxsplit=2 означает, что бот разобьет текст на 3 части: [команда, ID, всё_остальное_как_тег]
     args = message.text.split(maxsplit=2)
     
     if len(args) < 2:
-        bot.send_message(message.chat.id, "❌ Формат: `/globalunban [ID] [НЕОБЯЗАТЕЛЬНО: ТЕГ]`\nПример: `/globalunban 123456 𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕`", parse_mode="Markdown")
+        bot.send_message(message.chat.id, "❌ Формат: `/unban [ID] [НЕОБЯЗАТЕЛЬНО: ТЕГ]`\nПример: `/unban 123456 𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕`", parse_mode="Markdown")
         return
     
     try:
@@ -1853,7 +1861,8 @@ def skynet_core_handler(message):
             r'\b(мне|я)\s*18\s*-\s*[1-9]\b',             
             r'\b(1[0-7]|18\s*-\s*[1-9])\s*(лет|годик)\b',
             r'\b(1[0-7])\s*[/\\-]\s*1\d{2}\b',           
-            r'\b(200[9]|201[0-9])\s*(г|год|года|г\.р)\b' 
+            r'\b(200[9]|201[0-9])\s*(г|год|года|г\.р)\b',
+            r'\bочень молод(ой|енький)\b'  # <--- ЛОВИМ И В ЧАТАХ ТОЖЕ
         ]
         
         if any(re.search(p, safe_minor) for p in minor_patterns):
@@ -1892,7 +1901,6 @@ def skynet_core_handler(message):
         EXCLUDED_FROM_PARAMS = set(PARNI_CHATS)
         EXCLUDED_FROM_PARAMS.update([VIP_CHAT_ID, BEYOND_CHAT_ID])
         EXCLUDED_FROM_PARAMS.update([
-            chat_ids_mk.get("БЕЗ ПРЕДРАССУДКОВ"),
             chat_ids_mk.get("Фетиши"),
             chat_ids_mk.get("Мужской Чат"),
             chat_ids_mk.get("Секс Туризм"),
