@@ -772,6 +772,7 @@ def promote_to_admin_global(message):
     bot.send_message(message.chat.id, f"🔄 Запускаю протокол «Коронация» для `{target_id}`.\nНазначаю права и должность «{custom_title}» по всей сети...", parse_mode="Markdown")
 
     # Собираем все чаты сети в единый список
+    all_chats = []
     all_chats.extend(chat_ids_parni.values())
     all_chats.extend(chat_ids_mk.values())
     all_chats.extend(chat_ids_ns.values())
