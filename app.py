@@ -458,9 +458,6 @@ def start(message):
                 # Человек уже кликал ссылку, просто запускаем приветствие без спама
                 is_referral = True 
 
-        if message.chat.id not in user_posts:
-            user_posts[message.chat.id] = []
-
         # 2. Выдаем меню
         bot.send_message(
             message.chat.id,
@@ -775,7 +772,6 @@ def promote_to_admin_global(message):
     bot.send_message(message.chat.id, f"🔄 Запускаю протокол «Коронация» для `{target_id}`.\nНазначаю права и должность «{custom_title}» по всей сети...", parse_mode="Markdown")
 
     # Собираем все чаты сети в единый список
-    all_chats = [VIP_CHAT_ID, BEYOND_CHAT_ID]
     all_chats.extend(chat_ids_parni.values())
     all_chats.extend(chat_ids_mk.values())
     all_chats.extend(chat_ids_ns.values())
@@ -826,6 +822,75 @@ def promote_to_admin_global(message):
         f"🔖 Выдана должность: `{custom_title}`\n\n"
         f"⚠️ *Ошибок/Пропусков: {error_count} (юзера нет в чате или у бота не хватает прав).*\n\n"
         f"**Важно:** Пусть новый админ добавится во все нужные чаты, если он еще не там, чтобы права применились корректно.",
+        parse_mode="Markdown"
+    )
+
+@bot.message_handler(commands=['unadmin'])
+def demote_admin_global(message):
+    # --- ДИНАМИЧЕСКАЯ ПРОВЕРКА ПРАВ (только для руководства) ---
+    try:
+        staff_member = bot.get_chat_member(STAFF_GROUP_ID, message.from_user.id)
+        if staff_member.status not in ['administrator', 'creator']:
+            bot.send_message(message.chat.id, "❌ Отказано. Только руководство может срывать погоны.")
+            return
+    except Exception:
+        return 
+    # ------------------------------------------------------------
+
+    args = message.text.split()
+    if len(args) < 2:
+        bot.send_message(message.chat.id, "❌ Формат: `/unadmin [ID]`\nПример: `/unadmin 123456789`", parse_mode="Markdown")
+        return
+
+    try:
+        target_id = int(args[1])
+    except ValueError:
+        bot.send_message(message.chat.id, "❌ Ошибка: ID должен состоять только из цифр!")
+        return
+
+    bot.send_message(message.chat.id, f"🔄 Запускаю протокол «Разжалование» для `{target_id}`...\nСнимаю права по всей сети...", parse_mode="Markdown")
+
+    # Собираем все чаты (без VIP и BEYOND)
+    all_chats = []
+    all_chats.extend(chat_ids_parni.values())
+    all_chats.extend(chat_ids_mk.values())
+    all_chats.extend(chat_ids_ns.values())
+    all_chats.extend(chat_ids_rainbow.values())
+    all_chats.extend(chat_ids_gayznak.values())
+
+    unique_chats = set(all_chats)
+    
+    success_count = 0
+    error_count = 0
+
+    for cid in unique_chats:
+        try:
+            # Снимаем абсолютно все права (ставим False)
+            bot.promote_chat_member(
+                chat_id=cid,
+                user_id=target_id,
+                can_manage_chat=False,
+                can_change_info=False,
+                can_delete_messages=False,
+                can_restrict_members=False,
+                can_invite_users=False,
+                can_pin_messages=False,
+                can_manage_video_chats=False,
+                is_anonymous=False,
+                can_promote_members=False
+            )
+            success_count += 1
+        except Exception:
+            error_count += 1
+            
+        time.sleep(0.1) # Пауза от спам-блока Телеграма
+
+    bot.send_message(
+        message.chat.id, 
+        f"✅ **Разжалование завершено!** 📉\n\n"
+        f"Пользователь `{target_id}` лишен прав модератора в **{success_count}** чатах.\n\n"
+        f"⚠️ *Ошибок/Пропусков: {error_count} (юзер уже не админ или его нет в чате).* \n\n"
+        f"**Важно:** Кастомный тег должности удаляется автоматически при снятии прав.",
         parse_mode="Markdown"
     )
 
