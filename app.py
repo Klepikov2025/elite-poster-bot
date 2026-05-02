@@ -2076,8 +2076,12 @@ def skynet_core_handler(message):
                 bot.delete_message(chat_id, message.message_id)
                 mute_user_everywhere(user_id, reason="Нет параметров или неверный формат (1 Мая)", admin_name="Скайнет 📏", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
                 
-                markup = types.InlineKeyboardMarkup()
-                markup.add(types.InlineKeyboardButton("🛠 Пройти верификацию", url="https://t.me/MK_MensClubSUPPORT"))
+                markup = types.InlineKeyboardMarkup(row_width=1)
+                markup.add(
+                    types.InlineKeyboardButton("🛠 Пройти верификацию", url="https://t.me/MK_MensClubSUPPORT"),
+                    types.InlineKeyboardButton("😈 ПАРНИ 18+ (Без ограничений)", url="https://t.me/znakparni/116")
+                )
+
                 warning_msg = bot.send_message(
                     chat_id, 
                     f"🚨 {user_link}, **ВНИМАНИЕ!**\n\n"
@@ -2085,7 +2089,8 @@ def skynet_core_handler(message):
                     "Любой текст **БЕЗ ПАРАМЕТРОВ** или с неправильным форматом запрещен!\n"
                     "Параметры должны быть указаны **ТОЛЬКО через слеш (/) без пробелов и лишних слов**.\n\n"
                     "✅ *Примеры:* `24/187/72` или `24/187/72/19` (допускается `19.5` или `19*4`)\n\n"
-                    "Ваша анкета удалена, а вы временно ограничены в общении во всех группах сети. Пройдите верификацию для разблокировки.",
+                    "Ваша анкета удалена, а вы временно ограничены в общении во всех группах сети. Пройдите верификацию для разблокировки.\n\n"
+                    "💡 *P.S. В нашей сети «ПАРНИ 18+» нет ограничений на формат текста и разрешен любой откровенный контент (включая порно). Переходи туда! 👇*",
                     reply_markup=markup, parse_mode="Markdown"
                 )
                 
