@@ -813,7 +813,7 @@ def promote_to_admin_global(message):
             error_count += 1
             
         # Небольшая пауза, чтобы Телеграм не забанил бота за спам запросами
-        time.sleep(0.1)
+        time.sleep(1)
 
     bot.send_message(
         message.chat.id, 
@@ -883,7 +883,7 @@ def demote_admin_global(message):
         except Exception:
             error_count += 1
             
-        time.sleep(0.1) # Пауза от спам-блока Телеграма
+        time.sleep(1) # Пауза от спам-блока Телеграма
 
     bot.send_message(
         message.chat.id, 
