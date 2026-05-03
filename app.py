@@ -2091,7 +2091,7 @@ def skynet_core_handler(message):
                     "✅ *Примеры:* `24/187/72` или `24/187/72/19` (допускается `19.5` или `19*4`)\n\n"
                     "Ваша анкета удалена, а вы временно ограничены в общении во всех группах сети. Пройдите верификацию для разблокировки.\n\n"
                     "💡 *P.S. В нашей сети «ПАРНИ 18+» нет ограничений на формат текста и разрешен любой откровенный контент (включая порно). Переходи туда! 👇*",
-                    reply_markup=markup, parse_mode="Markdown"
+                    reply_markup=markup, parse_mode="Markdown", disable_web_page_preview=True
                 )
                 
                 def delete_warning_may():
@@ -2131,7 +2131,7 @@ def skynet_core_handler(message):
                 f"🚨 {user_link}, **Внимание!**\n"
                 "Ваша анкета попала под автоматический фильтр безопасности сети.\n\n"
                 "Для защиты участников чата, вам необходимо пройти обязательную верификацию. Вы временно ограничены в общении во всех группах сети до подтверждения профиля администрацией.", 
-                reply_markup=markup, parse_mode="Markdown"
+                reply_markup=markup, parse_mode="Markdown", disable_web_page_preview=True
             )
             
             def delete_warning_18():
