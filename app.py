@@ -1062,7 +1062,7 @@ def unban_user_everywhere(target_id):
 
 # --- ФУНКЦИЯ: ГЛОБАЛЬНЫЙ МУТ (ДЛЯ РЕКЛАМЩИКОВ И НАРУШИТЕЛЕЙ) ---
 def mute_user_everywhere(target_id, reason="Без причины", admin_name="Система", user_link=None, trigger_text=None, mute_time=0, origin_chat=None):
-    chats_to_mute = {VIP_CHAT_ID: "VIP Клуб", BEYOND_CHAT_ID: "BEYOND"}
+    chats_to_mute = {}
     for city, cid in chat_ids_parni.items(): chats_to_mute[cid] = f"ПАРНИ 18+ | {city}"
     for city, cid in chat_ids_mk.items(): chats_to_mute[cid] = f"МК | {city}"
     for city, cid in chat_ids_ns.items(): chats_to_mute[cid] = f"НС | {city}"
@@ -1303,6 +1303,18 @@ def successful_payment(message):
     # --- СНИМАЕМ С МУШКИ СНАЙПЕРА (ОПЛАТИЛ) ---
     db['vip_funnel'].delete_one({"_id": new_user_id})
     # ------------------------------------------
+
+    # === АВТОМАТИЧЕСКАЯ АМНИСТИЯ (ПРОЩЕНИЕ ГРЕХОВ ЗА ДЕНЬГИ) ===
+    try:
+        # 1. Снимаем все муты по всей сети (возвращаем голос)
+        unmute_user_everywhere(new_user_id)
+        # 2. Снимаем все баны по всей сети (вычеркиваем из ЧС)
+        unban_user_everywhere(new_user_id)
+        # 3. Стираем позорный тег из базы, если он был
+        users_collection.update_one({"_id": new_user_id}, {"$unset": {"shame_tag": ""}})
+    except Exception as e:
+        print(f"Ошибка при амнистии после оплаты VIP: {e}")
+    # ===========================================================
     
     # 1. Генерируем ссылку
     try:
