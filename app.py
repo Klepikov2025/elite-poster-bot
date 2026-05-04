@@ -1518,7 +1518,7 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
         # ЖЕСТКАЯ ПРОВЕРКА: Физически состоит в VIP Клубе?
         try:
             vip_status = bot.get_chat_member(VIP_CHAT_ID, user_id).status
-            if vip_status in ["member", "administrator", "creator", "restricted"]:
+            if vip_status in ["member", "administrator", "creator"]:
                 is_privileged = True
         except: 
             pass
