@@ -26,6 +26,7 @@ VIP_PRICE_STARS = 250
 # ==================== НАСТРОЙКИ СЛУЖЕБНЫХ ЧАТОВ ====================
 STAFF_GROUP_ID = -1002196190507
 JOURNAL_CHAT_ID = -1002158861390
+SUPPORT_GROUP_ID = -1002287143588
 
 # ==================== БАЗА ДАННЫХ MONGODB ====================
 MONGO_URI = os.getenv('MONGO_URI')
@@ -1931,6 +1932,25 @@ def catch_illegal_entry(message):
             except: pass
 # ===========================================================================================
 
+# ==================== ЛОВЕЦ ЗВЕЗД (ОПЛАТА 50 ЗВЕЗД) ====================
+@bot.message_handler(func=lambda message: str(message.chat.id) == str(SUPPORT_GROUP_ID))
+def catch_paid_stars(message):
+    # Игнорируем сообщения от других ботов и системные уведомления
+    if message.from_user.is_bot: return
+    
+    uid = message.from_user.id
+    
+    # В этой группе любое сообщение стоит 50 звезд. 
+    # Пишем в базу paid_users "status: 1", чтобы Секретарь его пропустил
+    db['paid_users'].update_one(
+        {"uid": uid},
+        {"$set": {
+            "status": 1,
+            "timestamp": datetime.now()
+        }},
+        upsert=True
+    )
+
 # ==================== НАСТРОЙКИ И ЕДИНОЕ ЯДРО СКАЙНЕТА ====================
 
 # 🔴 Красная зона (Глобал бан) - добавлены \b для точного поиска коротких слов
@@ -2234,6 +2254,35 @@ def vip_funnel_sniper():
 # Запускаем снайпера в отдельном потоке (добавить перед app.run)
 threading.Thread(target=vip_funnel_sniper, daemon=True).start()
 # =====================================================================
+
+# ==================== СЛУШАТЕЛЬ СЕКРЕТАРЯ (РАЗБАН ПО КНОПКЕ) ====================
+def skynet_listener():
+    while True:
+        try:
+            # Ищем невыполненные приказы в базе
+            tasks = db['skynet_tasks'].find({"status": {"$ne": "done"}})
+            for task in tasks:
+                if task['action'] == "full_unban":
+                    target_uid = task['uid']
+                    
+                    # 1. Снимаем бан и мут везде
+                    unbanned = unban_user_everywhere(target_uid)
+                    unmuted = unmute_user_everywhere(target_uid)
+                    
+                    # 2. Снимаем позорный тег
+                    users_collection.update_one({"_id": target_uid}, {"$unset": {"shame_tag": ""}})
+                    
+                    # 3. ОТЧЕТ В ФЛУДИЛКУ АДМИНАМ! (Точно как вы привыкли)
+                    report_text = f"✅ **Скайнет (Автоматика):**\nЮзер `{target_uid}` верифицирован Секретарем!\nГлобально разбанен ({unbanned} чатов) и размучен ({unmuted} чатов)."
+                    try: bot.send_message(STAFF_GROUP_ID, report_text, parse_mode="Markdown")
+                    except: pass
+                    
+                    # 4. Закрываем задачу
+                    db['skynet_tasks'].update_one({"_id": task['_id']}, {"$set": {"status": "done"}})
+        except Exception as e:
+            print(f"Ошибка слушателя: {e}")
+            
+        time.sleep(3) # Проверяем приказы каждые 3 секунды
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
