@@ -1515,16 +1515,13 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
         user_id = message.from_user.id
         is_privileged = False
 
-        user_data = users_collection.find_one({"_id": user_id}) or {}
-        if user_data.get("custom_tag"):
-            is_privileged = True
-
-        if not is_privileged:
-            try:
-                status = bot.get_chat_member(VIP_CHAT_ID, user_id).status
-                if status in ["member", "administrator", "creator", "restricted"]:
-                    is_privileged = True
-            except: pass
+        # ЖЕСТКАЯ ПРОВЕРКА: Физически состоит в VIP Клубе?
+        try:
+            vip_status = bot.get_chat_member(VIP_CHAT_ID, user_id).status
+            if vip_status in ["member", "administrator", "creator", "restricted"]:
+                is_privileged = True
+        except: 
+            pass
 
         if is_privileged:
             vip_tag = "\n\n✅ *Анкета проверена администрацией сети*\n\n⭐️ *Привилегированный участник* ⭐️"
@@ -1970,22 +1967,28 @@ def skynet_core_handler(message):
         shame_tag = user_data.get("shame_tag")
         custom_tag = user_data.get("custom_tag") 
 
-        # --- АВТО-СИНХРОНИЗАЦИЯ ФИЗИЧЕСКОГО ПРИСУТСТВИЯ ---
-        if not is_vip:
-            try:
-                m_vip = bot.get_chat_member(VIP_CHAT_ID, user_id)
-                if m_vip.status in ['member', 'administrator', 'creator']:
-                    is_vip = True
-                    users_collection.update_one({"_id": user_id}, {"$set": {"is_vip": True}}, upsert=True)
-            except: pass
+        # --- АВТО-СИНХРОНИЗАЦИЯ ФИЗИЧЕСКОГО ПРИСУТСТВИЯ (ДВУСТОРОННЯЯ) ---
+        try:
+            m_vip = bot.get_chat_member(VIP_CHAT_ID, user_id)
+            actual_vip = m_vip.status in ['member', 'administrator', 'creator']
+            if is_vip != actual_vip:
+                is_vip = actual_vip
+                users_collection.update_one({"_id": user_id}, {"$set": {"is_vip": is_vip}}, upsert=True)
+        except:
+            if is_vip: 
+                is_vip = False
+                users_collection.update_one({"_id": user_id}, {"$set": {"is_vip": False}}, upsert=True)
 
-        if not is_queer:
-            try:
-                m_beyond = bot.get_chat_member(BEYOND_CHAT_ID, user_id)
-                if m_beyond.status in ['member', 'administrator', 'creator']:
-                    is_queer = True
-                    users_collection.update_one({"_id": user_id}, {"$set": {"is_queer": True}}, upsert=True)
-            except: pass
+        try:
+            m_beyond = bot.get_chat_member(BEYOND_CHAT_ID, user_id)
+            actual_queer = m_beyond.status in ['member', 'administrator', 'creator']
+            if is_queer != actual_queer:
+                is_queer = actual_queer
+                users_collection.update_one({"_id": user_id}, {"$set": {"is_queer": is_queer}}, upsert=True)
+        except:
+            if is_queer:
+                is_queer = False
+                users_collection.update_one({"_id": user_id}, {"$set": {"is_queer": False}}, upsert=True)
 
         # --- МАГИЯ: ПЕРЕХВАТ РУЧНЫХ ТЕГОВ ИЗ ИНТЕРФЕЙСА ---
         try:
