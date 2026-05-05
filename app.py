@@ -12,6 +12,14 @@ import re
 import time
 import threading
 
+NETWORK_LINKS = (
+    "📍 **Ссылки для возврата в чаты:**\n"
+    "• [МК (Мужской Клуб)](https://t.me/clubofrm/44)\n"
+    "• [ПАРНИ 18+](https://t.me/znakparni/116)\n"
+    "• [ГЕЙ чаты (Инфо)](https://t.me/gaychatcities_info/4)\n"
+    "• [НС (Урал)](https://t.me/uralns/118)"
+)
+
 # ==================== НАСТРОЙКИ ====================
 TOKEN = os.getenv('BOT_TOKEN')
 bot = telebot.TeleBot(TOKEN)
@@ -1330,13 +1338,45 @@ def handle_withdrawal_admin(call):
         bot.edit_message_text(call.message.text + f"\n\n❌ **ОТКЛОНЕНО:** {admin_info}", STAFF_GROUP_ID, call.message.message_id)
 
 # ==================== ОПЛАТА И ССЫЛКА ====================
-@bot.pre_checkout_query_handler(func=lambda query: query.invoice_payload == "vip_access_payment")
+@bot.pre_checkout_query_handler(func=lambda query: query.invoice_payload.startswith("vip_access_payment") or query.invoice_payload.startswith("fine_payment_"))
 def checkout_process(pre_checkout_query):
     bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
 
 @bot.message_handler(content_types=['successful_payment'])
 def successful_payment(message):
     new_user_id = message.from_user.id
+
+# ================= ОПЛАТА ШТРАФА (АВТОРАЗБАН) =================
+    if payload.startswith("fine_payment_"):
+        now = datetime.now(pytz.timezone('Asia/Yekaterinburg'))
+        ticket_num = now.strftime("%d%m%Y%H%M%S") + f"-{random.randint(100, 999)}"
+        
+        # Приказ на разбан
+        db['skynet_tasks'].insert_one({"uid": new_user_id, "action": "full_unban", "timestamp": now})
+        
+        # Досье
+        archive_collection.update_one(
+            {"target": str(new_user_id)},
+            {"$push": {"history": {"date": now.strftime("%d.%m.%Y %H:%M"), "action": "Разблокировка (Штраф оплачен)", "reason": "Автоматическое снятие"}}},
+            upsert=True
+        )
+        
+        # Закрываем тикет у админов
+        paid_collection = db['paid_users']
+        user_data = paid_collection.find_one({"uid": new_user_id})
+        if user_data and "thread_id" in user_data:
+            thread_id = user_data["thread_id"]
+            try: bot.send_message("-1002196190507", f"🤑 **ЮЗЕР ОПЛАТИЛ ШТРАФ!**\nСкайнет получил приказ на разбан. Тикет закрыт: `{ticket_num}`", message_thread_id=thread_id, parse_mode="Markdown")
+            except: pass
+            try: bot.close_forum_topic("-1002196190507", thread_id)
+            except: pass
+            
+        paid_collection.update_one({"uid": new_user_id}, {"$set": {"status": 0}, "$unset": {"topic_type": ""}})
+        
+        # Пишем юзеру и даем ссылки
+        success_msg = f"✅ **Оплата штрафа успешно получена!**\n\nВаши ограничения сняты автоматически. Уникальный номер: `{ticket_num}`\n\n{NETWORK_LINKS}\n\n*Больше не нарушайте правила!*"
+        bot.send_message(new_user_id, success_msg, parse_mode="Markdown", disable_web_page_preview=True)
+        return
     
     # --- СНИМАЕМ С МУШКИ СНАЙПЕРА (ОПЛАТИЛ) ---
     db['vip_funnel'].delete_one({"_id": new_user_id})
