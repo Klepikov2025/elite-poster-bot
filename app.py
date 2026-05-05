@@ -1774,6 +1774,11 @@ def handle_report_scam(call):
         reporter = call.from_user
         reporter_link = get_user_name(reporter)
 
+        # --- ИЩЕМ АВТОРА ОБЪЯВЛЕНИЯ В БАЗЕ (MONGODB) ---
+        post = posts_collection.find_one({"chat_id": chat_id, "message_id": msg_id})
+        found_vip_id = post["user_id"] if post else None
+        # -----------------------------------------------
+
         channel_part = str(chat_id)[4:] if str(chat_id).startswith("-100") else str(chat_id)
         ann_link = f"https://t.me/c/{channel_part}/{msg_id}"
         user_link = f"tg://user?id={responder_id}"
@@ -1804,7 +1809,7 @@ def handle_report_scam(call):
         # Сохраняем информацию о жалобе
         scam_reports[report_id] = {
             "reporter_id": reporter.id,
-            "vip_id": post_owner.get((chat_id, msg_id), None),   # кто опубликовал объявление
+            "vip_id": found_vip_id,   # <--- ТЕПЕРЬ БЕРЕМ ИЗ БАЗЫ, А НЕ ИЗ СТАРОЙ ПАМЯТИ
             "chat_id": chat_id,
             "msg_id": msg_id,
             "responder_id": responder_id,
