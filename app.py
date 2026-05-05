@@ -1345,6 +1345,7 @@ def checkout_process(pre_checkout_query):
 @bot.message_handler(content_types=['successful_payment'])
 def successful_payment(message):
     new_user_id = message.from_user.id
+    payload = message.successful_payment.invoice_payload
 
 # ================= ОПЛАТА ШТРАФА (АВТОРАЗБАН) =================
     if payload.startswith("fine_payment_"):
