@@ -2295,10 +2295,14 @@ def vip_funnel_sniper():
 
 # Запускаем снайпера в отдельном потоке (добавить перед app.run)
 threading.Thread(target=vip_funnel_sniper, daemon=True).start()
+
+# --- ЗАПУСКАЕМ СЛУШАТЕЛЯ ---
+threading.Thread(target=skynet_listener, daemon=True).start()
+# ---------------------------
 # =====================================================================
 
 # ==================== СЛУШАТЕЛЬ СЕКРЕТАРЯ (РАЗБАН ПО КНОПКЕ) ====================
-def skynet_listener():
+def skynet_listener():def skynet_listener():
     while True:
         try:
             # Ищем невыполненные приказы в базе
