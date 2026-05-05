@@ -2302,7 +2302,7 @@ threading.Thread(target=skynet_listener, daemon=True).start()
 # =====================================================================
 
 # ==================== СЛУШАТЕЛЬ СЕКРЕТАРЯ (РАЗБАН ПО КНОПКЕ) ====================
-def skynet_listener():def skynet_listener():
+def skynet_listener():
     while True:
         try:
             # Ищем невыполненные приказы в базе
