@@ -2293,14 +2293,6 @@ def vip_funnel_sniper():
         # Спим 12 часов до следующей проверки
         time.sleep(43200)
 
-# Запускаем снайпера в отдельном потоке (добавить перед app.run)
-threading.Thread(target=vip_funnel_sniper, daemon=True).start()
-
-# --- ЗАПУСКАЕМ СЛУШАТЕЛЯ ---
-threading.Thread(target=skynet_listener, daemon=True).start()
-# ---------------------------
-# =====================================================================
-
 # ==================== СЛУШАТЕЛЬ СЕКРЕТАРЯ (РАЗБАН ПО КНОПКЕ) ====================
 def skynet_listener():
     while True:
@@ -2318,7 +2310,7 @@ def skynet_listener():
                     # 2. Снимаем позорный тег
                     users_collection.update_one({"_id": target_uid}, {"$unset": {"shame_tag": ""}})
                     
-                    # 3. ОТЧЕТ В ФЛУДИЛКУ АДМИНАМ! (Точно как вы привыкли)
+                    # 3. ОТЧЕТ В ФЛУДИЛКУ АДМИНАМ!
                     report_text = f"✅ **Скайнет (Автоматика):**\nЮзер `{target_uid}` верифицирован Секретарем!\nГлобально разбанен ({unbanned} чатов) и размучен ({unmuted} чатов)."
                     try: bot.send_message(STAFF_GROUP_ID, report_text, parse_mode="Markdown")
                     except: pass
@@ -2329,6 +2321,11 @@ def skynet_listener():
             print(f"Ошибка слушателя: {e}")
             
         time.sleep(3) # Проверяем приказы каждые 3 секунды
+
+# === ЗАПУСКАЕМ ФОНОВЫЕ ПРОЦЕССЫ ЗДЕСЬ (КОГДА ПИТОН УЖЕ ЗНАЕТ ВСЕ ФУНКЦИИ) ===
+threading.Thread(target=vip_funnel_sniper, daemon=True).start()
+threading.Thread(target=skynet_listener, daemon=True).start()
+# ============================================================================
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
