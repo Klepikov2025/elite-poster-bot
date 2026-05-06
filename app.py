@@ -614,6 +614,58 @@ def handle_manual_ban(message):
     count = ban_user_everywhere(target_id, reason, admin_info)
     bot.send_message(message.chat.id, f"✅ Готово! Юзер `{target_id}` забанен в {count} чатах. Отчет отправлен в Журнал.", parse_mode="Markdown")
 
+@bot.message_handler(commands=['addpromo'])
+def create_custom_promo(message):
+    # ПРОВЕРКА ПРАВ
+    try:
+        staff_member = bot.get_chat_member(STAFF_GROUP_ID, message.from_user.id)
+        if staff_member.status not in ['administrator', 'creator']:
+            return
+    except Exception: return 
+
+    args = message.text.split()
+    # /addpromo [КОД] [СКИДКА] [ЦЕЛЬ] [ЛИМИТ]
+    if len(args) < 5:
+        text = (
+            "🛠 **Генератор промокодов**\n\n"
+            "Формат: `/addpromo [КОД] [СКИДКА_В_%] [ЦЕЛЬ] [ЛИМИТ]`\n\n"
+            "🎯 **Цели:**\n"
+            "`vip` - только на VIP\n"
+            "`fine` - только на штрафы\n"
+            "`ads` - на рекламу\n"
+            "`all` - работает везде\n\n"
+            "Пример: `/addpromo VESNA 50 vip 100`\n"
+            "_(Создаст код VESNA на скидку 50% для VIP, хватит на 100 человек)_"
+        )
+        bot.send_message(message.chat.id, text, parse_mode="Markdown")
+        return
+
+    code = args[1].upper()
+    try:
+        discount = int(args[2])
+        target = args[3].lower()
+        limit = int(args[4])
+    except ValueError:
+        bot.send_message(message.chat.id, "❌ Ошибка: Скидка и лимит должны быть числами!")
+        return
+
+    # Записываем в базу
+    db['promocodes'].update_one(
+        {"_id": code},
+        {"$set": {
+            "type": "percent",
+            "value": discount,
+            "target": target,
+            "usage_limit": limit,
+            "used_count": 0,
+            "owner_uid": message.from_user.id,
+            "is_active": True
+        }},
+        upsert=True
+    )
+    
+    bot.send_message(message.chat.id, f"🎉 **Промокод создан!**\n\nКод: `{code}`\nСкидка: **{discount}%**\nДействует на: **{target}**\nЛимит: **{limit}** активаций.", parse_mode="Markdown")
+
 @bot.message_handler(commands=['get_report'])
 def get_detailed_report(message):
     if message.from_user.id != OWNER_ID: return
@@ -1246,24 +1298,27 @@ def handle_vip_decision(call):
         except:
             pass
 
-        # Отправка счета на оплату
+        # Отправка кассы с вопросом про промокод
         try:
-            bot.send_invoice(
-                user_id, 
-                title="Вход в VIP Клуб 👑", 
-                description="Оплата доступа в закрытый чат.", 
-                invoice_payload="vip_access_payment", 
-                provider_token="", 
-                currency="XTR", 
-                prices=[types.LabeledPrice(label="VIP Доступ", amount=VIP_PRICE_STARS)]
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            markup.add(
+                types.InlineKeyboardButton("🎫 У меня есть промокод", callback_data=f"checkout_promo_vip_{VIP_PRICE_STARS}"),
+                types.InlineKeyboardButton(f"💳 Оплатить {VIP_PRICE_STARS}⭐️", callback_data=f"checkout_pay_vip_{VIP_PRICE_STARS}")
             )
-            bot.send_message(call.message.chat.id, f"✅ Счет отправлен пользователю {user_id}.")
+            bot.send_message(
+                user_id, 
+                f"💎 **Оформление VIP-доступа**\n\nСтоимость: **{VIP_PRICE_STARS}⭐️** (Доступ навсегда)\n\nЕсли у вас есть промокод на скидку, нажмите соответствующую кнопку ниже 👇",
+                reply_markup=markup,
+                parse_mode="Markdown"
+            )
+            bot.send_message(call.message.chat.id, f"✅ Касса для оплаты VIP отправлена пользователю {user_id}.")
         except Exception as e:
-            if "bot was blocked by the user" in str(e):
+            if "bot was blocked by the user" in str(e).lower() or "forbidden" in str(e).lower():
                 # Проверка: если юзер заблокировал бота, проверяем, отказался ли он официально
                 if user_id in safe_from_autoban:
                     bot.send_message(call.message.chat.id, f"ℹ️ Юзер {user_id} заблокировал бота, НО он официально отказался. Бан отменен.")
-                    safe_from_autoban.remove(user_id) 
+                    try: safe_from_autoban.remove(user_id)
+                    except: pass
                 else:
                     bot.send_message(call.message.chat.id, f"🚨 Юзер {user_id} заблокировал бота БЕЗ отказа! Авто-бан активирован.")
                     ban_user_everywhere(user_id, reason="Блокировка бота при верификации", admin_name="Auto-Defender")
@@ -1336,6 +1391,82 @@ def handle_withdrawal_admin(call):
         withdrawals_collection.update_one({"_id": wd_id}, {"$set": {"status": "rejected"}})
         bot.send_message(user_id, "❌ Ваш запрос на вывод средств был отклонен администрацией.")
         bot.edit_message_text(call.message.text + f"\n\n❌ **ОТКЛОНЕНО:** {admin_info}", STAFF_GROUP_ID, call.message.message_id)
+
+# ================= УМНАЯ КАССА И ПРОМОКОДЫ (VIP) =================
+@bot.callback_query_handler(func=lambda call: call.data.startswith('checkout_'))
+def handle_checkout(call):
+    parts = call.data.split('_')
+    action = parts[1] # "promo" или "pay"
+    target_type = parts[2] # В данном боте это "vip"
+    original_amount = int(parts[3])
+    
+    if action == "pay":
+        try: bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+        except: pass
+        
+        bot.send_invoice(
+            call.message.chat.id, 
+            title="Вход в VIP Клуб 👑", 
+            description="Оплата доступа в закрытый чат навсегда.", 
+            invoice_payload="vip_access_payment", 
+            provider_token="", 
+            currency="XTR", 
+            prices=[types.LabeledPrice(label="VIP Доступ", amount=original_amount)]
+        )
+        
+    elif action == "promo":
+        msg = bot.send_message(call.message.chat.id, "👇 **Введите ваш промокод ответом на это сообщение:**", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, process_promo_code, target_type=target_type, original_amount=original_amount, call_msg=call.message)
+
+def process_promo_code(message, target_type, original_amount, call_msg):
+    try: bot.edit_message_reply_markup(call_msg.chat.id, call_msg.message_id, reply_markup=None)
+    except: pass
+    
+    promo_text = message.text.strip().upper()
+    promo_data = db['promocodes'].find_one({"_id": promo_text})
+    
+    # ПРОВЕРКИ
+    if not promo_data or not promo_data.get("is_active"):
+        bot.send_message(message.chat.id, "❌ Промокод не найден или уже недействителен. Выставляем полный счет.")
+        bot.send_invoice(message.chat.id, title="Вход в VIP Клуб 👑", description="Оплата доступа.", invoice_payload="vip_access_payment", provider_token="", currency="XTR", prices=[types.LabeledPrice(label="VIP Доступ", amount=original_amount)])
+        return
+        
+    if promo_data["used_count"] >= promo_data.get("usage_limit", 1):
+        bot.send_message(message.chat.id, "❌ Лимит активаций этого промокода исчерпан. Выставляем полный счет.")
+        bot.send_invoice(message.chat.id, title="Вход в VIP Клуб 👑", description="Оплата доступа.", invoice_payload="vip_access_payment", provider_token="", currency="XTR", prices=[types.LabeledPrice(label="VIP Доступ", amount=original_amount)])
+        return
+        
+    if promo_data.get("target") not in ["all", target_type]:
+        bot.send_message(message.chat.id, "❌ Этот промокод нельзя применить к покупке VIP.")
+        bot.send_invoice(message.chat.id, title="Вход в VIP Клуб 👑", description="Оплата доступа.", invoice_payload="vip_access_payment", provider_token="", currency="XTR", prices=[types.LabeledPrice(label="VIP Доступ", amount=original_amount)])
+        return
+
+    # ПЕРЕСЧЕТ СКИДКИ
+    discount = promo_data["value"]
+    new_amount = original_amount
+    
+    if promo_data["type"] == "percent":
+        new_amount = int(original_amount * (1 - discount / 100))
+    elif promo_data["type"] == "fixed":
+        new_amount = original_amount - discount
+        
+    if new_amount < 1: new_amount = 1 
+        
+    # Списываем активацию кода
+    db['promocodes'].update_one({"_id": promo_text}, {"$inc": {"used_count": 1}})
+    
+    bot.send_message(message.chat.id, f"✅ **Промокод успешно применен!**\nСкидка составила {original_amount - new_amount}⭐️.", parse_mode="Markdown")
+    
+    # Отправляем инвойс со скидкой
+    bot.send_invoice(
+        message.chat.id, 
+        title=f"VIP Клуб со скидкой 👑", 
+        description="Оплата доступа в закрытый чат навсегда.", 
+        invoice_payload="vip_access_payment", # Оставляем тот же пейлоад, чтобы сработал successful_payment
+        provider_token="", 
+        currency="XTR", 
+        prices=[types.LabeledPrice(label="К оплате", amount=new_amount)]
+    )
 
 # ==================== ОПЛАТА И ССЫЛКА ====================
 @bot.pre_checkout_query_handler(func=lambda query: query.invoice_payload.startswith("vip_access_payment") or query.invoice_payload.startswith("fine_payment_"))
