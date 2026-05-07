@@ -540,6 +540,13 @@ def show_profile(message):
 # Юзер нажал "Запросить вывод"
 @bot.callback_query_handler(func=lambda call: call.data == "request_withdrawal")
 def start_withdrawal(call):
+    # --- ЗАЩИТА ОТ ДВОЙНЫХ ВЫВОДОВ ---
+    pending_request = withdrawals_collection.find_one({"user_id": call.from_user.id, "status": "pending"})
+    if pending_request:
+        bot.answer_callback_query(call.id, "❌ У вас уже есть активная заявка. Дождитесь её обработки!", show_alert=True)
+        return
+    # ---------------------------------
+
     stats = get_user_stats(call.from_user.id)
     if stats['balance'] <= 0:
         bot.answer_callback_query(call.id, "❌ Ваш баланс пуст", show_alert=True)
@@ -1522,9 +1529,15 @@ def successful_payment(message):
         unban_user_everywhere(new_user_id)
         # 3. Стираем позорный тег из базы, если он был
         users_collection.update_one({"_id": new_user_id}, {"$unset": {"shame_tag": ""}})
+        # 4. ВОЗВРАЩАЕМ ДОСТУП К ПОДДЕРЖКЕ
+        archive_collection.update_one({"target": str(new_user_id)}, {"$unset": {"banned_in_support": "", "strikes": ""}})
     except Exception as e:
         print(f"Ошибка при амнистии после оплаты VIP: {e}")
     # ===========================================================
+
+    # --- НОВАЯ СТРОЧКА: ОТЧЕТ АДМИНАМ ОБ ОПЛАТЕ ---
+    bot.send_message(STAFF_GROUP_ID, f"🤑 **УСПЕШНАЯ ОПЛАТА VIP!**\nЮзер `{new_user_id}` только что купил доступ навсегда. Ссылку он получил.")
+    # ----------------------------------------------
     
     # 1. Генерируем ссылку
     try:
@@ -2216,7 +2229,8 @@ def skynet_core_handler(message):
         # --- АВТО-СИНХРОНИЗАЦИЯ ФИЗИЧЕСКОГО ПРИСУТСТВИЯ (ДВУСТОРОННЯЯ) ---
         try:
             m_vip = bot.get_chat_member(VIP_CHAT_ID, user_id)
-            actual_vip = m_vip.status in ['member', 'administrator', 'creator']
+            # Добавили restricted, чтобы временные муты не лишали статуса VIP в базе
+            actual_vip = m_vip.status in ['member', 'administrator', 'creator', 'restricted']
             if is_vip != actual_vip:
                 is_vip = actual_vip
                 users_collection.update_one({"_id": user_id}, {"$set": {"is_vip": is_vip}}, upsert=True)
@@ -2227,7 +2241,7 @@ def skynet_core_handler(message):
 
         try:
             m_beyond = bot.get_chat_member(BEYOND_CHAT_ID, user_id)
-            actual_queer = m_beyond.status in ['member', 'administrator', 'creator']
+            actual_queer = m_beyond.status in ['member', 'administrator', 'creator', 'restricted']
             if is_queer != actual_queer:
                 is_queer = actual_queer
                 users_collection.update_one({"_id": user_id}, {"$set": {"is_queer": is_queer}}, upsert=True)
