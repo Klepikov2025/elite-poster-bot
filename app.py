@@ -1750,13 +1750,21 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
         user_id = message.from_user.id
         is_privileged = False
 
-        # ЖЕСТКАЯ ПРОВЕРКА: Физически состоит в VIP Клубе?
+        # ЖЕСТКАЯ ПРОВЕРКА: Живой статус (Основа) + БД (Страховка)
         try:
+            # 1. Спрашиваем живой статус у серверов Телеграма
             vip_status = bot.get_chat_member(VIP_CHAT_ID, user_id).status
-            if vip_status in ["member", "administrator", "creator"]:
+            
+            # Если он реально в чате (даже с мутом) — пускаем!
+            if vip_status in ["member", "administrator", "creator", "restricted"]:
                 is_privileged = True
-        except: 
-            pass
+            # Если он left или kicked — НЕ пускаем (базу даже не спрашиваем)
+            
+        except Exception: 
+            # 2. СТРАХОВКА: Если Телеграм "упал" и выдал ошибку API, только тогда смотрим в БД
+            user_data = users_collection.find_one({"_id": user_id}) or {}
+            if user_data.get("is_vip", False):
+                is_privileged = True
 
         if is_privileged:
             vip_tag = "\n\n✅ *Анкета проверена администрацией сети*\n\n⭐️ *Привилегированный участник* ⭐️"
