@@ -345,6 +345,24 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
             bot.decline_chat_join_request(chat_id, user_id)
             return
 
+        # --- 🕊️ ЛОКАЛЬНАЯ АМНИСТИЯ ПАРНИ (Размут ТОЛЬКО в 18+) ---
+        if chat_id in PARNI_CHATS:
+            user_data = users_collection.find_one({"_id": user_id}) or {}
+            last_reason = user_data.get("last_mute_reason", "")
+            
+            # Проверяем, был ли мут именно за параметры
+            if any(word in last_reason for word in ["1 Мая", "параметр"]):
+                # РАЗМУЧИВАЕМ ТОЛЬКО В ЭТОЙ СЕТИ
+                count = unmute_in_parni_only(user_id)
+                
+                # Очищаем причину, чтобы не срабатывало повторно
+                users_collection.update_one({"_id": user_id}, {"$unset": {"last_mute_reason": ""}})
+                
+                # Сообщаем админам о частичной свободе
+                try: 
+                    bot.send_message(STAFF_GROUP_ID, f"🕊️ **ЛОКАЛЬНАЯ АМНИСТИЯ:** Юзер `{user_id}` размучен ТОЛЬКО в сети ПАРНИ 18+ ({count} чатов). В остальных сетях ограничения сохраняются до верификации.")
+                except: pass
+
         # --- ФАЗА 0: Санитарный контроль (БИО) ---
         user_info = bot.get_chat(user_id)
         bio = user_info.bio.lower() if user_info.bio else ""
@@ -628,6 +646,32 @@ def handle_manual_ban(message):
     bot.send_message(message.chat.id, "🚀 Глобальный бан запущен...")
     count = ban_user_everywhere(target_id, reason, admin_info)
     bot.send_message(message.chat.id, f"✅ Готово! Юзер `{target_id}` забанен в {count} чатах. Отчет отправлен в Журнал.", parse_mode="Markdown")
+
+@bot.message_handler(commands=['mute'])
+def handle_manual_mute(message):
+    if message.chat.id != STAFF_GROUP_ID: return
+    
+    args = message.text.split(maxsplit=2)
+    if len(args) < 2:
+        bot.send_message(message.chat.id, "❌ Формат: `/mute [ID] [Причина]`", parse_mode="Markdown")
+        return
+    
+    try:
+        target_id = int(args[1])
+    except ValueError:
+        bot.send_message(message.chat.id, "❌ Ошибка: ID должен быть числом!")
+        return
+        
+    reason = args[2] if len(args) > 2 else "Не указана"
+    admin_info = get_user_name(message.from_user)
+    
+    # 1. Запоминаем причину в базу для Амнистии
+    users_collection.update_one({"_id": target_id}, {"$set": {"last_mute_reason": reason}}, upsert=True)
+    
+    # 2. Выполняем глобальный мут
+    bot.send_message(message.chat.id, "🤐 Запускаю глобальный мут...")
+    count = mute_user_everywhere(target_id, reason=reason, admin_name=admin_info)
+    bot.send_message(message.chat.id, f"✅ Юзер `{target_id}` замучен в {count} чатах. Причина сохранена.")
 
 @bot.message_handler(commands=['addpromo'])
 def create_custom_promo(message):
@@ -1176,6 +1220,23 @@ def unmute_user_everywhere(target_id):
             
     return unmuted_count
 
+def unmute_in_parni_only(target_id):
+    """Снимает мут ТОЛЬКО в чатах сети ПАРНИ 18+"""
+    success_count = 0
+    for cid in PARNI_CHATS:
+        try:
+            bot.restrict_chat_member(
+                cid, target_id,
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True
+            )
+            success_count += 1
+        except:
+            pass
+    return success_count
+
 def unban_user_everywhere(target_id):
     """Снимает глобальный бан с пользователя во всех чатах сети"""
     # 1. Удаляем метку бана из памяти Скайнета
@@ -1211,6 +1272,8 @@ def unban_user_everywhere(target_id):
 
 # --- ФУНКЦИЯ: ГЛОБАЛЬНЫЙ МУТ (ДЛЯ РЕКЛАМЩИКОВ И НАРУШИТЕЛЕЙ) ---
 def mute_user_everywhere(target_id, reason="Без причины", admin_name="Система", user_link=None, trigger_text=None, mute_time=0, origin_chat=None):
+    # --- СОХРАНЯЕМ ПРИЧИНУ ДЛЯ АМНИСТИИ В ПАРНЯХ ---
+    users_collection.update_one({"_id": target_id}, {"$set": {"last_mute_reason": reason}}, upsert=True)
     chats_to_mute = {}
     for city, cid in chat_ids_parni.items(): chats_to_mute[cid] = f"ПАРНИ 18+ | {city}"
     for city, cid in chat_ids_mk.items(): chats_to_mute[cid] = f"МК | {city}"
