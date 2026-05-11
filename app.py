@@ -808,32 +808,6 @@ def global_bot_stats(message):
     
     bot.send_message(message.chat.id, text, parse_mode="Markdown")
 
-# ==================== ИНТЕРАКТИВНАЯ АМНИСТИЯ ДЛЯ ПАРНЕЙ ====================
-@bot.message_handler(commands=['parni_amnesty'])
-def send_amnesty_button(message):
-    if message.chat.id != STAFF_GROUP_ID: return
-    
-    bot.send_message(message.chat.id, "🔄 Начинаю рассылку кнопок амнистии по сети ПАРНИ...")
-    
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("🕊 Снять мут (Только для 18+)", callback_data="claim_parni_amnesty"))
-    
-    text = (
-        "⚠️ **ОБЪЯВЛЕНИЕ ОТ АДМИНИСТРАЦИИ** ⚠️\n\n"
-        "Если ранее вы получили автоматический мут за отсутствие параметров в анкете, "
-        "вы можете снять ограничения **специально для сети ПАРНИ 18+**, где эти правила не действуют.\n\n"
-        "👇 Нажмите на кнопку ниже, чтобы вернуть себе право голоса в этих чатах!"
-    )
-    
-    success_count = 0
-    for cid in PARNI_CHATS:
-        try: 
-            bot.send_message(cid, text, reply_markup=markup, parse_mode="Markdown")
-            success_count += 1
-        except: pass
-        
-    bot.send_message(message.chat.id, f"✅ Кнопка амнистии успешно отправлена в {success_count} чатов сети ПАРНИ 18+.")
-
 @bot.callback_query_handler(func=lambda call: call.data == "claim_parni_amnesty")
 def process_amnesty_click(call):
     user_id = call.from_user.id
@@ -843,22 +817,39 @@ def process_amnesty_click(call):
         bot.answer_callback_query(call.id, "❌ Отказано. Ваш аккаунт находится в черном списке.", show_alert=True)
         return
         
-    # 2. ПРОВЕРЯЕМ ПРИЧИНУ МУТА В БАЗЕ (Защита от коммерции)
+    # 2. ИЩЕМ ПРИЧИНУ ВЕЗДЕ (И в новой базе, и в старом архиве)
+    is_eligible = False
+    
+    # Проверка А (Новая логика - для свежих мутов)
     user_data = users_collection.find_one({"_id": user_id}) or {}
     last_reason = user_data.get("last_mute_reason", "")
-    
     if any(word in last_reason for word in ["1 Мая", "параметр"]):
+        is_eligible = True
+        
+    # Проверка Б (Старая логика - копаемся в Архиве Секретаря)
+    if not is_eligible:
+        archive = archive_collection.find_one({"target": str(user_id)}) or {}
+        history = archive.get("history", [])
+        for entry in history:
+            if entry.get("action") == "Глобальный МУТ (Скайнет)":
+                if any(word in entry.get("reason", "") for word in ["1 Мая", "параметр"]):
+                    is_eligible = True
+                    break
+    
+    if is_eligible:
         # Размучиваем ТОЛЬКО в сети ПАРНИ
         unmute_in_parni_only(user_id)
         
-        # Стираем причину, чтобы кнопка не срабатывала вхолостую
+        # Стираем причину из новой базы, чтобы кнопка не срабатывала вхолостую
         users_collection.update_one({"_id": user_id}, {"$unset": {"last_mute_reason": ""}})
+        
+        try: bot.send_message(STAFF_GROUP_ID, f"🕊 **ИНТЕРАКТИВНАЯ АМНИСТИЯ:** Юзер `{user_id}` нажал кнопку и вернул себе голос в сети ПАРНИ 18+.")
+        except: pass
         
         bot.answer_callback_query(call.id, "🕊 Амнистия применена!\nТеперь вы можете писать в сети ПАРНИ 18+.", show_alert=True)
     else:
         # Если мут был ручной или за МП/рекламу
         bot.answer_callback_query(call.id, "❌ Отказано. Амнистия действует только на блокировки за формат анкеты (параметры).", show_alert=True)
-# ===========================================================================
 
 @bot.message_handler(commands=['tag'])
 def set_custom_user_tag(message):
