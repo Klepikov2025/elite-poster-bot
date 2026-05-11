@@ -2259,25 +2259,24 @@ def catch_bot_block(message):
                 
                 ban_user_everywhere(user_id, reason="Мгновенный перехват блокировки бота", admin_name="Auto-Radar ⚡️")
 
-# ==================== ПЕРЕХВАТЧИК "МЕРТВЫХ ДУШ" (Защита от старых заявок) ====================
+# ==================== ПЕРЕХВАТЧИК "МЕРТВЫХ ДУШ" (Защита от старых заявок + Амнистия) ====================
 @bot.message_handler(content_types=['new_chat_members'])
 def catch_illegal_entry(message):
     for new_user in message.new_chat_members:
         user_id = new_user.id
+        chat_id = message.chat.id
         
         # 1. Проверяем, есть ли он в черном списке Скайнета
         banned_info = banned_collection.find_one({"_id": user_id})
         
         if banned_info:
-            chat_id = message.chat.id
-            
-            # 2. Мгновенно баним обратно (стирать сообщение о входе не нужно, их у вас нет)
+            # 2. Мгновенно баним обратно
             try:
                 bot.ban_chat_member(chat_id, user_id, revoke_messages=True)
             except:
                 pass
             
-            # 3. Гордо отчитываемся в Staff-чат
+            # 3. Отчет в Staff-чат
             user_link = f"[{escape_md(new_user.first_name)}](tg://user?id={user_id})"
             chat_title = escape_md(message.chat.title) if message.chat.title else str(chat_id)
             
@@ -2289,6 +2288,25 @@ def catch_illegal_entry(message):
             )
             try: bot.send_message(STAFF_GROUP_ID, report, parse_mode="Markdown")
             except: pass
+            return # Если юзер в бане, дальше не идем
+
+        # --- 🕊️ ЛОКАЛЬНАЯ АМНИСТИЯ ПАРНИ (Для тех, кто вошел сам или одобрен вручную) ---
+        if chat_id in PARNI_CHATS:
+            user_data = users_collection.find_one({"_id": user_id}) or {}
+            last_reason = user_data.get("last_mute_reason", "")
+            
+            # Если мут был за параметры (1 Мая)
+            if any(word in last_reason for word in ["1 Мая", "параметр"]):
+                # РАЗМУЧИВАЕМ ТОЛЬКО В СЕТИ ПАРНИ
+                count = unmute_in_parni_only(user_id)
+                
+                # Очищаем причину, чтобы не срабатывало повторно
+                users_collection.update_one({"_id": user_id}, {"$unset": {"last_mute_reason": ""}})
+                
+                # Отчет админам
+                try: 
+                    bot.send_message(STAFF_GROUP_ID, f"🕊️ **АМНИСТИЯ (Вход):** Юзер `{user_id}` вошел в сеть ПАРНИ 18+ и был автоматически размучен ({count} чатов).")
+                except: pass
 # ===========================================================================================
 
 # ==================== ЛОВЕЦ ЗВЕЗД (ОПЛАТА 50 ЗВЕЗД) ====================
