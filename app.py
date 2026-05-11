@@ -86,13 +86,6 @@ MAIN_CHANNEL_ID = -1002246737442
 MAIN_CHANNEL_USERNAME = "@clubofrm"
 MAIN_CHANNEL_LINK = "https://t.me/clubofrm"
 
-# Сеть ПАРНИ — полностью исключаем из всех проверок
-PARNI_CHATS = {
-    -1002413948841, -1002255622479, -1002274367832, -1002406302365,
-    -1002280860973, -1002469285352, -1002287709568, -1002448909000,
-    -1002261777025, -1002371438340
-}
-
 # ==================== СПИСКИ ЧАТОВ ====================
 chat_ids_mk = {
     "Екатеринбург": -1002210043742,
@@ -151,6 +144,9 @@ chat_ids_parni = {
     "Санкт-Петербург": -1003519420984,
     "Красноярск": -1003347456711
 }
+
+# --- АВТОМАТИЧЕСКИ СОБИРАЕМ ВСЕ ID ПАРНЕЙ ---
+PARNI_CHATS = set(chat_ids_parni.values())
 
 chat_ids_ns = {
     "Новосибирск": -1001824149334,
@@ -850,6 +846,41 @@ def process_amnesty_click(call):
     else:
         # Если мут был ручной или за МП/рекламу
         bot.answer_callback_query(call.id, "❌ Отказано. Амнистия действует только на блокировки за формат анкеты (параметры).", show_alert=True)
+
+# ==================== ИНТЕРАКТИВНАЯ АМНИСТИЯ ДЛЯ ПАРНЕЙ ====================
+@bot.message_handler(commands=['parni_amnesty'])
+def send_amnesty_button(message):
+    if message.chat.id != STAFF_GROUP_ID: return
+    
+    bot.send_message(message.chat.id, "🔄 Начинаю рассылку кнопок амнистии по сети ПАРНИ...")
+    
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("🕊 Снять мут (Только для 18+)", callback_data="claim_parni_amnesty"))
+    
+    text = (
+        "⚠️ **ОБЪЯВЛЕНИЕ ОТ АДМИНИСТРАЦИИ** ⚠️\n\n"
+        "Если ранее вы получили автоматический мут за отсутствие параметров в анкете, "
+        "вы можете снять ограничения **специально для сети ПАРНИ 18+**, где эти правила не действуют.\n\n"
+        "👇 Нажмите на кнопку ниже, чтобы вернуть себе право голоса в этих чатах!"
+    )
+    
+    success_count = 0
+    error_list = []
+    
+    for cid in PARNI_CHATS:
+        try: 
+            bot.send_message(cid, text, reply_markup=markup, parse_mode="Markdown")
+            success_count += 1
+            time.sleep(1)  # Защитная пауза от спам-блока Телеграма
+        except Exception as e: 
+            error_list.append(f"`{cid}`: {e}")
+            
+    # Формируем умный отчет
+    report_msg = f"✅ Кнопка амнистии успешно отправлена в {success_count} чатов сети ПАРНИ 18+."
+    if error_list:
+        report_msg += "\n\n⚠️ **Ошибки отправки:**\n" + "\n".join(error_list)
+        
+    bot.send_message(message.chat.id, report_msg, parse_mode="Markdown")
 
 @bot.message_handler(commands=['tag'])
 def set_custom_user_tag(message):
