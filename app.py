@@ -315,6 +315,38 @@ def safe_set_tag(chat_id, user_id, tag):
         url = f"https://api.telegram.org/bot{TOKEN}/setChatMemberTag"
         requests.post(url, json={"chat_id": chat_id, "user_id": user_id, "tag": tag})
 
+def is_real_vip(user_id: int) -> bool:
+    """Надёжная проверка VIP-статуса по живому состоянию в чате"""
+    try:
+        member = bot.get_chat_member(VIP_CHAT_ID, user_id)
+        
+        if member.status in ['member', 'administrator', 'creator']:
+            return True
+            
+        if member.status == 'restricted':
+            return getattr(member, 'is_member', False)
+            
+        return False
+        
+    except telebot.apihelper.ApiTelegramException as e:
+        error = str(e).lower()
+        if any(phrase in error for phrase in ["user not found", "chat not found", "not a member", "forbidden", "user is not a member"]):
+            # Зачищаем "призраков" в базе
+            users_collection.update_one(
+                {"_id": user_id}, 
+                {"$set": {"is_vip": False}, "$unset": {"custom_tag": ""}}
+            )
+            return False
+        # Для других ошибок API (например, таймаут) — логируем
+        print(f"[is_real_vip] Telegram API error for {user_id}: {e}")
+        
+    except Exception as e:
+        print(f"[is_real_vip] Unexpected error for {user_id}: {e}")
+    
+    # Fallback — только если Telegram полностью недоступен
+    user_data = users_collection.find_one({"_id": user_id}) or {}
+    return bool(user_data.get("is_vip", False))
+
 # ==================== МОДУЛЬ 2: УМНАЯ ТАМОЖНЯ + СТАТИСТИКА ====================
 @bot.chat_join_request_handler()
 def handle_join_requests(message: telebot.types.ChatJoinRequest):
@@ -1193,8 +1225,12 @@ def handle_video_note(message):
     pending_verification_users[message.from_user.id] = False
 
 def ban_user_everywhere(target_id, reason="Без причины", admin_name="Система", user_link=None, trigger_text=None, origin_chat=None):
+    # === СБРАСЫВАЕМ VIP-СТАТУС И ТЕГИ ПРИ БАНЕ ===
+    users_collection.update_one({"_id": target_id}, {"$set": {"is_vip": False}, "$unset": {"custom_tag": ""}})
+    # ============================================
+
     banned_collection.update_one({"_id": target_id}, {"$set": {"reason": reason}}, upsert=True)
-    
+   
     chats_to_ban = {VIP_CHAT_ID: "VIP Клуб"}
     for city, cid in chat_ids_parni.items(): chats_to_ban[cid] = f"ПАРНИ 18+ | {city}"
     for city, cid in chat_ids_mk.items(): chats_to_ban[cid] = f"МК | {city}"
@@ -1959,23 +1995,9 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
 
     try:
         user_id = message.from_user.id
-        is_privileged = False
 
         # ЖЕСТКАЯ ПРОВЕРКА: Живой статус (Основа) + БД (Страховка)
-        try:
-            # 1. Спрашиваем живой статус у серверов Телеграма
-            vip_status = bot.get_chat_member(VIP_CHAT_ID, user_id).status
-            
-            # Если он реально в чате (даже с мутом) — пускаем!
-            if vip_status in ["member", "administrator", "creator", "restricted"]:
-                is_privileged = True
-            # Если он left или kicked — НЕ пускаем (базу даже не спрашиваем)
-            
-        except Exception: 
-            # 2. СТРАХОВКА: Если Телеграм "упал" и выдал ошибку API, только тогда смотрим в БД
-            user_data = users_collection.find_one({"_id": user_id}) or {}
-            if user_data.get("is_vip", False):
-                is_privileged = True
+        is_privileged = is_real_vip(user_id)
 
         if is_privileged:
             vip_tag = "\n\n✅ *Анкета проверена администрацией сети*\n\n⭐️ *Привилегированный участник* ⭐️"
