@@ -334,7 +334,7 @@ def is_real_vip(user_id: int) -> bool:
             # Зачищаем "призраков" в базе
             users_collection.update_one(
                 {"_id": user_id}, 
-                {"$set": {"is_vip": False}, "$unset": {"custom_tag": ""}}
+                {"$set": {"is_vip": False}}
             )
             return False
         # Для других ошибок API (например, таймаут) — логируем
@@ -2953,8 +2953,20 @@ def skynet_listener():
                     unbanned = unban_user_everywhere(target_uid)
                     unmuted = unmute_user_everywhere(target_uid)
                     
-                    # 2. Снимаем позорный тег
-                    users_collection.update_one({"_id": target_uid}, {"$unset": {"shame_tag": ""}})
+                    # 2. ВЫДАЕМ ИММУНИТЕТ ИЛИ ПРОСТО ЧИСТИМ ТЕГ
+                    if task['action'] == "full_unban":
+                        # Если это верификация — выдаем официальный статус и тег!
+                        users_collection.update_one(
+                            {"_id": target_uid}, 
+                            {"$set": {"is_verified": True, "custom_tag": "Верифицирован МК"}, "$unset": {"shame_tag": ""}},
+                            upsert=True
+                        )
+                    elif task['action'] == "fine_unban":
+                        # Если просто оплатил штраф — снимаем позор, но верификацию не даем
+                        users_collection.update_one(
+                            {"_id": target_uid}, 
+                            {"$unset": {"shame_tag": ""}}
+                        )
                     
                     # 3. ОТЧЕТ В ФЛУДИЛКУ АДМИНАМ!
                     if task['action'] == "fine_unban":
