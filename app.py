@@ -517,6 +517,9 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
                 db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
                 return
 
+    except Exception as e:
+        print(f"Ошибка Таможни: {e}")
+
 @bot.message_handler(commands=['start'])
 def start(message):
     try:
