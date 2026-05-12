@@ -371,6 +371,16 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
         # --- ФАЗА -1: Проверка Глобального Черного Списка ---
         if is_banned_in_network(user_id):
             bot.decline_chat_join_request(chat_id, user_id)
+            try:
+                bot.send_message(
+                    user_id, 
+                    "🚫 **Доступ заблокирован за грубые нарушения.**\n\n"
+                    "Ваш аккаунт находится в глобальном черном списке сети. "
+                    "Разблокировка возможна только после оплаты официального штрафа.\n\n"
+                    "📍 Обратитесь в поддержку для уточнения суммы и получения ссылки на оплату: @MK_MensClubSUPPORT",
+                    parse_mode="Markdown"
+                )
+            except: pass
             return
 
         # --- 🕊️ ЛОКАЛЬНАЯ АМНИСТИЯ ПАРНИ (Размут ТОЛЬКО в 18+) ---
@@ -459,7 +469,7 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
             db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
             return
 
-        # --- ФАЗА 3: Гео-контроль (Городские чаты) ---
+        # --- ФАЗА 3: Гео-контроль (Единый город + Метод первой двери + Монетизация) ---
         target_city = None
         for city_name, networks in all_cities.items():
             for net, groups in networks.items():
@@ -467,17 +477,45 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
                     target_city = city_name
                     break
         
-        if target_city and user_has_city_passport(user_id, target_city):
-            bot.approve_chat_join_request(chat_id, user_id)
-            db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
-            return
+        if target_city:
+            user_data = users_collection.find_one({"_id": user_id}) or {}
+            main_city = user_data.get("main_city")
+            purchased_cities = user_data.get("purchased_cities", [])
 
-        # --- ФАЗА 4: Новички ---
-        # Оставляем висеть в списке (ты одобришь их кнопкой "Одобрить все" 1-го или 15-го числа)
-        pass
-
-    except Exception as e:
-        print(f"Ошибка Таможни: {e}")
+            if main_city:
+                # 📍 СЦЕНАРИЙ А: Юзер уже привязан к городу
+                if main_city == target_city or target_city in purchased_cities:
+                    bot.approve_chat_join_request(chat_id, user_id)
+                    db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
+                    return
+                else:
+                    # Чужой город! Отклоняем моментально + Кидаем Оффер
+                    bot.decline_chat_join_request(chat_id, user_id)
+                    
+                    markup = types.InlineKeyboardMarkup(row_width=1)
+                    markup.add(
+                        types.InlineKeyboardButton(f"🎟 Купить пропуск в г. {target_city} (250⭐️)", callback_data=f"buy_city_{target_city}"),
+                        types.InlineKeyboardButton("👑 Купить VIP (Все города)", callback_data="start_verification")
+                    )
+                    try:
+                        bot.send_message(
+                            user_id, 
+                            f"❌ Ваша заявка в чат **{target_city}** отклонена.\n\n"
+                            f"По правилам сети за вами закреплен город: **{main_city}**.\n\n"
+                            f"Вы можете приобрести разовый пропуск (откроет доступ к сетям МК, Парни 18+, НС и др. в г. {target_city}), либо стать VIP-участником для неограниченного доступа везде.",
+                            reply_markup=markup,
+                            parse_mode="Markdown"
+                        )
+                    except: pass
+                    return
+            else:
+                # 📍 СЦЕНАРИЙ Б: Метод «Первой двери» для новичков
+                # Намертво привязываем к городу и СРАЗУ пускаем
+                users_collection.update_one({"_id": user_id}, {"$set": {"main_city": target_city}}, upsert=True)
+                
+                bot.approve_chat_join_request(chat_id, user_id)
+                db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
+                return
 
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -803,6 +841,32 @@ def get_detailed_report(message):
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("🗑 Сбросить счетчики", callback_data="reset_stats"))
     bot.send_message(message.chat.id, report_text, reply_markup=markup)
+
+@bot.message_handler(commands=['setcity'])
+def admin_set_city(message):
+    try:
+        staff_member = bot.get_chat_member(STAFF_GROUP_ID, message.from_user.id)
+        if staff_member.status not in ['administrator', 'creator']:
+            return
+    except Exception: return 
+
+    args = message.text.split(maxsplit=2)
+    if len(args) < 3:
+        bot.send_message(message.chat.id, "❌ Формат: `/setcity [ID] [Город]`", parse_mode="Markdown")
+        return
+
+    try:
+        target_id = int(args[1])
+        new_city = args[2]
+        
+        users_collection.update_one(
+            {"_id": target_id}, 
+            {"$set": {"main_city": new_city}}, 
+            upsert=True
+        )
+        bot.send_message(message.chat.id, f"✅ Город для пользователя `{target_id}` успешно изменен на **{new_city}**.")
+    except ValueError:
+        bot.send_message(message.chat.id, "❌ Ошибка: ID должен быть числом.")
 
 @bot.message_handler(commands=['stats'])
 def global_bot_stats(message):
@@ -1456,19 +1520,6 @@ def mute_user_everywhere(target_id, reason="Без причины", admin_name="
     
     return len(muted_in)
 
-# --- ФУНКЦИЯ: ПРОВЕРКА "ПРОПИСКИ" В ГОРОДАХ ---
-def user_has_city_passport(user_id, target_city):
-    """Ищет юзера в других сетях в том же самом городе"""
-    for network_key, cities in all_cities.get(target_city, {}).items():
-        for group in cities:
-            try:
-                member = bot.get_chat_member(group['chat_id'], user_id)
-                if member.status in ['member', 'administrator', 'creator']:
-                    return True
-            except:
-                continue
-    return False
-
 # --- ОБРАБОТКА ОТКАЗА ОТ ВЕРИФИКАЦИИ ---
 @bot.message_handler(func=lambda message: message.text and message.text.strip().lower() in ["я отказываюсь от продолжения", "отказываюсь от продолжения"])
 def handle_refusal(message):
@@ -1644,6 +1695,25 @@ def handle_withdrawal_admin(call):
         bot.send_message(user_id, "❌ Ваш запрос на вывод средств был отклонен администрацией.")
         bot.edit_message_text(call.message.text + f"\n\n❌ **ОТКЛОНЕНО:** {admin_info}", STAFF_GROUP_ID, call.message.message_id)
 
+# ==================== МОНЕТИЗАЦИЯ ГОРОДОВ ====================
+@bot.callback_query_handler(func=lambda call: call.data.startswith('buy_city_'))
+def handle_buy_city(call):
+    city_name = call.data.split('_', 2)[2]
+    CITY_PRICE_STARS = 250
+    
+    try: bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+    except: pass
+    
+    bot.send_invoice(
+        call.message.chat.id, 
+        title=f"Пропуск: {city_name} 🏙", 
+        description=f"Открывает доступ ко всем чатам нашей сети в городе {city_name} навсегда.", 
+        invoice_payload=f"city_access_{city_name}", 
+        provider_token="", 
+        currency="XTR", 
+        prices=[types.LabeledPrice(label=f"Доступ к {city_name}", amount=CITY_PRICE_STARS)]
+    )
+
 # ================= УМНАЯ КАССА И ПРОМОКОДЫ (VIP) =================
 @bot.callback_query_handler(func=lambda call: call.data.startswith('checkout_'))
 def handle_checkout(call):
@@ -1720,8 +1790,7 @@ def process_promo_code(message, target_type, original_amount, call_msg):
         prices=[types.LabeledPrice(label="К оплате", amount=new_amount)]
     )
 
-# ==================== ОПЛАТА И ССЫЛКА ====================
-@bot.pre_checkout_query_handler(func=lambda query: query.invoice_payload.startswith("vip_access_payment") or query.invoice_payload.startswith("fine_payment_"))
+@bot.pre_checkout_query_handler(func=lambda query: query.invoice_payload.startswith("vip_access_payment") or query.invoice_payload.startswith("fine_payment_") or query.invoice_payload.startswith("city_access_"))
 def checkout_process(pre_checkout_query):
     bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
 
@@ -1729,6 +1798,45 @@ def checkout_process(pre_checkout_query):
 def successful_payment(message):
     new_user_id = message.from_user.id
     payload = message.successful_payment.invoice_payload
+
+# === ОПЛАТА ПРОПУСКА В ГОРОД ===
+    if payload.startswith("city_access_"):
+        purchased_city = payload.replace("city_access_", "")
+        
+        users_collection.update_one(
+            {"_id": new_user_id}, 
+            {"$addToSet": {"purchased_cities": purchased_city}}, 
+            upsert=True
+        )
+        
+        links_text = f"🎉 **Оплата успешно получена!**\n\nВы приобрели доступ к городу **{purchased_city}**.\nВот ваши персональные одноразовые ссылки для входа:\n\n"
+        
+        links_generated = 0
+        for net_key, groups in all_cities.get(purchased_city, {}).items():
+            for group in groups:
+                try:
+                    invite = bot.create_chat_invite_link(group['chat_id'], member_limit=1)
+                    network_name = net_key_to_name(net_key)
+                    links_text += f"🔹 **{network_name}**: [Вступить]({invite.invite_link})\n"
+                    links_generated += 1
+                except Exception as e:
+                    pass # Игнорируем ошибки при создании ссылки
+        
+        if links_generated == 0:
+            links_text += "К сожалению, не удалось сгенерировать ссылки. Обратитесь в поддержку @MK_MensClubSUPPORT."
+        else:
+            links_text += "\n⚠️ *Внимание: Ссылки одноразовые! Никому их не передавайте, иначе вы не сможете войти сами.*"
+
+        bot.send_message(
+            new_user_id, 
+            links_text, 
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
+        
+        try: bot.send_message(STAFF_GROUP_ID, f"🤑 **ПРОДАЖА ПРОПУСКА!**\nЮзер `{new_user_id}` купил доступ к городу **{purchased_city}** за 250⭐️.")
+        except: pass
+        return
 
 # ================= ОПЛАТА ШТРАФА (АВТОРАЗБАН) =================
     if payload.startswith("fine_payment_"):
@@ -2483,7 +2591,24 @@ def skynet_core_handler(message):
         is_queer = user_data.get("is_queer", False)
         is_verified = user_data.get("is_verified", False)
         shame_tag = user_data.get("shame_tag")
-        custom_tag = user_data.get("custom_tag") 
+        custom_tag = user_data.get("custom_tag")
+
+        # --- ТЕНЕВАЯ ИНДЕКСАЦИЯ ГОРОДОВ (SMART LEGACY) ---
+        main_city = user_data.get("main_city")
+        if not main_city:
+            # Юзер еще не привязан. Определяем город текущего чата:
+            detected_city = None
+            for city_name, networks in all_cities.items():
+                for net, groups in networks.items():
+                    if any(g['chat_id'] == chat_id for g in groups):
+                        detected_city = city_name
+                        break
+                if detected_city: break
+            
+            if detected_city:
+                users_collection.update_one({"_id": user_id}, {"$set": {"main_city": detected_city}}, upsert=True)
+                main_city = detected_city
+        # ------------------------------------------------- 
 
         # --- АВТО-СИНХРОНИЗАЦИЯ ФИЗИЧЕСКОГО ПРИСУТСТВИЯ (ДВУСТОРОННЯЯ) ---
         try:
