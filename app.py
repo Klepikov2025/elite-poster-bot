@@ -2745,37 +2745,50 @@ def skynet_core_handler(message):
                     return # Останавливаем код, сообщение не пройдет дальше!
         # ==========================================
 
-        # === 🛡 КАРАНТИН НОВОРЕГОВ (Свежие ID) ===
-        # Порог 7.8 млрд отсеет только свежайшие вирт-номера
-        if user_id > 7800000000:
+        # === 🛡 КАРАНТИН НОВОРЕГОВ (С реальным таймером 48ч) ===
+        # 1. Проверяем, когда мы впервые увидели этот аккаунт
+        first_seen = user_data.get('first_seen')
+        if not first_seen:
+            first_seen = time.time()
+            users_collection.update_one({"_id": user_id}, {"$set": {"first_seen": first_seen}}, upsert=True)
+
+        # 2. Считаем, сколько часов прошло (48 часов = 172800 сек)
+        seconds_passed = time.time() - first_seen
+        
+        # 3. Если ID "свежий" (больше 7.8 млрд) И прошло меньше 48 часов
+        if user_id > 7800000000 and seconds_passed < 172800:
             try: bot.delete_message(chat_id, message.message_id)
             except: pass
             
-            # --- НОВОЕ: ТИХИЙ ОТЧЕТ В STAFF-ЧАТ ---
+            # --- ОТЧЕТ В STAFF (Чтобы поддержка знала) ---
             try: 
                 bot.send_message(
                     STAFF_GROUP_ID, 
-                    f"🥷 **КАРАНТИН:** Тихо удалено сообщение от новорега {user_link} (`{user_id}`).\n📍 Чат: {chat_title}",
+                    f"🥷 **КАРАНТИН:** Удалено сообщение от новорега {user_link} (`{user_id}`).\n"
+                    f"📍 Чат: {chat_title}\n"
+                    f"🕒 Прошло: {int(seconds_passed // 3600)}ч. из 48ч.",
                     parse_mode="Markdown"
                 )
             except: pass
-            # --------------------------------------
             
-            warning_msg = bot.send_message(
-                chat_id, 
-                f"🚨 {user_link}, **Защита от спама!**\n"
-                "Ваш аккаунт создан недавно. Для новых пользователей действует карантин 48 часов.\n"
-                "Подождите пару дней или пройдите верификацию в @MK_MensClubSUPPORT.", 
-                parse_mode="Markdown"
-            )
+            # --- ПРЕДУПРЕЖДЕНИЕ В ГРУППУ (На 5 минут) ---
+            try:
+                warning_msg = bot.send_message(
+                    chat_id, 
+                    f"🚨 {user_link}, **Защита от спама!**\n"
+                    "Ваш аккаунт создан недавно. Для безопасности сети действует карантин 48 часов.\n"
+                    "Подождите, или пройдите верификацию в @MK_MensClubSUPPORT.", 
+                    parse_mode="Markdown"
+                )
+                
+                def delete_quarantine_warning():
+                    time.sleep(300) # Удалит через 5 минут
+                    try: bot.delete_message(chat_id, warning_msg.message_id)
+                    except: pass
+                threading.Thread(target=delete_quarantine_warning, daemon=True).start()
+            except: pass
             
-            def delete_quarantine_warning():
-                time.sleep(300) # <--- УВЕЛИЧИЛИ ДО 5 МИНУТ (300 секунд)
-                try: bot.delete_message(chat_id, warning_msg.message_id)
-                except: pass
-            threading.Thread(target=delete_quarantine_warning, daemon=True).start()
-            
-            return # Останавливаем код, сообщение не пройдет дальше!
+            return # Сообщение не идет дальше
         # ==========================================
 
         # 3.5. ОПЕРАЦИЯ "1 МАЯ" (Строгий формат параметров)
