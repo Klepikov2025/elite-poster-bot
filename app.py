@@ -2751,6 +2751,16 @@ def skynet_core_handler(message):
             try: bot.delete_message(chat_id, message.message_id)
             except: pass
             
+            # --- НОВОЕ: ТИХИЙ ОТЧЕТ В STAFF-ЧАТ ---
+            try: 
+                bot.send_message(
+                    STAFF_GROUP_ID, 
+                    f"🥷 **КАРАНТИН:** Тихо удалено сообщение от новорега {user_link} (`{user_id}`).\n📍 Чат: {chat_title}",
+                    parse_mode="Markdown"
+                )
+            except: pass
+            # --------------------------------------
+            
             warning_msg = bot.send_message(
                 chat_id, 
                 f"🚨 {user_link}, **Защита от спама!**\n"
@@ -2760,7 +2770,7 @@ def skynet_core_handler(message):
             )
             
             def delete_quarantine_warning():
-                time.sleep(120) # Удалит сообщение через 2 минуты
+                time.sleep(300) # <--- УВЕЛИЧИЛИ ДО 5 МИНУТ (300 секунд)
                 try: bot.delete_message(chat_id, warning_msg.message_id)
                 except: pass
             threading.Thread(target=delete_quarantine_warning, daemon=True).start()
