@@ -2773,12 +2773,14 @@ def skynet_core_handler(message):
             
             # --- ПРЕДУПРЕЖДЕНИЕ В ГРУППУ (На 5 минут) ---
             try:
+                # Прячем ссылку в слово, чтобы нижнее подчеркивание не ломало Markdown!
                 warning_msg = bot.send_message(
                     chat_id, 
                     f"🚨 {user_link}, **Защита от спама!**\n"
                     "Ваш аккаунт создан недавно. Для безопасности сети действует карантин 48 часов.\n"
-                    "Подождите, или пройдите верификацию в @MK_MensClubSUPPORT.", 
-                    parse_mode="Markdown"
+                    "Подождите, или пройдите верификацию в [Службе Поддержки](https://t.me/MK_MensClubSUPPORT).", 
+                    parse_mode="Markdown",
+                    disable_web_page_preview=True
                 )
                 
                 def delete_quarantine_warning():
@@ -2786,7 +2788,8 @@ def skynet_core_handler(message):
                     try: bot.delete_message(chat_id, warning_msg.message_id)
                     except: pass
                 threading.Thread(target=delete_quarantine_warning, daemon=True).start()
-            except: pass
+            except Exception as e:
+                print(f"Ошибка отправки карантина: {e}")
             
             return # Сообщение не идет дальше
         # ==========================================
