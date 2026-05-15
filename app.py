@@ -48,6 +48,7 @@ banned_collection = db['banned']             # Черный список (заб
 posts_collection = db['posts']
 archive_collection = db['grouphelp_archive']
 temp_posts = db['temp_posts']
+proxy_sessions = db['proxy_sessions'] # Черный Ящик для анонимных чатов
 
 # --- Функции общения с базой ---
 def update_user_stats(user_id, invites_add=0, balance_add=0, clicks_add=0):
@@ -2308,74 +2309,164 @@ def handle_new_post_choice(message):
             reply_markup=get_main_keyboard()
         )
 
+# ==================== ЗАЩИЩЕННЫЙ КОММУТАТОР И ЧЕРНЫЙ ЯЩИК ====================
+
+def log_proxy_message(session_id, sender_id, message):
+    # Собираем текст и тип медиафайла
+    content = message.text if message.text else f"[{message.content_type.upper()}]"
+    if message.caption: content += f" | {message.caption}"
+    
+    timestamp = datetime.now(pytz.timezone('Asia/Yekaterinburg')).strftime("%H:%M:%S")
+    proxy_sessions.update_one(
+        {"_id": session_id},
+        {"$push": {"history": {"time": timestamp, "sender": sender_id, "text": content}}}
+    )
+
 @bot.callback_query_handler(func=lambda call: call.data == "respond")
 def handle_respond(call):
     chat_id = call.message.chat.id
     msg_id = call.message.message_id
     user_id = call.from_user.id
-    responder = call.from_user  
-
-    post = posts_collection.find_one({"chat_id": chat_id, "message_id": msg_id})
     
+    post = posts_collection.find_one({"chat_id": chat_id, "message_id": msg_id})
     if not post:
         bot.answer_callback_query(call.id, "Ошибка: Объявление устарело или было удалено.", show_alert=True)
         return
 
     vip_id = post["user_id"]
-
-    key = (chat_id, msg_id)
-    if key not in responded:
-        responded[key] = set()
-
-    if user_id in responded[key]:
-        bot.answer_callback_query(call.id, "Вы уже откликались на это объявление.")
+    if user_id == vip_id:
+        bot.answer_callback_query(call.id, "❌ Вы не можете откликнуться на свое же объявление!", show_alert=True)
         return
 
-    if not responder.username:
-        bot.answer_callback_query(
-            callback_query_id=call.id,
-            text="❌ Отклик запрещён!\n\n"
-                 "У вас скрыт @username в настройках приватности.\n\n"
-                 "Чтобы откликаться на VIP-объявления — откройте его:\n"
-                 "Настройки → Конфиденциальность и безопасность → "
-                 "«Пересылка сообщений» → выбрать «Всем»",
-            show_alert=True
-        )
-        return
-
-    responded[key].add(user_id)
-
-    # === ИСПРАВЛЕНИЕ: ПЕРЕХОД НА НАДЕЖНЫЙ HTML ===
-    clean_name = responder.first_name.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-
-    if responder.username:
-        name = f'<a href="https://t.me/{responder.username}">{clean_name}</a>'
-    else:
-        name = f'<a href="tg://user?id={user_id}">{clean_name}</a>'
-
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        types.InlineKeyboardButton(
-            text="🚨 Это спам / скам / мошенник",
-            callback_data=f"report_scam_{chat_id}_{msg_id}_{user_id}",
-            style="danger"          
-        )
+    bot.answer_callback_query(call.id)
+    msg = bot.send_message(
+        user_id, 
+        "🛡 **Защищенный чат с VIP-пользователем**\n\n"
+        "Напишите ваше первое сообщение (можно прикрепить фото или видео). Оно будет передано анонимно.\n"
+        "👉 _Жду ваше сообщение:_ ",
+        parse_mode="Markdown"
     )
+    bot.register_next_step_handler(msg, process_proxy_first_message, vip_id)
 
-    try:
-        bot.send_message(
-            vip_id,
-            f"Вами заинтересовался {name}",
-            parse_mode="HTML",  # <--- ПЕРЕКЛЮЧИЛИ С MARKDOWN НА HTML
-            reply_markup=markup
+def process_proxy_first_message(message, vip_id):
+    if not message.text and not message.photo and not message.video and not message.voice:
+        bot.send_message(message.chat.id, "❌ Ошибка: Поддерживается только текст, фото, видео или голос.")
+        return
+
+    guest_id = message.from_user.id
+    session_id = f"proxy_{vip_id}_{guest_id}"
+    
+    # Открываем сессию Черного Ящика
+    proxy_sessions.update_one(
+        {"_id": session_id},
+        {"$set": {"vip_id": vip_id, "guest_id": guest_id, "is_active": True, "history": []}},
+        upsert=True
+    )
+    log_proxy_message(session_id, guest_id, message)
+    
+    # Кнопки для VIP-пользователя
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        types.InlineKeyboardButton("🛑 Заблокировать диалог", callback_data=f"px_block_{session_id}"),
+        types.InlineKeyboardButton("🚨 Заблокировать и сообщить администратору", callback_data=f"px_report_{session_id}")
+    )
+    
+    # === НОВОЕ: ГЕНЕРИРУЕМ ССЫЛКУ НА ГОСТЯ ===
+    clean_name = message.from_user.first_name.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    if message.from_user.username:
+        guest_link = f'<a href="https://t.me/{message.from_user.username}">{clean_name}</a>'
+    else:
+        guest_link = f'<a href="tg://user?id={guest_id}">{clean_name}</a>'
+    
+    bot.send_message(
+        vip_id, 
+        f"💌 <b>Новый отклик от {guest_link}!</b>\n<i>Сделайте Reply (ответить) на сообщение ниже, чтобы написать ему через бота.</i>", 
+        parse_mode="HTML"
+    )
+    # ==========================================
+    
+    # Пересылаем сообщение VIP-у (копируем, чтобы скрыть отправителя)
+    sent_msg = bot.copy_message(vip_id, message.chat.id, message.message_id, reply_markup=markup)
+    
+    # Запоминаем ID сообщения, чтобы ловить на него ответы
+    proxy_sessions.update_one({"_id": session_id}, {"$set": {f"msgs_{vip_id}_{sent_msg.message_id}": True}})
+    
+    bot.send_message(message.chat.id, "✅ Сообщение доставлено. Ждите ответа (он придет прямо в этот чат).")
+
+# Ловец ответов (Свайпов) внутри бота
+@bot.message_handler(func=lambda m: m.chat.type == "private" and m.reply_to_message is not None, content_types=['text', 'photo', 'video', 'voice', 'video_note', 'document'])
+def handle_proxy_reply(message):
+    reply_to_id = message.reply_to_message.message_id
+    user_id = message.from_user.id
+    
+    # Ищем, к какой активной сессии привязано это сообщение
+    session = proxy_sessions.find_one({f"msgs_{user_id}_{reply_to_id}": {"$exists": True}, "is_active": True})
+    if not session: return # Это ответ на какую-то другую команду бота
+        
+    session_id = session["_id"]
+    vip_id = session["vip_id"]
+    guest_id = session["guest_id"]
+    
+    # Определяем, кто кому пишет
+    recipient_id = guest_id if user_id == vip_id else vip_id
+        
+    log_proxy_message(session_id, user_id, message)
+    
+    # Пересылаем сообщение
+    if user_id == guest_id:
+        # Если пишет гость, снова цепляем кнопки управления для VIP
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(
+            types.InlineKeyboardButton("🛑 Заблокировать диалог", callback_data=f"px_block_{session_id}"),
+            types.InlineKeyboardButton("🚨 Заблокировать и сообщить администратору", callback_data=f"px_report_{session_id}")
         )
-    except Exception as e:
-        for admin_id in ADMIN_CHAT_IDS:
-            try: bot.send_message(admin_id, f"❗️Не удалось уведомить VIP {vip_id}: {e}")
-            except Exception: pass
-    # ===============================================
+        sent_msg = bot.copy_message(recipient_id, message.chat.id, message.message_id, reply_markup=markup)
+    else:
+        # VIP пишет гостю (без кнопок)
+        sent_msg = bot.copy_message(recipient_id, message.chat.id, message.message_id)
+        
+    # Запоминаем новое сообщение для будущих ответов
+    proxy_sessions.update_one({"_id": session_id}, {"$set": {f"msgs_{recipient_id}_{sent_msg.message_id}": True}})
 
-    bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
+# Обработка кнопок блокировки и жалобы
+@bot.callback_query_handler(func=lambda call: call.data.startswith("px_block_") or call.data.startswith("px_report_"))
+def handle_proxy_actions(call):
+    action = "block" if call.data.startswith("px_block_") else "report"
+    session_id = call.data.split("_", 2)[2]
+    
+    session = proxy_sessions.find_one({"_id": session_id})
+    if not session or not session.get("is_active"):
+        bot.answer_callback_query(call.id, "Диалог уже закрыт.", show_alert=True)
+        return
+        
+    vip_id = session["vip_id"]
+    guest_id = session["guest_id"]
+    
+    # Закрываем сессию в базе
+    proxy_sessions.update_one({"_id": session_id}, {"$set": {"is_active": False}})
+    
+    try: bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+    except: pass
+    
+    bot.send_message(vip_id, "🛑 Диалог завершен. Собеседник отключен от канала связи.")
+    try: bot.send_message(guest_id, "🛑 VIP-пользователь завершил диалог. Вы больше не можете ему написать.")
+    except: pass
+    
+    # Если нажата кнопка жалобы -> Слив логов админам!
+    if action == "report":
+        history = session.get("history", [])
+        log_text = f"🗄 **СКАЙНЕТ: ПЕРЕХВАТ ДИАЛОГА (ЖАЛОБА VIP)**\n\n"
+        log_text += f"**👑 VIP:** `{vip_id}`\n**👤 Гость:** `{guest_id}`\n\n💬 **ЛОГ ПЕРЕПИСКИ:**\n"
+        
+        for h in history:
+            sender_label = "VIP" if h["sender"] == vip_id else "Гость"
+            log_text += f"`[{h['time']}] {sender_label}:` {escape_md(h['text'])}\n"
+            
+        try: 
+            bot.send_message(STAFF_GROUP_ID, log_text, parse_mode="Markdown")
+            bot.send_message(vip_id, "✅ Жалоба и полная история переписки успешно выгружены на стол администрации. Меры будут приняты!")
+        except: pass
+# ==============================================================================
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("report_scam_"))
 def handle_report_scam(call):
