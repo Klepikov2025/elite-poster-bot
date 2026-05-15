@@ -47,6 +47,7 @@ pending_refs_collection = db['pending_refs'] # Клики и ожидающие 
 banned_collection = db['banned']             # Черный список (забаненные)
 posts_collection = db['posts']
 archive_collection = db['grouphelp_archive']
+temp_posts = db['temp_posts']
 
 # --- Функции общения с базой ---
 def update_user_stats(user_id, invites_add=0, balance_add=0, clicks_add=0):
@@ -1957,16 +1958,86 @@ def create_new_post(message):
         bot.send_message(message.chat.id, "🚫 Вы не можете публиковать объявления. Ваш аккаунт заблокирован в сети.")
         return
 
-    bot.send_message(message.chat.id, "Напишите текст объявления:")
-    bot.register_next_step_handler(message, process_text)
+    # Очищаем старые черновики
+    temp_posts.delete_one({"_id": message.from_user.id})
+
+    msg = bot.send_message(message.chat.id, "✍️ **Напишите текст вашего объявления:**", parse_mode="Markdown")
+    bot.register_next_step_handler(msg, process_draft_text)
+
+def process_draft_text(message):
+    if message.text == "Назад":
+        bot.send_message(message.chat.id, "Вы вернулись в главное меню.", reply_markup=get_main_keyboard())
+        return
+
+    if not message.text:
+        msg = bot.send_message(message.chat.id, "❌ Ошибка! Нужно прислать именно текст. Попробуйте еще раз:")
+        bot.register_next_step_handler(msg, process_draft_text)
+        return
+
+    # Сохраняем текст в черновик
+    temp_posts.update_one(
+        {"_id": message.from_user.id},
+        {"$set": {"text": message.text, "media": []}},
+        upsert=True
+    )
+
+    markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    markup.add("✅ Все файлы загружены. Опубликовать")
+    markup.add("Назад")
+
+    warn_text = (
+        "📸 **Теперь отправляйте фото или видео (до 10 штук).**\n\n"
+        "⚠️ **ВНИМАНИЕ:** Публикация ПОРНО-материалов строго запрещена во всех сетях, кроме «ПАРНИ 18+».\n"
+        "За нарушение в общих чатах — мгновенный бан без возврата VIP.\n\n"
+        "Как закончите — жмите кнопку **«✅ Все файлы загружены»** 👇"
+    )
+    msg = bot.send_message(message.chat.id, warn_text, reply_markup=markup, parse_mode="Markdown")
+    bot.register_next_step_handler(msg, process_draft_media_loop)
+
+def process_draft_media_loop(message):
+    uid = message.from_user.id
+
+    if message.text == "✅ Все файлы загружены. Опубликовать":
+        draft = temp_posts.find_one({"_id": uid})
+        if not draft: return
+        
+        media_type = None
+        file_id = uid  # Передаем uid, чтобы потом достать массив из базы
+        
+        media_count = len(draft.get('media', []))
+        if media_count == 1:
+            media_type = draft['media'][0]['type']
+            file_id = draft['media'][0]['id']
+        elif media_count > 1:
+            media_type = "album"
+
+        confirm_text(message, draft['text'], media_type=media_type, file_id=file_id)
+        return
+
+    if message.text == "Назад":
+        bot.send_message(message.chat.id, "Создание отменено.", reply_markup=get_main_keyboard())
+        return
+
+    # Собираем медиа
+    media_item = None
+    if message.photo: media_item = {"type": "photo", "id": message.photo[-1].file_id}
+    elif message.video: media_item = {"type": "video", "id": message.video.file_id}
+
+    if media_item:
+        draft = temp_posts.find_one({"_id": uid})
+        if len(draft.get('media', [])) >= 10:
+            bot.send_message(message.chat.id, "🚫 Лимит 10 файлов исчерпан! Жмите кнопку «Опубликовать».")
+        else:
+            temp_posts.update_one({"_id": uid}, {"$push": {"media": media_item}})
+            bot.send_message(message.chat.id, f"📥 Файл принят ({len(draft.get('media', [])) + 1}/10)")
+    
+    bot.register_next_step_handler(message, process_draft_media_loop)
 
 @bot.message_handler(func=lambda message: message.text == "Удалить объявление")
 def handle_delete_post(message):
     if message.chat.type != "private": return
-    
     user_id = message.from_user.id
     posts = list(posts_collection.find({"user_id": user_id}))
-    
     if posts:
         markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
         for post in posts:
@@ -1976,43 +2047,37 @@ def handle_delete_post(message):
         markup.add("Отмена")
         bot.send_message(message.chat.id, "Выберите объявление для удаления:", reply_markup=markup)
         bot.register_next_step_handler(message, process_delete_choice)
-    else:
-        bot.send_message(message.chat.id, "❌ У вас нет опубликованных объявлений.")
+    else: bot.send_message(message.chat.id, "❌ У вас нет опубликованных объявлений.")
 
 @bot.message_handler(func=lambda message: message.text == "Удалить все объявления")
 def handle_delete_all_posts(message):
     if message.chat.type != "private": return
-    
     user_id = message.from_user.id
     posts = list(posts_collection.find({"user_id": user_id}))
-    
     if posts:
         markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
         markup.add("Да, удалить всё", "Нет, отменить")
         bot.send_message(message.chat.id, "Вы уверены, что хотите удалить все свои объявления?", reply_markup=markup)
         bot.register_next_step_handler(message, process_delete_all_choice)
-    else:
-        bot.send_message(message.chat.id, "❌ У вас нет опубликованных объявлений.")
+    else: bot.send_message(message.chat.id, "❌ У вас нет опубликованных объявлений.")
 
 def process_delete_choice(message):
     if message.text == "Отмена":
         bot.send_message(message.chat.id, "Удаление отменено.", reply_markup=get_main_keyboard())
         return
-
     user_id = message.from_user.id
     posts = list(posts_collection.find({"user_id": user_id}))
-    
     for post in posts:
         time_formatted = format_time(post["time"])
         if message.text == f"Удалить: {time_formatted}, {post['city']}, {post['network']}":
-            try:
-                bot.delete_message(post["chat_id"], post["message_id"])
-            except: pass
-            
+            msg_ids = post.get("message_ids", [post.get("message_id")]) # Поддержка массивов
+            for m_id in msg_ids:
+                if m_id:
+                    try: bot.delete_message(post["chat_id"], m_id)
+                    except: pass
             posts_collection.delete_one({"_id": post["_id"]})
-            bot.send_message(message.chat.id, "✅ Объявление успешно удалено.", reply_markup=get_main_keyboard())
+            bot.send_message(message.chat.id, "✅ Объявление (и все вложения) полностью удалено.", reply_markup=get_main_keyboard())
             return
-            
     bot.send_message(message.chat.id, "❌ Объявление не найдено.")
 
 def process_delete_all_choice(message):
@@ -2020,39 +2085,14 @@ def process_delete_all_choice(message):
     if message.text == "Да, удалить всё":
         posts = list(posts_collection.find({"user_id": user_id}))
         for post in posts:
-            try:
-                bot.delete_message(post["chat_id"], post["message_id"])
-            except: pass
-        
+            msg_ids = post.get("message_ids", [post.get("message_id")])
+            for m_id in msg_ids:
+                if m_id:
+                    try: bot.delete_message(post["chat_id"], m_id)
+                    except: pass
         posts_collection.delete_many({"user_id": user_id})
         bot.send_message(message.chat.id, "✅ Все ваши объявления успешно удалены.", reply_markup=get_main_keyboard())
-    else:
-        bot.send_message(message.chat.id, "Удаление отменено.", reply_markup=get_main_keyboard())
-
-def process_text(message):
-    if message.text == "Назад":
-        bot.send_message(message.chat.id, "Вы вернулись в главное меню.", reply_markup=get_main_keyboard())
-        return
-
-    if message.photo or message.video:
-        if message.photo:
-            media_type = "photo"
-            file_id = message.photo[-1].file_id
-            text = message.caption if message.caption else ""
-        elif message.video:
-            media_type = "video"
-            file_id = message.video.file_id
-            text = message.caption if message.caption else ""
-    elif message.text:
-        media_type = None
-        file_id = None
-        text = message.text
-    else:
-        bot.send_message(message.chat.id, "❌ Ошибка! Отправьте текст, фото или видео.")
-        bot.register_next_step_handler(message, process_text)
-        return
-
-    confirm_text(message, text, media_type, file_id)
+    else: bot.send_message(message.chat.id, "Удаление отменено.", reply_markup=get_main_keyboard())
 
 def confirm_text(message, text, media_type=None, file_id=None):
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
@@ -2066,7 +2106,7 @@ def handle_confirmation(message, text, media_type, file_id):
         bot.register_next_step_handler(message, select_network, text, media_type, file_id)
     elif message.text.lower() == "нет":
         bot.send_message(message.chat.id, "Хорошо, напишите текст объявления заново:")
-        bot.register_next_step_handler(message, process_text)
+        bot.register_next_step_handler(message, process_draft_text)
     else:
         bot.send_message(message.chat.id, "❌ Неверный ответ. Выберите 'Да' или 'Нет'.")
         bot.register_next_step_handler(message, handle_confirmation, text, media_type, file_id)
@@ -2080,8 +2120,8 @@ def get_network_markup():
 
 def select_network(message, text, media_type, file_id):
     if message.text == "Назад":
-        bot.send_message(message.chat.id, "Напишите текст объявления:")
-        bot.register_next_step_handler(message, process_text)
+        # Направляем на новую стартовую функцию создания (она всё корректно очистит и запустит)
+        create_new_post(message)
         return
 
     selected_network = message.text
@@ -2187,16 +2227,37 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
 
             for chat_id, network_name in target_chats:
                 try:
-                    if media_type == "photo":
+                    ids_to_store = [] # Массив для хранения всех частей объявления
+                    
+                    if media_type == "album":
+                        draft = temp_posts.find_one({"_id": user_id})
+                        media_list = []
+                        for m in draft['media']:
+                            if m['type'] == 'photo': media_list.append(telebot.types.InputMediaPhoto(m['id']))
+                            else: media_list.append(telebot.types.InputMediaVideo(m['id']))
+                        
+                        # 1. Отправляем альбом без кнопок
+                        sent_album = bot.send_media_group(chat_id, media_list)
+                        for msg in sent_album: ids_to_store.append(msg.message_id)
+                        
+                        # 2. Сразу отправляем текст с кнопкой отклика
+                        sent_text = bot.send_message(chat_id, full_text, parse_mode="Markdown", reply_markup=markup_inline)
+                        ids_to_store.append(sent_text.message_id)
+                        
+                    elif media_type == "photo":
                         sent_message = bot.send_photo(chat_id, file_id, caption=full_text, parse_mode="Markdown", reply_markup=markup_inline)
+                        ids_to_store.append(sent_message.message_id)
                     elif media_type == "video":
                         sent_message = bot.send_video(chat_id, file_id, caption=full_text, parse_mode="Markdown", reply_markup=markup_inline)
+                        ids_to_store.append(sent_message.message_id)
                     else:
                         sent_message = bot.send_message(chat_id, full_text, parse_mode="Markdown", reply_markup=markup_inline)
+                        ids_to_store.append(sent_message.message_id)
 
+                    # Сохраняем массив ID в базу
                     post_data = {
                         "user_id": user_id,
-                        "message_id": sent_message.message_id,
+                        "message_ids": ids_to_store,
                         "chat_id": chat_id,
                         "time": datetime.now(),
                         "city": city,
@@ -2238,8 +2299,8 @@ def ask_for_new_post(message):
 
 def handle_new_post_choice(message):
     if message.text.lower() == "да":
-        bot.send_message(message.chat.id, "Напишите текст объявления:")
-        bot.register_next_step_handler(message, process_text)
+        # Сразу вызываем главную функцию создания нового поста
+        create_new_post(message)
     else:
         bot.send_message(
             message.chat.id,
