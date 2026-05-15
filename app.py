@@ -2003,7 +2003,7 @@ def process_draft_media_loop(message):
         if not draft: return
         
         media_type = None
-        file_id = uid  # Передаем uid, чтобы потом достать массив из базы
+        file_id = uid
         
         media_count = len(draft.get('media', []))
         if media_count == 1:
@@ -2019,6 +2019,9 @@ def process_draft_media_loop(message):
         bot.send_message(message.chat.id, "Создание отменено.", reply_markup=get_main_keyboard())
         return
 
+    # ⚡ ФИКС: Включаем слушатель СРАЗУ, до долгих операций БД, чтобы не терять фото из альбомов!
+    bot.register_next_step_handler(message, process_draft_media_loop)
+
     # Собираем медиа
     media_item = None
     if message.photo: media_item = {"type": "photo", "id": message.photo[-1].file_id}
@@ -2026,13 +2029,17 @@ def process_draft_media_loop(message):
 
     if media_item:
         draft = temp_posts.find_one({"_id": uid})
-        if len(draft.get('media', [])) >= 10:
-            bot.send_message(message.chat.id, "🚫 Лимит 10 файлов исчерпан! Жмите кнопку «Опубликовать».")
+        current_media = draft.get('media', [])
+        
+        if len(current_media) >= 10:
+            if not message.media_group_id: # Не спамим, если это пачка фото
+                bot.send_message(message.chat.id, "🚫 Лимит 10 файлов исчерпан! Жмите кнопку «Опубликовать».")
         else:
             temp_posts.update_one({"_id": uid}, {"$push": {"media": media_item}})
-            bot.send_message(message.chat.id, f"📥 Файл принят ({len(draft.get('media', [])) + 1}/10)")
-    
-    bot.register_next_step_handler(message, process_draft_media_loop)
+            
+            # Отвечаем "Файл принят" только если юзер кидает по одной штуке. Альбомы глотаем молча!
+            if not message.media_group_id:
+                bot.send_message(message.chat.id, f"📥 Файл принят ({len(current_media) + 1}/10)")
 
 @bot.message_handler(func=lambda message: message.text == "Удалить объявление")
 def handle_delete_post(message):
@@ -2328,7 +2335,10 @@ def handle_respond(call):
     msg_id = call.message.message_id
     user_id = call.from_user.id
     
-    post = posts_collection.find_one({"chat_id": chat_id, "message_id": msg_id})
+    # === ИСПРАВЛЕННАЯ СТРОКА: Ищем в массиве message_ids ===
+    post = posts_collection.find_one({"chat_id": chat_id, "message_ids": msg_id})
+    # =======================================================
+    
     if not post:
         bot.answer_callback_query(call.id, "Ошибка: Объявление устарело или было удалено.", show_alert=True)
         return
