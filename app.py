@@ -2300,21 +2300,12 @@ def select_city_and_publish(message, text, selected_network, media_type, file_id
         bot.send_message(message.chat.id, f"⚠️ Ошибка при проверке VIP-статуса: {e.description}")
 
 def ask_for_new_post(message):
-    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-    markup.add("Да", "Нет")
-    bot.send_message(message.chat.id, "Хотите создать еще одно объявление?", reply_markup=markup)
-    bot.register_next_step_handler(message, handle_new_post_choice)
-
-def handle_new_post_choice(message):
-    if message.text.lower() == "да":
-        # Сразу вызываем главную функцию создания нового поста
-        create_new_post(message)
-    else:
-        bot.send_message(
-            message.chat.id,
-            "Спасибо за использование бота! 🙌\nЕсли хотите создать новое объявление, нажмите кнопку ниже.",
-            reply_markup=get_main_keyboard()
-        )
+    bot.send_message(
+        message.chat.id, 
+        "✅ Публикация завершена!\nЕсли захотите создать еще одно объявление, воспользуйтесь меню ниже.", 
+        reply_markup=get_main_keyboard()
+    )
+# Полностью удаляем старую функцию handle_new_post_choice!
 
 # ==================== ЗАЩИЩЕННЫЙ КОММУТАТОР И ЧЕРНЫЙ ЯЩИК ====================
 
@@ -2381,25 +2372,27 @@ def process_proxy_first_message(message, vip_id):
         types.InlineKeyboardButton("🚨 Заблокировать и сообщить администратору", callback_data=f"px_report_{session_id}")
     )
     
-    # === НОВОЕ: ГЕНЕРИРУЕМ ССЫЛКУ НА ГОСТЯ ===
+    # === ГЕНЕРИРУЕМ ССЫЛКУ НА ГОСТЯ ===
     clean_name = message.from_user.first_name.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
     if message.from_user.username:
         guest_link = f'<a href="https://t.me/{message.from_user.username}">{clean_name}</a>'
     else:
         guest_link = f'<a href="tg://user?id={guest_id}">{clean_name}</a>'
     
-    bot.send_message(
+    msg_alert = bot.send_message(
         vip_id, 
-        f"💌 <b>Новый отклик от {guest_link}!</b>\n<i>Сделайте Reply (ответить) на сообщение ниже, чтобы написать ему через бота.</i>", 
+        f"💌 <b>Новый отклик от {guest_link}!</b>\n<i>Сделайте Reply (свайп влево) на это сообщение или на медиа ниже, чтобы ответить.</i>", 
         parse_mode="HTML"
     )
-    # ==========================================
     
     # Пересылаем сообщение VIP-у (копируем, чтобы скрыть отправителя)
     sent_msg = bot.copy_message(vip_id, message.chat.id, message.message_id, reply_markup=markup)
     
-    # Запоминаем ID сообщения, чтобы ловить на него ответы
-    proxy_sessions.update_one({"_id": session_id}, {"$set": {f"msgs_{vip_id}_{sent_msg.message_id}": True}})
+    # === ФИКС: Запоминаем ID ОБОИХ сообщений, чтобы ловить ответы на любое из них ===
+    proxy_sessions.update_one({"_id": session_id}, {"$set": {
+        f"msgs_{vip_id}_{sent_msg.message_id}": True,
+        f"msgs_{vip_id}_{msg_alert.message_id}": True
+    }})
     
     bot.send_message(message.chat.id, "✅ Сообщение доставлено. Ждите ответа (он придет прямо в этот чат).")
 
@@ -2477,6 +2470,20 @@ def handle_proxy_actions(call):
             bot.send_message(vip_id, "✅ Жалоба и полная история переписки успешно выгружены на стол администрации. Меры будут приняты!")
         except: pass
 # ==============================================================================
+
+# === ГЛОБАЛЬНЫЙ ЛОВЕЦ ЗАБЫТЫХ РЕПЛАЕВ ===
+@bot.message_handler(func=lambda m: m.chat.type == "private" and not m.reply_to_message and not m.text.startswith('/'))
+def catch_forgotten_reply(message):
+    # Игнорируем кнопки главного меню
+    menu_buttons = ["Создать новое объявление", "Удалить объявление", "Удалить все объявления", "👑 Вступить в VIP-чат", "👤 Партнерская программа", "Мужской Клуб", "ПАРНИ 18+", "НС", "Радуга", "Гей Знакомства", "Все сети", "Назад", "Выбрать другую сеть", "Да", "Нет"]
+    if message.text in menu_buttons:
+        return
+
+    # Если у юзера есть активный защищенный диалог, но он просто пишет текст в пустоту
+    active_session = proxy_sessions.find_one({"$or": [{"vip_id": message.from_user.id}, {"guest_id": message.from_user.id}], "is_active": True})
+    if active_session:
+        bot.send_message(message.chat.id, "⚠️ **Внимание!**\nЧтобы отправить сообщение собеседнику в анонимном чате, вам нужно сделать **Reply (свайп влево)** на его сообщение!\n\nИначе я не пойму, кому именно вы хотите ответить.", parse_mode="Markdown")
+# ========================================
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("report_scam_"))
 def handle_report_scam(call):
