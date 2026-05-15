@@ -200,13 +200,23 @@ chat_ids_gayznak = {
 }
 
 # ==================== АВТОГЕНЕРАЦИЯ all_cities ====================
-# Уничтожили логику маппинга, так как теперь всё стандартизировано!
 def normalize_city_name(name):
     return name 
 
 all_cities = {}
 
+# --- НОВОЕ: СПИСОК ИСКЛЮЧЕНИЙ (Не-города) ---
+NON_CITIES = [
+    "БЕЗ ПРЕДРАССУДКОВ", "RAINBOW MAN", "Мужской Чат", "Фетиши", 
+    "Аренда Жилья", "Секс Туризм", "Галерея", "Тестовая группа 🛠️"
+]
+# --------------------------------------------
+
 def insert_to_all(city, net_key, real_name, chat_id):
+    # Если это Биг-чат, игнорируем его для гео-привязки!
+    if city in NON_CITIES: 
+        return
+        
     # Чтобы в "Все сети" не дублировались кнопки (Тюмень и Тюмень 2),
     # обрезаем " 2" и кладем всё в одну общую категорию для кнопок.
     clean_city = city.replace(" 2", "")
@@ -436,14 +446,20 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
             return
 
         # --- ФАЗА 1: Режим БОГА (VIP и BEYOND) ---
-        is_privileged = False
-        for priv_chat in [VIP_CHAT_ID, BEYOND_CHAT_ID]:
-            try:
-                member = bot.get_chat_member(priv_chat, user_id)
-                if member.status in ['member', 'administrator', 'creator']:
-                    is_privileged = True
-                    break 
-            except: pass
+        user_data = users_collection.find_one({"_id": user_id}) or {}
+        # Проверяем сначала базу (вдруг он только что оплатил, но еще не зашел)
+        is_privileged = user_data.get("is_vip", False) or user_data.get("is_queer", False)
+        
+        # Если в базе нет, на всякий случай проверяем физическое наличие в чате
+        if not is_privileged:
+            for priv_chat in [VIP_CHAT_ID, BEYOND_CHAT_ID]:
+                try:
+                    member = bot.get_chat_member(priv_chat, user_id)
+                    is_physically_there = getattr(member, 'is_member', False) if member.status == 'restricted' else True
+                    if member.status in ['member', 'administrator', 'creator'] or (member.status == 'restricted' and is_physically_there):
+                        is_privileged = True
+                        break 
+                except: pass
         
         if is_privileged:
             bot.approve_chat_join_request(chat_id, user_id)
@@ -2268,10 +2284,13 @@ def handle_respond(call):
 
     responded[key].add(user_id)
 
+    # === ИСПРАВЛЕНИЕ: ПЕРЕХОД НА НАДЕЖНЫЙ HTML ===
+    clean_name = responder.first_name.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
     if responder.username:
-        name = f"[{escape_md(responder.first_name)}](https://t.me/{responder.username})"
+        name = f'<a href="https://t.me/{responder.username}">{clean_name}</a>'
     else:
-        name = f"[{escape_md(responder.first_name)}](tg://user?id={user_id})"
+        name = f'<a href="tg://user?id={user_id}">{clean_name}</a>'
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
@@ -2286,13 +2305,14 @@ def handle_respond(call):
         bot.send_message(
             vip_id,
             f"Вами заинтересовался {name}",
-            parse_mode="Markdown",
+            parse_mode="HTML",  # <--- ПЕРЕКЛЮЧИЛИ С MARKDOWN НА HTML
             reply_markup=markup
         )
     except Exception as e:
         for admin_id in ADMIN_CHAT_IDS:
             try: bot.send_message(admin_id, f"❗️Не удалось уведомить VIP {vip_id}: {e}")
             except Exception: pass
+    # ===============================================
 
     bot.answer_callback_query(call.id, "✅ Ваш отклик отправлен!")
 
@@ -2616,31 +2636,39 @@ def skynet_core_handler(message):
         # --- АВТО-СИНХРОНИЗАЦИЯ ФИЗИЧЕСКОГО ПРИСУТСТВИЯ (ДВУСТОРОННЯЯ) ---
         try:
             m_vip = bot.get_chat_member(VIP_CHAT_ID, user_id)
-            # Проверяем, что он РЕАЛЬНО в чате, а не просто висит в Restricted
             is_physically_there = getattr(m_vip, 'is_member', False) if m_vip.status == 'restricted' else True
             actual_vip = m_vip.status in ['member', 'administrator', 'creator'] or (m_vip.status == 'restricted' and is_physically_there)
             
             if is_vip != actual_vip:
                 is_vip = actual_vip
                 users_collection.update_one({"_id": user_id}, {"$set": {"is_vip": is_vip}}, upsert=True)
-        except:
-            if is_vip: 
-                is_vip = False
-                users_collection.update_one({"_id": user_id}, {"$set": {"is_vip": False}}, upsert=True)
+                
+        except telebot.apihelper.ApiTelegramException as e:
+            error = str(e).lower()
+            if any(phrase in error for phrase in ["user not found", "chat not found", "not a member", "forbidden", "user is not a member"]):
+                if is_vip: 
+                    is_vip = False
+                    users_collection.update_one({"_id": user_id}, {"$set": {"is_vip": False}}, upsert=True)
+        except Exception:
+            pass # Игнорируем сетевые лаги, не срываем погоны!
 
         try:
             m_beyond = bot.get_chat_member(BEYOND_CHAT_ID, user_id)
-            # Проверяем, что он РЕАЛЬНО в чате, а не просто висит в Restricted
             is_physically_there_q = getattr(m_beyond, 'is_member', False) if m_beyond.status == 'restricted' else True
             actual_queer = m_beyond.status in ['member', 'administrator', 'creator'] or (m_beyond.status == 'restricted' and is_physically_there_q)
             
             if is_queer != actual_queer:
                 is_queer = actual_queer
                 users_collection.update_one({"_id": user_id}, {"$set": {"is_queer": is_queer}}, upsert=True)
-        except:
-            if is_queer:
-                is_queer = False
-                users_collection.update_one({"_id": user_id}, {"$set": {"is_queer": False}}, upsert=True)
+                
+        except telebot.apihelper.ApiTelegramException as e:
+            error = str(e).lower()
+            if any(phrase in error for phrase in ["user not found", "chat not found", "not a member", "forbidden", "user is not a member"]):
+                if is_queer:
+                    is_queer = False
+                    users_collection.update_one({"_id": user_id}, {"$set": {"is_queer": False}}, upsert=True)
+        except Exception:
+            pass # Игнорируем сетевые лаги
 
         # --- МАГИЯ: ПЕРЕХВАТ РУЧНЫХ ТЕГОВ ИЗ ИНТЕРФЕЙСА ---
         try:
