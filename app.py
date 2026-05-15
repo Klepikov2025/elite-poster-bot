@@ -2317,7 +2317,14 @@ def log_proxy_message(session_id, sender_id, message):
     timestamp = datetime.now(pytz.timezone('Asia/Yekaterinburg')).strftime("%H:%M:%S")
     proxy_sessions.update_one(
         {"_id": session_id},
-        {"$push": {"history": {"time": timestamp, "sender": sender_id, "text": content}}}
+        {"$push": {"history": {
+            "time": timestamp, 
+            "sender": sender_id, 
+            "text": content,
+            "chat_id": message.chat.id,        # Запоминаем чат для копирования
+            "message_id": message.message_id,  # Запоминаем ID сообщения
+            "is_media": message.content_type != 'text' # Метка, что это медиафайл
+        }}}
     )
 
 @bot.callback_query_handler(func=lambda call: call.data == "respond")
@@ -2466,8 +2473,21 @@ def handle_proxy_actions(call):
             log_text += f"`[{h['time']}] {sender_label}:` {escape_md(h['text'])}\n"
             
         try: 
+            # 1. Отправляем текстовый лог переписки
             bot.send_message(STAFF_GROUP_ID, log_text, parse_mode="Markdown")
-            bot.send_message(vip_id, "✅ Жалоба и полная история переписки успешно выгружены на стол администрации. Меры будут приняты!")
+            
+            # 2. НОВОЕ: Досылаем все медиафайлы из этого диалога подряд
+            for h in history:
+                if h.get("is_media") and "chat_id" in h and "message_id" in h:
+                    try:
+                        sender_label = "VIP" if h["sender"] == vip_id else "Гость"
+                        bot.send_message(STAFF_GROUP_ID, f"📎 **Медиа от {sender_label} ({h['time']}):**", parse_mode="Markdown")
+                        # Копируем сообщение (сохраняет подпись, кнопки и исходный вид файла)
+                        bot.copy_message(STAFF_GROUP_ID, from_chat_id=h["chat_id"], message_id=h["message_id"])
+                    except:
+                        pass # Если юзер удалил сообщение у себя в ЛС, просто идем дальше
+            
+            bot.send_message(vip_id, "✅ Жалоба отправлена администрации. Меры будут приняты!")
         except: pass
 # ==============================================================================
 
