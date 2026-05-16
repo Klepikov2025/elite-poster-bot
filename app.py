@@ -2659,7 +2659,7 @@ def is_subscribed(user_id):
         print(f"Ошибка при проверке подписки для {user_id}: {e}")
         return False
 
-# --- МГНОВЕННЫЙ РАДАР БЛОКИРОВОК (Ловит тех, кто кинул в ЧС) ---
+# --- МГНОВЕННЫЙ РАДАР БЛОКИРОВОК (Ловит ТОЛЬКО беглецов из VIP-воронки) ---
 @bot.my_chat_member_handler()
 def catch_bot_block(message):
     if message.chat.type == "private":
@@ -2675,18 +2675,31 @@ def catch_bot_block(message):
             except:
                 pass 
                 
-            # 2. ПРОВЕРКА: ИММУНИТЕТ (ФРАЗА ОТКАЗА)
+            # 2. ПРОВЕРКА: ИММУНИТЕТ (Официальный отказ)
             if user_id in safe_from_autoban:
                 try: safe_from_autoban.remove(user_id)
                 except: pass
+                return
                 
-            # 3. ЛИКВИДАЦИЯ ХИТРЕЦА
-            else:
+            # 3. ПРОВЕРКА НА БЕГЛЕЦА: Он был в воронке отбора?
+            is_in_funnel = db['vip_funnel'].find_one({"_id": user_id})
+            is_pending = pending_verification_users.get(user_id, False)
+            
+            if is_in_funnel or is_pending:
+                # Ага! Нажал кнопку верификации и сбежал в блок! ЛИКВИДИРОВАТЬ!
                 try:
-                    bot.send_message(STAFF_GROUP_ID, f"⚡️ **РАДАР СРАБОТАЛ** ⚡️\nЮзер `{user_id}` заблокировал бота без предупреждения! Запускаю ликвидацию...")
+                    bot.send_message(STAFF_GROUP_ID, f"⚡️ **РАДАР СРАБОТАЛ** ⚡️\nТрус `{user_id}` попытался сбежать с верификации и заблокировал бота! Запускаю ликвидацию...")
                 except: pass
                 
-                ban_user_everywhere(user_id, reason="Мгновенный перехват блокировки бота", admin_name="Auto-Radar ⚡️")
+                ban_user_everywhere(user_id, reason="Сбежал с верификации и заблокировал бота", admin_name="Auto-Radar ⚡️")
+                
+                # Зачищаем следы в воронке
+                db['vip_funnel'].delete_one({"_id": user_id})
+                pending_verification_users[user_id] = False
+            else:
+                # Это обычный обыватель. Просто заблокировал бота. Пусть живет мирно 🕊
+                pass
+# ========================================================================
 
 # ==================== ПЕРЕХВАТЧИК "МЕРТВЫХ ДУШ" (Защита от старых заявок + Амнистия) ====================
 @bot.message_handler(content_types=['new_chat_members'])
