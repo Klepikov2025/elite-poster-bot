@@ -59,15 +59,14 @@ pending_verification_users = {}
 active_vip_requests = set()
 safe_from_autoban = set()
 
-from collections import deque
-
-# Оперативная память для Живого Радара
-if 'live_radar_logs' not in globals():
-    live_radar_logs = deque(maxlen=100)
-
+# 📡 ЖИВОЙ РАДАР (Теперь использует общую базу данных MongoDB)
 def add_radar_log(text):
     now = datetime.now(pytz.timezone('Asia/Yekaterinburg')).strftime("%H:%M:%S")
-    live_radar_logs.appendleft(f"[{now}] {text}") 
+    # Пишем напрямую в матрицу, чтобы все процессы сервера это видели
+    db['radar_logs'].insert_one({
+        "text": f"[{now}] {text}",
+        "ts": time.time()
+    })
 
 # ==================== ФУНКЦИИ, ТРЕБУЮЩИЕ BOT ====================
 def is_banned_in_network(user_id):
@@ -913,7 +912,6 @@ threading.Thread(target=skynet_listener, daemon=True).start()
 # ============================================================================
 
 # ==================== ВЕБ-ПАНЕЛЬ (ГЛАЗ САУРОНА) ====================
-from collections import deque
 import threading
 
 @app.route('/glaz/login', methods=['GET', 'POST'])
@@ -1039,9 +1037,13 @@ def api_chart_data():
 
 @app.route('/glaz/api/radar')
 def api_radar():
-    """Отдает список логов для хакерского терминала"""
+    """Отдает список логов для хакерского терминала ИЗ БАЗЫ"""
     if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
-    return jsonify(list(live_radar_logs))
+    
+    # Достаем 100 самых свежих событий из базы (сортируем по убыванию времени)
+    logs = db['radar_logs'].find().sort("ts", -1).limit(100)
+    
+    return jsonify([log["text"] for log in logs])
 
 @app.route('/glaz/api/get_list')
 def api_get_list():
