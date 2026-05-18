@@ -13,269 +13,44 @@ import time
 import difflib
 import threading
 
-NETWORK_LINKS = (
-    "📍 **Ссылки для возврата в чаты:**\n"
-    "• [МК (Мужской Клуб)](https://t.me/clubofrm/44)\n"
-    "• [ПАРНИ 18+](https://t.me/znakparni/116)\n"
-    "• [ГЕЙ чаты (Инфо)](https://t.me/gaychatcities_info/4)\n"
-    "• [НС (Урал)](https://t.me/uralns/118)"
+# ====================== НОВЫЕ МОДУЛИ ======================
+from config import (
+    TOKEN, MONGO_URI, ADMIN_CHAT_IDS, OWNER_ID, VIP_PRICE_STARS,
+    STAFF_GROUP_ID, JOURNAL_CHAT_ID, SUPPORT_GROUP_ID,
+    MAIN_CHANNEL_ID, MAIN_CHANNEL_LINK, NETWORK_LINKS,
+    VIP_CHAT_ID, BEYOND_CHAT_ID, NON_CITIES,
+    chat_ids_mk, chat_ids_parni, chat_ids_ns, 
+    chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS,
+    all_cities, insert_to_all
 )
 
-# ==================== НАСТРОЙКИ ====================
-TOKEN = os.getenv('BOT_TOKEN')
+from database import (
+    users_collection, pending_refs_collection, banned_collection,
+    posts_collection, archive_collection, temp_posts, proxy_sessions,
+    withdrawals_collection, update_user_stats, get_user_stats,
+    set_pending_ref, get_pending_ref, delete_pending_ref, db
+)
+
+from utils import (
+    escape_md, clean_user_text, format_time, get_user_name,
+    net_key_to_name, get_referral_bonus
+)
+
+# ==================== ИНИЦИАЛИЗАЦИЯ ====================
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
-ADMIN_CHAT_IDS = [479938867, 7235010425]
-OWNER_ID = 479938867
-
-# ==================== НАСТРОЙКИ VIP И РЕФЕРАЛКИ ====================
-VIP_PRICE_STARS = 250
-
-# ==================== НАСТРОЙКИ СЛУЖЕБНЫХ ЧАТОВ ====================
-STAFF_GROUP_ID = -1002196190507
-JOURNAL_CHAT_ID = -1002158861390
-SUPPORT_GROUP_ID = -1002287143588
-
-# ==================== БАЗА ДАННЫХ MONGODB ====================
-MONGO_URI = os.getenv('MONGO_URI')
-mongo_client = pymongo.MongoClient(MONGO_URI)
-db = mongo_client['elite_bot_db']
-
-users_collection = db['users']               # Статистика и балансы рефералов
-pending_refs_collection = db['pending_refs'] # Клики и ожидающие оплаты
-banned_collection = db['banned']             # Черный список (забаненные)
-posts_collection = db['posts']
-archive_collection = db['grouphelp_archive']
-temp_posts = db['temp_posts']
-proxy_sessions = db['proxy_sessions'] # Черный Ящик для анонимных чатов
-
-# --- Функции общения с базой ---
-def update_user_stats(user_id, invites_add=0, balance_add=0, clicks_add=0):
-    users_collection.update_one(
-        {"_id": user_id},
-        {"$inc": {"invites": invites_add, "balance": balance_add, "clicks": clicks_add}},
-        upsert=True
-    )
-withdrawals_collection = db['withdrawals']   # Заявки на вывод средств
-
-def get_user_stats(user_id):
-    user = users_collection.find_one({"_id": user_id})
-    if user: return {'invites': user.get('invites', 0), 'balance': user.get('balance', 0), 'clicks': user.get('clicks', 0)}
-    return {'invites': 0, 'balance': 0, 'clicks': 0}
-
-def set_pending_ref(new_user_id, ref_id):
-    pending_refs_collection.update_one({"_id": new_user_id}, {"$set": {"ref_id": ref_id}}, upsert=True)
-
-def get_pending_ref(new_user_id):
-    doc = pending_refs_collection.find_one({"_id": new_user_id})
-    return doc['ref_id'] if doc else None
-
-def delete_pending_ref(new_user_id):
-    pending_refs_collection.delete_one({"_id": new_user_id})
-# ==============================================================
-
-def get_referral_bonus(invites_count):
-    """Лестница бонусов: чем больше пригласил, тем выше процент"""
-    if invites_count <= 10:   return 0.10, int(VIP_PRICE_STARS * 0.10)
-    elif invites_count <= 30: return 0.13, int(VIP_PRICE_STARS * 0.13)
-    elif invites_count <= 50: return 0.15, int(VIP_PRICE_STARS * 0.15)
-    elif invites_count <= 100:return 0.17, int(VIP_PRICE_STARS * 0.17)
-    else:                     return 0.20, int(VIP_PRICE_STARS * 0.20)
-
-# Главный канал
-MAIN_CHANNEL_ID = -1002246737442
-MAIN_CHANNEL_USERNAME = "@clubofrm"
-MAIN_CHANNEL_LINK = "https://t.me/clubofrm"
-
-# ==================== СПИСКИ ЧАТОВ ====================
-chat_ids_mk = {
-    "Екатеринбург": -1002210043742,
-    "Челябинск": -1002238514762,
-    "БЕЗ ПРЕДРАССУДКОВ": -1001219669239,
-    "RAINBOW MAN": -1003496028436,
-    "Пермь": -1002205127231,
-    "Ижевск": -1001604781452,
-    "Казань": -1002228881675,
-    "Оренбург": -1002255568202,
-    "Уфа": -1002196469365,
-    "Новосибирск": -1002235645677,
-    "Красноярск": -1002248474008,
-    "Барнаул": -1002234471215,
-    "Омск": -1002151258573,
-    "Саратов": -1002426762134,
-    "Воронеж": -1002207503508,
-    "Самара": -1001852671383,
-    "Волгоград": -1002167762598,
-    "Нижний Новгород": -1001631628911,
-    "Калининград": -1002217056197,
-    "Иркутск": -1002685095003,
-    "Кемерово": -1002147522863,
-    "Москва": -1002208434096,
-    "Санкт-Петербург": -1002485776859, # <-- Добавлен дефис
-    "Общая группа Юга": -1001814693664,
-    
-    # === ТРЮК С РЕГИОНАМИ ===
-    "Тюмень": -1002210623988, # Заменили "Общую группу Тюмень и Север"
-    "ХМАО": -1002210623988,   # Дублируем ID для серверных городов
-    "ЯМАЛ": -1002210623988,   # Дублируем ID для серверных городов
-    # ========================
-
-    "Казахстан": -1003091556050,
-    "Мужской Чат": -1002169723426,
-    "Фетиши": -1002197215824,
-    "Аренда Жилья": -1001238252865,
-    "Секс Туризм": -1002236337328,
-    "Галерея": -1002217967528,
-    "Тестовая группа 🛠️": -1002426733876
-}
-
-chat_ids_parni = {
-    "Екатеринбург": -1002413948841,
-    "Тюмень": -1002255622479,
-    "Омск": -1002274367832,
-    "Челябинск": -1002406302365,
-    "Пермь": -1002280860973,
-    "Курган": -1002469285352,
-    "ХМАО": -1002287709568,
-    "Уфа": -1002448909000,
-    "Новосибирск": -1002261777025,
-    "ЯМАЛ": -1002371438340,
-    "Оренбург": -1003888335997,
-    "Москва": -1003856528145,
-    "Санкт-Петербург": -1003519420984,
-    "Красноярск": -1003347456711
-}
-
-# --- АВТОМАТИЧЕСКИ СОБИРАЕМ ВСЕ ID ПАРНЕЙ ---
-PARNI_CHATS = set(chat_ids_parni.values())
-
-chat_ids_ns = {
-    "Новосибирск": -1001824149334,
-    "Челябинск": -1002233108474,
-    "Пермь": -1001753881279,
-    "Уфа": -1001823390636,
-    "ЯМАЛ": -1002145851794, # <-- Сделали капсом
-    "Москва": -1001938448310,
-    "ХМАО": -1001442597049,
-    "Екатеринбург": -1002169473861, # Заменили "Знакомства 66"
-    "Тюмень": -1002170955867,       # Заменили "Знакомства 72"
-    "Санкт-Петербург": -1002335014334,
-    
-    # Так как в НС оказалось два Челябинска и две Тюмени, 
-    # вторые группы называем с цифрой 2:
-    "Тюмень 2": -1001427433513,     # Заменили "Секс Знакомства Тюмень"
-    "Челябинск 2": -1002193127380   # Заменили "Знакомства 74"
-}
-
-chat_ids_rainbow = {
-    "Екатеринбург": -1002419653224
-}
-
-chat_ids_gayznak = {
-    "Красноярск": -1002335149925,
-    "Екатеринбург": -1002571605722,
-    "Пермь": -1002599206099,
-    "Тюмень": -1002553431228,
-    "Новосибирск": -1002627786446,
-    "Самара": -1002301984331,
-    "Казань": -1002277433049,
-    "Воронеж": -1002428155161,
-    "Кемерово": -1002418700136,
-    "Иркутск": -1002454522264,
-    "Челябинск": -1003366643944,
-    "Орёл": -1003323558103,
-    "Саратов": -1003638608363,
-    "Архангельск": -1003120218775,
-    "Ярославль": -1003332193158,
-    "Тверь": -1003369813272,
-    "Великий Новгород": -1003429766543,
-    "Владимир": -1003276544901,
-    "Мурманск": -1003302580641,
-    "Рязань": -1003460247519,
-    "Смоленск": -1003423811230,
-    "Тамбов": -1003225139634,
-    "Липецк": -1003487872172,
-    "Тула": -1003482077625,
-    "Брянск": -1003372917376,
-    "Волгоград": -1002476113714
-}
-
-# ==================== АВТОГЕНЕРАЦИЯ all_cities ====================
-def normalize_city_name(name):
-    return name 
-
-all_cities = {}
-
-# --- НОВОЕ: СПИСОК ИСКЛЮЧЕНИЙ (Не-города) ---
-NON_CITIES = [
-    "БЕЗ ПРЕДРАССУДКОВ", "RAINBOW MAN", "Мужской Чат", "Фетиши", 
-    "Аренда Жилья", "Секс Туризм", "Галерея", "Тестовая группа 🛠️"
-]
-# --------------------------------------------
-
-def insert_to_all(city, net_key, real_name, chat_id):
-    # Если это Биг-чат, игнорируем его для гео-привязки!
-    if city in NON_CITIES: 
-        return
-        
-    # Чтобы в "Все сети" не дублировались кнопки (Тюмень и Тюмень 2),
-    # обрезаем " 2" и кладем всё в одну общую категорию для кнопок.
-    clean_city = city.replace(" 2", "")
-    
-    if clean_city not in all_cities:
-        all_cities[clean_city] = {}
-    if net_key not in all_cities[clean_city]:
-        all_cities[clean_city][net_key] = []
-    all_cities[clean_city][net_key].append({"name": real_name, "chat_id": chat_id})
-
-for city, chat_id in chat_ids_mk.items():
-    insert_to_all(city, "mk", city, chat_id)
-for city, chat_id in chat_ids_parni.items():
-    insert_to_all(city, "parni", city, chat_id)
-for city, chat_id in chat_ids_ns.items():
-    insert_to_all(city, "ns", city, chat_id)
-for city, chat_id in chat_ids_rainbow.items():
-    insert_to_all(city, "rainbow", city, chat_id)
-for city, chat_id in chat_ids_gayznak.items():
-    insert_to_all(city, "gayznak", city, chat_id)
-
-def net_key_to_name(key):
-    return {
-        "mk": "Мужской Клуб",
-        "parni": "ПАРНИ 18+",
-        "ns": "НС",
-        "rainbow": "Радуга",
-        "gayznak": "Гей Знакомства"
-    }.get(key, key)
-
-# Оставляем этот словарь пустым, чтобы не сломать функцию публикации!
+# Глобальные переменные
 ns_city_substitution = {}
-
-VIP_CHAT_ID = -1002446486648
-BEYOND_CHAT_ID = -1002873115881
-VERIFICATION_LINK = "http://t.me/vip_znakbot"
-
 responded = {}
-scam_reports = {}  # ключ: report_id (случайный или timestamp+random), значение: {reporter_id, vip_id, chat_id, msg_id, responder_id, message_id_in_admin_chat}
+scam_reports = {}  
 pending_verification_users = {}
 active_vip_requests = set()
-safe_from_autoban = set() # Те, кто официально отказался
+safe_from_autoban = set() 
 
-# ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
-def escape_md(text):
-    escape_chars = r'\_*[]()~`>#+=|{}'
-    for ch in escape_chars:
-        text = text.replace(ch, f"\\{ch}")
-    return text
-
-def clean_user_text(text):
-    return re.sub(r'(?<=\d)\*(?=\d)', '×', text)
-
+# ==================== ФУНКЦИИ, ТРЕБУЮЩИЕ BOT ====================
 def is_banned_in_network(user_id):
     """Проверяет статус пользователя в самых крупных (якорных) чатах сети"""
-    
-    # Собираем актуальные крупные узлы для проверки:
     anchor_chats = [
         VIP_CHAT_ID,
         chat_ids_mk.get("БЕЗ ПРЕДРАССУДКОВ"), 
@@ -283,19 +58,12 @@ def is_banned_in_network(user_id):
         chat_ids_mk.get("Екатеринбург"),      
         chat_ids_parni.get("Екатеринбург")    
     ]
-    
-    # Очищаем список от пустых значений
     anchor_chats = [cid for cid in anchor_chats if cid]
-
     for chat_id in anchor_chats:
         try:
             member = bot.get_chat_member(chat_id, user_id)
-            # Если статус "kicked" хотя бы в одном — не пускаем
-            if member.status == "kicked":
-                return True
-        except:
-            pass 
-            
+            if member.status == "kicked": return True
+        except: pass 
     return False
 
 def get_main_keyboard():
@@ -304,18 +72,6 @@ def get_main_keyboard():
     markup.add(types.KeyboardButton("Удалить объявление"), types.KeyboardButton("Удалить все объявления"))
     markup.add(types.KeyboardButton("👑 Вступить в VIP-чат"), types.KeyboardButton("👤 Партнерская программа"))
     return markup
-
-def format_time(timestamp):
-    tz = pytz.timezone('Asia/Yekaterinburg')
-    local_time = timestamp.astimezone(tz)
-    return local_time.strftime("%H:%M, %d %B %Y")
-
-def get_user_name(user):
-    name = escape_md(user.first_name)
-    if user.username:
-        return f"[{name}](https://t.me/{user.username})"
-    else:
-        return f"[{name}](tg://user?id={user.id})"
 
 def safe_set_tag(chat_id, user_id, tag):
     """Безопасная выдача тегов без прав админа (обновление Telegram от Марта 2026)"""
