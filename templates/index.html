@@ -3,91 +3,255 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Глаз Саурона | Skynet Admin</title>
+    <title>Глаз Саурона | Сводная панель</title>
     <style>
-        body {
-            background-color: #121212;
-            color: #ffffff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 20px;
-        }
-        h1 {
-            text-align: center;
-            color: #bb86fc;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-bottom: 40px;
-        }
-        .dashboard {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 20px;
-        }
-        .card {
-            background-color: #1e1e1e;
-            border-radius: 10px;
-            padding: 20px;
-            width: 250px;
-            text-align: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            border-bottom: 4px solid #bb86fc;
-            transition: transform 0.3s;
-        }
-        .card:hover {
-            transform: translateY(-5px);
-        }
+        body { background-color: #121212; color: #ffffff; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; }
+        h1 { text-align: center; color: #bb86fc; text-transform: uppercase; letter-spacing: 2px; }
+        
+        /* Вкладки (Tabs) */
+        .tabs-nav { display: flex; justify-content: center; gap: 15px; margin-bottom: 30px; border-bottom: 1px solid #333; padding-bottom: 15px; }
+        .tab-btn { padding: 12px 30px; background-color: #1e1e1e; border: 1px solid #444; border-radius: 5px; color: #aaa; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.2s; }
+        .tab-btn:hover { background-color: #2d2d2d; color: #fff; }
+        .tab-btn.active { background-color: #bb86fc; color: #121212; border-color: #bb86fc; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Дашборд статки */
+        .dashboard { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin-bottom: 40px; }
+        .card { background-color: #1e1e1e; border-radius: 10px; padding: 20px; width: 200px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5); border-bottom: 4px solid #bb86fc; }
         .card.danger { border-color: #cf6679; }
         .card.success { border-color: #03dac6; }
         .card.warning { border-color: #f6a5c0; }
-        
-        .number {
-            font-size: 40px;
-            font-weight: bold;
-            margin: 10px 0;
-        }
-        .footer {
-            text-align: center;
-            margin-top: 50px;
-            color: #888;
-            font-size: 14px;
-        }
+        .number { font-size: 36px; font-weight: bold; margin: 10px 0; }
+
+        /* Поиск и Досье */
+        .search-container, .panel-block { max-width: 700px; margin: 0 auto 30px auto; background-color: #1e1e1e; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .search-box { display: flex; gap: 10px; }
+        .search-input, .form-input { flex: 1; padding: 12px; border-radius: 5px; border: 1px solid #333; background-color: #2d2d2d; color: #fff; font-size: 16px; }
+        .search-btn, .form-btn { padding: 12px 25px; background-color: #bb86fc; color: #121212; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        .search-btn:hover, .form-btn:hover { background-color: #9965db; }
+        .error-msg { color: #cf6679; margin-top: 10px; font-weight: bold; text-align: center; }
+
+        .dossier-card { max-width: 700px; margin: 20px auto; background-color: #1e1e1e; border-radius: 10px; padding: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.7); border-left: 6px solid #bb86fc; }
+        .dossier-card.banned { border-left-color: #cf6679; }
+        .dossier-header { font-size: 20px; font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px; color: #03dac6; }
+        .dossier-header.banned { color: #cf6679; }
+        .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #252525; }
+        .info-label { color: #aaa; }
+        .info-value { font-weight: bold; }
+        .badge { padding: 3px 8px; border-radius: 3px; font-size: 12px; font-transform: uppercase; }
+        .badge.yes { background-color: #03dac6; color: #121212; }
+        .badge.no { background-color: #333; color: #888; }
+        .badge.alert { background-color: #cf6679; color: #fff; }
+
+        /* Сетка карательных веб-кнопок */
+        .actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; border-top: 1px solid #333; padding-top: 20px; }
+        .act-btn { padding: 12px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.2s; text-transform: uppercase; }
+        .act-btn.ban { background-color: #cf6679; color: #fff; }
+        .act-btn.unban { background-color: #03dac6; color: #121212; }
+        .act-btn.vip { background-color: #ffb74d; color: #121212; }
+        .act-btn.devip { background-color: #555; color: #fff; }
+        .act-btn:hover { opacity: 0.85; transform: scale(1.02); }
+
+        /* Таблицы выплат и промокодов */
+        .admin-table { width: 100%; border-collapse: collapse; margin-top: 15px; background-color: #1e1e1e; }
+        .admin-table th, .admin-table td { padding: 12px; text-align: left; border-bottom: 1px solid #333; }
+        .admin-table th { background-color: #2d2d2d; color: #bb86fc; }
+        .admin-table tr:nth-child(even) { background-color: #252525; }
+        .status-paid { color: #03dac6; font-weight: bold; }
+        .status-pending { color: #ffb74d; font-weight: bold; }
+        .status-rejected { color: #cf6679; font-weight: bold; }
+
+        .form-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+
+        .footer { text-align: center; margin-top: 50px; color: #888; font-size: 14px; }
     </style>
 </head>
 <body>
 
-    <h1>👁️ Глаз Саурона | Панель Управления</h1>
+    <h1>👁️ Глаз Саурона | ЦУП Империи</h1>
 
-    <div class="dashboard">
-        <div class="card">
-            <h3>Всего юзеров</h3>
-            <div class="number">{{ total }}</div>
-            <p>В базе Скайнета</p>
+    <div class="tabs-nav">
+        <button class="tab-btn active" onclick="openTab('tab-main')">🔍 Обзор и Обыск</button>
+        <button class="tab-btn" onclick="openTab('tab-withdrawals')">💸 Заявки на Вывод</button>
+        <button class="tab-btn" onclick="openTab('tab-promos')">🎫 Управление Скидками</button>
+    </div>
+
+    <div id="tab-main" class="tab-content active">
+        <div class="dashboard">
+            <div class="card"><h3>Всего юзеров</h3><div class="number">{{ total }}</div><p>В базе Скайнетика</p></div>
+            <div class="card success"><h3>VIP Элита</h3><div class="number">{{ vips }}</div><p>Коронованные</p></div>
+            <div class="card warning"><h3>BEYOND</h3><div class="number">{{ queers }}</div><p>Спец. статус</p></div>
+            <div class="card danger"><h3>В Черном Списке</h3><div class="number">{{ banned }}</div><p>Ликвидированы</p></div>
         </div>
 
-        <div class="card success">
-            <h3>VIP Элита</h3>
-            <div class="number">{{ vips }}</div>
-            <p>Коронованные</p>
+        <div class="search-container">
+            <h3>🕵️‍♂️ Моментальный перехват досье</h3>
+            <form method="POST" action="/glaz" class="search-box">
+                <input type="text" name="search_id" class="search-input" placeholder="Введите ID пользователя для обыска..." value="{{ search_id }}" required>
+                <button type="submit" class="search-btn">Найти</button>
+            </form>
+            {% if search_error %}<div class="error-msg">⚠️ {{ search_error }}</div>{% endif %}
         </div>
 
-        <div class="card warning">
-            <h3>BEYOND (Queer)</h3>
-            <div class="number">{{ queers }}</div>
-            <p>Специальный статус</p>
-        </div>
+        {% if user_data %}
+            <div class="dossier-card {% if user_data.banned %}banned{% endif %}">
+                <div class="dossier-header {% if user_data.banned %}banned{% endif %}">
+                    📁 ЛИЧНОЕ ДЕЛО УЧАСТНИКА [ID: {{ user_data.id }}]
+                </div>
+                <div class="info-row"><span class="info-label">Статус в системе:</span><span>{% if user_data.banned %}<span class="badge alert">ЗАБАНЕН ГЛОБАЛЬНО</span>{% else %}<span class="badge yes">АКТИВЕН / ЧИСТ</span>{% endif %}</span></div>
+                <div class="info-row"><span class="info-label">VIP-Доступ:</span><span>{% if user_data.is_vip %}<span class="badge yes">👑 VIP ЕСТЬ</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
+                <div class="info-row"><span class="info-label">Клуб BEYOND:</span><span>{% if user_data.is_queer %}<span class="badge yes">🏳️‍🌈 QUEER</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
+                <div class="info-row"><span class="info-label">Привязанный город:</span><span style="color: #bb86fc;">📍 {{ user_data.main_city }}</span></div>
+                <div class="info-row"><span class="info-label">Кастомные погоны (Тег):</span><span style="color: #03dac6;">{{ user_data.custom_tag }}</span></div>
+                <div class="info-row"><span class="info-label">Метка Скайнета (Шейм):</span><span style="color: #cf6679;">{{ user_data.shame_tag }}</span></div>
+                <div class="info-row" style="background: #252525; padding: 10px; border-radius: 5px; flex-direction: column; gap: 5px; border:none; margin-top:10px;">
+                    <span class="info-label">Последняя улика / Причина бана:</span>
+                    <span style="color: #ffb74d; font-style: italic;">{{ user_data.ban_reason }}</span>
+                </div>
 
-        <div class="card danger">
-            <h3>В Черном Списке</h3>
-            <div class="number">{{ banned }}</div>
-            <p>Заблокированы везде</p>
+                <div class="actions-grid">
+                    <form action="/glaz/user_action" method="POST">
+                        <input type="hidden" name="uid" value="{{ user_data.id }}"><input type="hidden" name="action" value="ban">
+                        <button type="submit" class="act-btn ban" style="width:100%;">🔨 Забанить везде</button>
+                    </form>
+                    <form action="/glaz/user_action" method="POST">
+                        <input type="hidden" name="uid" value="{{ user_data.id }}"><input type="hidden" name="action" value="unban">
+                        <button type="submit" class="act-btn unban" style="width:100%;">🕊️ Амнистировать</button>
+                    </form>
+                    <form action="/glaz/user_action" method="POST">
+                        <input type="hidden" name="uid" value="{{ user_data.id }}"><input type="hidden" name="action" value="make_vip">
+                        <button type="submit" class="act-btn vip" style="width:100%;">👑 Выдать статус VIP</button>
+                    </form>
+                    <form action="/glaz/user_action" method="POST">
+                        <input type="hidden" name="uid" value="{{ user_data.id }}"><input type="hidden" name="action" value="remove_vip">
+                        <button type="submit" class="act-btn devip" style="width:100%;">❌ Снять VIP</button>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <div id="tab-withdrawals" class="tab-content">
+        <div class="panel-block" style="max-width: 900px;">
+            <h3>💸 Очередь финансовых выплат (Звёзды)</h3>
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>ID Заявки</th>
+                        <th>User ID</th>
+                        <th>Сумма</th>
+                        <th>Реквизиты</th>
+                        <th>Статус</th>
+                        <th>Действие</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for wd in withdrawals %}
+                    <tr>
+                        <td><code>{{ wd._id }}</code></td>
+                        <td><code>{{ wd.user_id }}</code></td>
+                        <td>⭐️ {{ wd.amount }}</td>
+                        <td><code>{{ wd.details }}</code></td>
+                        <td>
+                            {% if wd.status == 'pending' %}<span class="status-pending">Ожидает</span>
+                            {% elif wd.status == 'paid' %}<span class="status-paid">Выплачено</span>
+                            {% else %}<span class="status-rejected">Отклонено</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if wd.status == 'pending' %}
+                            <div style="display:flex; gap:5px;">
+                                <form action="/glaz/withdrawal_action" method="POST">
+                                    <input type="hidden" name="wd_id" value="{{ wd._id }}"><input type="hidden" name="action" value="pay">
+                                    <button type="submit" class="act-btn unban" style="padding: 5px 10px; font-size:11px;">💵 Да</button>
+                                </form>
+                                <form action="/glaz/withdrawal_action" method="POST">
+                                    <input type="hidden" name="wd_id" value="{{ wd._id }}"><input type="hidden" name="action" value="reject">
+                                    <button type="submit" class="act-btn ban" style="padding: 5px 10px; font-size:11px;">❌ Нет</button>
+                                </form>
+                            </div>
+                            {% else %}-{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 
-    <div class="footer">
-        Skynet Enterprise © 2026 | Система работает в штатном режиме
+    <div id="tab-promos" class="tab-content">
+        <div class="panel-block">
+            <h3>🎫 Генератор промокодов</h3>
+            <form action="/glaz/add_promo" method="POST" class="form-group">
+                <input type="text" name="code" class="form-input" placeholder="КОДОВОЕ_СЛОВО (например: BLACK50)" required>
+                <input type="number" name="discount" class="form-input" placeholder="Размер скидки в % (например: 50)" min="1" max="100" required>
+                <select name="target" class="form-input">
+                    <option value="all">Работает везде (all)</option>
+                    <option value="vip">Только на покупку VIP</option>
+                    <option value="fine">Только на штрафы разбана</option>
+                </select>
+                <input type="number" name="limit" class="form-input" placeholder="Лимит использований (число активаций)" min="1" required>
+                <button type="submit" class="form-btn">Сгенерировать код</button>
+            </form>
+        </div>
+
+        <div class="panel-block" style="max-width: 800px;">
+            <h3>📊 Активные промокоды в базе</h3>
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Код</th>
+                        <th>Скидка</th>
+                        <th>Где работает</th>
+                        <th>Юзано / Лимит</th>
+                        <th>Состояние</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for promo in promos %}
+                    <tr>
+                        <td><code>{{ promo._id }}</code></td>
+                        <td>{{ promo.value }}%</td>
+                        <td><span class="badge yes" style="background:#555; color:#fff;">{{ promo.target }}</span></td>
+                        <td>{{ promo.used_count }} / {{ promo.usage_limit }}</td>
+                        <td>{% if promo.is_active %}<span class="status-paid">Активен</span>{% else %}<span class="status-rejected">Выключен</span>{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 
+    <div class="footer">Skynet Enterprise © 2026 | Высший уровень контроля безопасности</div>
+
+    <script>
+        function openTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+            
+            localStorage.setItem('activeTab', tabId);
+        }
+
+        // При перезагрузке восстанавливаем вкладку
+        window.onload = function() {
+            let savedTab = localStorage.getItem('activeTab');
+            if (savedTab && document.getElementById(savedTab)) {
+                document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+                document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+                
+                document.getElementById(savedTab).classList.add('active');
+                // Ищем кнопку по вызову функции
+                let btns = document.querySelectorAll('.tab-btn');
+                btns.forEach(btn => {
+                    if(btn.getAttribute('onclick').includes(savedTab)) {
+                        btn.classList.add('active');
+                    }
+                });
+            }
+        }
+    </script>
 </body>
 </html>
