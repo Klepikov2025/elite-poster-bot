@@ -1213,22 +1213,111 @@ threading.Thread(target=skynet_listener, daemon=True).start()
 # ============================================================================
 
 # ==================== ВЕБ-ПАНЕЛЬ (ГЛАЗ САУРОНА) ====================
-@app.route('/glaz')
+@app.route('/glaz', methods=['GET', 'POST'])
 def admin_panel():
-    # Собираем живую статистику из MongoDB
+    # 1. Сбор общих цифр для дашборда
     total_users = users_collection.count_documents({})
     vip_users = users_collection.count_documents({"is_vip": True})
     queer_users = users_collection.count_documents({"is_queer": True})
     banned_users = banned_collection.count_documents({})
     
-    # Отдаем её в наш красивый HTML-шаблон
+    # 2. Получение списков для других вкладок
+    all_withdrawals = list(withdrawals_collection.find().sort("_id", -1).limit(50))
+    all_promos = list(db['promocodes'].find().sort("_id", -1))
+    
+    user_data = None
+    search_error = None
+    
+    search_id = request.args.get('search_id') or request.form.get('search_id')
+    if search_id:
+        try:
+            uid = int(search_id.strip())
+            u_info = users_collection.find_one({"_id": uid})
+            b_info = banned_collection.find_one({"_id": uid})
+            
+            if u_info or b_info:
+                user_data = {
+                    "id": uid,
+                    "is_vip": u_info.get("is_vip", False) if u_info else False,
+                    "is_queer": u_info.get("is_queer", False) if u_info else False,
+                    "is_verified": u_info.get("is_verified", False) if u_info else False,
+                    "main_city": u_info.get("main_city", "Не привязан") if u_info else "Не привязан",
+                    "custom_tag": u_info.get("custom_tag", "Отсутствует") if u_info else "Отсутствует",
+                    "shame_tag": u_info.get("shame_tag", "Отсутствует") if u_info else "Отсутствует",
+                    "banned": True if b_info else False,
+                    "ban_reason": b_info.get("reason", "Нет активных блокировок") if b_info else "Нет active-блоков"
+                }
+            else:
+                search_error = f"Юзер {uid} не найден в матрице."
+        except ValueError:
+            search_error = "ID должен состоять только из цифр!"
+
     return render_template(
         'index.html', 
-        total=total_users, 
-        vips=vip_users, 
-        queers=queer_users, 
-        banned=banned_users
+        total=total_users, vips=vip_users, queers=queer_users, banned=banned_users,
+        user_data=user_data, search_error=search_error, search_id=search_id or "",
+        withdrawals=all_withdrawals, promos=all_promos
     )
+
+@app.route('/glaz/user_action', methods=['POST'])
+def glaz_user_action():
+    """Обработчик карательных кнопок и коронации прямо из карточки поиска"""
+    uid = int(request.form.get('uid'))
+    action = request.form.get('action')
+    
+    if action == 'ban':
+        ban_user_everywhere(uid, reason="Ликвидация через Web-Панель", admin_name="Web-Саурон 👁️")
+    elif action == 'unban':
+        unban_user_everywhere(uid)
+        unmute_user_everywhere(uid)
+    elif action == 'make_vip':
+        users_collection.update_one({"_id": uid}, {"$set": {"is_vip": True}}, upsert=True)
+        try: bot.send_message(uid, "👑 Администрация выдала вам статус VIP через панель управления!")
+        except: pass
+    elif action == 'remove_vip':
+        users_collection.update_one({"_id": uid}, {"$set": {"is_vip": False}})
+        try: bot.send_message(uid, "❌ Ваш статус VIP аннулирован администрацией.")
+        except: pass
+        
+    return request.referrer or "/glaz"
+
+@app.route('/glaz/withdrawal_action', methods=['POST'])
+def glaz_withdrawal_action():
+    """Управление выплатами партнеров в один клик"""
+    wd_id = request.form.get('wd_id')
+    action = request.form.get('action')
+    
+    wd = withdrawals_collection.find_one({"_id": wd_id})
+    if wd and wd.get('status') == 'pending':
+        uid = wd['user_id']
+        amount = wd['amount']
+        
+        if action == 'pay':
+            update_user_stats(uid, balance_add=-amount)
+            withdrawals_collection.update_one({"_id": wd_id}, {"$set": {"status": "paid"}})
+            try: bot.send_message(uid, f"✅ Ваш запрос на вывод {amount}⭐️ одобрен через Web-интерфейс! Деньги отправлены.")
+            except: pass
+        elif action == 'reject':
+            withdrawals_collection.update_one({"_id": wd_id}, {"$set": {"status": "rejected"}})
+            try: bot.send_message(uid, "❌ Ваш запрос на вывод средств отклонён. Звезды возвращены на игровой баланс.")
+            except: pass
+            
+    return request.referrer or "/glaz"
+
+@app.route('/glaz/add_promo', methods=['POST'])
+def glaz_add_promo():
+    """Быстрое создание промокодов через форму на сайте"""
+    code = request.form.get('code').strip().upper()
+    discount = int(request.form.get('discount'))
+    target = request.form.get('target')
+    limit = int(request.form.get('limit'))
+    
+    db['promocodes'].update_one(
+        {"_id": code},
+        {"$set": {"type": "percent", "value": discount, "target": target, "usage_limit": limit, "used_count": 0, "owner_uid": OWNER_ID, "is_active": True}},
+        upsert=True
+    )
+    return request.referrer or "/glaz"
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
