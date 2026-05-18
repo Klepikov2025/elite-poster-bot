@@ -760,6 +760,16 @@ def mute_user_everywhere(target_id, reason="Без причины", admin_name="
     
     return len(muted_in)
 
+# === АКТИВАЦИЯ ВНЕШНИХ ХЭНДЛЕРОВ ===
+register_admin_handlers(
+    bot, 
+    ban_user_everywhere, 
+    mute_user_everywhere, 
+    unban_user_everywhere, 
+    unmute_user_everywhere, 
+    unmute_in_parni_only
+)
+
 # --- ОБРАБОТКА ОТКАЗА ОТ ВЕРИФИКАЦИИ ---
 @bot.message_handler(func=lambda message: message.text and message.text.strip().lower() in ["я отказываюсь от продолжения", "отказываюсь от продолжения"])
 def handle_refusal(message):
@@ -2463,17 +2473,6 @@ def skynet_listener():
 threading.Thread(target=vip_funnel_sniper, daemon=True).start()
 threading.Thread(target=skynet_listener, daemon=True).start()
 # ============================================================================
-
-# === АКТИВАЦИЯ ВНЕШНИХ ХЭНДЛЕРОВ ===
-register_admin_handlers(
-    bot, 
-    ban_user_everywhere, 
-    mute_user_everywhere, 
-    unban_user_everywhere, 
-    unmute_user_everywhere, 
-    unmute_in_parni_only
-)
-
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
