@@ -56,8 +56,7 @@ warned_users = {}  # Кэш отбивок подписок (chat_id, user_id) -
 
 def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, safe_set_tag, add_radar_log, is_subscribed):
     
-    @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact'], func=lambda message: message.chat.type in ['group', 'supergroup'])
-    @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact'], func=lambda message: message.chat.type in ['group', 'supergroup'])
+    @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact', 'video_note'], func=lambda message: message.chat.type in ['group', 'supergroup'])
     def skynet_core_handler(message):
         
         if getattr(message, 'sender_chat', None) or message.from_user.id in [777000, 136817688]:
@@ -247,7 +246,8 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 EXCLUDED_FROM_PARAMS.update([VIP_CHAT_ID, BEYOND_CHAT_ID])
                 EXCLUDED_FROM_PARAMS.update([chat_ids_mk.get("Фетиши"), chat_ids_mk.get("Мужской Чат"), chat_ids_mk.get("Секс Туризм"), chat_ids_mk.get("Аренда Жилья")])
 
-                if chat_id not in EXCLUDED_FROM_PARAMS:
+                # 👇 ДОБАВИЛИ ПРОВЕРКУ: КРУЖКИ НЕ МУТИМ ЗА ОТСУТСТВИЕ ТЕКСТА 👇
+                if chat_id not in EXCLUDED_FROM_PARAMS and message.content_type != 'video_note':
                     strict_match = re.search(r'(?<!\d)[1-9]\d/1\d{2}/\d{2,3}(?:/\d{1,2}(?:[.,*xхX]\d{1,2})?)?(?!\d)', text)
                     if not strict_match:
                         bot.delete_message(chat_id, message.message_id)
