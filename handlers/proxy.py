@@ -262,7 +262,7 @@ def register_proxy_handlers(bot, ban_user_everywhere):
             ann_link = report["ann_link"]
 
             if action == "accept":
-                bot.answer_callback_query(call.id, "🚀 Запускаю массовый бан скамера...")
+                bot.answer_callback_query(call.id, "🚀 Запускаю mass-бан скамера...")
                 reason = f"Жалоба на скам в объявлении {ann_link}"
                 count = ban_user_everywhere(responder_id, reason=reason, admin_name=f"Admin: {admin_info}")
                 reply_text = f"✅ Ваша жалоба на пользователя в объявлении {ann_link} **принята**.\n\nМошенник заблокирован в {count} чатах сети! Спасибо за бдительность. 🛡️"
@@ -271,7 +271,7 @@ def register_proxy_handlers(bot, ban_user_everywhere):
                 reply_text = f"❌ Жалоба на пользователя в объявлении {ann_link} **отклонена**.\nСпасибо за сигнал, но оснований для блокировки недостаточно."
                 
             elif action == "details":
-                reply_text = f"ℹ️ По жалобе на объявление {ann_link} нужны детали.\nПожалуйста, напишите нам в саппорт, что именно вызвал подозрения."
+                reply_text = f"ℹ️ По жалобе на объявление {ann_link} нужны детали.\nПожалуйста, напишите нам в саппорт, что именно вызвало подозрения."
 
             try: bot.send_message(vip_id, reply_text, parse_mode="Markdown", disable_web_page_preview=True)
             except: pass
@@ -286,5 +286,5 @@ def register_proxy_handlers(bot, ban_user_everywhere):
 
             del scam_reports[report_id]
 
-    except Exception as e:
-        bot.answer_callback_query(call.id, f"Ошибка: {str(e)}", show_alert=True)
+        except Exception as e:
+            bot.answer_callback_query(call.id, f"Ошибка: {str(e)}", show_alert=True)
