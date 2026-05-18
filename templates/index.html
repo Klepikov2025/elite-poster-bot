@@ -12,8 +12,8 @@
         .logout-link { color: #cf6679; text-decoration: none; font-weight: bold; border: 1px solid #cf6679; padding: 8px 15px; border-radius: 5px; transition: 0.2s; }
         .logout-link:hover { background: #cf6679; color: #fff; }
         
-        .tabs-nav { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-bottom: 30px; border-bottom: 1px solid #333; padding-bottom: 15px; }
-        .tab-btn { padding: 10px 15px; background-color: #1e1e1e; border: 1px solid #444; border-radius: 5px; color: #aaa; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.2s; }
+        .tabs-nav { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-bottom: 25px; border-bottom: 1px solid #333; padding-bottom: 15px; }
+        .tab-btn { padding: 8px 12px; background-color: #1e1e1e; border: 1px solid #444; border-radius: 5px; color: #aaa; font-weight: bold; cursor: pointer; font-size: 13px; transition: 0.2s; }
         .tab-btn:hover { background-color: #2d2d2d; color: #fff; }
         .tab-btn.active { background-color: #bb86fc; color: #121212; border-color: #bb86fc; }
         .tab-content { display: none; }
@@ -69,7 +69,6 @@
         .radar-box { background-color: #000; border: 1px solid #333; padding: 15px; border-radius: 5px; height: 300px; overflow-y: auto; font-family: monospace; color: #0f0; font-size: 14px; box-shadow: inset 0 0 10px rgba(0,255,0,0.1); }
         .radar-line { margin: 5px 0; border-bottom: 1px dashed #111; padding-bottom: 2px; }
 
-        /* --- СТИЛИ ДЛЯ ЧЕРНОГО ЯЩИКА --- */
         .chat-app { display: flex; gap: 15px; height: 500px; }
         .chat-sidebar { width: 300px; background: #1e1e1e; border-radius: 10px; border: 1px solid #333; overflow-y: auto; display: flex; flex-direction: column; }
         .session-item { padding: 15px; border-bottom: 1px solid #333; cursor: pointer; transition: 0.2s; }
@@ -77,13 +76,20 @@
         .session-item.active { background: #252525; border-left: 4px solid #03dac6; }
         .chat-main { flex: 1; background: #121212; border-radius: 10px; border: 1px solid #333; display: flex; flex-direction: column; }
         .chat-header { background: #1e1e1e; padding: 15px; border-bottom: 1px solid #333; font-weight: bold; color: #03dac6; border-radius: 10px 10px 0 0; }
-        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background: url('https://i.imgur.com/kS5kL3r.png') center/cover; }
-        
+        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background: #0d0d0d; border-radius: 0 0 10px 10px; }
         .msg-box { max-width: 75%; padding: 10px 15px; border-radius: 15px; font-size: 14px; line-height: 1.4; position: relative; word-wrap: break-word; }
         .msg-vip { background: #37244f; color: #fff; align-self: flex-end; border-bottom-right-radius: 2px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
         .msg-guest { background: #1e1e1e; border: 1px solid #444; color: #eee; align-self: flex-start; border-bottom-left-radius: 2px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
         .msg-meta { font-size: 11px; color: #aaa; margin-top: 5px; text-align: right; }
         .msg-media-tag { color: #03dac6; font-weight: bold; font-size: 12px; margin-bottom: 5px; display: block; }
+
+        /* Тумблеры */
+        .toggle-switch { position: relative; width: 50px; height: 28px; display: inline-block; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cf6679; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #03dac6; }
+        input:checked + .slider:before { transform: translateX(22px); }
 
         .footer { text-align: center; margin-top: 50px; color: #888; font-size: 14px; }
     </style>
@@ -101,7 +107,10 @@
         <button class="tab-btn active" onclick="openTab('tab-main')">🔍 Обзор и Досье</button>
         <button class="tab-btn" onclick="openTab('tab-radar')">🔴 Радар и Списки</button>
         <button class="tab-btn" onclick="openTab('tab-blackbox')" style="color: #03dac6; border-color: #03dac6;">🕵️‍♂️ Чёрный Ящик</button>
+        <button class="tab-btn" onclick="openTab('tab-quarantine')" style="color: #ffb74d;">🥷 Карантин</button>
+        <button class="tab-btn" onclick="openTab('tab-broadcast')" style="color: #bb86fc;">🚀 Рассылка</button>
         <button class="tab-btn" onclick="openTab('tab-mass')" style="color: #cf6679;">💥 Репрессии</button>
+        <button class="tab-btn" onclick="openTab('tab-system')">⚙️ Система</button>
         <button class="tab-btn" onclick="openTab('tab-withdrawals')">💸 Выводы</button>
         <button class="tab-btn" onclick="openTab('tab-promos')">🎫 Скидки</button>
     </div>
@@ -113,12 +122,10 @@
             <div class="card warning"><h3>BEYOND</h3><div class="number" id="stat-queers">{{ queers }}</div><p>Спец. статус</p></div>
             <div class="card danger"><h3>В Черном Списке</h3><div class="number" id="stat-banned">{{ banned }}</div><p>Ликвидированы</p></div>
         </div>
-
         <div class="charts-container">
             <div class="chart-block" style="width: 400px;"><h3 style="color: #bb86fc;">📊 Соотношение сил</h3><canvas id="statusChart" width="360" height="240"></canvas></div>
             <div class="chart-block" style="width: 625px;"><h3 style="color: #03dac6;">📍 Топ-10 активных городов сети</h3><canvas id="cityChart" width="580" height="240"></canvas></div>
         </div>
-
         <div class="search-container">
             <h3>🕵️‍♂️ Моментальный перехват досье</h3>
             <form method="POST" action="/glaz" class="search-box">
@@ -127,35 +134,23 @@
             </form>
             {% if search_error %}<div class="error-msg">⚠️ {{ search_error }}</div>{% endif %}
         </div>
-
         {% if user_data %}
             <div class="dossier-card {% if user_data.banned %}banned{% endif %}">
                 <div class="dossier-header {% if user_data.banned %}banned{% endif %}">📁 ЛИЧНОЕ ДЕЛО УЧАСТНИКА [ID: {{ user_data.id }}]</div>
-                <div class="info-row"><span class="info-label">Администратор сети:</span><span>{% if user_data.is_admin %}<span class="badge yes" style="background-color: #bb86fc; color: #121212; font-weight: bold; box-shadow: 0 0 10px #bb86fc;">⚔️ ДА (РУКОВОДСТВО)</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
+                <div class="info-row"><span class="info-label">Администратор сети:</span><span>{% if user_data.is_admin %}<span class="badge yes" style="background-color: #bb86fc; color: #121212; font-weight: bold;">⚔️ ДА (РУКОВОДСТВО)</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
                 <div class="info-row"><span class="info-label">Статус в системе:</span><span>{% if user_data.banned %}<span class="badge alert">ЗАБАНЕН ГЛОБАЛЬНО</span>{% else %}<span class="badge yes">АКТИВЕН / ЧИСТ</span>{% endif %}</span></div>
                 <div class="info-row"><span class="info-label">VIP-Доступ:</span><span>{% if user_data.is_vip %}<span class="badge yes">👑 VIP ЕСТЬ</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
                 <div class="info-row"><span class="info-label">Клуб BEYOND:</span><span>{% if user_data.is_queer %}<span class="badge yes" style="background: #f6a5c0; color:#121212;">🏳️‍🌈 QUEER АКТИВЕН</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
                 <div class="info-row"><span class="info-label">Город:</span><span style="color: #bb86fc;">📍 {{ user_data.main_city }}</span></div>
                 <div class="info-row"><span class="info-label">Кастомные погоны:</span><span style="color: #03dac6;">{{ user_data.custom_tag }}</span></div>
-                
-                <div class="info-row" style="padding: 12px 0;">
-                    <span class="info-label">Изменить тег:</span>
-                    <div style="display:flex; gap: 5px; flex: 0.7;">
-                        <input type="text" id="input-tag-value" class="search-input" style="padding:6px; font-size:14px;" placeholder="Новый тег (none для удаления)" value="{{ user_data.custom_tag if user_data.custom_tag != 'Отсутствует' else '' }}">
-                        <button type="button" class="form-btn" style="padding:6px 12px; font-size:14px;" onclick="saveCustomTag({{ user_data.id }})">OK</button>
-                    </div>
+                <div class="info-row" style="padding: 12px 0;"><span class="info-label">Изменить тег:</span>
+                    <div style="display:flex; gap: 5px; flex: 0.7;"><input type="text" id="input-tag-value" class="search-input" style="padding:6px; font-size:14px;" placeholder="Новый тег (none для удаления)" value="{{ user_data.custom_tag if user_data.custom_tag != 'Отсутствует' else '' }}"><button type="button" class="form-btn" style="padding:6px 12px; font-size:14px;" onclick="saveCustomTag({{ user_data.id }})">OK</button></div>
                 </div>
-
                 <div class="info-row"><span class="info-label">Метка Скайнета (Шейм):</span><span style="color: #cf6679;">{{ user_data.shame_tag }}</span></div>
                 <div class="info-row" style="background: #252525; padding: 10px; border-radius: 5px; flex-direction: column; gap: 5px; border:none; margin-top:10px; align-items: flex-start;"><span class="info-label">Текущий вердикт / Последняя улика:</span><span style="color: #ffb74d; font-style: italic;">{{ user_data.ban_reason }}</span></div>
-
                 {% if user_data.history %}
-                <div style="margin-top: 15px; background: #1a1a1a; padding: 12px; border-radius: 5px; border: 1px solid #333;">
-                    <span class="info-label" style="color: #bb86fc; font-weight: bold; font-size: 13px;">📜 ПОЛНАЯ ХРОНОЛОГИЯ НАКАЗАНИЙ:</span>
-                    <ul style="margin: 8px 0 0 0; padding-left: 20px; color: #ccc; font-size: 13px; line-height: 1.6; text-align: left;">{% for log in user_data.history %}<li>{{ log }}</li>{% endfor %}</ul>
-                </div>
+                <div style="margin-top: 15px; background: #1a1a1a; padding: 12px; border-radius: 5px; border: 1px solid #333;"><span class="info-label" style="color: #bb86fc; font-weight: bold; font-size: 13px;">📜 ПОЛНАЯ ХРОНОЛОГИЯ:</span><ul style="margin: 8px 0 0 0; padding-left: 20px; color: #ccc; font-size: 13px; line-height: 1.6; text-align: left;">{% for log in user_data.history %}<li>{{ log }}</li>{% endfor %}</ul></div>
                 {% endif %}
-
                 <div class="actions-grid">
                     <button type="button" class="act-btn ban" onclick="fireAction({{ user_data.id }}, 'ban')">🔨 Забанить везде</button>
                     <button type="button" class="act-btn unban" onclick="fireAction({{ user_data.id }}, 'unban')">🕊️ Амнистировать</button>
@@ -170,24 +165,11 @@
 
     <div id="tab-radar" class="tab-content">
         <div class="charts-container" style="align-items: flex-start;">
-            <div class="chart-block" style="width: 500px;">
-                <h3 style="color: #03dac6;">🔴 Живой Радар (Web-Логи)</h3>
-                <div class="radar-box" id="radar-box"><div style="color: #888;">Загрузка канала связи...</div></div>
-            </div>
-            <div class="chart-block" style="width: 500px;">
-                <h3 style="color: #bb86fc;">📋 Умные Списки</h3>
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <button class="form-btn" style="flex: 1;" onclick="fetchList('vip')">👑 VIP</button>
-                    <button class="form-btn" style="flex: 1; background: #f6a5c0;" onclick="fetchList('queer')">🏳️‍🌈 QUEER</button>
-                    <button class="form-btn" style="flex: 1; background: #cf6679; color: #fff;" onclick="fetchList('banned')">🔨 ЧС</button>
-                </div>
+            <div class="chart-block" style="width: 500px;"><h3 style="color: #03dac6;">🔴 Живой Радар (Web-Логи)</h3><div class="radar-box" id="radar-box"><div style="color: #888;">Загрузка канала связи...</div></div></div>
+            <div class="chart-block" style="width: 500px;"><h3 style="color: #bb86fc;">📋 Умные Списки</h3>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;"><button class="form-btn" style="flex: 1;" onclick="fetchList('vip')">👑 VIP</button><button class="form-btn" style="flex: 1; background: #f6a5c0;" onclick="fetchList('queer')">🏳️‍🌈 QUEER</button><button class="form-btn" style="flex: 1; background: #cf6679; color: #fff;" onclick="fetchList('banned')">🔨 ЧС</button></div>
                 <button id="download-csv-btn" class="form-btn" style="width: 100%; display: none; background: #03dac6; margin-bottom: 15px;" onclick="downloadCSV()">⬇️ Скачать Excel (CSV)</button>
-                <div style="height: 250px; overflow-y: auto; background: #121212; border-radius: 5px; padding: 10px;">
-                    <table class="admin-table" style="margin-top: 0;">
-                        <thead><tr><th>ID</th><th>Инфо / Причина</th><th>Тег</th></tr></thead>
-                        <tbody id="list-tbody"><tr><td colspan="3" style="text-align: center; color: #888;">Выберите категорию</td></tr></tbody>
-                    </table>
-                </div>
+                <div style="height: 250px; overflow-y: auto; background: #121212; border-radius: 5px; padding: 10px;"><table class="admin-table" style="margin-top: 0;"><thead><tr><th>ID</th><th>Инфо / Причина</th><th>Тег</th></tr></thead><tbody id="list-tbody"><tr><td colspan="3" style="text-align: center; color: #888;">Выберите категорию</td></tr></tbody></table></div>
             </div>
         </div>
     </div>
@@ -195,21 +177,36 @@
     <div id="tab-blackbox" class="tab-content">
         <div class="panel-block" style="max-width: 1000px; padding: 0; background: transparent; box-shadow: none;">
             <div class="chat-app">
-                <div class="chat-sidebar">
-                    <div style="padding: 15px; background: #252525; border-bottom: 1px solid #333; font-weight: bold; color: #03dac6; text-align: center;">
-                        Анонимные сессии <button style="background: none; border:none; cursor:pointer;" onclick="loadProxySessions()">🔄</button>
-                    </div>
-                    <div id="proxy-list-container">
-                        <div style="padding: 20px; text-align: center; color: #888;">Загрузка архивов...</div>
-                    </div>
-                </div>
+                <div class="chat-sidebar"><div style="padding: 15px; background: #252525; border-bottom: 1px solid #333; font-weight: bold; color: #03dac6; text-align: center;">Анонимные сессии <button style="background: none; border:none; cursor:pointer;" onclick="loadProxySessions()">🔄</button></div><div id="proxy-list-container"><div style="padding: 20px; text-align: center; color: #888;">Загрузка архивов...</div></div></div>
+                <div class="chat-main"><div class="chat-header" id="chat-header">Выберите диалог из списка слева</div><div class="chat-messages" id="chat-box"><div style="color: #888; text-align: center; margin-top: 40px;">Терминал перехвата связи готов.</div></div></div>
+            </div>
+        </div>
+    </div>
 
-                <div class="chat-main">
-                    <div class="chat-header" id="chat-header">Выберите диалог из списка слева</div>
-                    <div class="chat-messages" id="chat-box">
-                        <div style="color: #888; text-align: center; margin-top: 40px;">Терминал перехвата связи готов.</div>
-                    </div>
-                </div>
+    <div id="tab-quarantine" class="tab-content">
+        <div class="panel-block" style="max-width: 800px;">
+            <h3 style="color: #ffb74d;">🥷 Новореги под надзором Скайнета</h3>
+            <p style="color: #aaa; margin-bottom: 15px;">Список свежих аккаунтов, чьи сообщения блокируются в течение первых 48 часов.</p>
+            <button class="form-btn" style="margin-bottom: 15px; background: #2d2d2d; color: #fff; border: 1px solid #444;" onclick="loadQuarantine()">🔄 Обновить список</button>
+            <table class="admin-table">
+                <thead><tr><th>Telegram ID</th><th>Осталось сидеть</th><th>Амнистия</th></tr></thead>
+                <tbody id="quarantine-tbody"><tr><td colspan="3" style="text-align: center; color: #888;">Загрузка списка надзора...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="tab-broadcast" class="tab-content">
+        <div class="panel-block" style="max-width: 800px;">
+            <h3 style="color: #bb86fc;">🚀 Мега-Рассылка (Global Broadcast)</h3>
+            <p style="color: #aaa; margin-bottom: 15px;">Рассылка сообщений в ЛС от имени бота. Поддерживается Markdown.</p>
+            <textarea id="broadcast-text" class="mass-textarea" style="height: 200px;" placeholder="*Внимание!*\nЗавтра стартует новая акция..."></textarea>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <select id="broadcast-target" class="form-input">
+                    <option value="all">🌐 Всем пользователям базы</option>
+                    <option value="vip">👑 Только VIP Элита</option>
+                    <option value="queer">🏳️‍🌈 Только участники QUEER</option>
+                </select>
+                <button class="form-btn" style="background: #03dac6; color: #121212; font-weight: bold; font-size: 18px;" onclick="fireBroadcast()">🚀 ЗАПУСТИТЬ</button>
             </div>
         </div>
     </div>
@@ -217,10 +214,42 @@
     <div id="tab-mass" class="tab-content">
         <div class="panel-block" style="max-width: 800px;">
             <h3 style="color: #cf6679;">💥 Оружие Массового Поражения</h3>
+            <p style="color: #aaa; margin-bottom: 15px;">Вставьте список Telegram ID в столбик или через запятую.</p>
+            
             <textarea id="mass-ids" class="mass-textarea" placeholder="123456789&#10;987654321&#10;..."></textarea>
-            <div style="display: flex; gap: 15px;">
-                <button type="button" class="form-btn" style="flex: 1; background: #cf6679; color: #fff; font-size: 18px;" onclick="fireMassAction('ban')">🔨 УНИЧТОЖИТЬ ВСЕХ (БАН)</button>
-                <button type="button" class="form-btn" style="flex: 1; background: #03dac6; font-size: 18px;" onclick="fireMassAction('unban')">🕊️ МАССОВАЯ АМНИСТИЯ</button>
+            
+            <div style="margin-bottom: 20px; text-align: left;">
+                <label style="color: #aaa; font-size: 14px; display:block; margin-bottom:8px;">⚖️ Выберите официальный вердикт:</label>
+                <select id="mass-reason" class="form-input" style="width: 100%; box-sizing: border-box;">
+                    <option value="Массовая репрессия (Web)">💀 Глобальная чистка Скайнета (По умолчанию)</option>
+                    <option value="Несогласованная реклама / Спам сетей">📺 Спам / Реклама каналов и услуг</option>
+                    <option value="Несовершеннолетний аккаунт (<18)">🔞 Нарушение возрастного ценза (&lt;18)</option>
+                    <option value="Коммерция / Платные услуги">💸 Коммерческая анкета / Поиск спонсора</option>
+                    <option value="Блокировка ВИП бота">💀 Глобальная чистка Скайнета (ВИП БОТ)</option>
+                    <option value="Блокировка ТРАНС бота">💀 Глобальная чистка Скайнета (ТРАНС БОТ)</option>
+                    <option value="Вредоносный твинк / Налёт на чаты">🥷 Обход банов / Твинк нарушителя</option>
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <button type="button" class="form-btn" style="flex: 1; background: #cf6679; color: #fff; font-size: 16px;" onclick="fireMassAction('ban')">🔨 МАССОВЫЙ БАН</button>
+                <button type="button" class="form-btn" style="flex: 1; background: #ffb74d; color: #121212; font-size: 16px;" onclick="fireMassAction('mute')">🤐 МАССОВЫЙ МУТ</button>
+                <button type="button" class="form-btn" style="flex: 1; background: #03dac6; color: #121212; font-size: 16px;" onclick="fireMassAction('unban')">🕊️ АМНИСТИЯ ВСЕХ</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-system" class="tab-content">
+        <div class="panel-block" style="max-width: 600px;">
+            <h3 style="color: #03dac6;">⚙️ Пульт Управления Ядром</h3>
+            <p style="color: #aaa; margin-bottom: 25px;">Тумблеры мгновенно меняют логику Скайнета без перезагрузки сервера.</p>
+            <div class="info-row" style="padding: 15px 0;">
+                <div><span class="info-label" style="font-size: 16px; color:#fff;">🥷 Карантин Новорегов (48 часов)</span><div style="font-size: 12px; color: #888; margin-top:5px;">Удаляет сообщения от аккаунтов младше 48 часов.</div></div>
+                <label class="toggle-switch"><input type="checkbox" id="toggle-quarantine" onchange="toggleSetting('quarantine_active')"><span class="slider"></span></label>
+            </div>
+            <div class="info-row" style="padding: 15px 0;">
+                <div><span class="info-label" style="font-size: 16px; color:#fff;">📏 Строгие параметры (Операция "1 Мая")</span><div style="font-size: 12px; color: #888; margin-top:5px;">Требует формат 24/180/70 во всех базовых чатах.</div></div>
+                <label class="toggle-switch"><input type="checkbox" id="toggle-may1" onchange="toggleSetting('may_1_active')"><span class="slider"></span></label>
             </div>
         </div>
     </div>
@@ -270,8 +299,9 @@
             event.currentTarget.classList.add('active');
             localStorage.setItem('activeTab', tabId);
 
-            // Если открыли черный ящик — загружаем список диалогов
             if(tabId === 'tab-blackbox') loadProxySessions();
+            if(tabId === 'tab-system') loadSystemSettings();
+            if(tabId === 'tab-quarantine') loadQuarantine();
         }
 
         function showToast(text) {
@@ -301,14 +331,19 @@
 
         function fireMassAction(actionName) {
             const ids = document.getElementById('mass-ids').value;
+            const reason = document.getElementById('mass-reason').value; // Забираем вердикт
             if(!ids.trim()) { showToast("⚠️ Вставьте список ID!"); return; }
+            
             const formData = new FormData();
-            formData.append('uids', ids); formData.append('action', actionName);
+            formData.append('uids', ids); 
+            formData.append('action', actionName);
+            formData.append('reason', reason); // Отправляем Питону
+
             fetch('/glaz/mass_action', { method: 'POST', body: formData })
             .then(res => res.json()).then(data => {
                 if(data.success) { showToast(data.message); document.getElementById('mass-ids').value = ''; } 
                 else showToast("❌ Ошибка: " + data.message);
-            }).catch(() => showToast("❌ Ошибка связи"));
+            }).catch(() => showToast("❌ Ошибка связи с сервером"));
         }
 
         function fetchList(type) {
@@ -332,7 +367,6 @@
             a.href = url; a.download = 'skynet_export.csv'; a.click();
         }
 
-        // --- ЛОГИКА ЧЕРНОГО ЯЩИКА (ПЕРЕХВАТ СООБЩЕНИЙ) ---
         function loadProxySessions() {
             fetch('/glaz/api/proxy_sessions').then(res => res.json()).then(data => {
                 let html = '';
@@ -341,9 +375,7 @@
                     html += `<div class="session-item" id="ses-${s.id}" onclick="loadProxyChat('${s.id}')">
                                 <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px;">VIP: ${s.vip_id}</div>
                                 <div style="font-size: 12px; color: #aaa;">Гость: ${s.guest_id}</div>
-                                <div style="display:flex; justify-content:space-between; margin-top:5px;">
-                                    ${statusBadge} <span style="font-size:10px; color:#888;">${s.msg_count} сообщ.</span>
-                                </div>
+                                <div style="display:flex; justify-content:space-between; margin-top:5px;">${statusBadge} <span style="font-size:10px; color:#888;">${s.msg_count} сообщ.</span></div>
                              </div>`;
                 });
                 if(data.length === 0) html = '<div style="padding: 20px; text-align: center; color: #888;">Нет данных в базе</div>';
@@ -366,19 +398,56 @@
                     const cssClass = isVip ? 'msg-vip' : 'msg-guest';
                     const senderLabel = isVip ? '👑 VIP' : '👤 Гость';
                     const mediaTag = msg.is_media ? '<span class="msg-media-tag">📎 [ВЛОЖЕНИЕ / МЕДИА]</span>' : '';
-                    
-                    html += `<div class="msg-box ${cssClass}">
-                                <div style="font-size:11px; color:#bb86fc; font-weight:bold; margin-bottom:3px;">${senderLabel} (ID: ${msg.sender})</div>
-                                ${mediaTag}
-                                ${msg.text}
-                                <div class="msg-meta">${msg.time}</div>
-                             </div>`;
+                    html += `<div class="msg-box ${cssClass}"><div style="font-size:11px; color:#bb86fc; font-weight:bold; margin-bottom:3px;">${senderLabel} (ID: ${msg.sender})</div>${mediaTag}${msg.text}<div class="msg-meta">${msg.time}</div></div>`;
                 });
                 if(data.history.length === 0) html = '<div style="color:#888; text-align:center; margin-top:50px;">Переписка пуста</div>';
-                
                 const box = document.getElementById('chat-box');
                 box.innerHTML = html;
-                box.scrollTop = box.scrollHeight; // Скроллим в самый низ
+                box.scrollTop = box.scrollHeight;
+            });
+        }
+
+        // --- НОВЫЕ ФУНКЦИИ СИСТЕМЫ И КАРАНТИНА ---
+        function toggleSetting(settingName) {
+            const formData = new FormData(); formData.append('setting', settingName);
+            fetch('/glaz/toggle_setting', { method: 'POST', body: formData })
+            .then(res => res.json()).then(data => { if(data.success) showToast(`⚙️ Тумблер переключен!`); });
+        }
+
+        function loadSystemSettings() {
+            fetch('/glaz/api/system_settings').then(res => res.json()).then(data => {
+                document.getElementById('toggle-quarantine').checked = data.quarantine_active;
+                document.getElementById('toggle-may1').checked = data.may_1_active;
+            });
+        }
+
+        function loadQuarantine() {
+            document.getElementById('quarantine-tbody').innerHTML = '<tr><td colspan="3" style="text-align: center;">Загрузка...</td></tr>';
+            fetch('/glaz/api/quarantine_list').then(res => res.json()).then(data => {
+                let html = '';
+                data.forEach(item => {
+                    html += `<tr><td><code>${item.id}</code></td><td style="color: #ffb74d;">⏱ ${item.hours_left} ч.</td>
+                        <td><button class="act-btn unban" style="padding: 6px 12px; font-size: 12px; width: auto;" onclick="releaseQuarantine(${item.id})">🔓 Выпустить</button></td></tr>`;
+                });
+                if(data.length === 0) html = '<tr><td colspan="3" style="text-align: center; color: #888;">Карантин пуст, все чисты.</td></tr>';
+                document.getElementById('quarantine-tbody').innerHTML = html;
+            });
+        }
+
+        function releaseQuarantine(uid) {
+            const formData = new FormData(); formData.append('uid', uid);
+            fetch('/glaz/release_quarantine', { method: 'POST', body: formData })
+            .then(res => res.json()).then(data => { if(data.success) { showToast("✅ Новорег амнистирован!"); loadQuarantine(); } });
+        }
+
+        function fireBroadcast() {
+            const txt = document.getElementById('broadcast-text').value;
+            const tgt = document.getElementById('broadcast-target').value;
+            if(!txt.trim()) { showToast("⚠️ Введите текст рассылки!"); return; }
+            
+            const formData = new FormData(); formData.append('text', txt); formData.append('target', tgt);
+            fetch('/glaz/broadcast', { method: 'POST', body: formData }).then(res => res.json()).then(data => {
+                if(data.success) { showToast(data.message); document.getElementById('broadcast-text').value = ''; }
             });
         }
 
@@ -386,7 +455,7 @@
         function initCharts() {
             fetch('/glaz/api/chart_data').then(res => res.json()).then(data => {
                 const ctxStatus = document.getElementById('statusChart').getContext('2d');
-                statusChart = new Chart(ctxStatus, { type: 'doughnut', data: { labels: ['Обычные юзеры', 'VIP Элита', 'BEYOND (Queer)', 'Черный Список'], datasets: [{ data: data.status_values, backgroundColor: ['#444444', '#ffb74d', '#f6a5c0', '#cf6679'], borderWidth: 1, borderColor: '#121212' }] }, options: { responsive: false, plugins: { legend: { labels: { color: '#fff' } } } } });
+                statusChart = new Chart(ctxStatus, { type: 'doughnut', data: { labels: ['Обычные юзеры', 'VIP Элита', 'BEYOND', 'Черный Список'], datasets: [{ data: data.status_values, backgroundColor: ['#444444', '#ffb74d', '#f6a5c0', '#cf6679'], borderWidth: 1, borderColor: '#121212' }] }, options: { responsive: false, plugins: { legend: { labels: { color: '#fff' } } } } });
                 const ctxCity = document.getElementById('cityChart').getContext('2d');
                 cityChart = new Chart(ctxCity, { type: 'bar', data: { labels: data.city_labels, datasets: [{ label: 'Участников', data: data.city_values, backgroundColor: 'rgba(3, 218, 198, 0.6)', borderColor: '#03dac6', borderWidth: 1 }] }, options: { responsive: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: '#252525' }, ticks: { color: '#fff' } }, y: { grid: { color: '#252525' }, ticks: { color: '#fff' } } } } });
             });
@@ -407,18 +476,13 @@
                     document.getElementById('radar-box').innerHTML = html;
                 }
             });
-            // Авто-подгрузка сообщений, если открыт Черный Ящик
-            if(activeProxySession && document.getElementById('tab-blackbox').classList.contains('active')) {
-                loadProxyChat(activeProxySession);
-            }
+            if(activeProxySession && document.getElementById('tab-blackbox').classList.contains('active')) { loadProxyChat(activeProxySession); }
         }, 5000);
 
         window.onload = function() {
             initCharts();
             let savedTab = localStorage.getItem('activeTab');
-            if (savedTab && document.getElementById(savedTab)) {
-                openTab(savedTab);
-            }
+            if (savedTab && document.getElementById(savedTab)) { openTab(savedTab); }
         }
     </script>
 </body>
