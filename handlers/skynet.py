@@ -7,20 +7,47 @@ import pytz
 from telebot import types
 import telebot
 
-# Импортируем зависимости из конфигов и баз
 from config import (
     OWNER_ID, ADMIN_CHAT_IDS, VIP_CHAT_ID, BEYOND_CHAT_ID, PARNI_CHATS,
-    all_cities, STAFF_GROUP_ID, chat_ids_mk, chat_ids_parni, chat_ids_ns,
+    all_cities, STAFF_GROUP_ID, SUPPORT_GROUP_ID, JOURNAL_CHAT_ID, # <--- Добавили их сюда
+    chat_ids_mk, chat_ids_parni, chat_ids_ns,
     chat_ids_rainbow, chat_ids_gayznak, MAIN_CHANNEL_LINK
 )
 from database import users_collection, banned_collection, db, archive_collection
 from utils import escape_md, get_user_name
 
 # 🔴 Красная зона (Глобал бан)
-RED_WORDS = [r"фен\b", r"\bмеф\b", r"кристаллы", r"\bсоли\b", r"стафф", r"\bцп\b", r"детское"]
+RED_WORDS = [
+    r"\bфен\b",          # Ограничили жестко с двух сторон, чтобы не банил за "телефон" или "феномен"
+    r"\bмеф\b", 
+    r"\bкристаллы\b", 
+    r"\bсоли\b", 
+    r"\bстафф\b", 
+    r"\bцп\b", 
+    r"\bдетское\b",
+    
+    # 👇 НАШИ НОВЫЕ БРОНЕБОЙНЫЕ ФИЛЬТРЫ 👇
+    r"\bмяу\b",          # Сработает ТОЛЬКО на отдельное слово "мяу". "Мяукать" пропустит!
+    r"\bне\s*зож\b"      # Ловит "не зож", "незож", "не  зож" (любое количество пробелов между ними)
+]
 
 # 🟡 Желтая зона: Коммерция
-YELLOW_COMMERCE_REGEX = [r'\bмп\b', r'\bм\.п\b', r'\bмат\s*помощь\b', r'\bспонсор\b', r'\bсодержу\b', r'\bкоммерция\b', r'\bвознаграждение\b', r'\bбабки\b']
+YELLOW_COMMERCE_REGEX = [
+    r'\bмп\b', r'\bм\.п\b', r'\bмат\s*помощь\b', r'\bспонсор\b', 
+    r'\bсодержу\b', r'\bкоммерция\b', r'\bвознаграждение\b', r'\bбабки\b',
+    
+    # 👇 ТВОИ НОВЫЕ ФИЛЬТРЫ 👇
+    r'\bпапик[а-я]*\b',             # Ловит: "папик", "папика", "папику" (благодаря [а-я]*)
+    r'\bтакси\s+с\s+тебя\b',        # Четкая фраза "такси с тебя" с любым количеством пробелов
+    
+    # 👇 ПРОФЕССИОНАЛЬНЫЙ СЛЕНГ ПЛАТНЫХ АНКЕТ 👇
+    r'\bпрайс\b',                   # "мой прайс", "прайс в лс" — 100% коммерция
+    r'\bгонорар[а-я]*\b',           # "за гонорар", "обсудим гонорар"
+    r'\bапарт[ыа-я]*\b',            # "апарты", "апартаменты", "выезд/апарты"
+    r'\bиндивидуалка[а-я]*\b',      # Без комментариев, сразу в мут
+    r'\bуслуги\b',                  # "оказываю услуги", "интим услуги" (рискованное, но в анкетах МК работает четко)
+    r'\bвстреч[аи]\s+за\b'          # Ловит "встреча за...", "встречи за..." (обычно там дальше идет "деньги" или "мп")
+]
 
 # 🟡 Желтая зона: Попрошайки
 YELLOW_BEGGARS = ["у меня бан", "пиши первым", "напишите первым", "жду в лс", "пиши в лс", "ставь реакцию", "ставьте реакции"]
@@ -30,6 +57,7 @@ warned_users = {}  # Кэш отбивок подписок (chat_id, user_id) -
 def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, safe_set_tag, add_radar_log, is_subscribed):
     
     @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact'], func=lambda message: message.chat.type in ['group', 'supergroup'])
+    @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact'], func=lambda message: message.chat.type in ['group', 'supergroup'])
     def skynet_core_handler(message):
         
         if getattr(message, 'sender_chat', None) or message.from_user.id in [777000, 136817688]:
@@ -37,6 +65,12 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
 
         chat_id = message.chat.id
         user_id = message.from_user.id
+        
+        # 👇 ДОБАВЛЯЕМ ЭТОТ БЛОК 👇
+        # Игнорируем служебные чаты: Поддержку, Журнал логов и чат Админов
+        if str(chat_id) in [str(SUPPORT_GROUP_ID), str(STAFF_GROUP_ID), str(JOURNAL_CHAT_ID)]:
+            return
+        # 👆 👆 👆
         
         raw_text = message.text or message.caption or ""
         text = raw_text.lower()
@@ -117,7 +151,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 r'\b(мне|я)\s*18\s*-\s*[1-9]\b',             
                 r'\b(1[0-7]|18\s*-\s*[1-9])\s*(лет|годик)\b',
                 r'\b(1[0-7])\s*[/\\-]\s*1\d{2}\b',           
-                r'\b(200[9]|201[0-9])\s*(г|год|года|г\.р)\b',
+                r'\b(200[9]|201[0-9])\s*(г\.р\.?|года?\s*рожд\w*)\b', # <--- ИСПРАВЛЕНО! (Только г.р. или год рождения)
                 r'\bочень молод(ой|енький)\b'
             ]
             if any(re.search(p, safe_minor) for p in minor_patterns):
