@@ -2,7 +2,7 @@ import os
 import telebot
 import requests
 from telebot import types
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, session, redirect, url_for, jsonify
 from datetime import datetime
 import pymongo
 from pymongo import MongoClient
@@ -45,6 +45,11 @@ from handlers.proxy import register_proxy_handlers
 # ==================== ИНИЦИАЛИЗАЦИЯ ====================
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
+
+app.secret_key = "skynet_secret_eye_2026"
+# Секретные данные для входа на твой сайт (можешь поменять на свои!)
+WEB_USER = "admin"
+WEB_PASS = "mkadmin"
 
 # Глобальные переменные
 ns_city_substitution = {}
@@ -1213,15 +1218,33 @@ threading.Thread(target=skynet_listener, daemon=True).start()
 # ============================================================================
 
 # ==================== ВЕБ-ПАНЕЛЬ (ГЛАЗ САУРОНА) ====================
+@app.route('/glaz/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        if request.form['username'] == WEB_USER and request.form['password'] == WEB_PASS:
+            session['logged_in'] = True
+            return redirect(url_for('admin_panel'))
+        else:
+            error = 'ОТКАЗАНО: Неверный маркер доступа!'
+    return render_template('login.html', error=error)
+
+@app.route('/glaz/logout')
+def logout():
+    session.pop('logged_in', None)
+    return redirect(url_for('login'))
+
 @app.route('/glaz', methods=['GET', 'POST'])
 def admin_panel():
-    # 1. Сбор общих цифр для дашборда
+    # Защита: Если не залогинен — выгоняем на страницу логина
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+        
     total_users = users_collection.count_documents({})
     vip_users = users_collection.count_documents({"is_vip": True})
     queer_users = users_collection.count_documents({"is_queer": True})
     banned_users = banned_collection.count_documents({})
     
-    # 2. Получение списков для других вкладок
     all_withdrawals = list(withdrawals_collection.find().sort("_id", -1).limit(50))
     all_promos = list(db['promocodes'].find().sort("_id", -1))
     
@@ -1234,21 +1257,37 @@ def admin_panel():
             uid = int(search_id.strip())
             u_info = users_collection.find_one({"_id": uid})
             b_info = banned_collection.find_one({"_id": uid})
+            archive_info = archive_collection.find_one({"target": str(uid)})
             
-            if u_info or b_info:
+            if u_info or b_info or archive_info:
+                history_list = []
+                if archive_info and archive_info.get("history"):
+                    for entry in archive_info["history"]:
+                        history_list.append(f"[{entry.get('date', '')}] {entry.get('action', '')} — {entry.get('reason', '')}")
+                
+                detected_reason = "Нет активных блокировок"
+                if b_info and b_info.get("reason"): detected_reason = b_info.get("reason")
+                elif u_info and u_info.get("last_mute_reason"): detected_reason = u_info.get("last_mute_reason")
+                elif archive_info and archive_info.get("history"): detected_reason = archive_info["history"][-1].get("reason", "Не указана")
+
+                # Проверяем, является ли пользователь админом или создателем сети
+                is_admin_system = (uid == OWNER_ID or uid in ADMIN_CHAT_IDS)
+
                 user_data = {
                     "id": uid,
                     "is_vip": u_info.get("is_vip", False) if u_info else False,
                     "is_queer": u_info.get("is_queer", False) if u_info else False,
                     "is_verified": u_info.get("is_verified", False) if u_info else False,
+                    "is_admin": is_admin_system,  # Передаем статус админа на фронтенд!
                     "main_city": u_info.get("main_city", "Не привязан") if u_info else "Не привязан",
                     "custom_tag": u_info.get("custom_tag", "Отсутствует") if u_info else "Отсутствует",
                     "shame_tag": u_info.get("shame_tag", "Отсутствует") if u_info else "Отсутствует",
                     "banned": True if b_info else False,
-                    "ban_reason": b_info.get("reason", "Нет активных блокировок") if b_info else "Нет active-блоков"
+                    "ban_reason": detected_reason,
+                    "history": history_list
                 }
             else:
-                search_error = f"Юзер {uid} не найден в матрице."
+                search_error = f"Юзер {uid} не найден в матрице базы данных."
         except ValueError:
             search_error = "ID должен состоять только из цифр!"
 
@@ -1259,65 +1298,97 @@ def admin_panel():
         withdrawals=all_withdrawals, promos=all_promos
     )
 
+@app.route('/glaz/api/stats')
+def api_stats():
+    """Секретный JSON-эндпоинт для фонового обновления цифр без перезагрузки"""
+    if not session.get('logged_in'):
+        return jsonify({"error": "Unauthorized"}), 401
+    return jsonify({
+        "total": users_collection.count_documents({}),
+        "vips": users_collection.count_documents({"is_vip": True}),
+        "queers": users_collection.count_documents({"is_queer": True}),
+        "banned": banned_collection.count_documents({})
+    })
+
 @app.route('/glaz/user_action', methods=['POST'])
 def glaz_user_action():
-    """Обработчик карательных кнопок и коронации прямо из карточки поиска"""
+    """Интеллектуальный фоновый обработчик кнопок досье (AJAX-JSON)"""
+    if not session.get('logged_in'):
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+        
     uid = int(request.form.get('uid'))
     action = request.form.get('action')
+    msg = "Действие выполнено"
     
     if action == 'ban':
         ban_user_everywhere(uid, reason="Ликвидация через Web-Панель", admin_name="Web-Саурон 👁️")
+        msg = f"💥 Пользователь {uid} полностью ликвидирован во всех чатах!"
     elif action == 'unban':
         unban_user_everywhere(uid)
         unmute_user_everywhere(uid)
+        msg = f"🕊️ С пользователя {uid} успешно сняты все баны и муты."
     elif action == 'make_vip':
         users_collection.update_one({"_id": uid}, {"$set": {"is_vip": True}}, upsert=True)
+        msg = f"👑 Пользователь {uid} успешно коронован (VIP выдано)!"
         try: bot.send_message(uid, "👑 Администрация выдала вам статус VIP через панель управления!")
         except: pass
     elif action == 'remove_vip':
         users_collection.update_one({"_id": uid}, {"$set": {"is_vip": False}})
+        msg = f"❌ Корона снята. Статус VIP для {uid} аннулирован."
         try: bot.send_message(uid, "❌ Ваш статус VIP аннулирован администрацией.")
         except: pass
-        
-    return request.referrer or "/glaz"
+    elif action == 'make_queer':
+        users_collection.update_one({"_id": uid}, {"$set": {"is_queer": True}}, upsert=True)
+        msg = f"🏳️‍🌈 Пользователь {uid} добавлен в спец-клуб BEYOND!"
+        try: bot.send_message(uid, "🏳️‍🌈 Администрация предоставила вам доступ к клубу BEYOND!")
+        except: pass
+    elif action == 'remove_queer':
+        users_collection.update_one({"_id": uid}, {"$set": {"is_queer": False}})
+        msg = f"⚠️ Пользователь {uid} удален из спец-клуба BEYOND."
+    elif action == 'set_tag':
+        new_tag = request.form.get('tag', '').strip()
+        if new_tag and new_tag.lower() != 'none':
+            users_collection.update_one({"_id": uid}, {"$set": {"custom_tag": new_tag}}, upsert=True)
+            msg = f"🎖️ Пользователю присвоен новый кастомный тег: {new_tag}"
+        else:
+            users_collection.update_one({"_id": uid}, {"$unset": {"custom_tag": ""}})
+            msg = "🧹 Кастомный тег успешно аннулирован."
+
+    return jsonify({"success": True, "message": msg})
 
 @app.route('/glaz/withdrawal_action', methods=['POST'])
 def glaz_withdrawal_action():
-    """Управление выплатами партнеров в один клик"""
+    if not session.get('logged_in'): return redirect(url_for('login'))
     wd_id = request.form.get('wd_id')
     action = request.form.get('action')
-    
     wd = withdrawals_collection.find_one({"_id": wd_id})
     if wd and wd.get('status') == 'pending':
         uid = wd['user_id']
         amount = wd['amount']
-        
         if action == 'pay':
             update_user_stats(uid, balance_add=-amount)
             withdrawals_collection.update_one({"_id": wd_id}, {"$set": {"status": "paid"}})
-            try: bot.send_message(uid, f"✅ Ваш запрос на вывод {amount}⭐️ одобрен через Web-интерфейс! Деньги отправлены.")
+            try: bot.send_message(uid, f"✅ Ваш запрос на вывод {amount}⭐️ одобрен! Деньги отправлены.")
             except: pass
         elif action == 'reject':
             withdrawals_collection.update_one({"_id": wd_id}, {"$set": {"status": "rejected"}})
-            try: bot.send_message(uid, "❌ Ваш запрос на вывод средств отклонён. Звезды возвращены на игровой баланс.")
+            try: bot.send_message(uid, "❌ Ваш запрос на вывод средств отклонён.")
             except: pass
-            
-    return request.referrer or "/glaz"
+    return redirect(url_for('admin_panel'))
 
 @app.route('/glaz/add_promo', methods=['POST'])
 def glaz_add_promo():
-    """Быстрое создание промокодов через форму на сайте"""
+    if not session.get('logged_in'): return redirect(url_for('login'))
     code = request.form.get('code').strip().upper()
     discount = int(request.form.get('discount'))
     target = request.form.get('target')
     limit = int(request.form.get('limit'))
-    
     db['promocodes'].update_one(
         {"_id": code},
         {"$set": {"type": "percent", "value": discount, "target": target, "usage_limit": limit, "used_count": 0, "owner_uid": OWNER_ID, "is_active": True}},
         upsert=True
     )
-    return request.referrer or "/glaz"
+    return redirect(url_for('admin_panel'))
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
