@@ -656,16 +656,38 @@ def catch_bot_block(message):
     if message.chat.type == "private":
         new_status = message.new_chat_member.status
         if new_status == "kicked": 
-            user_id = message.from_user.id
+            # В приватных чатах chat.id — это 100% ID самого пользователя
+            user_id = message.chat.id
             
-            # 1. ПРОВЕРКА: СВОИХ НЕ ТРОГАЕМ (VIP-ЗАЩИТА)
-            try:
-                chat_member = bot.get_chat_member(VIP_CHAT_ID, user_id)
-                if chat_member.status in ["member", "administrator", "creator"]:
-                    return 
-            except:
-                pass 
+            # =================================================================
+            # 🛡️ ФАЗА 1: ЖЕЛЕЗОБЕТОННАЯ ЗАЩИТА СВОИХ (VIP & BEYOND ИММУНИТЕТ)
+            # =================================================================
+            
+            # А) Сначала проверяем по нашей базе данных (самый надежный способ)
+            user_data = users_collection.find_one({"_id": user_id}) or {}
+            if user_data.get("is_vip", False) or user_data.get("is_queer", False):
+                return  # Своих не трогаем, пусть блокируют бота сколько влезет
                 
+            # Б) На всякий случай проверяем живое присутствие в VIP-чате
+            try:
+                m_vip = bot.get_chat_member(VIP_CHAT_ID, user_id)
+                if m_vip.status in ["member", "administrator", "creator"]:
+                    return
+                if m_vip.status == 'restricted' and getattr(m_vip, 'is_member', False):
+                    return
+            except: pass
+            
+            # В) И живое присутствие в чате BEYOND (QUEER)
+            try:
+                m_beyond = bot.get_chat_member(BEYOND_CHAT_ID, user_id)
+                if m_beyond.status in ["member", "administrator", "creator"]:
+                    return
+                if m_beyond.status == 'restricted' and getattr(m_beyond, 'is_member', False):
+                    return
+            except: pass
+            
+            # =================================================================
+
             # 2. ПРОВЕРКА: ИММУНИТЕТ (Официальный отказ)
             if user_id in safe_from_autoban:
                 try: safe_from_autoban.remove(user_id)
@@ -690,7 +712,6 @@ def catch_bot_block(message):
             else:
                 # Это обычный обыватель. Просто заблокировал бота. Пусть живет мирно 🕊
                 pass
-# ========================================================================
 
 # ==================== ПЕРЕХВАТЧИК "МЕРТВЫХ ДУШ" (Защита от старых заявок + Амнистия) ====================
 @bot.message_handler(content_types=['new_chat_members'])
