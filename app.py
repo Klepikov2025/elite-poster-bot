@@ -922,8 +922,16 @@ def admin_panel():
 
                 is_admin_system = (uid == OWNER_ID or uid in ADMIN_CHAT_IDS)
 
+                # --- ДОБАВЛЯЕМ ПРОВЕРКУ КАРАНТИНА ---
+                is_quarantine = False
+                first_seen = u_info.get("first_seen", 0) if u_info else 0
+                if uid > 7800000000 and first_seen > 0 and (time.time() - first_seen) < 172800:
+                    is_quarantine = True
+                # ------------------------------------
+
                 user_data = {
                     "id": uid,
+                    "is_quarantine": is_quarantine,  # <--- ВОТ НАШ НОВЫЙ ФЛАГ
                     "is_vip": u_info.get("is_vip", False) if u_info else False,
                     "is_queer": u_info.get("is_queer", False) if u_info else False,
                     "is_verified": u_info.get("is_verified", False) if u_info else False,
@@ -1140,6 +1148,14 @@ def glaz_user_action():
             msg = "🧹 Тег аннулирован."
             add_radar_log(f"🧹 СНЯТ ТЕГ: {uid}")
             staff_msg = f"🧹 **ВЕБ-АДМИНКА: СБРОС ТЕГА**\n\n• **Пользователь:** `{uid}`"
+            
+    # 👇 ВОТ СЮДА ВСТАВЛЯЕМ НОВЫЙ БЛОК ДЛЯ ГОРОДА 👇
+    elif action == 'set_city':
+        new_city = request.form.get('city', '').strip()
+        users_collection.update_one({"_id": uid}, {"$set": {"main_city": new_city}}, upsert=True)
+        msg = f"📍 Город изменен на: {new_city}"
+        add_radar_log(f"📍 ГОРОД [{new_city}]: {uid}")
+        staff_msg = f"📍 **ВЕБ-АДМИНКА:** Изменен город для `{uid}` на `{new_city}`"
 
     if log_to_staff and staff_msg:
         try: bot.send_message(STAFF_GROUP_ID, staff_msg, parse_mode="Markdown")
@@ -1182,6 +1198,18 @@ def glaz_add_promo():
         upsert=True
     )
     add_radar_log(f"🎫 СОЗДАН ПРОМОКОД: {code} ({discount}%)")
+    return redirect(url_for('admin_panel'))
+
+@app.route('/glaz/delete_promo', methods=['POST'])
+def glaz_delete_promo():
+    """Уничтожитель промокодов"""
+    if not session.get('logged_in'): return redirect(url_for('login'))
+    
+    code = request.form.get('code')
+    if code:
+        db['promocodes'].delete_one({"_id": code})
+        add_radar_log(f"🗑 ПРОМОКОД УНИЧТОЖЕН: {code}")
+        
     return redirect(url_for('admin_panel'))
 
 # ==================== ДОПОЛНИТЕЛЬНЫЕ МОДУЛИ КОНТРОЛЯ ЯДРА ====================
@@ -1234,10 +1262,20 @@ def glaz_broadcast():
         count = 0
         for u in cursor:
             try:
+                # ПОПЫТКА 1: Отправляем с красивым Markdown
                 bot.send_message(u['_id'], txt, parse_mode="Markdown", disable_web_page_preview=True)
                 count += 1
-            except: pass
+            except Exception as e:
+                # Если Телеграм ругается на кривую разметку (забыл скобку или звездочку)
+                if "parse entities" in str(e).lower():
+                    try:
+                        # ПОПЫТКА 2: Спасаем рассылку! Отправляем голый текст без форматирования
+                        bot.send_message(u['_id'], txt, disable_web_page_preview=True)
+                        count += 1
+                    except: pass
+                # Если юзер просто заблокировал бота, ничего не делаем, идем дальше
             time.sleep(0.1) 
+            
         add_radar_log(f"✅ Рассылка завершена! Доставлено: {count}")
         try: bot.send_message(STAFF_GROUP_ID, f"🚀 **Рассылка завершена!**\nЦель: {tgt}\nДоставлено: {count} чел.")
         except: pass
