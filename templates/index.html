@@ -141,7 +141,20 @@
                 <div class="info-row"><span class="info-label">Статус в системе:</span><span>{% if user_data.banned %}<span class="badge alert">ЗАБАНЕН ГЛОБАЛЬНО</span>{% else %}<span class="badge yes">АКТИВЕН / ЧИСТ</span>{% endif %}</span></div>
                 <div class="info-row"><span class="info-label">VIP-Доступ:</span><span>{% if user_data.is_vip %}<span class="badge yes">👑 VIP ЕСТЬ</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
                 <div class="info-row"><span class="info-label">Клуб BEYOND:</span><span>{% if user_data.is_queer %}<span class="badge yes" style="background: #f6a5c0; color:#121212;">🏳️‍🌈 QUEER АКТИВЕН</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
-                <div class="info-row"><span class="info-label">Город:</span><span style="color: #bb86fc;">📍 {{ user_data.main_city }}</span></div>
+                {% if user_data.is_quarantine %}
+                <div class="info-row" style="background: rgba(255, 183, 77, 0.1); border-left: 4px solid #ffb74d; padding-left: 10px;">
+                    <span class="info-label" style="color: #ffb74d; font-weight: bold;">🥷 СТАТУС КАРАНТИНА:</span>
+                    <span class="badge" style="background: #ffb74d; color: #121212;">АКТИВЕН (<48 часов)</span>
+                </div>
+                {% endif %}
+
+                <div class="info-row" style="padding: 12px 0;">
+                    <span class="info-label">Привязанный город:</span>
+                    <div style="display:flex; gap: 5px; flex: 0.7;">
+                        <input type="text" id="input-city-value" class="search-input" style="padding:6px; font-size:14px; color: #bb86fc; font-weight: bold;" placeholder="Город" value="{{ user_data.main_city if user_data.main_city != 'Не привязан' else '' }}">
+                        <button type="button" class="form-btn" style="padding:6px 12px; font-size:14px;" onclick="saveCity({{ user_data.id }})">OK</button>
+                    </div>
+                </div>
                 <div class="info-row"><span class="info-label">Кастомные погоны:</span><span style="color: #03dac6;">{{ user_data.custom_tag }}</span></div>
                 <div class="info-row" style="padding: 12px 0;"><span class="info-label">Изменить тег:</span>
                     <div style="display:flex; gap: 5px; flex: 0.7;"><input type="text" id="input-tag-value" class="search-input" style="padding:6px; font-size:14px;" placeholder="Новый тег (none для удаления)" value="{{ user_data.custom_tag if user_data.custom_tag != 'Отсутствует' else '' }}"><button type="button" class="form-btn" style="padding:6px 12px; font-size:14px;" onclick="saveCustomTag({{ user_data.id }})">OK</button></div>
@@ -278,10 +291,47 @@
             <form action="/glaz/add_promo" method="POST" class="form-group">
                 <input type="text" name="code" class="form-input" placeholder="КОДОВОЕ_СЛОВО" required>
                 <input type="number" name="discount" class="form-input" placeholder="Скидка %" min="1" max="100" required>
-                <select name="target" class="form-input"><option value="all">Везде</option><option value="vip">Только VIP</option><option value="fine">Только Штрафы</option></select>
+                <select name="target" class="form-input">
+                    <option value="all">Везде</option>
+                    <option value="vip">Только VIP/ТРАНС</option>
+                    <option value="fine">Только штрафы</option>
+                    <option value="ads">На рекламу</option>
+                </select>
                 <input type="number" name="limit" class="form-input" placeholder="Лимит использований" min="1" required>
                 <button type="submit" class="form-btn">Сгенерировать код</button>
             </form>
+        </div>
+
+        <div class="panel-block" style="max-width: 900px;">
+            <h3>📊 Активные промокоды в базе</h3>
+            <table class="admin-table">
+                <thead>
+                    <tr><th>Код</th><th>Скидка</th><th>Где работает</th><th>Юзано / Лимит</th><th>Состояние</th><th>Действие</th></tr>
+                </thead>
+                <tbody>
+                    {% for promo in promos %}
+                    <tr>
+                        <td><code>{{ promo._id }}</code></td>
+                        <td>{{ promo.value }}%</td>
+                        <td><span class="badge yes" style="background:#555; color:#fff;">{{ promo.target }}</span></td>
+                        <td>{{ promo.used_count }} / {{ promo.usage_limit }}</td>
+                        <td>
+                            {% if promo.is_active and promo.used_count < promo.usage_limit %}
+                                <span class="status-paid">Активен</span>
+                            {% else %}
+                                <span class="status-rejected">Выдохся</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <form action="/glaz/delete_promo" method="POST" style="margin: 0;">
+                                <input type="hidden" name="code" value="{{ promo._id }}">
+                                <button type="submit" class="act-btn ban" style="padding: 5px 10px; font-size:11px; width: auto;">🗑 Удалить</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 
@@ -318,6 +368,16 @@
             fetch('/glaz/user_action', { method: 'POST', body: formData })
             .then(res => res.json()).then(data => { if(data.success) showToast(data.message); else showToast("❌ Ошибка: " + data.error); })
             .catch(() => showToast("❌ Критический сбой"));
+        }
+
+function saveCity(uid) {
+            const cityVal = document.getElementById('input-city-value').value;
+            if(!cityVal.trim()) return;
+            const formData = new FormData();
+            formData.append('uid', uid); formData.append('action', 'set_city'); formData.append('city', cityVal);
+            fetch('/glaz/user_action', { method: 'POST', body: formData })
+            .then(res => res.json()).then(data => { if(data.success) showToast(data.message); })
+            .catch(() => showToast("❌ Сбой"));
         }
 
         function saveCustomTag(uid) {
