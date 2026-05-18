@@ -648,9 +648,9 @@ def is_subscribed(user_id):
         print(f"Ошибка при проверке подписки для {user_id}: {e}")
         return False
 
-# ==================== ЛОВЕЦ ЗВЕЗД (ОПЛАТА 50 ЗВЕЗД) ====================
-# Добавлено content_types=['any'] для перехвата сообщений со скриншотами
-@bot.message_handler(func=lambda message: str(message.chat.id) == str(SUPPORT_GROUP_ID), content_types=['any'])
+# ==================== ЛОВЕЦ ЗВЕЗД (ОПЛАТА 50 ЗВЕЗД В ГРУППЕ) ====================
+# Перечисляем абсолютно ВСЕ типы, чтобы бот ловил стикеры, кружки, фото, текст и т.д.
+@bot.message_handler(func=lambda message: str(message.chat.id) == str(SUPPORT_GROUP_ID), content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'video_note', 'location', 'contact', 'successful_payment'])
 def catch_paid_stars(message):
     # Игнорируем сообщения от других ботов и системные уведомления
     if message.from_user.is_bot: return
