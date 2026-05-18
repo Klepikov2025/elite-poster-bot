@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Глаз Саурона | Skynet Admin</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #bb86fc;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 40px;
+        }
+        .dashboard {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+        }
+        .card {
+            background-color: #1e1e1e;
+            border-radius: 10px;
+            padding: 20px;
+            width: 250px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            border-bottom: 4px solid #bb86fc;
+            transition: transform 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .card.danger { border-color: #cf6679; }
+        .card.success { border-color: #03dac6; }
+        .card.warning { border-color: #f6a5c0; }
+        
+        .number {
+            font-size: 40px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            color: #888;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>👁️ Глаз Саурона | Панель Управления</h1>
+
+    <div class="dashboard">
+        <div class="card">
+            <h3>Всего юзеров</h3>
+            <div class="number">{{ total }}</div>
+            <p>В базе Скайнета</p>
+        </div>
+
+        <div class="card success">
+            <h3>VIP Элита</h3>
+            <div class="number">{{ vips }}</div>
+            <p>Коронованные</p>
+        </div>
+
+        <div class="card warning">
+            <h3>BEYOND (Queer)</h3>
+            <div class="number">{{ queers }}</div>
+            <p>Специальный статус</p>
+        </div>
+
+        <div class="card danger">
+            <h3>В Черном Списке</h3>
+            <div class="number">{{ banned }}</div>
+            <p>Заблокированы везде</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        Skynet Enterprise © 2026 | Система работает в штатном режиме
+    </div>
+
+</body>
+</html>
