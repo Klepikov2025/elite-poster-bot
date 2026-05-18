@@ -1218,15 +1218,28 @@ threading.Thread(target=skynet_listener, daemon=True).start()
 # ============================================================================
 
 # ==================== ВЕБ-ПАНЕЛЬ (ГЛАЗ САУРОНА) ====================
+from collections import deque
+import threading
+
+# Оперативная память для Живого Радара (хранит 100 последних событий)
+if 'live_radar_logs' not in globals():
+    live_radar_logs = deque(maxlen=100)
+
+def add_radar_log(text):
+    now = datetime.now(pytz.timezone('Asia/Yekaterinburg')).strftime("%H:%M:%S")
+    live_radar_logs.appendleft(f"[{now}] {text}")
+
 @app.route('/glaz/login', methods=['GET', 'POST'])
 def login():
     error = None
     if request.method == 'POST':
         if request.form['username'] == WEB_USER and request.form['password'] == WEB_PASS:
             session['logged_in'] = True
+            add_radar_log("🔐 Успешный вход в систему: Web-Саурон")
             return redirect(url_for('admin_panel'))
         else:
             error = 'ОТКАЗАНО: Неверный маркер доступа!'
+            add_radar_log(f"⚠️ Неудачная попытка входа! Логин: {request.form.get('username')}")
     return render_template('login.html', error=error)
 
 @app.route('/glaz/logout')
@@ -1236,10 +1249,8 @@ def logout():
 
 @app.route('/glaz', methods=['GET', 'POST'])
 def admin_panel():
-    # Защита: Если не залогинен — выгоняем на страницу логина
-    if not session.get('logged_in'):
-        return redirect(url_for('login'))
-        
+    if not session.get('logged_in'): return redirect(url_for('login'))
+    
     total_users = users_collection.count_documents({})
     vip_users = users_collection.count_documents({"is_vip": True})
     queer_users = users_collection.count_documents({"is_queer": True})
@@ -1270,7 +1281,6 @@ def admin_panel():
                 elif u_info and u_info.get("last_mute_reason"): detected_reason = u_info.get("last_mute_reason")
                 elif archive_info and archive_info.get("history"): detected_reason = archive_info["history"][-1].get("reason", "Не указана")
 
-                # Проверяем, является ли пользователь админом или создателем сети
                 is_admin_system = (uid == OWNER_ID or uid in ADMIN_CHAT_IDS)
 
                 user_data = {
@@ -1278,7 +1288,7 @@ def admin_panel():
                     "is_vip": u_info.get("is_vip", False) if u_info else False,
                     "is_queer": u_info.get("is_queer", False) if u_info else False,
                     "is_verified": u_info.get("is_verified", False) if u_info else False,
-                    "is_admin": is_admin_system,  # Передаем статус админа на фронтенд!
+                    "is_admin": is_admin_system,
                     "main_city": u_info.get("main_city", "Не привязан") if u_info else "Не привязан",
                     "custom_tag": u_info.get("custom_tag", "Отсутствует") if u_info else "Отсутствует",
                     "shame_tag": u_info.get("shame_tag", "Отсутствует") if u_info else "Отсутствует",
@@ -1286,6 +1296,7 @@ def admin_panel():
                     "ban_reason": detected_reason,
                     "history": history_list
                 }
+                add_radar_log(f"🔎 Обыск досье: {uid}")
             else:
                 search_error = f"Юзер {uid} не найден в матрице базы данных."
         except ValueError:
@@ -1300,9 +1311,7 @@ def admin_panel():
 
 @app.route('/glaz/api/stats')
 def api_stats():
-    """Секретный JSON-эндпоинт для фонового обновления цифр без перезагрузки"""
-    if not session.get('logged_in'):
-        return jsonify({"error": "Unauthorized"}), 401
+    if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
     return jsonify({
         "total": users_collection.count_documents({}),
         "vips": users_collection.count_documents({"is_vip": True}),
@@ -1310,49 +1319,189 @@ def api_stats():
         "banned": banned_collection.count_documents({})
     })
 
+@app.route('/glaz/api/chart_data')
+def api_chart_data():
+    if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+    total = users_collection.count_documents({})
+    vips = users_collection.count_documents({"is_vip": True})
+    queers = users_collection.count_documents({"is_queer": True})
+    banned = banned_collection.count_documents({})
+    regular = max(0, total - vips - queers)
+
+    pipeline = [
+        {"$match": {"main_city": {"$exists": True, "$ne": "Не привязан"}}},
+        {"$group": {"_id": "$main_city", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 10}
+    ]
+    city_stats = list(users_collection.aggregate(pipeline))
+    
+    return jsonify({
+        "status_values": [regular, vips, queers, banned],
+        "city_labels": [item["_id"] for item in city_stats],
+        "city_values": [item["count"] for item in city_stats]
+    })
+
+@app.route('/glaz/api/radar')
+def api_radar():
+    """Отдает список логов для хакерского терминала"""
+    if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+    return jsonify(list(live_radar_logs))
+
+@app.route('/glaz/api/get_list')
+def api_get_list():
+    """Умные списки базы данных"""
+    if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+    list_type = request.args.get('type')
+    results = []
+    
+    if list_type == 'vip':
+        for doc in users_collection.find({"is_vip": True}):
+            results.append({"id": doc["_id"], "info": doc.get("main_city", "Не указан"), "tag": doc.get("custom_tag", "VIP")})
+    elif list_type == 'queer':
+        for doc in users_collection.find({"is_queer": True}):
+            results.append({"id": doc["_id"], "info": doc.get("main_city", "Не указан"), "tag": doc.get("custom_tag", "QUEER")})
+    elif list_type == 'banned':
+        for doc in banned_collection.find().limit(1000): # Лимит, чтобы браузер не умер от 20000 строк
+            results.append({"id": doc["_id"], "info": doc.get("reason", "Забанен"), "tag": "ЧС"})
+            
+    return jsonify(results)
+
+@app.route('/glaz/api/proxy_sessions')
+def api_proxy_sessions():
+    """Секретный API: Отдает список всех анонимных диалогов (Черный Ящик)"""
+    if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+    
+    # Берем 30 последних переписок из базы
+    sessions = list(proxy_sessions.find().sort("_id", -1).limit(30))
+    result = []
+    for s in sessions:
+        result.append({
+            "id": s["_id"],
+            "vip_id": s.get("vip_id", "Неизвестно"),
+            "guest_id": s.get("guest_id", "Неизвестно"),
+            "is_active": s.get("is_active", False),
+            "msg_count": len(s.get("history", []))
+        })
+    return jsonify(result)
+
+@app.route('/glaz/api/proxy_chat')
+def api_proxy_chat():
+    """Секретный API: Отдает полную переписку конкретной сессии"""
+    if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+    
+    session_id = request.args.get('session_id')
+    s = proxy_sessions.find_one({"_id": session_id})
+    if not s: return jsonify({"error": "Not found"})
+    
+    return jsonify({
+        "vip_id": s.get("vip_id"),
+        "guest_id": s.get("guest_id"),
+        "is_active": s.get("is_active", False),
+        "history": s.get("history", [])
+    })
+
+@app.route('/glaz/mass_action', methods=['POST'])
+def glaz_mass_action():
+    """Оружие Массового Поражения (работает в фоне)"""
+    if not session.get('logged_in'): return jsonify({"success": False}), 401
+    
+    raw_ids = request.form.get('uids', '')
+    action = request.form.get('action', 'ban')
+    
+    uids = []
+    # Парсим IDшники, даже если админ вставил их криво с пробелами и запятыми
+    for line in raw_ids.replace(',', '\n').split('\n'):
+        clean_id = line.strip()
+        if clean_id.isdigit(): uids.append(int(clean_id))
+        
+    if not uids:
+        return jsonify({"success": False, "message": "Не найдено валидных ID!"})
+        
+    add_radar_log(f"⚡ Запущен МАССОВЫЙ {action.upper()} для {len(uids)} юзеров!")
+        
+    def background_mass_task(id_list, act):
+        for uid in id_list:
+            if act == 'ban':
+                ban_user_everywhere(uid, reason="Массовая репрессия (Web)", admin_name="Web-Саурон")
+            elif act == 'unban':
+                unban_user_everywhere(uid)
+                unmute_user_everywhere(uid)
+            # 🛡 ЗАЩИТА ОТ БЛОКИРОВКИ ТЕЛЕГРАМОМ! Спасает от лимитов API
+            time.sleep(0.5) 
+            
+        add_radar_log(f"✅ Массовый {act.upper()} успешно завершен!")
+        try: bot.send_message(STAFF_GROUP_ID, f"🚀 **ВЕБ-АДМИНКА:** Завершен массовый {act.upper()} для {len(id_list)} пользователей!")
+        except: pass
+            
+    # Запускаем фонового киллера
+    threading.Thread(target=background_mass_task, args=(uids, action), daemon=True).start()
+    
+    return jsonify({"success": True, "message": f"🔥 Процесс пошел! Обработка займет около {len(uids)//2} сек."})
+
 @app.route('/glaz/user_action', methods=['POST'])
 def glaz_user_action():
-    """Интеллектуальный фоновый обработчик кнопок досье (AJAX-JSON)"""
-    if not session.get('logged_in'):
-        return jsonify({"success": False, "error": "Unauthorized"}), 401
+    if not session.get('logged_in'): return jsonify({"success": False, "error": "Unauthorized"}), 401
         
     uid = int(request.form.get('uid'))
     action = request.form.get('action')
     msg = "Действие выполнено"
+    log_to_staff = True
+    staff_msg = ""
     
     if action == 'ban':
         ban_user_everywhere(uid, reason="Ликвидация через Web-Панель", admin_name="Web-Саурон 👁️")
-        msg = f"💥 Пользователь {uid} полностью ликвидирован во всех чатах!"
+        msg = f"💥 Пользователь {uid} ликвидирован!"
+        add_radar_log(f"💥 БАН: {uid}")
+        log_to_staff = False 
     elif action == 'unban':
         unban_user_everywhere(uid)
         unmute_user_everywhere(uid)
-        msg = f"🕊️ С пользователя {uid} успешно сняты все баны и муты."
+        msg = f"🕊️ С {uid} сняты баны."
+        add_radar_log(f"🕊️ АМНИСТИЯ: {uid}")
+        staff_msg = f"🕊️ **ВЕБ-АДМИНКА: ПОЛНАЯ АМНИСТИЯ**\n\n• **Пользователь:** `{uid}`\n• **Действие:** Глобально разбанен!"
     elif action == 'make_vip':
         users_collection.update_one({"_id": uid}, {"$set": {"is_vip": True}}, upsert=True)
-        msg = f"👑 Пользователь {uid} успешно коронован (VIP выдано)!"
+        msg = f"👑 {uid} коронован!"
+        add_radar_log(f"👑 ВЫДАН VIP: {uid}")
+        staff_msg = f"👑 **ВЕБ-АДМИНКА: КОРОНАЦИЯ (VIP)**\n\n• **Пользователь:** `{uid}`"
         try: bot.send_message(uid, "👑 Администрация выдала вам статус VIP через панель управления!")
         except: pass
     elif action == 'remove_vip':
         users_collection.update_one({"_id": uid}, {"$set": {"is_vip": False}})
-        msg = f"❌ Корона снята. Статус VIP для {uid} аннулирован."
+        msg = f"❌ VIP снят с {uid}."
+        add_radar_log(f"❌ СНЯТ VIP: {uid}")
+        staff_msg = f"❌ **ВЕБ-АДМИНКА: СНЯТИЕ VIP**\n\n• **Пользователь:** `{uid}`"
         try: bot.send_message(uid, "❌ Ваш статус VIP аннулирован администрацией.")
         except: pass
     elif action == 'make_queer':
         users_collection.update_one({"_id": uid}, {"$set": {"is_queer": True}}, upsert=True)
-        msg = f"🏳️‍🌈 Пользователь {uid} добавлен в спец-клуб BEYOND!"
+        msg = f"🏳️‍🌈 {uid} добавлен в BEYOND!"
+        add_radar_log(f"🏳️‍🌈 ВЫДАН QUEER: {uid}")
+        staff_msg = f"🏳️‍🌈 **ВЕБ-АДМИНКА: ДОСТУП BEYOND**\n\n• **Пользователь:** `{uid}`"
         try: bot.send_message(uid, "🏳️‍🌈 Администрация предоставила вам доступ к клубу BEYOND!")
         except: pass
     elif action == 'remove_queer':
         users_collection.update_one({"_id": uid}, {"$set": {"is_queer": False}})
-        msg = f"⚠️ Пользователь {uid} удален из спец-клуба BEYOND."
+        msg = f"⚠️ {uid} удален из BEYOND."
+        add_radar_log(f"⚠️ СНЯТ QUEER: {uid}")
+        staff_msg = f"⚠️ **ВЕБ-АДМИНКА: ИСКЛЮЧЕНИЕ ИЗ BEYOND**\n\n• **Пользователь:** `{uid}`"
     elif action == 'set_tag':
         new_tag = request.form.get('tag', '').strip()
         if new_tag and new_tag.lower() != 'none':
             users_collection.update_one({"_id": uid}, {"$set": {"custom_tag": new_tag}}, upsert=True)
-            msg = f"🎖️ Пользователю присвоен новый кастомный тег: {new_tag}"
+            msg = f"🎖️ Выдан тег: {new_tag}"
+            add_radar_log(f"🎖️ ТЕГ [{new_tag}]: {uid}")
+            staff_msg = f"🎖️ **ВЕБ-АДМИНКА: ВЫДАЧА ПОГОН**\n\n• **Пользователь:** `{uid}`\n• **Тег:** `{new_tag}`"
         else:
             users_collection.update_one({"_id": uid}, {"$unset": {"custom_tag": ""}})
-            msg = "🧹 Кастомный тег успешно аннулирован."
+            msg = "🧹 Тег аннулирован."
+            add_radar_log(f"🧹 СНЯТ ТЕГ: {uid}")
+            staff_msg = f"🧹 **ВЕБ-АДМИНКА: СБРОС ТЕГА**\n\n• **Пользователь:** `{uid}`"
+
+    if log_to_staff and staff_msg:
+        try: bot.send_message(STAFF_GROUP_ID, staff_msg, parse_mode="Markdown")
+        except: pass
 
     return jsonify({"success": True, "message": msg})
 
@@ -1368,10 +1517,12 @@ def glaz_withdrawal_action():
         if action == 'pay':
             update_user_stats(uid, balance_add=-amount)
             withdrawals_collection.update_one({"_id": wd_id}, {"$set": {"status": "paid"}})
+            add_radar_log(f"💸 ОПЛАЧЕНА ЗАЯВКА: {wd_id}")
             try: bot.send_message(uid, f"✅ Ваш запрос на вывод {amount}⭐️ одобрен! Деньги отправлены.")
             except: pass
         elif action == 'reject':
             withdrawals_collection.update_one({"_id": wd_id}, {"$set": {"status": "rejected"}})
+            add_radar_log(f"🚫 ОТКЛОНЕНА ЗАЯВКА: {wd_id}")
             try: bot.send_message(uid, "❌ Ваш запрос на вывод средств отклонён.")
             except: pass
     return redirect(url_for('admin_panel'))
@@ -1388,6 +1539,7 @@ def glaz_add_promo():
         {"$set": {"type": "percent", "value": discount, "target": target, "usage_limit": limit, "used_count": 0, "owner_uid": OWNER_ID, "is_active": True}},
         upsert=True
     )
+    add_radar_log(f"🎫 СОЗДАН ПРОМОКОД: {code} ({discount}%)")
     return redirect(url_for('admin_panel'))
 
 # ==================== WEBHOOK ====================
