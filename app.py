@@ -649,6 +649,27 @@ def is_subscribed(user_id):
         print(f"Ошибка при проверке подписки для {user_id}: {e}")
         return False
 
+# ==================== ЛОВЕЦ ЗВЕЗД (ОПЛАТА 50 ЗВЕЗД) ====================
+# Добавлено content_types=['any'] для перехвата сообщений со скриншотами
+@bot.message_handler(func=lambda message: str(message.chat.id) == str(SUPPORT_GROUP_ID), content_types=['any'])
+def catch_paid_stars(message):
+    # Игнорируем сообщения от других ботов и системные уведомления
+    if message.from_user.is_bot: return
+    
+    uid = message.from_user.id
+    
+    # В этой группе любое сообщение стоит 50 звезд. 
+    # Сбрасываем страйки и ставим status: 1
+    db['paid_users'].update_one(
+        {"uid": uid},
+        {"$set": {
+            "status": 1,
+            "strikes": 0,  # <-- Обязательно обнуляем страйки тут!
+            "timestamp": datetime.now()
+        }},
+        upsert=True
+    )
+
 # === АКТИВАЦИЯ ВНЕШНИХ ХЭНДЛЕРОВ ===
 register_admin_handlers(
     bot, 
@@ -787,25 +808,6 @@ def catch_illegal_entry(message):
                     bot.send_message(STAFF_GROUP_ID, f"🕊️ **АМНИСТИЯ (Вход):** Юзер `{user_id}` вошел в сеть ПАРНИ 18+ и был автоматически размучен ({count} чатов).")
                 except: pass
 # ===========================================================================================
-
-# ==================== ЛОВЕЦ ЗВЕЗД (ОПЛАТА 50 ЗВЕЗД) ====================
-@bot.message_handler(func=lambda message: str(message.chat.id) == str(SUPPORT_GROUP_ID))
-def catch_paid_stars(message):
-    # Игнорируем сообщения от других ботов и системные уведомления
-    if message.from_user.is_bot: return
-    
-    uid = message.from_user.id
-    
-    # В этой группе любое сообщение стоит 50 звезд. 
-    # Пишем в базу paid_users "status: 1", чтобы Секретарь его пропустил
-    db['paid_users'].update_one(
-        {"uid": uid},
-        {"$set": {
-            "status": 1,
-            "timestamp": datetime.now()
-        }},
-        upsert=True
-    )
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("radar_ban_"))
 def radar_confirm_ban(call):
