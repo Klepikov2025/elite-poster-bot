@@ -10,6 +10,7 @@ import pymongo
 from pymongo import MongoClient
 import pytz
 import random
+import json
 import re
 import time
 import difflib
@@ -1316,10 +1317,31 @@ def release_quarantine():
 @app.route('/glaz/broadcast', methods=['POST'])
 def glaz_broadcast():
     if not session.get('logged_in'): return jsonify({"success": False}), 401
+    
     text = request.form.get('text')
     target = request.form.get('target')
+    buttons_raw = request.form.get('buttons', '[]') # <-- Ловим кнопки с сайта
     
-    def bg_broadcast(txt, tgt):
+    # Парсим кнопки из строки в нормальный список
+    try:
+        buttons_list = json.loads(buttons_raw)
+    except:
+        buttons_list = []
+    
+    def bg_broadcast(txt, tgt, btns_list):
+        # === 1. СОБИРАЕМ КЛАВИАТУРУ ИЗ КНОПОК ===
+        markup = None
+        if btns_list:
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            for btn in btns_list:
+                kwargs = {"text": btn["text"], "url": btn["url"]}
+                if btn.get("style") and btn["style"] != "default":
+                    kwargs["style"] = btn["style"]
+                if btn.get("emoji_id"):
+                    kwargs["icon_custom_emoji_id"] = btn["emoji_id"]
+                markup.add(types.InlineKeyboardButton(**kwargs))
+        # ========================================
+
         add_radar_log(f"🚀 Запуск рассылки для: {tgt}")
         cursor = users_collection.find({}) if tgt == 'all' else users_collection.find({"is_vip": True}) if tgt == 'vip' else users_collection.find({"is_queer": True}) if tgt == 'queer' else None
         if not cursor: return
@@ -1329,34 +1351,32 @@ def glaz_broadcast():
         
         for u in cursor:
             try:
-                # ПОПЫТКА 1: Отправляем с красивым Markdown
-                bot.send_message(u['_id'], txt, parse_mode="Markdown", disable_web_page_preview=True)
+                # ПОПЫТКА 1: Отправляем с красивым Markdown и КНОПКАМИ (reply_markup=markup)
+                bot.send_message(u['_id'], txt, parse_mode="Markdown", disable_web_page_preview=True, reply_markup=markup)
                 count += 1
             except Exception as e:
                 err_text = str(e).lower()
                 
-                # Если Телеграм ругается на кривую разметку (забыл скобку или звездочку)
+                # Если Телеграм ругается на кривую разметку
                 if "parse entities" in err_text:
                     try:
-                        # ПОПЫТКА 2: Спасаем рассылку! Отправляем голый текст без форматирования
-                        bot.send_message(u['_id'], txt, disable_web_page_preview=True)
+                        # ПОПЫТКА 2: Спасаем рассылку! Голый текст, но КНОПКИ ОСТАВЛЯЕМ!
+                        bot.send_message(u['_id'], txt, disable_web_page_preview=True, reply_markup=markup)
                         count += 1
                     except Exception as inner_e:
-                        # Проверяем на трупака даже тут
                         if "deactivated" in str(inner_e).lower():
                             users_collection.delete_one({"_id": u['_id']})
                             dead_count += 1
                 
-                # 💀 РАБОТАЕТ ТРУПОВОЗКА: Если аккаунт удален (Deleted Account)
+                # 💀 РАБОТАЕТ ТРУПОВОЗКА
                 elif "deactivated" in err_text:
                     users_collection.delete_one({"_id": u['_id']})
                     dead_count += 1
                     
-                    # 🎛️ ПРОВЕРЯЕМ ТУМБЛЕР С САЙТА (Выносить ли труп из самих чатов?)
                     if SkynetSettings.get().get("auto_corpse_removal", True):
                         threading.Thread(target=background_corpse_removal, args=(u['_id'],), daemon=True).start() 
             
-        # Отчет в Радар и в чат
+        # Отчет
         add_radar_log(f"✅ Рассылка: Доставлено {count}. 💀 Вывезено трупов: {dead_count}")
         try: 
             bot.send_message(
@@ -1365,7 +1385,8 @@ def glaz_broadcast():
             )
         except: pass
 
-    threading.Thread(target=bg_broadcast, args=(text, target), daemon=True).start()
+    # Запускаем поток, передавая ему наши кнопки (btns_list)
+    threading.Thread(target=bg_broadcast, args=(text, target, buttons_list), daemon=True).start()
     return jsonify({"success": True, "message": "🚀 Рассылка запущена в фоне!"})
 
 # === 👑 ROOT: КОНСТРУКТОР КНОПОК ===
