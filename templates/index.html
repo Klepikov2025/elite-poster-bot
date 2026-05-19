@@ -253,19 +253,18 @@
     </div>
 
     <div id="tab-system" class="tab-content">
-        <div class="panel-block" style="max-width: 600px;">
-            <h3 style="color: #03dac6;">⚙️ Пульт Управления Ядром</h3>
-            <p style="color: #aaa; margin-bottom: 25px;">Тумблеры мгновенно меняют логику Скайнета без перезагрузки сервера.</p>
-            <div class="info-row" style="padding: 15px 0;">
-                <div><span class="info-label" style="font-size: 16px; color:#fff;">🥷 Карантин Новорегов (48 часов)</span><div style="font-size: 12px; color: #888; margin-top:5px;">Удаляет сообщения от аккаунтов младше 48 часов.</div></div>
-                <label class="toggle-switch"><input type="checkbox" id="toggle-quarantine" onchange="toggleSetting('quarantine_active')"><span class="slider"></span></label>
+    <div class="panel-block" style="max-width: 1000px; background: #121212; border-radius: 12px; padding: 25px; border: 1px solid #222;">
+        <h3 style="color: #03dac6; margin-bottom: 10px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+            ⚙️ Пульт Управления Коммандным Центром Империи
+        </h3>
+        <p style="color: #777; margin-bottom: 25px; font-size: 14px;">
+            Все переключатели меняют конфигурацию нейросети Скайнета «на лету». Сервер перезагружать не требуется.
+        </p>
+        
+        <div id="toggles-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 16px;">
             </div>
-            <div class="info-row" style="padding: 15px 0;">
-                <div><span class="info-label" style="font-size: 16px; color:#fff;">📏 Строгие параметры (Операция "1 Мая")</span><div style="font-size: 12px; color: #888; margin-top:5px;">Требует формат 24/180/70 во всех базовых чатах.</div></div>
-                <label class="toggle-switch"><input type="checkbox" id="toggle-may1" onchange="toggleSetting('may_1_active')"><span class="slider"></span></label>
-            </div>
-        </div>
     </div>
+</div>
 
     <div id="tab-withdrawals" class="tab-content">
         <div class="panel-block" style="max-width: 900px;">
@@ -475,11 +474,66 @@ function saveCity(uid) {
         }
 
         function loadSystemSettings() {
-            fetch('/glaz/api/system_settings').then(res => res.json()).then(data => {
-                document.getElementById('toggle-quarantine').checked = data.quarantine_active;
-                document.getElementById('toggle-may1').checked = data.may_1_active;
-            });
+    const container = document.getElementById('toggles-container');
+    if (!container) return;
+    
+    container.innerHTML = '<div style="color: #aaa; padding: 20px;">📡 Подключение к ядру Скайнета...</div>';
+    
+    fetch('/glaz/api/system_settings')
+    .then(res => res.json())
+    .then(settings => {
+        let html = '';
+        const labels = {
+            "skynet_enabled": "🔴 ПОЛНЫЙ СКАЙНЕТ (Главный рубильник модерации)",
+            "red_zone": "☢️ Красная зона (Фильтр: Наркотики, CP, тяжелые нарушения)",
+            "yellow_commerce": "💰 Желтая зона (Фильтр: Коммерция, папики, спонсоры, реклама)",
+            "twin_radar": "👥 Радар Твинков (Автопоиск и бан клонов)",
+            "autoban_on_block": "🚫 Автобан за блок бота (Ликвидация беглецов из воронки)",
+            "vip_sniper": "🎯 VIP-Снайпер (Ликвидация тех, кто бросил верификацию)",
+            "bio_hardcheck": "🔍 Жесткая проверка БИО (Контроль возраста и ссылок на входе)",
+            "auto_corpse_removal": "💀 Автоочистка трупов (Вынос Deleted Accounts из 85+ чатов)",
+            "proxy_system": "🕵️ Черный Ящик (Включение/выключение анонимных чатов Прокси)",
+            "referral_system": "🔗 Реферальная VIP-система (Начисление бонусов за друзей)",
+            "parni_autounmute": "🕊️ Локальная амнистия (Авторазмут в сети ПАРНИ 18+ при входе)",
+            "radar_logging": "📡 Живой Радар (Трансляция событий в хакерский терминал)",
+            "quarantine_active": "🥷 Карантин новорегов (Защита от свежих аккаунтов на 48ч)",
+            "may_1_active": "📏 Операция \"1 Мая\" (Строгий контроль формата параметров)"
+        };
+
+        Object.keys(labels).forEach(key => {
+            const isOn = settings[key] !== false;
+            html += `
+            <div class="info-row" style="padding: 18px; background: #1a1a1a; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #252525; transition: all 0.3s;">
+                <div style="flex: 1; padding-right: 15px;">
+                    <div style="font-size: 14px; font-weight: 500; color: #fff;">${labels[key]}</div>
+                    <div style="font-size: 11px; color: ${isOn ? '#03dac6' : '#ff0055'}; margin-top: 3px;">
+                        Статус: ${isOn ? 'АКТИВЕН' : 'ОТКЛЮЧЕН'}
+                    </div>
+                </div>
+                <label class="toggle-switch" style="position: relative; display: inline-block; width: 46px; height: 24px;">
+                    <input type="checkbox" ${isOn ? 'checked' : ''} onchange="toggleSetting('${key}')" style="opacity: 0; width: 0; height: 0;">
+                    <span class="slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 24px;"></span>
+                </label>
+            </div>`;
+        });
+        container.innerHTML = html;
+    });
+}
+
+function toggleSetting(key) {
+    const formData = new FormData();
+    formData.append('setting', key);
+    
+    fetch('/glaz/toggle_setting', { method: 'POST', body: formData })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) {
+            showToast(`⚙️ ${key} → ${data.state ? 'ВКЛ' : 'ВЫКЛ'}`);
+            loadSystemSettings(); // обновляем цвета и статусы
         }
+    })
+    .catch(() => showToast("❌ Ошибка связи"));
+}
 
         function loadQuarantine() {
             document.getElementById('quarantine-tbody').innerHTML = '<tr><td colspan="3" style="text-align: center;">Загрузка...</td></tr>';
