@@ -183,7 +183,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             markup.add(types.InlineKeyboardButton(text=btn["text"], url=btn["url"]))
                     else:
                         # Если база пустая (страховка)
-                        markup.add(types.InlineKeyboardButton(text="Подписаться на МК", url=https://t.me/clubofrm))
+                        markup.add(types.InlineKeyboardButton(text="Подписаться на МК", url="https://t.me/clubofrm"))
                     # =================================
 
                     sent = bot.send_message(chat_id, "❗ Внимание, чтобы писать в чате вам необходимо подписаться на наш основной канал.\n\nБез подписки на канал ваши сообщения будут удаляться автоматически. Вступая в чат, я подтверждаю совершеннолетие и обязуюсь соблюдать правила, с которыми ознакомлен и согласен.", reply_markup=markup)
