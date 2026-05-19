@@ -114,7 +114,7 @@
         <button class="tab-btn" onclick="openTab('tab-withdrawals')">💸 Выводы</button>
         <button class="tab-btn" onclick="openTab('tab-promos')">🎫 Скидки</button>
     </div>
-
+  
     <div id="tab-main" class="tab-content active">
         <div class="dashboard">
             <div class="card"><h3>Всего юзеров</h3><div class="number" id="stat-total">{{ total }}</div><p>В базе Скайнетика</p></div>
@@ -253,18 +253,27 @@
     </div>
 
     <div id="tab-system" class="tab-content">
-    <div class="panel-block" style="max-width: 1000px; background: #121212; border-radius: 12px; padding: 25px; border: 1px solid #222;">
-        <h3 style="color: #03dac6; margin-bottom: 10px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
-            ⚙️ Пульт Управления Коммандным Центром Империи
-        </h3>
-        <p style="color: #777; margin-bottom: 25px; font-size: 14px;">
-            Все переключатели меняют конфигурацию нейросети Скайнета «на лету». Сервер перезагружать не требуется.
-        </p>
-        
-        <div id="toggles-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 16px;">
+        <div class="panel-block" style="max-width: 1000px; background: #121212; border-radius: 12px; padding: 25px; border: 1px solid #222;">
+            <h3 style="color: #03dac6; margin-bottom: 10px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                ⚙️ Пульт Управления Коммандным Центром Империи
+                <span onclick="unlockRoot()" style="cursor:pointer; opacity:0.1; font-size: 14px;" title="Root Access">🔒</span>
+            </h3>
+            <p style="color: #777; margin-bottom: 25px; font-size: 14px;">
+                Все переключатели меняют конфигурацию нейросети Скайнета «на лету». Сервер перезагружать не требуется.
+            </p>
+            
+            <div id="root-panel" style="display: none; margin-top: 20px; margin-bottom: 25px; border-top: 2px dashed #ff4d4d; padding-top: 15px;">
+                <h4 style="color: #ff4d4d;">👑 ROOT: Конструктор кнопок Скайнета</h4>
+                <p style="font-size: 12px; color: #aaa;">Эти кнопки выводятся всем новорегам в предупреждении о подписке.</p>
+                <div id="buttons-container"></div>
+                <button onclick="addButtonRow('', '')" class="btn btn-sm btn-outline-primary mt-3">➕ Добавить кнопку</button>
+                <button onclick="saveRootButtons()" class="btn btn-sm btn-danger mt-3" style="float: right;">💾 Сохранить в сеть</button>
+                <div style="clear: both;"></div>
             </div>
+            <div id="toggles-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 16px;">
+            </div>
+        </div>
     </div>
-</div>
 
     <div id="tab-withdrawals" class="tab-content">
         <div class="panel-block" style="max-width: 900px;">
@@ -598,6 +607,71 @@ function toggleSetting(key) {
             let savedTab = localStorage.getItem('activeTab');
             if (savedTab && document.getElementById(savedTab)) { openTab(savedTab); }
         }
+
+let sessionPin = "";
+
+// 1. Функция запроса пароля
+function unlockRoot() {
+    const pin = prompt("Введите ROOT-пароль (Скайнет):");
+    if (!pin) return;
+    
+    // Стучимся на сервер, чтобы проверить PIN
+    fetch('/glaz/api/root/buttons', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({pin: pin})
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Неверный пароль!");
+        return res.json();
+    })
+    .then(data => {
+        sessionPin = pin; // Запоминаем пин в сессии
+        document.getElementById('root-panel').style.display = 'block'; // Показываем блок
+        document.getElementById('buttons-container').innerHTML = ''; // Очищаем контейнер
+        
+        // Отрисовываем кнопки из базы
+        data.buttons.forEach(b => addButtonRow(b.text, b.url));
+        if(data.buttons.length === 0) addButtonRow('', '');
+    })
+    .catch(err => alert("⛔️ " + err.message));
+}
+
+// 2. Рисуем строчку для новой кнопки
+function addButtonRow(text, url) {
+    const row = document.createElement('div');
+    row.style.cssText = "display:flex; gap:10px; margin-bottom:10px;";
+    row.className = "btn-row";
+    row.innerHTML = `
+        <input type="text" placeholder="Текст (напр. VIP Клуб)" value="${text}" class="form-control" style="width: 40%; background: #222; color: #fff; border: 1px solid #444;">
+        <input type="text" placeholder="Ссылка (https://...)" value="${url}" class="form-control" style="width: 50%; background: #222; color: #fff; border: 1px solid #444;">
+        <button onclick="this.parentElement.remove()" class="btn btn-danger">❌</button>
+    `;
+    document.getElementById('buttons-container').appendChild(row);
+}
+
+// 3. Собираем всё и пуляем в базу
+function saveRootButtons() {
+    const rows = document.querySelectorAll('#buttons-container .btn-row');
+    const buttons = [];
+    
+    rows.forEach(row => {
+        const inputs = row.querySelectorAll('input');
+        const text = inputs[0].value.trim();
+        const url = inputs[1].value.trim();
+        if(text && url) buttons.push({text: text, url: url}); // Берем только заполненные
+    });
+
+    fetch('/glaz/api/root/save_buttons', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({pin: sessionPin, buttons: buttons})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.status === 'ok') alert("✅ Кнопки успешно обновлены в базе! Скайнет принял новые параметры.");
+    });
+}
     </script>
 </body>
 </html>
