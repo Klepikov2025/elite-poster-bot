@@ -49,9 +49,6 @@ YELLOW_COMMERCE_REGEX = [
     r'\bвстреч[аи]\s+за\b'          # Ловит "встреча за...", "встречи за..." (обычно там дальше идет "деньги" или "мп")
 ]
 
-# 🟡 Желтая зона: Попрошайки
-YELLOW_BEGGARS = ["у меня бан", "пиши первым", "напишите первым", "жду в лс", "пиши в лс", "ставь реакцию", "ставьте реакции"]
-
 warned_users = {}  # Кэш отбивок подписок (chat_id, user_id) -> message_id
 
 def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, safe_set_tag, add_radar_log, is_subscribed):
@@ -158,6 +155,14 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 ban_user_everywhere(user_id, reason="Черная зона: Несовершеннолетний (<18)", admin_name="Скайнет 🔞", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
                 return
 
+            # 1. Сначала фильтруем коммерцию (для всех, даже для VIP/QUEER)
+            clean_commerce = re.sub(r'без\s*м\.?п\.?|не\s*коммерция|без\s*мат(\.?|ериальной)\s*помощи', '', text)
+            if any(re.search(pattern, clean_commerce) for pattern in YELLOW_COMMERCE_REGEX):
+                bot.delete_message(chat_id, message.message_id)
+                mute_user_everywhere(user_id, reason="Желтая зона: Коммерция", admin_name="Скайнет ⚔️", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
+                return
+
+            # 2. А ТОЛЬКО ПОТОМ разрешаем VIP/QUEER писать что угодно (кроме коммерции)
             if any([is_vip, is_queer, is_verified, custom_tag]): return 
             if chat_id in PARNI_CHATS: return
 
@@ -274,17 +279,6 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             except: pass
                         threading.Thread(target=delete_warning_may, daemon=True).start()
                         return
-
-            clean_commerce = re.sub(r'без\s*м\.?п\.?|не\s*коммерция|без\s*мат(\.?|ериальной)\s*помощи', '', text)
-            if any(re.search(pattern, clean_commerce) for pattern in YELLOW_COMMERCE_REGEX):
-                bot.delete_message(chat_id, message.message_id)
-                mute_user_everywhere(user_id, reason="Желтая зона: Коммерция", admin_name="Скайнет ⚔️", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
-                return
-
-            if any(word in text for word in YELLOW_BEGGARS):
-                bot.delete_message(chat_id, message.message_id)
-                mute_user_everywhere(user_id, reason="Желтая зона: Попрошайка", admin_name="Скайнет 🤫", user_link=user_link, trigger_text=trigger_text, mute_time=int(time.time())+7200, origin_chat=chat_title)
-                return
 
             safe_age = re.sub(r'(от|парня|мальчика|мужчину|ищу|для)\s*18\b|\b18\s*-\s*\d{2}\b|\b18\s*\+|\b18\s*(см|cm)\b', '', text)
             if re.search(r'\b18\s*(лет|год|годик|y\.?o\.?)\b|\b18\s*[/\\-]\s*1\d{2}\b|\b(мне|я)\s*18\b', safe_age):
