@@ -615,7 +615,6 @@ function unlockRoot() {
     const pin = prompt("Введите ROOT-пароль (Скайнет):");
     if (!pin) return;
     
-    // Стучимся на сервер, чтобы проверить PIN
     fetch('/glaz/api/root/buttons', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -626,25 +625,32 @@ function unlockRoot() {
         return res.json();
     })
     .then(data => {
-        sessionPin = pin; // Запоминаем пин в сессии
-        document.getElementById('root-panel').style.display = 'block'; // Показываем блок
-        document.getElementById('buttons-container').innerHTML = ''; // Очищаем контейнер
+        sessionPin = pin; 
+        document.getElementById('root-panel').style.display = 'block'; 
+        document.getElementById('buttons-container').innerHTML = ''; 
         
-        // Отрисовываем кнопки из базы
-        data.buttons.forEach(b => addButtonRow(b.text, b.url));
-        if(data.buttons.length === 0) addButtonRow('', '');
+        // Подтягиваем цвета и эмодзи из базы
+        data.buttons.forEach(b => addButtonRow(b.text, b.url, b.style || 'default', b.emoji_id || ''));
+        if(data.buttons.length === 0) addButtonRow('', '', 'default', '');
     })
     .catch(err => alert("⛔️ " + err.message));
 }
 
-// 2. Рисуем строчку для новой кнопки
-function addButtonRow(text, url) {
+// 2. Рисуем строчку для новой кнопки (ТЕПЕРЬ С ЦВЕТАМИ И ЭМОДЗИ)
+function addButtonRow(text, url, style = 'default', emojiId = '') {
     const row = document.createElement('div');
     row.style.cssText = "display:flex; gap:10px; margin-bottom:10px;";
     row.className = "btn-row";
     row.innerHTML = `
-        <input type="text" placeholder="Текст (напр. VIP Клуб)" value="${text}" class="form-control" style="width: 40%; background: #222; color: #fff; border: 1px solid #444;">
-        <input type="text" placeholder="Ссылка (https://...)" value="${url}" class="form-control" style="width: 50%; background: #222; color: #fff; border: 1px solid #444;">
+        <input type="text" placeholder="Текст" value="${text}" class="form-control" style="width: 25%; background: #222; color: #fff; border: 1px solid #444;">
+        <input type="text" placeholder="Ссылка" value="${url}" class="form-control" style="width: 30%; background: #222; color: #fff; border: 1px solid #444;">
+        <select class="form-control" style="width: 20%; background: #222; color: #fff; border: 1px solid #444;">
+            <option value="default" ${style==='default'?'selected':''}>Обычный</option>
+            <option value="primary" ${style==='primary'?'selected':''}>Синий</option>
+            <option value="success" ${style==='success'?'selected':''}>Зеленый</option>
+            <option value="danger" ${style==='danger'?'selected':''}>Красный</option>
+        </select>
+        <input type="text" placeholder="ID Эмодзи" value="${emojiId}" class="form-control" style="width: 20%; background: #222; color: #fff; border: 1px solid #444;">
         <button onclick="this.parentElement.remove()" class="btn btn-danger">❌</button>
     `;
     document.getElementById('buttons-container').appendChild(row);
@@ -657,9 +663,14 @@ function saveRootButtons() {
     
     rows.forEach(row => {
         const inputs = row.querySelectorAll('input');
+        const select = row.querySelector('select');
+        
         const text = inputs[0].value.trim();
         const url = inputs[1].value.trim();
-        if(text && url) buttons.push({text: text, url: url}); // Берем только заполненные
+        const style = select.value; // Берем цвет
+        const emojiId = inputs[2].value.trim(); // Берем ID эмодзи
+        
+        if(text && url) buttons.push({text: text, url: url, style: style, emoji_id: emojiId});
     });
 
     fetch('/glaz/api/root/save_buttons', {
@@ -669,7 +680,7 @@ function saveRootButtons() {
     })
     .then(res => res.json())
     .then(data => {
-        if(data.status === 'ok') alert("✅ Кнопки успешно обновлены в базе! Скайнет принял новые параметры.");
+        if(data.status === 'ok') alert("✅ Цвета и премиум-эмодзи успешно вшиты в Скайнет!");
     });
 }
     </script>
