@@ -171,11 +171,21 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 except: pass
                 key = (chat_id, user_id)
                 if key not in warned_users:
-                    markup = types.InlineKeyboardMarkup(row_width=2)
-                    markup.add(types.InlineKeyboardButton(text="Подписаться на МК", url=MAIN_CHANNEL_LINK, icon_custom_emoji_id="5215330331711775720", style="success"))
-                    markup.add(types.InlineKeyboardButton(text="ПАРНИ 18+", url="https://t.me/znakparni"))
-                    markup.add(types.InlineKeyboardButton("Резервный канал", url="https://t.me/gaysexchatrur"), types.InlineKeyboardButton("ПРАВИЛА МК", url="https://t.me/MensClubRules"))
-                    markup.add(types.InlineKeyboardButton(text="🚀 БЕСПЛАТНЫЙ VPN ДЛЯ ВСЕХ", url="https://t.me/perec?start=ref_2BBPF35H", icon_custom_emoji_id="5981123193862098366", style="primary"))
+                    # === МАГИЯ ТВОЕГО КОНСТРУКТОРА ===
+                    markup = types.InlineKeyboardMarkup(row_width=1)
+                    
+                    # Тянем кнопки прямо из базы в реальном времени!
+                    db_buttons = db['settings'].find_one({"_id": "skynet_buttons"})
+                    
+                    if db_buttons and db_buttons.get("buttons"):
+                        # Генерируем кнопки из вебки
+                        for btn in db_buttons["buttons"]:
+                            markup.add(types.InlineKeyboardButton(text=btn["text"], url=btn["url"]))
+                    else:
+                        # Если база пустая (страховка)
+                        markup.add(types.InlineKeyboardButton(text="Подписаться на МК", url=https://t.me/clubofrm))
+                    # =================================
+
                     sent = bot.send_message(chat_id, "❗ Внимание, чтобы писать в чате вам необходимо подписаться на наш основной канал.\n\nБез подписки на канал ваши сообщения будут удаляться автоматически. Вступая в чат, я подтверждаю совершеннолетие и обязуюсь соблюдать правила, с которыми ознакомлен и согласен.", reply_markup=markup)
                     warned_users[key] = sent.message_id
                     def auto_delete():
