@@ -213,6 +213,10 @@
             <h3 style="color: #bb86fc;">🚀 Мега-Рассылка (Global Broadcast)</h3>
             <p style="color: #aaa; margin-bottom: 15px;">Рассылка сообщений в ЛС от имени бота. Поддерживается Markdown.</p>
             <textarea id="broadcast-text" class="mass-textarea" style="height: 200px;" placeholder="*Внимание!*\nЗавтра стартует новая акция..."></textarea>
+            
+            <label style="color: #aaa; font-size: 14px; display:block; margin-bottom:8px;">🎛 Кнопки для этого поста (необязательно):</label>
+            <div id="broadcast-buttons-container" style="margin-bottom: 15px;"></div>
+            <button onclick="addBroadcastButtonRow('', '')" class="tab-btn" style="color: #03dac6; border-color: #03dac6; margin-bottom: 20px; font-size: 12px; padding: 6px 12px;">➕ Добавить кнопку</button>
             <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                 <select id="broadcast-target" class="form-input">
                     <option value="all">🌐 Всем пользователям базы</option>
@@ -563,16 +567,64 @@ function toggleSetting(key) {
             .then(res => res.json()).then(data => { if(data.success) { showToast("✅ Новорег амнистирован!"); loadQuarantine(); } });
         }
 
-        function fireBroadcast() {
-            const txt = document.getElementById('broadcast-text').value;
-            const tgt = document.getElementById('broadcast-target').value;
-            if(!txt.trim()) { showToast("⚠️ Введите текст рассылки!"); return; }
-            
-            const formData = new FormData(); formData.append('text', txt); formData.append('target', tgt);
-            fetch('/glaz/broadcast', { method: 'POST', body: formData }).then(res => res.json()).then(data => {
-                if(data.success) { showToast(data.message); document.getElementById('broadcast-text').value = ''; }
-            });
+        // 1. Создание строки кнопки для рассылки
+function addBroadcastButtonRow(text, url, style = 'default', emojiId = '') {
+    const row = document.createElement('div');
+    row.style.cssText = "display:flex; gap:10px; margin-bottom:10px;";
+    row.className = "bc-btn-row";
+    row.innerHTML = `
+        <input type="text" placeholder="Текст кнопки" value="${text}" class="form-control" style="width: 25%; background: #222; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 5px;">
+        <input type="text" placeholder="Ссылка (https://...)" value="${url}" class="form-control" style="width: 30%; background: #222; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 5px;">
+        <select class="form-control" style="width: 20%; background: #222; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 5px;">
+            <option value="default" ${style==='default'?'selected':''}>Обычный</option>
+            <option value="primary" ${style==='primary'?'selected':''}>Синий</option>
+            <option value="success" ${style==='success'?'selected':''}>Зеленый</option>
+            <option value="danger" ${style==='danger'?'selected':''}>Красный</option>
+        </select>
+        <input type="text" placeholder="ID Эмодзи" value="${emojiId}" class="form-control" style="width: 20%; background: #222; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 5px;">
+        <button onclick="this.parentElement.remove()" class="btn btn-danger" style="background: #cf6679; border: none; padding: 8px 12px; border-radius: 5px; color: white; cursor: pointer;">❌</button>
+    `;
+    document.getElementById('broadcast-buttons-container').appendChild(row);
+}
+
+// 2. Модифицированный запуск рассылки с кнопками
+function fireBroadcast() {
+    const txt = document.getElementById('broadcast-text').value;
+    const tgt = document.getElementById('broadcast-target').value;
+    if(!txt.trim()) { showToast("⚠️ Введите текст рассылки!"); return; }
+    
+    // Собираем все созданные кнопки с полей
+    const rows = document.querySelectorAll('#broadcast-buttons-container .bc-btn-row');
+    const buttons = [];
+    rows.forEach(row => {
+        const inputs = row.querySelectorAll('input');
+        const select = row.querySelector('select');
+        
+        const bText = inputs[0].value.trim();
+        const bUrl = inputs[1].value.trim();
+        const bStyle = select.value;
+        const bEmojiId = inputs[2].value.trim();
+        
+        if(bText && bUrl) {
+            buttons.push({text: bText, url: bUrl, style: bStyle, emoji_id: bEmojiId});
         }
+    });
+
+    const formData = new FormData(); 
+    formData.append('text', txt); 
+    formData.append('target', tgt);
+    formData.append('buttons', JSON.stringify(buttons)); // Запаковываем кнопки в JSON-строку
+
+    fetch('/glaz/broadcast', { method: 'POST', body: formData })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) { 
+            showToast(data.message); 
+            document.getElementById('broadcast-text').value = ''; 
+            document.getElementById('broadcast-buttons-container').innerHTML = ''; // Очищаем кнопки
+        }
+    }).catch(() => showToast("❌ Ошибка отправки рассылки"));
+}
 
         // Инициализация графиков
         function initCharts() {
