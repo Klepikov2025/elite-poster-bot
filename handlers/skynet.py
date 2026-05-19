@@ -171,20 +171,29 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 except: pass
                 key = (chat_id, user_id)
                 if key not in warned_users:
-                    # === МАГИЯ ТВОЕГО КОНСТРУКТОРА ===
+                    # === МАГИЯ ТВОЕГО КОНСТРУКТОРА (С ЦВЕТАМИ И ЭМОДЗИ) ===
                     markup = types.InlineKeyboardMarkup(row_width=1)
                     
-                    # Тянем кнопки прямо из базы в реальном времени!
                     db_buttons = db['settings'].find_one({"_id": "skynet_buttons"})
                     
                     if db_buttons and db_buttons.get("buttons"):
-                        # Генерируем кнопки из вебки
                         for btn in db_buttons["buttons"]:
-                            markup.add(types.InlineKeyboardButton(text=btn["text"], url=btn["url"]))
+                            # Базовые параметры (Текст и Ссылка)
+                            kwargs = {"text": btn["text"], "url": btn["url"]}
+                            
+                            # Если выбран цвет (и это не дефолт)
+                            if btn.get("style") and btn["style"] != "default":
+                                kwargs["style"] = btn["style"]
+                                
+                            # Если указан ID кастомного эмодзи
+                            if btn.get("emoji_id"):
+                                kwargs["icon_custom_emoji_id"] = btn["emoji_id"]
+                                
+                            markup.add(types.InlineKeyboardButton(**kwargs))
                     else:
                         # Если база пустая (страховка)
                         markup.add(types.InlineKeyboardButton(text="Подписаться на МК", url="https://t.me/clubofrm"))
-                    # =================================
+                    # ======================================================
 
                     sent = bot.send_message(chat_id, "❗ Внимание, чтобы писать в чате вам необходимо подписаться на наш основной канал.\n\nБез подписки на канал ваши сообщения будут удаляться автоматически. Вступая в чат, я подтверждаю совершеннолетие и обязуюсь соблюдать правила, с которыми ознакомлен и согласен.", reply_markup=markup)
                     warned_users[key] = sent.message_id
