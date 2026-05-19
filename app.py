@@ -1368,6 +1368,40 @@ def glaz_broadcast():
     threading.Thread(target=bg_broadcast, args=(text, target), daemon=True).start()
     return jsonify({"success": True, "message": "🚀 Рассылка запущена в фоне!"})
 
+# === 👑 ROOT: КОНСТРУКТОР КНОПОК ===
+ROOT_PIN = "6996"  # ⚠️ ПОМЕНЯЙ ЭТОТ ПАРОЛЬ НА СВОЙ СЕКРЕТНЫЙ ПИН-КОД!
+
+@app.route('/glaz/api/root/buttons', methods=['POST'])
+def api_get_root_buttons():
+    data = request.json
+    if data.get('pin') != ROOT_PIN:
+        return jsonify({"error": "Access Denied"}), 403
+    
+    btns = db['settings'].find_one({"_id": "skynet_buttons"})
+    if not btns or not btns.get("buttons"):
+        # Если база пока пустая, отдаем дефолтные для примера
+        default_btns = [
+            {"text": "Подписаться на МК", "url": "https://t.me/своя_ссылка"},
+            {"text": "ПАРНИ 18+", "url": "https://t.me/znakparni"}
+        ]
+        return jsonify({"buttons": default_btns})
+        
+    return jsonify({"buttons": btns.get("buttons", [])})
+
+@app.route('/glaz/api/root/save_buttons', methods=['POST'])
+def api_save_root_buttons():
+    data = request.json
+    if data.get('pin') != ROOT_PIN:
+        return jsonify({"error": "Access Denied"}), 403
+        
+    # Сохраняем массив кнопок прямо в MongoDB
+    db['settings'].update_one(
+        {"_id": "skynet_buttons"}, 
+        {"$set": {"buttons": data['buttons']}}, 
+        upsert=True
+    )
+    return jsonify({"status": "ok"})
+
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
 def webhook():
