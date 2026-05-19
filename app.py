@@ -1,9 +1,11 @@
 import os
+import sys
 import telebot
 import requests
 from telebot import types
 from flask import Flask, request, render_template, session, redirect, url_for, jsonify
 from datetime import datetime
+from core.settings import SkynetSettings
 import pymongo
 from pymongo import MongoClient
 import pytz
@@ -190,38 +192,40 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
                 except: pass
 
         # --- ФАЗА 0: Санитарный контроль (БИО) ---
-        user_info = bot.get_chat(user_id)
-        bio = user_info.bio.lower() if user_info.bio else ""
-        
-        allowed_links = ["anonquebot", "secretmessagebot", "askbot", "contactme", "voprosy"]
-        has_bad_link = ("t.me/" in bio or "http" in bio) and not any(allowed in bio for allowed in allowed_links)
-        
-        # Убираем маску параметров из БИО, чтобы "15" (размер) не считалось за 15 лет
-        safe_bio = re.sub(r'(?<!\d)[1-9]\d/1\d{2}/\d{2,3}(?:/\d{1,2}(?:[.,*xхX]\d{1,2})?)?(?!\d)', '', bio)
-        safe_bio = re.sub(r'\b(1[0-7])\s*(см|cm)\b', '', safe_bio)
-        
-        minor_bio_patterns = [
-            r'\b(мне|я)\s*(1[0-7])\b',                   
-            r'\b(мне|я)\s*18\s*-\s*[1-9]\b',             
-            r'\b(1[0-7]|18\s*-\s*[1-9])\s*(лет|годик)\b',
-            r'\b(1[0-7])\s*[/\\-]\s*1\d{2}\b',           
-            r'\b(200[9]|201[0-9])\s*(г|год|года|г\.р)\b',
-            r'\bочень молод(ой|енький)\b'  # <--- ЛОВИМ "ОЧЕНЬ МОЛОДОГО"
-        ]
-        has_bad_age = any(re.search(p, safe_bio) for p in minor_bio_patterns)
-        
-        if has_bad_age:
-            bot.decline_chat_join_request(chat_id, user_id)
-            bot.send_message(STAFF_GROUP_ID, f"🚨 **СКАЙНЕТ: ТАМОЖНЯ**\nОтклонена заявка от малолетки (`{user_id}`).\nЗапускаю глобальный БАН...")
-            ban_user_everywhere(user_id, reason="Возраст <18 (или 'очень молодой') в БИО", admin_name="Скайнет 🛂")
-            return
+        settings = SkynetSettings.get()
+        if settings.get("bio_hardcheck", True):
+            user_info = bot.get_chat(user_id)
+            bio = user_info.bio.lower() if user_info.bio else ""
+            
+            allowed_links = ["anonquebot", "secretmessagebot", "askbot", "contactme", "voprosy"]
+            has_bad_link = ("t.me/" in bio or "http" in bio) and not any(allowed in bio for allowed in allowed_links)
+            
+            # Убираем маску параметров из БИО, чтобы "15" (размер) не считалось за 15 лет
+            safe_bio = re.sub(r'(?<!\d)[1-9]\d/1\d{2}/\d{2,3}(?:/\d{1,2}(?:[.,*xхX]\d{1,2})?)?(?!\d)', '', bio)
+            safe_bio = re.sub(r'\b(1[0-7])\s*(см|cm)\b', '', safe_bio)
+            
+            minor_bio_patterns = [
+                r'\b(мне|я)\s*(1[0-7])\b',                   
+                r'\b(мне|я)\s*18\s*-\s*[1-9]\b',             
+                r'\b(1[0-7]|18\s*-\s*[1-9])\s*(лет|годик)\b',
+                r'\b(1[0-7])\s*[/\\-]\s*1\d{2}\b',           
+                r'\b(200[9]|201[0-9])\s*(г|год|года|г\.р)\b',
+                r'\bочень молод(ой|енький)\b'
+            ]
+            has_bad_age = any(re.search(p, safe_bio) for p in minor_bio_patterns)
+            
+            if has_bad_age:
+                bot.decline_chat_join_request(chat_id, user_id)
+                bot.send_message(STAFF_GROUP_ID, f"🚨 **СКАЙНЕТ: ТАМОЖНЯ**\nОтклонена заявка от малолетки (`{user_id}`).\nЗапускаю глобальный БАН...")
+                ban_user_everywhere(user_id, reason="Возраст <18 (или 'очень молодой') в БИО", admin_name="Скайнет 🛂")
+                return
 
-        if has_bad_link:
-            bot.approve_chat_join_request(chat_id, user_id) 
-            db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
-            bot.send_message(STAFF_GROUP_ID, f"⚠️ **СКАЙНЕТ: ТАМОЖНЯ**\nПустил спамера со ссылкой в БИО (`{user_id}`) для массовки.\nЗатыкаю рот глобальным МУТОМ 🤐...")
-            mute_user_everywhere(user_id, reason="Рекламная ссылка в БИО", admin_name="Скайнет 🛂")
-            return
+            if has_bad_link:
+                bot.approve_chat_join_request(chat_id, user_id) 
+                db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
+                bot.send_message(STAFF_GROUP_ID, f"⚠️ **СКАЙНЕТ: ТАМОЖНЯ**\nПустил спамера со ссылкой в БИО (`{user_id}`) для массовки.\nЗатыкаю рот глобальным МУТОМ 🤐...")
+                mute_user_everywhere(user_id, reason="Рекламная ссылка в БИО", admin_name="Скайнет 🛂")
+                return
 
         # --- ФАЗА 1: Режим БОГА (VIP и BEYOND) ---
         user_data = users_collection.find_one({"_id": user_id}) or {}
@@ -698,6 +702,11 @@ register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, safe_se
 # --- МГНОВЕННЫЙ РАДАР БЛОКИРОВОК (Ловит ТОЛЬКО беглецов из VIP-воронки) ---
 @bot.my_chat_member_handler()
 def catch_bot_block(message):
+    # 🎛️ ПРОВЕРЯЕМ ТУМБЛЕР С САЙТА
+    settings = SkynetSettings.get()
+    if not settings.get("autoban_on_block", True):
+        return  # Если выключен — игнорируем блокировки бота, никого не баним!
+
     if message.chat.type == "private":
         new_status = message.new_chat_member.status
         if new_status == "kicked": 
@@ -826,39 +835,41 @@ def radar_confirm_ban(call):
 def vip_funnel_sniper():
     while True:
         try:
-            now = time.time()
-            # Достаем всех, кто застрял в воронке
-            for doc in db['vip_funnel'].find():
-                user_id = doc['_id']
-                timestamp = doc.get('timestamp', now)
-                reminded = doc.get('reminded', False)
+            settings = SkynetSettings.get()
+            if settings.get("vip_sniper", True):
+                now = time.time()
                 
-                # 1. Прошла неделя (7 дней = 604800 секунд) -> Шлем напоминалку
-                if not reminded and (now - timestamp > 604800):
-                    reminder_text = (
-                        "⚠️ **Системное уведомление!**\n\n"
-                        "Вы начали процесс вступления в VIP, но остановились. "
-                        "Если вы не завершите верификацию или оплату, ваша заявка будет аннулирована, "
-                        "а доступ к сети будет ограничен системой безопасности.\n\n"
-                        "Ждем ваших действий! ⏱"
-                    )
-                    try:
-                        bot.send_message(user_id, reminder_text, parse_mode="Markdown")
-                    except: pass # Бот может быть заблокирован, пофиг, забаним через 3 дня
+                for doc in db['vip_funnel'].find():
+                    user_id = doc['_id']
+                    timestamp = doc.get('timestamp', now)
+                    reminded = doc.get('reminded', False)
                     
-                    # Ставим отметку, что напомнили, и сбрасываем таймер
-                    db['vip_funnel'].update_one({"_id": user_id}, {"$set": {"reminded": True, "timestamp": now}})
-                
-                # 2. Прошло еще 3 дня (259200 секунд) после напоминалки -> КАЗНЬ
-                elif reminded and (now - timestamp > 259200):
-                    # Баним везде
-                    ban_user_everywhere(user_id, reason="Не оплатил ВИП, тянул время", admin_name="Скайнет ⏱")
-                    # Снимаем с мушки
-                    db['vip_funnel'].delete_one({"_id": user_id})
+                    # 1. Напоминание через неделю
+                    if not reminded and (now - timestamp > 604800):
+                        reminder_text = (
+                            "⚠️ **Системное уведомление!**\n\n"
+                            "Вы начали процесс вступления в VIP, но остановились. "
+                            "Если вы не завершите верификацию или оплату, ваша заявка будет аннулирована.\n\n"
+                            "Ждем ваших действий! ⏱"
+                        )
+                        try:
+                            bot.send_message(user_id, reminder_text, parse_mode="Markdown")
+                        except:
+                            pass
+                        
+                        db['vip_funnel'].update_one(
+                            {"_id": user_id}, 
+                            {"$set": {"reminded": True, "timestamp": now}}
+                        )
+                    
+                    # 2. Бан через 3 дня после напоминания
+                    elif reminded and (now - timestamp > 259200):
+                        ban_user_everywhere(user_id, reason="Не оплатил ВИП, тянул время", admin_name="Скайнет ⏱")
+                        db['vip_funnel'].delete_one({"_id": user_id})
+                        
         except Exception as e:
             print(f"Ошибка Снайпера: {e}")
             
-        # Спим 12 часов до следующей проверки
         time.sleep(43200)
 
 # ==================== СЛУШАТЕЛЬ СЕКРЕТАРЯ (РАЗБАН ПО КНОПКЕ) ====================
@@ -1266,18 +1277,22 @@ def glaz_delete_promo():
 @app.route('/glaz/api/system_settings')
 def api_system_settings():
     if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
-    settings = db['settings'].find_one({"_id": "skynet"}) or {"quarantine_active": True, "may_1_active": True}
-    return jsonify(settings)
+    return jsonify(SkynetSettings.get())
 
 @app.route('/glaz/toggle_setting', methods=['POST'])
 def toggle_setting():
     if not session.get('logged_in'): return jsonify({"success": False}), 401
+    
     setting_name = request.form.get('setting')
-    current = db['settings'].find_one({"_id": "skynet"}) or {"quarantine_active": True, "may_1_active": True}
+    if not setting_name: return jsonify({"success": False, "error": "No setting specified"})
+
+    current = SkynetSettings.get()
     new_val = not current.get(setting_name, True)
-    db['settings'].update_one({"_id": "skynet"}, {"$set": {setting_name: new_val}}, upsert=True)
-    add_radar_log(f"⚙️ Система: {setting_name} -> {'ВКЛ' if new_val else 'ВЫКЛ'}")
-    return jsonify({"success": True, "state": new_val})
+    
+    SkynetSettings.set(setting_name, new_val)
+    add_radar_log(f"⚙️ Тумблер: {setting_name} ➡️ {'ВКЛ' if new_val else 'ВЫКЛ'}")
+    
+    return jsonify({"success": True, "state": new_val, "setting": setting_name})
 
 @app.route('/glaz/api/quarantine_list')
 def api_quarantine_list():
@@ -1336,8 +1351,10 @@ def glaz_broadcast():
                 elif "deactivated" in err_text:
                     users_collection.delete_one({"_id": u['_id']})
                     dead_count += 1
-                    # Отправляем фонового рабочего выносить тело из всех 85+ чатов
-                    threading.Thread(target=background_corpse_removal, args=(u['_id'],), daemon=True).start() 
+                    
+                    # 🎛️ ПРОВЕРЯЕМ ТУМБЛЕР С САЙТА (Выносить ли труп из самих чатов?)
+                    if SkynetSettings.get().get("auto_corpse_removal", True):
+                        threading.Thread(target=background_corpse_removal, args=(u['_id'],), daemon=True).start() 
             
         # Отчет в Радар и в чат
         add_radar_log(f"✅ Рассылка: Доставлено {count}. 💀 Вывезено трупов: {dead_count}")
