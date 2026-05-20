@@ -106,7 +106,7 @@
     <div class="tabs-nav">
         <button class="tab-btn active" onclick="openTab('tab-main')">🔍 Обзор и Досье</button>
         <button class="tab-btn" onclick="openTab('tab-radar')">🔴 Радар и Списки</button>
-        <button class="tab-btn" onclick="openTab('tab-support')" style="color: #03dac6; border-color: #03dac6; font-weight: bold;">📩 Входящие</button>
+        <button class="tab-btn" onclick="openTab('tab-support')" style="color: #03dac6; border-color: #03dac6; font-weight: bold;">📩 Входящие <span id="ticket-badge" style="display:none; background:#cf6679; color:#fff; border-radius:50%; padding:2px 6px; font-size:10px; margin-left:5px;">0</span></button>
         <button class="tab-btn" onclick="openTab('tab-blackbox')" style="color: #03dac6; border-color: #03dac6;">🕵️‍♂️ Чёрный Ящик</button>
         <button class="tab-btn" onclick="openTab('tab-quarantine')" style="color: #ffb74d;">🥷 Карантин</button>
         <button class="tab-btn" onclick="openTab('tab-broadcast')" style="color: #bb86fc;">🚀 Рассылка</button>
@@ -730,16 +730,20 @@ function fireBroadcast() {
         // ЖИВОЙ ПУЛЬС
         setInterval(() => {
             fetch('/glaz/api/stats').then(res => res.json()).then(data => {
-                if(!data.error) { document.getElementById('stat-total').innerText = data.total; document.getElementById('stat-vips').innerText = data.vips; document.getElementById('stat-queers').innerText = data.queers; document.getElementById('stat-banned').innerText = data.banned; }
-            });
-            fetch('/glaz/api/chart_data').then(res => res.json()).then(data => {
-                if(!data.error && statusChart && cityChart) { statusChart.data.datasets[0].data = data.status_values; statusChart.update(); cityChart.data.labels = data.city_labels; cityChart.data.datasets[0].data = data.city_values; cityChart.update(); }
-            });
-            fetch('/glaz/api/radar').then(res => res.json()).then(logs => {
-                if(!logs.error && document.getElementById('radar-box')) {
-                    let html = ''; logs.forEach(log => { html += `<div class="radar-line">${log}</div>`; });
-                    if(logs.length === 0) html = '<div style="color:#888;">Жду новых событий...</div>';
-                    document.getElementById('radar-box').innerHTML = html;
+                if(!data.error) { 
+                    document.getElementById('stat-total').innerText = data.total; 
+                    document.getElementById('stat-vips').innerText = data.vips; 
+                    document.getElementById('stat-queers').innerText = data.queers; 
+                    document.getElementById('stat-banned').innerText = data.banned; 
+                    
+                    // Обновляем красный счетчик тикетов
+                    const badge = document.getElementById('ticket-badge');
+                    if (data.unanswered_tickets > 0) {
+                        badge.style.display = 'inline-block';
+                        badge.innerText = data.unanswered_tickets;
+                    } else {
+                        badge.style.display = 'none';
+                    }
                 }
             });
             if(activeProxySession && document.getElementById('tab-blackbox').classList.contains('active')) { loadProxyChat(activeProxySession); }
@@ -1073,9 +1077,16 @@ function openTicket(t) {
                         <div class="msg-meta">${dateStr}</div>
                      </div>`;
     
-    // Если уже ответили, добавляем плашку
+    // Если уже ответили, показываем сам текст ответа (или старую плашку, если текста нет)
     if(t.is_answered) {
-        box.innerHTML += `<div style="text-align:center; color:#03dac6; margin-top:20px; font-size:12px;">✅ Вы уже ответили на этот тикет</div>`;
+        if(t.reply_text) {
+            box.innerHTML += `<div class="msg-box msg-vip" style="max-width: 90%; background: #03dac6; color: #121212; margin-top: 15px; align-self: flex-end;">
+                <div style="font-size:11px; font-weight:bold; margin-bottom:5px;">👨‍💻 Ваш ответ:</div>
+                ${t.reply_text}
+            </div>`;
+        } else {
+            box.innerHTML += `<div style="text-align:center; color:#03dac6; margin-top:20px; font-size:12px;">✅ Вы уже ответили на этот тикет</div>`;
+        }
     }
 }
 
