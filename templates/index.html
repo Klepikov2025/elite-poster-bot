@@ -217,7 +217,12 @@
                     </div>
                     <div style="padding: 15px; background: #1e1e1e; border-top: 1px solid #333; border-radius: 0 0 10px 10px;">
                         <textarea id="ticket-reply-text" class="form-control" placeholder="Написать ответ пользователю..." style="width: 100%; height: 60px; background: #121212; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 5px; margin-bottom: 10px; resize: vertical; box-sizing: border-box; font-size: 13px;"></textarea>
-                        <button class="form-btn" style="width: 100%; background: #03dac6; color: #121212; font-weight: bold;" onclick="sendTicketReply()">📤 Отправить ответ от имени Бота</button>
+                        
+                        <div style="display: flex; gap: 10px;">
+                            <button class="form-btn" style="flex: 2; background: #03dac6; color: #121212; font-weight: bold;" onclick="sendTicketReply()">📤 Отправить ответ</button>
+                            <button class="form-btn" style="flex: 1; background: #252525; color: #aaa; border: 1px solid #444;" onclick="closeTicket()" onmouseover="this.style.color='#fff'; this.style.borderColor='#cf6679';" onmouseout="this.style.color='#aaa'; this.style.borderColor='#444';">✅ Вопрос Решен</button>
+                        </div>
+                        
                     </div>
                 </div>
             </div>
@@ -729,6 +734,7 @@ function fireBroadcast() {
 
         // ЖИВОЙ ПУЛЬС
         setInterval(() => {
+            // 1. Обновляем статистику и бейджик входящих
             fetch('/glaz/api/stats').then(res => res.json()).then(data => {
                 if(!data.error) { 
                     document.getElementById('stat-total').innerText = data.total; 
@@ -736,7 +742,6 @@ function fireBroadcast() {
                     document.getElementById('stat-queers').innerText = data.queers; 
                     document.getElementById('stat-banned').innerText = data.banned; 
                     
-                    // Обновляем красный счетчик тикетов
                     const badge = document.getElementById('ticket-badge');
                     if (data.unanswered_tickets > 0) {
                         badge.style.display = 'inline-block';
@@ -746,7 +751,23 @@ function fireBroadcast() {
                     }
                 }
             });
-            if(activeProxySession && document.getElementById('tab-blackbox').classList.contains('active')) { loadProxyChat(activeProxySession); }
+
+            // 2. Обновляем Живой Радар (Web-Логи)
+            fetch('/glaz/api/radar').then(res => res.json()).then(data => {
+                const box = document.getElementById('radar-box');
+                // Обновляем только если вкладка открыта (экономим ресурсы браузера)
+                if(box && document.getElementById('tab-radar').classList.contains('active')) {
+                    let html = '';
+                    data.forEach(line => { html += `<div class="radar-line">${line}</div>`; });
+                    if(data.length === 0) html = '<div style="color: #888;">Радар пуст. Ждем событий...</div>';
+                    box.innerHTML = html;
+                }
+            });
+
+            // 3. Обновляем Черный ящик
+            if(activeProxySession && document.getElementById('tab-blackbox').classList.contains('active')) { 
+                loadProxyChat(activeProxySession); 
+            }
         }, 5000);
 
         window.onload = function() {
@@ -1035,8 +1056,9 @@ function saveSystemTexts() {
     }).catch(() => showToast("❌ Ошибка связи с сервером"));
 }
 
-// === СИСТЕМА ТИКЕТОВ (ВХОДЯЩИЕ) ===
-let currentActiveTicket = null;
+// === СИСТЕМА ТИКЕТОВ (ВХОДЯЩИЕ 2.0 - РЕЖИМ МЕССЕНДЖЕРА) ===
+let currentActiveUid = null;
+let currentActiveName = "";
 
 function loadSupportTickets() {
     fetch('/glaz/api/tickets').then(res => res.json()).then(data => {
@@ -1044,11 +1066,12 @@ function loadSupportTickets() {
         data.forEach(t => {
             const statusBadge = t.is_answered 
                 ? '<span style="color:#888; font-size:10px;">✅ Отвечен</span>' 
-                : '<span style="color:#cf6679; font-size:10px; font-weight:bold;">🔴 Ждет ответа</span>';
+                : '<span style="color:#cf6679; font-size:10px; font-weight:bold;">🔴 Новое сообщение</span>';
                 
             const shortText = t.text.length > 30 ? t.text.substring(0, 30) + '...' : t.text;
+            const safeName = t.name.replace(/'/g, "\\'");
             
-            html += `<div class="session-item" id="ticket-${t.timestamp}" onclick='openTicket(${JSON.stringify(t).replace(/'/g, "&apos;")})'>
+            html += `<div class="session-item" id="ticket-${t.uid}" onclick="openTicket(${t.uid}, '${safeName}')">
                         <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px; color: #fff;">${t.name} <span style="font-size: 11px; color: #aaa;">(${t.uid})</span></div>
                         <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">${shortText}</div>
                         <div style="display:flex; justify-content:space-between;">${statusBadge}</div>
@@ -1056,64 +1079,94 @@ function loadSupportTickets() {
         });
         if(data.length === 0) html = '<div style="padding: 20px; text-align: center; color: #888;">Входящих сообщений нет</div>';
         document.getElementById('tickets-list-container').innerHTML = html;
+        
+        // Сохраняем подсветку активного чата при автообновлении
+        if(currentActiveUid) {
+            const activeItem = document.getElementById(`ticket-${currentActiveUid}`);
+            if(activeItem) activeItem.classList.add('active');
+        }
     });
 }
 
-function openTicket(t) {
-    currentActiveTicket = t;
-    // Подсветка активного тикета
+function openTicket(uid, name) {
+    currentActiveUid = uid;
+    currentActiveName = name;
+    
     document.querySelectorAll('#tickets-list-container .session-item').forEach(el => el.classList.remove('active'));
-    document.getElementById(`ticket-${t.timestamp}`).classList.add('active');
+    const item = document.getElementById(`ticket-${uid}`);
+    if(item) item.classList.add('active');
     
-    // Заголовок
-    document.getElementById('ticket-header').innerHTML = `Диалог с: ${t.name} [ID: ${t.uid}]`;
+    document.getElementById('ticket-header').innerHTML = `Диалог с: ${name} [ID: ${uid}]`;
     
-    // Само сообщение
-    const box = document.getElementById('ticket-box');
-    const dateStr = new Date(t.timestamp * 1000).toLocaleString();
-    box.innerHTML = `<div class="msg-box msg-guest" style="max-width: 90%;">
-                        <div style="font-size:11px; color:#bb86fc; font-weight:bold; margin-bottom:5px;">👤 ${t.name} (Вопрос):</div>
-                        ${t.text}
-                        <div class="msg-meta">${dateStr}</div>
-                     </div>`;
-    
-    // Если уже ответили, показываем сам текст ответа (или старую плашку, если текста нет)
-    if(t.is_answered) {
-        if(t.reply_text) {
-            box.innerHTML += `<div class="msg-box msg-vip" style="max-width: 90%; background: #03dac6; color: #121212; margin-top: 15px; align-self: flex-end;">
-                <div style="font-size:11px; font-weight:bold; margin-bottom:5px;">👨‍💻 Ваш ответ:</div>
-                ${t.reply_text}
-            </div>`;
-        } else {
-            box.innerHTML += `<div style="text-align:center; color:#03dac6; margin-top:20px; font-size:12px;">✅ Вы уже ответили на этот тикет</div>`;
-        }
-    }
+    // Подгружаем ВСЮ историю переписки с сервера для этого юзера
+    fetch(`/glaz/api/tickets/history?uid=${uid}`).then(res => res.json()).then(history => {
+        const box = document.getElementById('ticket-box');
+        box.innerHTML = '';
+        
+        history.forEach(t => {
+            const dateStr = new Date(t.timestamp * 1000).toLocaleString();
+            
+            // Рендерим сообщение пользователя
+            box.innerHTML += `<div class="msg-box msg-guest" style="max-width: 90%; margin-bottom: 5px; align-self: flex-start;">
+                                <div style="font-size:11px; color:#bb86fc; font-weight:bold; margin-bottom:3px;">👤 ${t.name}:</div>
+                                ${t.text}
+                                <div class="msg-meta">${dateStr}</div>
+                             </div>`;
+            
+            // Если на это сообщение был дан ответ админа — выводим его следом в правый бок
+            if(t.reply_text) {
+                box.innerHTML += `<div class="msg-box msg-vip" style="max-width: 90%; background: #03dac6; color: #121212; margin-bottom: 15px; align-self: flex-end;">
+                                    <div style="font-size:11px; font-weight:bold; margin-bottom:3px;">👨‍💻 Ваш ответ:</div>
+                                    ${t.reply_text}
+                                 </div>`;
+            }
+        });
+        box.scrollTop = box.scrollHeight; // Скроллим чат вниз до упора
+    });
 }
 
 function sendTicketReply() {
-    if(!currentActiveTicket) { showToast("⚠️ Выберите сообщение из списка!"); return; }
+    if(!currentActiveUid) { showToast("⚠️ Выберите диалог из списка!"); return; }
     
     const textEl = document.getElementById('ticket-reply-text');
     const text = textEl.value.trim();
     if(!text) { showToast("⚠️ Напишите текст ответа!"); return; }
 
     fetch('/glaz/api/tickets/reply', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ uid: currentActiveTicket.uid, text: text, timestamp: currentActiveTicket.timestamp })
+        method: 'POST', 
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ uid: currentActiveUid, text: text })
     })
     .then(res => res.json())
     .then(data => {
         if(data.success) {
             showToast("✅ Ответ отправлен!");
-            textEl.value = ''; // Очищаем поле
-            loadSupportTickets(); // Перезагружаем список слева
-            // Добавляем наш ответ визуально в чат
-            document.getElementById('ticket-box').innerHTML += `<div class="msg-box msg-vip" style="max-width: 90%; background: #03dac6; color: #121212; margin-top: 15px;">
-                <div style="font-size:11px; font-weight:bold; margin-bottom:5px;">👨‍💻 Ваш ответ:</div>
-                ${text}
-            </div>`;
+            textEl.value = ''; // Очищаем поле ввода
+            openTicket(currentActiveUid, currentActiveName); // Перезагружаем чат, чтобы ответ появился в ленте
+            loadSupportTickets(); // Обновляем левую панель контактов
         } else {
             showToast("❌ Ошибка: " + (data.error || "Не удалось отправить"));
+        }
+    });
+}
+
+function closeTicket() {
+    if(!currentActiveUid) { showToast("⚠️ Выберите диалог для закрытия!"); return; }
+    if(!confirm("Уверены, что вопрос решен? Диалог будет скрыт в архив.")) return;
+
+    fetch('/glaz/api/tickets/close', {
+        method: 'POST', 
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ uid: currentActiveUid })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) {
+            showToast("🧹 Диалог успешно закрыт и убран из панели!");
+            currentActiveUid = null;
+            document.getElementById('ticket-header').innerHTML = 'Выберите сообщение из списка слева';
+            document.getElementById('ticket-box').innerHTML = '<div style="color: #888; text-align: center; margin-top: 40px;">Диалог закрыт.в архив</div>';
+            loadSupportTickets(); // Обновляем список, закрытый контакт исчезнет!
         }
     });
 }
