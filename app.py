@@ -1062,7 +1062,8 @@ def api_stats():
         "total": users_collection.count_documents({}),
         "vips": users_collection.count_documents({"is_vip": True}),
         "queers": users_collection.count_documents({"is_queer": True}),
-        "banned": banned_collection.count_documents({})
+        "banned": banned_collection.count_documents({}),
+        "unanswered_tickets": db['support_tickets'].count_documents({"is_answered": False}) # <--- НОВОЕ
     })
 
 @app.route('/glaz/api/chart_data')
@@ -1691,10 +1692,10 @@ def api_reply_ticket():
             f"👨‍💻 **Ответ Службы Поддержки:**\n\n{text}", 
             parse_mode="Markdown"
         )
-        # Помечаем в базе, что тикет закрыт (отвечен)
+        # Помечаем в базе, что тикет закрыт (отвечен) и СОХРАНЯЕМ ТЕКСТ ОТВЕТА
         db['support_tickets'].update_one(
             {"uid": int(uid), "timestamp": timestamp},
-            {"$set": {"is_answered": True}}
+            {"$set": {"is_answered": True, "reply_text": text}}
         )
         add_radar_log(f"✅ Отправлен ответ на тикет юзеру {uid}")
         return jsonify({"success": True})
