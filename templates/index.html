@@ -164,6 +164,15 @@
                 {% if user_data.history %}
                 <div style="margin-top: 15px; background: #1a1a1a; padding: 12px; border-radius: 5px; border: 1px solid #333;"><span class="info-label" style="color: #bb86fc; font-weight: bold; font-size: 13px;">📜 ПОЛНАЯ ХРОНОЛОГИЯ:</span><ul style="margin: 8px 0 0 0; padding-left: 20px; color: #ccc; font-size: 13px; line-height: 1.6; text-align: left;">{% for log in user_data.history %}<li>{{ log }}</li>{% endfor %}</ul></div>
                 {% endif %}
+                <div style="margin-top: 20px; background: #1a1a1a; padding: 15px; border-radius: 8px; border: 1px solid #333; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);">
+                    <span class="info-label" style="color: #03dac6; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                        👁‍🗨 Голос Саурона (Прямая связь ЛС)
+                    </span>
+                    <textarea id="sauron-msg-text-{{ user_data.id }}" class="form-control" placeholder="Напишите ответ пользователю. Поддерживается Markdown (*жирный*)." style="width: 100%; height: 70px; background: #121212; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 5px; margin-bottom: 10px; resize: vertical; box-sizing: border-box; font-size: 13px;"></textarea>
+                    <button type="button" class="form-btn" style="width: 100%; background: #2d2d2d; border: 1px solid #03dac6; color: #03dac6; padding: 10px; font-size: 14px; font-weight: bold; transition: 0.2s;" onclick="sendSauronMessage({{ user_data.id }})" onmouseover="this.style.background='#03dac6'; this.style.color='#121212';" onmouseout="this.style.background='#2d2d2d'; this.style.color='#03dac6';">
+                        ✉️ Отправить сообщение от имени Бота
+                    </button>
+                </div>
                 <div class="actions-grid">
                     <button type="button" class="act-btn ban" onclick="fireAction({{ user_data.id }}, 'ban')">🔨 Забанить везде</button>
                     <button type="button" class="act-btn unban" onclick="fireAction({{ user_data.id }}, 'unban')">🕊️ Амнистировать</button>
@@ -225,7 +234,23 @@
                 </select>
                 <button class="form-btn" style="background: #03dac6; color: #121212; font-weight: bold; font-size: 18px;" onclick="fireBroadcast()">🚀 ЗАПУСТИТЬ</button>
             </div>
-        </div>
+
+            <div style="margin-top: 30px; border-top: 2px dashed #333; padding-top: 20px;">
+                <h3 style="color: #03dac6; margin-bottom: 15px;">🤖 База Шаблонов и Автопилот</h3>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <input type="text" id="template-name" class="form-input" placeholder="Название шаблона (напр. Реклама VPN)" style="flex: 1;">
+                    <button class="form-btn" style="background: #bb86fc; color: #121212;" onclick="saveTemplate()">💾 Сохранить текущий пост как Шаблон</button>
+                </div>
+
+                <table class="admin-table">
+                    <thead><tr><th>Название</th><th>Аудитория</th><th>Автопилот</th><th>Действия</th></tr></thead>
+                    <tbody id="templates-tbody">
+                        <tr><td colspan="4" style="text-align: center; color: #888;">Загрузка шаблонов...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            </div>
     </div>
 
     <div id="tab-mass" class="tab-content">
@@ -276,10 +301,48 @@
             </div>
             <div id="toggles-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 16px;">
             </div>
-        </div>
-    </div>
+        </div> <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #333; padding: 20px; border-radius: 10px; max-width: 1000px;">
+            <h3 style="color: #cf6679; margin-bottom: 10px; font-size: 18px;">🤬 Словарь Инквизитора (Живые фильтры)</h3>
+            <p style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Добавляйте слова-триггеры. Бот начнет удалять их без перезагрузки сервера.</p>
+            
+            <div style="display: flex; gap: 20px;">
+                <div style="flex: 1; border: 1px solid #cf6679; padding: 15px; border-radius: 8px; background: rgba(207, 102, 121, 0.05);">
+                    <h4 style="color: #cf6679; margin-top: 0;">🔴 Красная зона (Глобал Бан)</h4>
+                    <div id="dict-red-list" style="margin-bottom: 15px; min-height: 50px; display: flex; flex-wrap: wrap; gap: 5px;"></div>
+                    <input type="text" id="dict-red-input" class="form-control" placeholder="Например: меф" style="width: 100%; margin-bottom: 10px; background: #222; color: #fff; border: 1px solid #555; padding: 8px; box-sizing: border-box;">
+                    <label style="font-size: 12px; color: #aaa; display: flex; align-items: center; gap: 5px; margin-bottom: 10px;">
+                        <input type="checkbox" id="dict-red-exact"> Точное совпадение (без склонений)
+                    </label>
+                    <button onclick="addDictWord('red')" class="btn btn-sm" style="background: #cf6679; color: #fff; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; width: 100%;">➕ Добавить в Бан-лист</button>
+                </div>
 
-    <div id="tab-withdrawals" class="tab-content">
+                <div style="flex: 1; border: 1px solid #ffb74d; padding: 15px; border-radius: 8px; background: rgba(255, 183, 77, 0.05);">
+                    <h4 style="color: #ffb74d; margin-top: 0;">🟡 Желтая зона (Мут коммерции)</h4>
+                    <div id="dict-yellow-list" style="margin-bottom: 15px; min-height: 50px; display: flex; flex-wrap: wrap; gap: 5px;"></div>
+                    <input type="text" id="dict-yellow-input" class="form-control" placeholder="Например: прайс" style="width: 100%; margin-bottom: 10px; background: #222; color: #fff; border: 1px solid #555; padding: 8px; box-sizing: border-box;">
+                    <label style="font-size: 12px; color: #aaa; display: flex; align-items: center; gap: 5px; margin-bottom: 10px;">
+                        <input type="checkbox" id="dict-yellow-exact"> Точное совпадение (без склонений)
+                    </label>
+                    <button onclick="addDictWord('yellow')" class="btn btn-sm" style="background: #ffb74d; color: #121212; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%;">➕ Добавить в Мут-лист</button>
+                </div>
+            </div>
+        </div>
+        <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #333; padding: 20px; border-radius: 10px; max-width: 1000px;">
+            <h3 style="color: #bb86fc; margin-bottom: 10px; font-size: 18px;">📝 Конструктор Правил и Приветствий</h3>
+            <p style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Редактируйте системные сообщения Скайнета. Используйте тег <code>{user_link}</code>, чтобы бот обращался к нарушителю по имени.</p>
+
+            <label style="color: #ffb74d; font-weight: bold; display: block; margin-bottom: 5px;">🥷 Текст карантина новорегов:</label>
+            <textarea id="text-quarantine" class="form-control" style="width: 100%; height: 80px; background: #222; color: #fff; border: 1px solid #555; padding: 10px; margin-bottom: 15px; border-radius: 5px;"></textarea>
+
+            <label style="color: #03dac6; font-weight: bold; display: block; margin-bottom: 5px;">📏 Текст операции «1 Мая» (Параметры):</label>
+            <textarea id="text-may1" class="form-control" style="width: 100%; height: 200px; background: #222; color: #fff; border: 1px solid #555; padding: 10px; margin-bottom: 15px; border-radius: 5px;"></textarea>
+
+            <label style="color: #cf6679; font-weight: bold; display: block; margin-bottom: 5px;">🔞 Текст для фильтра 18+ (Оранжевая зона):</label>
+            <textarea id="text-minor" class="form-control" style="width: 100%; height: 80px; background: #222; color: #fff; border: 1px solid #555; padding: 10px; margin-bottom: 15px; border-radius: 5px;"></textarea>
+
+            <button class="form-btn" style="background: #bb86fc; color: #121212; width: 100%; font-weight: bold; font-size: 16px;" onclick="saveSystemTexts()">💾 Сохранить тексты в сеть</button>
+        </div>
+        </div> <div id="tab-withdrawals" class="tab-content">
         <div class="panel-block" style="max-width: 900px;">
             <h3>💸 Очередь финансовых выплат</h3>
             <table class="admin-table">
@@ -731,9 +794,212 @@ function saveRootButtons() {
         body: JSON.stringify({pin: sessionPin, buttons: buttons})
     })
     .then(res => res.json())
-    .then(data => {
+.then(data => {
         if(data.status === 'ok') alert("✅ Цвета и премиум-эмодзи успешно вшиты в Скайнет!");
     });
+}
+
+// === СЛОВАРЬ ИНКВИЗИТОРА ===
+function loadDictionary() {
+    fetch('/glaz/api/dictionary')
+    .then(res => res.json())
+    .then(data => {
+        renderDictList('red', data.red);
+        renderDictList('yellow', data.yellow);
+    });
+}
+
+function renderDictList(zone, words) {
+    const container = document.getElementById(`dict-${zone}-list`);
+    let html = '';
+    const color = zone === 'red' ? '#cf6679' : '#ffb74d';
+    words.forEach(item => {
+        const exactIcon = item.exact ? '🎯' : '🔤';
+        html += `<div style="background: #2d2d2d; border: 1px solid ${color}; padding: 3px 8px; border-radius: 15px; font-size: 12px; display: flex; align-items: center; gap: 5px;">
+            ${exactIcon} ${item.word} 
+            <span onclick="removeDictWord('${item.word}', '${zone}')" style="cursor: pointer; color: #aaa; margin-left: 5px;">✖</span>
+        </div>`;
+    });
+    if(words.length === 0) html = '<span style="color: #666; font-size: 12px;">Список пуст...</span>';
+    container.innerHTML = html;
+}
+
+function addDictWord(zone) {
+    const input = document.getElementById(`dict-${zone}-input`);
+    const exact = document.getElementById(`dict-${zone}-exact`).checked;
+    const word = input.value.trim();
+    if(!word) return;
+
+    fetch('/glaz/api/dictionary/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({word: word, zone: zone, exact: exact})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) {
+            input.value = '';
+            showToast(data.message);
+            loadDictionary(); // Перезагружаем список
+        } else {
+            showToast("❌ Ошибка: " + data.error);
+        }
+    });
+}
+
+function removeDictWord(word, zone) {
+    fetch('/glaz/api/dictionary/remove', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({word: word, zone: zone})
+    })
+    .then(res => res.json())
+    .then(data => { if(data.success) loadDictionary(); });
+}
+
+// Загружаем словарь при открытии вкладки "Система"
+const originalOpenTab = openTab;
+openTab = function(tabId) {
+    originalOpenTab(tabId);
+    if(tabId === 'tab-system') { loadDictionary(); loadSystemTexts(); } // Добавили загрузку текстов
+    if(tabId === 'tab-broadcast') loadTemplates();
+};
+
+// === ГОЛОС САУРОНА (Связь с юзером) ===
+function sendSauronMessage(uid) {
+    const textEl = document.getElementById('sauron-msg-text-' + uid);
+    const text = textEl.value.trim();
+    if(!text) { showToast("⚠️ Введите текст сообщения!"); return; }
+
+    const formData = new FormData();
+    formData.append('uid', uid);
+    formData.append('message', text);
+
+    fetch('/glaz/api/send_sauron_msg', { method: 'POST', body: formData })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) {
+            showToast("✅ Сообщение успешно доставлено юзеру!");
+            textEl.value = ''; // Очищаем поле после отправки
+        } else {
+            showToast("❌ Ошибка: " + (data.error || "Не удалось отправить"));
+        }
+    })
+    .catch(() => showToast("❌ Ошибка связи с сервером"));
+}
+
+// === АВТОПИЛОТ И ШАБЛОНЫ ===
+function loadTemplates() {
+    fetch('/glaz/api/templates').then(res => res.json()).then(data => {
+        let html = '';
+        data.forEach(t => {
+            const targetName = t.target === 'all' ? '🌐 Всем' : t.target === 'vip' ? '👑 VIP' : '🏳️‍🌈 QUEER';
+            
+            const selectHtml = `
+                <select class="form-control" style="background: #222; color: #fff; border: 1px solid #444; padding: 5px; font-size: 12px; width: 130px;" onchange="toggleAutopilot('${t.id}', this.value)">
+                    <option value="0" ${t.autopilot_interval == 0 ? 'selected' : ''}>Остановлен</option>
+                    <option value="6" ${t.autopilot_interval == 6 ? 'selected' : ''}>Каждые 6 часов</option>
+                    <option value="12" ${t.autopilot_interval == 12 ? 'selected' : ''}>Каждые 12 часов</option>
+                    <option value="24" ${t.autopilot_interval == 24 ? 'selected' : ''}>Раз в сутки (24ч)</option>
+                    <option value="48" ${t.autopilot_interval == 48 ? 'selected' : ''}>Раз в 2 дня</option>
+                    <option value="168" ${t.autopilot_interval == 168 ? 'selected' : ''}>Раз в неделю</option>
+                </select>
+            `;
+
+            const badge = t.autopilot_interval > 0 
+                ? `<span style="color:#03dac6; font-size:10px; display:block; margin-top:3px;">🟢 Активен (${t.autopilot_interval}ч)</span>`
+                : '';
+
+            html += `<tr>
+                <td><strong>${t.name}</strong></td>
+                <td>${targetName}</td>
+                <td>${selectHtml}${badge}</td>
+                <td>
+                    <div style="display:flex; gap:5px;">
+                        <button class="act-btn unban" style="padding: 5px 10px; font-size:11px; width: auto;" onclick='loadTemplateToForm(${JSON.stringify(t).replace(/'/g, "&apos;")})'>📥 Загрузить</button>
+                        <button class="act-btn ban" style="padding: 5px 10px; font-size:11px; width: auto;" onclick="deleteTemplate('${t.id}')">❌</button>
+                    </div>
+                </td>
+            </tr>`;
+        });
+        if(data.length === 0) html = '<tr><td colspan="4" style="text-align: center; color: #888;">Шаблонов пока нет</td></tr>';
+        
+        const tbody = document.getElementById('templates-tbody');
+        if(tbody) tbody.innerHTML = html;
+    });
+}
+
+function saveTemplate() {
+    const name = document.getElementById('template-name').value.trim();
+    const txt = document.getElementById('broadcast-text').value.trim();
+    const tgt = document.getElementById('broadcast-target').value;
+    if(!name || !txt) { showToast("⚠️ Введите название и текст рассылки!"); return; }
+
+    const rows = document.querySelectorAll('#broadcast-buttons-container .bc-btn-row');
+    const buttons = [];
+    rows.forEach(row => {
+        const inputs = row.querySelectorAll('input');
+        const select = row.querySelector('select');
+        const bText = inputs[0].value.trim(), bUrl = inputs[1].value.trim(), bStyle = select.value, bEmojiId = inputs[2].value.trim();
+        if(bText && bUrl) buttons.push({text: bText, url: bUrl, style: bStyle, emoji_id: bEmojiId});
+    });
+
+    fetch('/glaz/api/templates/save', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name, text: txt, target: tgt, buttons: buttons})
+    }).then(res => res.json()).then(data => {
+        if(data.success) { showToast("✅ Шаблон сохранен!"); document.getElementById('template-name').value = ''; loadTemplates(); }
+    });
+}
+
+function deleteTemplate(id) {
+    if(!confirm("Удалить этот шаблон?")) return;
+    fetch('/glaz/api/templates/delete', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: id})
+    }).then(res => res.json()).then(data => { if(data.success) loadTemplates(); });
+}
+
+function toggleAutopilot(id, interval) {
+    fetch('/glaz/api/templates/toggle_autopilot', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: id, interval: interval})
+    }).then(res => res.json()).then(data => { 
+        if(data.success) { showToast(interval > 0 ? "🟢 Автопилот запущен!" : "🔴 Автопилот остановлен!"); loadTemplates(); } 
+    });
+}
+
+function loadTemplateToForm(t) {
+    document.getElementById('broadcast-text').value = t.text;
+    document.getElementById('broadcast-target').value = t.target;
+    document.getElementById('broadcast-buttons-container').innerHTML = '';
+    if(t.buttons) { t.buttons.forEach(b => addBroadcastButtonRow(b.text, b.url, b.style, b.emoji_id)); }
+    showToast("📥 Шаблон загружен в редактор!");
+}
+
+// === КОНСТРУКТОР ТЕКСТОВ ===
+function loadSystemTexts() {
+    fetch('/glaz/api/system_texts').then(res => res.json()).then(data => {
+        document.getElementById('text-quarantine').value = data.quarantine_warn || '';
+        document.getElementById('text-may1').value = data.may_1_warn || '';
+        document.getElementById('text-minor').value = data.minor_warn || '';
+    });
+}
+
+function saveSystemTexts() {
+    const payload = {
+        quarantine_warn: document.getElementById('text-quarantine').value.trim(),
+        may_1_warn: document.getElementById('text-may1').value.trim(),
+        minor_warn: document.getElementById('text-minor').value.trim()
+    };
+    
+    fetch('/glaz/api/system_texts/save', {
+        method: 'POST', 
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) showToast(data.message);
+    }).catch(() => showToast("❌ Ошибка связи с сервером"));
 }
     </script>
 </body>
