@@ -1063,7 +1063,7 @@ def api_stats():
         "vips": users_collection.count_documents({"is_vip": True}),
         "queers": users_collection.count_documents({"is_queer": True}),
         "banned": banned_collection.count_documents({}),
-        "unanswered_tickets": db['support_tickets'].count_documents({"is_answered": False}) # <--- НОВОЕ
+        "unanswered_tickets": db['support_tickets'].count_documents({"is_answered": False, "is_closed": {"$ne": True}})
     })
 
 @app.route('/glaz/api/chart_data')
@@ -1669,13 +1669,39 @@ def autopilot_daemon():
 threading.Thread(target=autopilot_daemon, daemon=True).start()
 # =======================================
 
-# === 📩 WEB-МЕССЕНДЖЕР (САППОРТ) ===
+# === 📩 WEB-МЕССЕНДЖЕР (САППОРТ - ВЕРСИЯ 2.0) ===
 @app.route('/glaz/api/tickets', methods=['GET'])
 def api_get_tickets():
     if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
-    # Достаем последние 50 вопросов
-    tickets = list(db['support_tickets'].find({}, {"_id": 0}).sort("timestamp", -1).limit(50))
+    
+    # 🧠 МАГИЯ АГРЕГАЦИИ: Группируем сообщения по uid, берем только НЕЗАКРЫТЫЕ диалоги
+    pipeline = [
+        {"$match": {"is_closed": {"$ne": True}}},
+        {"$sort": {"timestamp": -1}}, # Сначала свежие
+        {"$group": {
+            "_id": "$uid",
+            "uid": {"$first": "$uid"},
+            "name": {"$first": "$name"},
+            "username": {"$first": "$username"},
+            "text": {"$first": "$text"},
+            "timestamp": {"$first": "$timestamp"},
+            "is_answered": {"$first": "$is_answered"}
+        }},
+        {"$sort": {"timestamp": -1}} # Сортируем список контактов по последнему действию
+    ]
+    tickets = list(db['support_tickets'].aggregate(pipeline))
     return jsonify(tickets)
+
+@app.route('/glaz/api/tickets/history', methods=['GET'])
+def api_get_ticket_history():
+    if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+    uid = request.args.get('uid')
+    if not uid: return jsonify([])
+    
+    # Достаем ВСЮ историю переписки с этим пользователем для ленты чата
+    history = list(db['support_tickets'].find({"uid": int(uid)}).sort("timestamp", 1))
+    for h in history: h.pop('_id', None) # Чистим для JSON
+    return jsonify(history)
 
 @app.route('/glaz/api/tickets/reply', methods=['POST'])
 def api_reply_ticket():
@@ -1683,24 +1709,47 @@ def api_reply_ticket():
     data = request.json
     uid = data.get('uid')
     text = data.get('text')
-    timestamp = data.get('timestamp')
     
     try:
-        # Отправляем ответ юзеру
+        # Отправляем ответ юзеру в телеграм
         bot.send_message(
             int(uid), 
             f"👨‍💻 **Ответ Службы Поддержки:**\n\n{text}", 
             parse_mode="Markdown"
         )
-        # Помечаем в базе, что тикет закрыт (отвечен) и СОХРАНЯЕМ ТЕКСТ ОТВЕТА
-        db['support_tickets'].update_one(
-            {"uid": int(uid), "timestamp": timestamp},
+        # Помечаем ВСЕ активные сообщения этого юзера как отвеченные и сохраняем текст последнего ответа
+        db['support_tickets'].update_many(
+            {"uid": int(uid), "is_answered": False},
             {"$set": {"is_answered": True, "reply_text": text}}
         )
-        add_radar_log(f"✅ Отправлен ответ на тикет юзеру {uid}")
+        add_radar_log(f"✅ Отправлен ответ юзеру {uid}")
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
+
+@app.route('/glaz/api/tickets/close', methods=['POST'])
+def api_close_ticket():
+    if not session.get('logged_in'): return jsonify({"success": False}), 401
+    data = request.json
+    uid = data.get('uid')
+    
+    # Архивируем (закрываем) абсолютно все сообщения от этого юзера
+    db['support_tickets'].update_many(
+        {"uid": int(uid)},
+        {"$set": {"is_closed": True}}
+    )
+    
+    # Отправляем юзеру красивое уведомление в ТГ
+    try:
+        bot.send_message(
+            int(uid), 
+            "✅ **Ваш запрос в Поддержку успешно решен и закрыт.**\n\nЕсли у вас возникнут новые вопросы — просто нажмите кнопку **«💬 Написать в Поддержку»** в меню бота, и мы снова будем на связи!", 
+            parse_mode="Markdown"
+        )
+    except: pass
+    
+    add_radar_log(f"🧹 Все тикеты юзера {uid} закрыты и перемещены в архив.")
+    return jsonify({"success": True})
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
