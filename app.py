@@ -10,6 +10,7 @@ import pymongo
 from pymongo import MongoClient
 import pytz
 import random
+import uuid
 import json
 import re
 import time
@@ -1422,6 +1423,210 @@ def api_save_root_buttons():
         upsert=True
     )
     return jsonify({"status": "ok"})
+
+# === 🤬 СЛОВАРЬ ИНКВИЗИТОРА (Живой фильтр) ===
+@app.route('/glaz/api/dictionary', methods=['GET'])
+def get_dictionary():
+    # Тянем слова из базы
+    data = db['settings'].find_one({"_id": "skynet_dictionary"}) or {"red": [], "yellow": []}
+    return jsonify({"red": data.get("red", []), "yellow": data.get("yellow", [])})
+
+@app.route('/glaz/api/dictionary/add', methods=['POST'])
+def add_dictionary_word():
+    if not session.get('logged_in'): return jsonify({"success": False, "error": "Unauthorized"}), 401
+    
+    data = request.json
+    word = data.get('word', '').strip().lower()
+    zone = data.get('zone') # 'red' или 'yellow'
+    exact = data.get('exact', False)
+    
+    if not word or zone not in ['red', 'yellow']:
+        return jsonify({"success": False, "error": "Некорректные данные"})
+
+    # 🧠 УМНАЯ ГЕНЕРАЦИЯ REGEX (Машинный код)
+    # Если галочка "Точное совпадение": ищем строго это слово (например "мяу", но не "мяукать")
+    if exact:
+        pattern = rf"\b{word}\b"
+    # Если галочка снята: ищем корень и любые окончания (например "папик", "папика", "папику")
+    else:
+        pattern = rf"\b{word}[а-я]*\b"
+
+    # Сохраняем в базу и само слово, и его машинный код
+    new_entry = {"word": word, "pattern": pattern, "exact": exact}
+    
+    db['settings'].update_one(
+        {"_id": "skynet_dictionary"},
+        {"$push": {zone: new_entry}},
+        upsert=True
+    )
+    return jsonify({"success": True, "message": f"Слово '{word}' добавлено в {zone} зону!"})
+
+@app.route('/glaz/api/dictionary/remove', methods=['POST'])
+def remove_dictionary_word():
+    if not session.get('logged_in'): return jsonify({"success": False}), 401
+    
+    data = request.json
+    word = data.get('word')
+    zone = data.get('zone')
+    
+    db['settings'].update_one(
+        {"_id": "skynet_dictionary"},
+        {"$pull": {zone: {"word": word}}}
+    )
+    return jsonify({"success": True})
+
+# === 📝 КОНСТРУКТОР ТЕКСТОВ СКАЙНЕТА ===
+@app.route('/glaz/api/system_texts', methods=['GET'])
+def api_get_system_texts():
+    if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+    data = db['settings'].find_one({"_id": "skynet_texts"}) or {}
+    
+    # Возвращаем с дефолтными значениями, если база пока пустая
+    return jsonify({
+        "quarantine_warn": data.get("quarantine_warn", "🚨 {user_link}, **Защита от спама!**\nВаш аккаунт создан недавно. Для безопасности сети действует карантин 48 часов.\nПодождите, или пройдите верификацию в [Службе Поддержки](https://t.me/MK_MensClubSUPPORT)."),
+        "may_1_warn": data.get("may_1_warn", "🚨 {user_link}, **ВНИМАНИЕ!**\n\nС 1 мая введен СТРОГИЙ стандарт оформления анкет для досок объявлений.\nЛюбой текст **БЕЗ ПАРАМЕТРОВ** или с неправильным форматом запрещен!\nПараметры должны быть указаны **ТОЛЬКО через слеш (/) без пробелов и лишних слов**.\n\n✅ *Примеры:* `24/187/72` или `24/187/72/19` (допускается `19.5` или `19*4`)\n\nВаша анкета удалена, а вы временно ограничены в общении во всех группах сети.\n\n💡 *P.S. В нашей сети «ПАРНИ 18+» нет ограничений на формат текста и разрешен любой откровенный контент (включая порно). Переходи туда! 👇*"),
+        "minor_warn": data.get("minor_warn", "🚨 {user_link}, **Внимание!**\nВаша анкета попала под автоматический фильтр безопасности сети. Пройдите обязательную верификацию 🔞.")
+    })
+
+@app.route('/glaz/api/system_texts/save', methods=['POST'])
+def api_save_system_texts():
+    if not session.get('logged_in'): return jsonify({"success": False}), 401
+    data = request.json
+    db['settings'].update_one(
+        {"_id": "skynet_texts"},
+        {"$set": {
+            "quarantine_warn": data.get("quarantine_warn"),
+            "may_1_warn": data.get("may_1_warn"),
+            "minor_warn": data.get("minor_warn")
+        }},
+        upsert=True
+    )
+    add_radar_log("📝 Тексты системных предупреждений обновлены!")
+    return jsonify({"success": True, "message": "✅ Тексты успешно вшиты в нейросеть!"})
+
+# === 👁‍🗨 ГОЛОС САУРОНА (Связь с юзером из Досье) ===
+@app.route('/glaz/api/send_sauron_msg', methods=['POST'])
+def api_send_sauron_msg():
+    if not session.get('logged_in'): return jsonify({"success": False, "error": "Unauthorized"}), 401
+    
+    uid = request.form.get('uid')
+    message_text = request.form.get('message')
+    
+    if not uid or not message_text:
+        return jsonify({"success": False, "error": "Пустые данные"}), 400
+        
+    try:
+        # Отправляем сообщение от лица бота
+        bot.send_message(
+            chat_id=int(uid), 
+            text=f"👑 **Сообщение от Администрации:**\n\n{message_text}", 
+            parse_mode="Markdown"
+        )
+        # Логируем действие в радар, чтобы ты видел, что оно ушло
+        add_radar_log(f"👁‍🗨 Голос Саурона: Отправлено ЛС юзеру {uid}")
+        return jsonify({"success": True})
+        
+    except Exception as e:
+        err_str = str(e).lower()
+        if "bot was blocked" in err_str or "deactivated" in err_str:
+            return jsonify({"success": False, "error": "Пользователь заблокировал бота или удален 💀"})
+        return jsonify({"success": False, "error": "Ошибка API Telegram"})
+
+# === 🕒 АВТОПИЛОТ И ШАБЛОНЫ РАССЫЛОК ===
+@app.route('/glaz/api/templates', methods=['GET'])
+def api_get_templates():
+    # Отдаем список шаблонов из базы
+    templates = list(db['templates'].find({}, {"_id": 0}))
+    return jsonify(templates)
+
+@app.route('/glaz/api/templates/save', methods=['POST'])
+def api_save_template():
+    if not session.get('logged_in'): return jsonify({"success": False}), 401
+    data = request.json
+    new_template = {
+        "id": str(uuid.uuid4())[:8],
+        "name": data.get("name", "Новый шаблон"),
+        "text": data.get("text", ""),
+        "target": data.get("target", "all"),
+        "buttons": data.get("buttons", []),
+        "autopilot_interval": 0, # 0 = Автопилот выключен. Иначе - часы (12, 24 и тд)
+        "last_run": 0
+    }
+    db['templates'].insert_one(new_template)
+    return jsonify({"success": True, "message": "Шаблон сохранен!"})
+
+@app.route('/glaz/api/templates/delete', methods=['POST'])
+def api_delete_template():
+    if not session.get('logged_in'): return jsonify({"success": False}), 401
+    db['templates'].delete_one({"id": request.json.get("id")})
+    return jsonify({"success": True})
+
+@app.route('/glaz/api/templates/toggle_autopilot', methods=['POST'])
+def api_toggle_autopilot():
+    if not session.get('logged_in'): return jsonify({"success": False}), 401
+    tid = request.json.get("id")
+    interval = int(request.json.get("interval", 0))
+    # Обновляем интервал и сбрасываем таймер
+    db['templates'].update_one({"id": tid}, {"$set": {"autopilot_interval": interval, "last_run": 0}})
+    return jsonify({"success": True})
+
+# 🤖 ФОНОВЫЙ ДЕМОН АВТОПИЛОТА
+def autopilot_daemon():
+    while True:
+        try:
+            # Ищем шаблоны, у которых включен автопилот (> 0 часов)
+            templates = list(db['templates'].find({"autopilot_interval": {"$gt": 0}}))
+            current_time = time.time()
+            
+            for t in templates:
+                interval_sec = t['autopilot_interval'] * 3600 # переводим часы в секунды
+                
+                # Если прошло нужное время с последнего запуска
+                if current_time - t.get('last_run', 0) >= interval_sec:
+                    # 1. Сразу обновляем время в базе, чтобы не было спама!
+                    db['templates'].update_one({"id": t['id']}, {"$set": {"last_run": current_time}})
+                    
+                    # 2. Собираем клавиатуру (если есть кнопки)
+                    markup = None
+                    if t.get("buttons"):
+                        markup = types.InlineKeyboardMarkup(row_width=1)
+                        for btn in t["buttons"]:
+                            kwargs = {"text": btn["text"], "url": btn["url"]}
+                            if btn.get("style") and btn["style"] != "default": kwargs["style"] = btn["style"]
+                            if btn.get("emoji_id"): kwargs["icon_custom_emoji_id"] = btn["emoji_id"]
+                            markup.add(types.InlineKeyboardButton(**kwargs))
+
+                    # 3. Выбираем цель
+                    tgt = t['target']
+                    txt = t['text']
+                    cursor = users_collection.find({}) if tgt == 'all' else users_collection.find({"is_vip": True}) if tgt == 'vip' else users_collection.find({"is_queer": True}) if tgt == 'queer' else None
+                    
+                    if cursor:
+                        count = 0
+                        add_radar_log(f"🤖 АВТОПИЛОТ: Запуск по расписанию '{t['name']}'")
+                        for u in cursor:
+                            try:
+                                bot.send_message(u['_id'], txt, parse_mode="Markdown", disable_web_page_preview=True, reply_markup=markup)
+                                count += 1
+                            except Exception as e:
+                                # Спасаем текст, если слетел Markdown
+                                if "parse entities" in str(e).lower():
+                                    try: bot.send_message(u['_id'], txt, disable_web_page_preview=True, reply_markup=markup)
+                                    except: pass
+                        try:
+                            # Уведомляем админов, что автопилот отработал
+                            bot.send_message(STAFF_GROUP_ID, f"🤖 **Автопилот Скайнета сработал!**\nШаблон: `{t['name']}`\n✅ Доставлено: {count} чел.")
+                        except: pass
+
+        except Exception as e:
+            print(f"Ошибка Автопилота: {e}")
+        
+        # Демон спит 60 секунд, потом снова проверяет базу
+        time.sleep(60)
+
+# Запускаем Демона при старте сервера
+threading.Thread(target=autopilot_daemon, daemon=True).start()
+# =======================================
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
