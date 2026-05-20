@@ -106,6 +106,7 @@
     <div class="tabs-nav">
         <button class="tab-btn active" onclick="openTab('tab-main')">🔍 Обзор и Досье</button>
         <button class="tab-btn" onclick="openTab('tab-radar')">🔴 Радар и Списки</button>
+        <button class="tab-btn" onclick="openTab('tab-support')" style="color: #03dac6; border-color: #03dac6; font-weight: bold;">📩 Входящие</button>
         <button class="tab-btn" onclick="openTab('tab-blackbox')" style="color: #03dac6; border-color: #03dac6;">🕵️‍♂️ Чёрный Ящик</button>
         <button class="tab-btn" onclick="openTab('tab-quarantine')" style="color: #ffb74d;">🥷 Карантин</button>
         <button class="tab-btn" onclick="openTab('tab-broadcast')" style="color: #bb86fc;">🚀 Рассылка</button>
@@ -192,6 +193,33 @@
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;"><button class="form-btn" style="flex: 1;" onclick="fetchList('vip')">👑 VIP</button><button class="form-btn" style="flex: 1; background: #f6a5c0;" onclick="fetchList('queer')">🏳️‍🌈 QUEER</button><button class="form-btn" style="flex: 1; background: #cf6679; color: #fff;" onclick="fetchList('banned')">🔨 ЧС</button></div>
                 <button id="download-csv-btn" class="form-btn" style="width: 100%; display: none; background: #03dac6; margin-bottom: 15px;" onclick="downloadCSV()">⬇️ Скачать Excel (CSV)</button>
                 <div style="height: 250px; overflow-y: auto; background: #121212; border-radius: 5px; padding: 10px;"><table class="admin-table" style="margin-top: 0;"><thead><tr><th>ID</th><th>Инфо / Причина</th><th>Тег</th></tr></thead><tbody id="list-tbody"><tr><td colspan="3" style="text-align: center; color: #888;">Выберите категорию</td></tr></tbody></table></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-support" class="tab-content">
+        <div class="panel-block" style="max-width: 1000px; padding: 0; background: transparent; box-shadow: none;">
+            <div class="chat-app">
+                <div class="chat-sidebar" style="width: 350px;">
+                    <div style="padding: 15px; background: #252525; border-bottom: 1px solid #333; font-weight: bold; color: #03dac6; text-align: center;">
+                        📩 Служба Поддержки
+                        <button style="background: none; border:none; cursor:pointer;" onclick="loadSupportTickets()">🔄</button>
+                    </div>
+                    <div id="tickets-list-container">
+                        <div style="padding: 20px; text-align: center; color: #888;">Загрузка сообщений...</div>
+                    </div>
+                </div>
+                
+                <div class="chat-main">
+                    <div class="chat-header" id="ticket-header">Выберите сообщение из списка слева</div>
+                    <div class="chat-messages" id="ticket-box" style="height: 300px; padding: 20px;">
+                        <div style="color: #888; text-align: center; margin-top: 40px;">Здесь появится текст вопроса.</div>
+                    </div>
+                    <div style="padding: 15px; background: #1e1e1e; border-top: 1px solid #333; border-radius: 0 0 10px 10px;">
+                        <textarea id="ticket-reply-text" class="form-control" placeholder="Написать ответ пользователю..." style="width: 100%; height: 60px; background: #121212; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 5px; margin-bottom: 10px; resize: vertical; box-sizing: border-box; font-size: 13px;"></textarea>
+                        <button class="form-btn" style="width: 100%; background: #03dac6; color: #121212; font-weight: bold;" onclick="sendTicketReply()">📤 Отправить ответ от имени Бота</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -861,8 +889,9 @@ function removeDictWord(word, zone) {
 const originalOpenTab = openTab;
 openTab = function(tabId) {
     originalOpenTab(tabId);
-    if(tabId === 'tab-system') { loadDictionary(); loadSystemTexts(); } // Добавили загрузку текстов
+    if(tabId === 'tab-system') { loadDictionary(); loadSystemTexts(); }
     if(tabId === 'tab-broadcast') loadTemplates();
+    if(tabId === 'tab-support') loadSupportTickets(); // <--- Добавили вот это!
 };
 
 // === ГОЛОС САУРОНА (Связь с юзером) ===
@@ -1000,6 +1029,82 @@ function saveSystemTexts() {
     .then(data => {
         if(data.success) showToast(data.message);
     }).catch(() => showToast("❌ Ошибка связи с сервером"));
+}
+
+// === СИСТЕМА ТИКЕТОВ (ВХОДЯЩИЕ) ===
+let currentActiveTicket = null;
+
+function loadSupportTickets() {
+    fetch('/glaz/api/tickets').then(res => res.json()).then(data => {
+        let html = '';
+        data.forEach(t => {
+            const statusBadge = t.is_answered 
+                ? '<span style="color:#888; font-size:10px;">✅ Отвечен</span>' 
+                : '<span style="color:#cf6679; font-size:10px; font-weight:bold;">🔴 Ждет ответа</span>';
+                
+            const shortText = t.text.length > 30 ? t.text.substring(0, 30) + '...' : t.text;
+            
+            html += `<div class="session-item" id="ticket-${t.timestamp}" onclick='openTicket(${JSON.stringify(t).replace(/'/g, "&apos;")})'>
+                        <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px; color: #fff;">${t.name} <span style="font-size: 11px; color: #aaa;">(${t.uid})</span></div>
+                        <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">${shortText}</div>
+                        <div style="display:flex; justify-content:space-between;">${statusBadge}</div>
+                     </div>`;
+        });
+        if(data.length === 0) html = '<div style="padding: 20px; text-align: center; color: #888;">Входящих сообщений нет</div>';
+        document.getElementById('tickets-list-container').innerHTML = html;
+    });
+}
+
+function openTicket(t) {
+    currentActiveTicket = t;
+    // Подсветка активного тикета
+    document.querySelectorAll('#tickets-list-container .session-item').forEach(el => el.classList.remove('active'));
+    document.getElementById(`ticket-${t.timestamp}`).classList.add('active');
+    
+    // Заголовок
+    document.getElementById('ticket-header').innerHTML = `Диалог с: ${t.name} [ID: ${t.uid}]`;
+    
+    // Само сообщение
+    const box = document.getElementById('ticket-box');
+    const dateStr = new Date(t.timestamp * 1000).toLocaleString();
+    box.innerHTML = `<div class="msg-box msg-guest" style="max-width: 90%;">
+                        <div style="font-size:11px; color:#bb86fc; font-weight:bold; margin-bottom:5px;">👤 ${t.name} (Вопрос):</div>
+                        ${t.text}
+                        <div class="msg-meta">${dateStr}</div>
+                     </div>`;
+    
+    // Если уже ответили, добавляем плашку
+    if(t.is_answered) {
+        box.innerHTML += `<div style="text-align:center; color:#03dac6; margin-top:20px; font-size:12px;">✅ Вы уже ответили на этот тикет</div>`;
+    }
+}
+
+function sendTicketReply() {
+    if(!currentActiveTicket) { showToast("⚠️ Выберите сообщение из списка!"); return; }
+    
+    const textEl = document.getElementById('ticket-reply-text');
+    const text = textEl.value.trim();
+    if(!text) { showToast("⚠️ Напишите текст ответа!"); return; }
+
+    fetch('/glaz/api/tickets/reply', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ uid: currentActiveTicket.uid, text: text, timestamp: currentActiveTicket.timestamp })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) {
+            showToast("✅ Ответ отправлен!");
+            textEl.value = ''; // Очищаем поле
+            loadSupportTickets(); // Перезагружаем список слева
+            // Добавляем наш ответ визуально в чат
+            document.getElementById('ticket-box').innerHTML += `<div class="msg-box msg-vip" style="max-width: 90%; background: #03dac6; color: #121212; margin-top: 15px;">
+                <div style="font-size:11px; font-weight:bold; margin-bottom:5px;">👨‍💻 Ваш ответ:</div>
+                ${text}
+            </div>`;
+        } else {
+            showToast("❌ Ошибка: " + (data.error || "Не удалось отправить"));
+        }
+    });
 }
     </script>
 </body>
