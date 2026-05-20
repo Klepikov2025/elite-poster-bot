@@ -136,7 +136,13 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             try: safe_set_tag(chat_id, user_id, final_tag)
             except: pass
 
-            if any(re.search(word, text) for word in RED_WORDS):
+            # === 🤬 СЛОВАРЬ ИНКВИЗИТОРА (ТЯНЕМ ИЗ БАЗЫ) ===
+            dict_settings = db['settings'].find_one({"_id": "skynet_dictionary"}) or {}
+            live_red = RED_WORDS + [w['pattern'] for w in dict_settings.get('red', [])]
+            live_yellow = YELLOW_COMMERCE_REGEX + [w['pattern'] for w in dict_settings.get('yellow', [])]
+            # ===============================================
+
+            if any(re.search(word, text) for word in live_red):
                 bot.delete_message(chat_id, message.message_id)
                 ban_user_everywhere(user_id, reason="Мясорубка: Красная зона", admin_name="Скайнет ⚔️", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
                 return
@@ -157,7 +163,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
 
             # 1. Сначала фильтруем коммерцию (для всех, даже для VIP/QUEER)
             clean_commerce = re.sub(r'без\s*м\.?п\.?|не\s*коммерция|без\s*мат(\.?|ериальной)\s*помощи', '', text)
-            if any(re.search(pattern, clean_commerce) for pattern in YELLOW_COMMERCE_REGEX):
+            if any(re.search(pattern, clean_commerce) for pattern in live_yellow):
                 bot.delete_message(chat_id, message.message_id)
                 mute_user_everywhere(user_id, reason="Желтая зона: Коммерция", admin_name="Скайнет ⚔️", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
                 return
@@ -247,11 +253,13 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         )
                     except: pass
                     try:
+                        # 📝 ТЯНЕМ ТЕКСТ КАРАНТИНА ИЗ БАЗЫ
+                        db_texts = db['settings'].find_one({"_id": "skynet_texts"}) or {}
+                        raw_text_quarantine = db_texts.get("quarantine_warn", "🚨 {user_link}, **Защита от спама!**\nВаш аккаунт создан недавно. Для безопасности сети действует карантин 48 часов.\nПодождите, или пройдите верификацию в [Службе Поддержки](https://t.me/MK_MensClubSUPPORT).")
+                        
                         warning_msg = bot.send_message(
                             chat_id, 
-                            f"🚨 {user_link}, **Защита от спама!**\n"
-                            "Ваш аккаунт создан недавно. Для безопасности сети действует карантин 48 часов.\n"
-                            "Подождите, или пройдите верификацию в [Службе Поддержки](https://t.me/MK_MensClubSUPPORT).", 
+                            raw_text_quarantine.replace("{user_link}", user_link), 
                             parse_mode="Markdown",
                             disable_web_page_preview=True
                         )
@@ -281,15 +289,13 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             types.InlineKeyboardButton("🛠 Пройти верификацию", url="https://t.me/MK_MensClubSUPPORT"),
                             types.InlineKeyboardButton("😈 ПАРНИ 18+ (Без ограничений)", url="https://t.me/znakparni/116")
                         )
+                        # 📝 ТЯНЕМ ТЕКСТ "1 МАЯ" ИЗ БАЗЫ
+                        db_texts = db['settings'].find_one({"_id": "skynet_texts"}) or {}
+                        raw_text_may1 = db_texts.get("may_1_warn", "🚨 {user_link}, **ВНИМАНИЕ!**\n\nС 1 мая введен СТРОГИЙ стандарт оформления анкет для досок объявлений.\nЛюбой текст **БЕЗ ПАРАМЕТРОВ** или с неправильным форматом запрещен!\nПараметры должны быть указаны **ТОЛЬКО через слеш (/) без пробелов и лишних слов**.\n\n✅ *Примеры:* `24/187/72` или `24/187/72/19` (допускается `19.5` или `19*4`)\n\nВаша анкета удалена, а вы временно ограничены в общении во всех группах сети.\n\n💡 *P.S. В нашей сети «ПАРНИ 18+» нет ограничений на формат текста и разрешен любой откровенный контент (включая порно). Переходи туда! 👇*")
+
                         warning_msg = bot.send_message(
                             chat_id, 
-                            f"🚨 {user_link}, **ВНИМАНИЕ!**\n\n"
-                            "С 1 мая введен СТРОГИЙ стандарт оформления анкет для досок объявлений.\n"
-                            "Любой текст **БЕЗ ПАРАМЕТРОВ** или с неправильным форматом запрещен!\n"
-                            "Параметры должны быть указаны **ТОЛЬКО через слеш (/) без пробелов и лишних слов**.\n\n"
-                            "✅ *Примеры:* `24/187/72` или `24/187/72/19` (допускается `19.5` или `19*4`)\n\n"
-                            "Ваша анкета удалена, а вы временно ограничены в общении во всех группах сети.\n\n"
-                            "💡 *P.S. В нашей сети «ПАРНИ 18+» нет ограничений на формат текста и разрешен любой откровенный контент (включая порно). Переходи туда! 👇*",
+                            raw_text_may1.replace("{user_link}", user_link),
                             reply_markup=markup, parse_mode="Markdown", disable_web_page_preview=True
                         )
                         def delete_warning_may():
@@ -305,7 +311,11 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 mute_user_everywhere(user_id, reason="Оранжевая зона: 18 лет", admin_name="Скайнет 🔞", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
                 markup = types.InlineKeyboardMarkup()
                 markup.add(types.InlineKeyboardButton("🛠 Пройти верификацию 🔞", url="https://t.me/FAQMKBOT"))
-                warning_msg = bot.send_message(chat_id, f"🚨 {user_link}, **Внимание!**\nВаша анкета попала под автоматический фильтр безопасности сети. Пройдите обязательную верификацию.", reply_markup=markup, parse_mode="Markdown", disable_web_page_preview=True)
+                # 📝 ТЯНЕМ ТЕКСТ 18+ ИЗ БАЗЫ
+                db_texts = db['settings'].find_one({"_id": "skynet_texts"}) or {}
+                raw_text_minor = db_texts.get("minor_warn", "🚨 {user_link}, **Внимание!**\nВаша анкета попала под автоматический фильтр безопасности сети. Пройдите обязательную верификацию 🔞.")
+                
+                warning_msg = bot.send_message(chat_id, raw_text_minor.replace("{user_link}", user_link), reply_markup=markup, parse_mode="Markdown", disable_web_page_preview=True)
                 def delete_warning_18():
                     time.sleep(300)
                     try: bot.delete_message(chat_id, warning_msg.message_id)
