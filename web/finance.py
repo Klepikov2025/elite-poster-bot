@@ -54,16 +54,15 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             
         return redirect(url_for('admin_panel'))
 
+    # === API РОУТЫ ===
     @app.route('/glaz/api/root/finance', methods=['POST'])
     def api_get_root_finance():
         data = request.json
-        # Жесткая проверка пин-кода
         if data.get('pin') != ROOT_PIN:
             return jsonify({"error": "Access Denied"}), 403
             
         today_str = datetime.now().strftime("%d.%m.%Y")
         
-        # 🧠 Агрегация: Считаем сумму звезд за сегодня
         today_payments = list(db['fine_payments'].find({"date": today_str}))
         total_stars = sum(p.get('amount', 0) for p in today_payments)
         
@@ -80,13 +79,12 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             "payments": formatted_list
         })
 
-@app.route('/glaz/api/analytics/revenue', methods=['POST'])
+    @app.route('/glaz/api/analytics/revenue', methods=['POST'])
     def api_get_revenue_stats():
         data = request.json
         if data.get('pin') != ROOT_PIN: 
             return jsonify({"error": "Unauthorized"}), 403
         
-        # Агрегация: группируем по ДАТЕ и ТИПУ (для будущего графика-календаря)
         pipeline = [
             {"$group": {
                 "_id": {"date": "$date", "type": "$type"},
