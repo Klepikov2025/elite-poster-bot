@@ -1288,51 +1288,42 @@ function loadRootRevenue(pin) {
     })
     .then(res => res.json())
     .then(data => {
-        if(!data.error) {
-            const labels = [];
-            const values = [];
-            const colors = [];
-            let totalStars = 0;
-            
-            // Распределяем цвета
-            data.forEach(item => {
-                totalStars += item.total;
-                if(item._id === 'fine') { labels.push('Штрафы'); colors.push('#cf6679'); }
-                else if(item._id === 'ads') { labels.push('Реклама'); colors.push('#03dac6'); }
-                else if(item._id === 'vip') { labels.push('VIP / QUEER'); colors.push('#ffb74d'); }
-                else if(item._id === 'donation') { labels.push('Донаты'); colors.push('#bb86fc'); }
-                else { labels.push(item._id); colors.push('#888'); }
-                values.push(item.total);
-            });
-            
-            const ctx = document.getElementById('revenueChart').getContext('2d');
-            if(revenueChartInstance) revenueChartInstance.destroy();
-            
-            revenueChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: `Итого заработано: ${totalStars} ⭐️`,
-                        data: values,
-                        backgroundColor: colors,
-                        borderWidth: 1,
-                        borderColor: '#121212'
-                    }]
-                },
-                options: {
-                    responsive: false,
-                    plugins: { legend: { labels: { color: '#fff', font: {size: 14, weight: 'bold'} } } },
-                    scales: {
-                        y: { ticks: { color: '#fff' }, grid: { color: '#333' } },
-                        x: { ticks: { color: '#fff', font: {weight: 'bold'} }, grid: { display: false } }
-                    }
+        // Получаем все уникальные даты
+        const dates = [...new Set(data.map(item => item._id.date))];
+        
+        // Массив типов, которые есть в базе
+        const types = ['fine', 'ads', 'vip', 'donation'];
+        const datasets = types.map(type => {
+            return {
+                label: type === 'fine' ? 'Штрафы' : type === 'ads' ? 'Реклама' : type === 'vip' ? 'VIP' : 'Донаты',
+                data: dates.map(date => {
+                    const found = data.find(item => item._id.date === date && item._id.type === type);
+                    return found ? found.total : 0;
+                }),
+                borderColor: type === 'fine' ? '#cf6679' : type === 'ads' ? '#03dac6' : type === 'vip' ? '#ffb74d' : '#bb86fc',
+                backgroundColor: 'transparent',
+                tension: 0.4, // Красивый изгиб линии
+                borderWidth: 3
+            };
+        });
+
+        const ctx = document.getElementById('revenueChart').getContext('2d');
+        if(revenueChartInstance) revenueChartInstance.destroy();
+        
+        revenueChartInstance = new Chart(ctx, {
+            type: 'line', // Теперь это линия!
+            data: { labels: dates, datasets: datasets },
+            options: {
+                responsive: false,
+                plugins: { legend: { labels: { color: '#fff' } } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { color: '#fff' }, grid: { color: '#333' } },
+                    x: { ticks: { color: '#fff' }, grid: { color: '#333' } }
                 }
-            });
-        }
+            }
+        });
     });
 }
-
     </script>
 </body>
 </html>
