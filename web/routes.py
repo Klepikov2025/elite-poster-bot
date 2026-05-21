@@ -5,7 +5,7 @@ import threading
 from datetime import datetime
 from flask import request, render_template, session, redirect, url_for, jsonify
 from core.settings import SkynetSettings
-from database import db, users_collection, banned_collection, withdrawals_collection, proxy_sessions
+from database import db, users_collection, banned_collection, withdrawals_collection, proxy_sessions, archive_collection
 
 def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user_everywhere,
                          unban_user_everywhere, unmute_user_everywhere, background_corpse_removal,
