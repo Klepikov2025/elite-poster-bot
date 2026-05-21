@@ -345,8 +345,14 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
     def successful_payment(message):
         new_user_id = message.from_user.id
         payload = message.successful_payment.invoice_payload
+        
+        # 👇 ДОБАВЬ ВОТ ЭТУ СТРОЧКУ ПРЯМО СЮДА 👇
+        amount = message.successful_payment.total_amount
+        # 👆 ================================= 👆
 
         if payload.startswith("city_access_"):
+            # 👇 НОВАЯ СТРОЧКА: Пишем доход с пропуска 👇
+            db['daily_revenue'].insert_one({"type": "city_access", "amount": amount, "timestamp": time.time(), "date": datetime.now().strftime("%d.%m.%Y")})
             purchased_city = payload.replace("city_access_", "")
             users_collection.update_one({"_id": new_user_id}, {"$addToSet": {"purchased_cities": purchased_city}}, upsert=True)
             
@@ -370,6 +376,8 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
             return
 
         if payload.startswith("fine_payment_"):
+            # 👇 НОВАЯ СТРОЧКА: Пишем доход со штрафа 👇
+            db['daily_revenue'].insert_one({"type": "fine", "amount": amount, "timestamp": time.time(), "date": datetime.now().strftime("%d.%m.%Y")})
             now = datetime.now(pytz.timezone('Asia/Yekaterinburg'))
             ticket_num = now.strftime("%d%m%Y%H%M%S") + f"-{random.randint(100, 999)}"
             
@@ -390,6 +398,9 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
             success_msg = f"✅ **Оплата штрафа успешно получена!**\n\nВаши ограничения сняты автоматически. Уникальный номер: `{ticket_num}`\n\n{NETWORK_LINKS}\n\n*Больше не нарушайте правила!*"
             bot.send_message(new_user_id, success_msg, parse_mode="Markdown", disable_web_page_preview=True)
             return
+
+        # 👇 НОВАЯ СТРОЧКА: Пишем доход с VIP 👇
+        db['daily_revenue'].insert_one({"type": "vip", "amount": amount, "timestamp": time.time(), "date": datetime.now().strftime("%d.%m.%Y")})
         
         db['vip_funnel'].delete_one({"_id": new_user_id})
 
