@@ -1451,6 +1451,32 @@ def api_get_root_buttons():
         
     return jsonify({"buttons": btns.get("buttons", [])})
 
+@app.route('/glaz/api/root/finance', methods=['POST'])
+def api_get_root_finance():
+    data = request.json
+    # Жесткая проверка пин-кода (защита от обычных админов)
+    if data.get('pin') != ROOT_PIN:
+        return jsonify({"error": "Access Denied"}), 403
+        
+    today_str = datetime.now().strftime("%d.%m.%Y")
+    
+    # 🧠 Агрегация: Считаем сумму звезд за сегодня и вытаскиваем список плательщиков
+    today_payments = list(db['fine_payments'].find({"date": today_str}))
+    total_stars = sum(p.get('amount', 0) for p in today_payments)
+    
+    formatted_list = []
+    for p in today_payments:
+        formatted_list.append({
+            "uid": p["uid"],
+            "amount": p["amount"],
+            "time": time.strftime("%H:%M:%S", time.localtime(p["timestamp"]))
+        })
+        
+    return jsonify({
+        "total_today": total_stars,
+        "payments": formatted_list
+    })
+
 @app.route('/glaz/api/root/save_buttons', methods=['POST'])
 def api_save_root_buttons():
     data = request.json
