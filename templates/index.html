@@ -331,7 +331,18 @@
                 <button onclick="addButtonRow('', '')" class="btn btn-sm btn-outline-primary mt-3">➕ Добавить кнопку</button>
                 <button onclick="saveRootButtons()" class="btn btn-sm btn-danger mt-3" style="float: right;">💾 Сохранить в сеть</button>
                 <div style="clear: both;"></div>
+
+                <div style="background: rgba(3, 218, 198, 0.05); border: 1px solid #03dac6; padding: 15px; border-radius: 8px; margin-top: 20px;">
+                    <h5 style="margin: 0 0 10px 0; color: #03dac6; text-transform: uppercase; font-size: 13px; letter-spacing: 1px;">💰 Касса авторазбанов (За сегодня)</h5>
+                    <div style="font-size: 24px; font-weight: bold; color: #fff; margin-bottom: 10px;">
+                        Всего прилетело: <span id="root-finance-total" style="color: #ffb74d;">0</span> ⭐️
+                    </div>
+                    <div id="root-finance-list" style="font-size: 12px; color: #aaa; max-height: 120px; overflow-y: auto; font-family: monospace;">
+                        📊 Сводка пуста.
+                    </div>
+                </div>
             </div>
+            
             <div id="toggles-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 16px;">
             </div>
         </div> <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #333; padding: 20px; border-radius: 10px; max-width: 1000px;">
@@ -800,8 +811,32 @@ function unlockRoot() {
         // Подтягиваем цвета и эмодзи из базы
         data.buttons.forEach(b => addButtonRow(b.text, b.url, b.style || 'default', b.emoji_id || ''));
         if(data.buttons.length === 0) addButtonRow('', '', 'default', '');
+
+        // 👇 ВЫЗЫВАЕМ ЗАГРУЗКУ КАССЫ 👇
+        loadRootFinance(pin);
     })
     .catch(err => alert("⛔️ " + err.message));
+}
+
+// 1.5. Секретная функция загрузки Кассы
+function loadRootFinance(pin) {
+    fetch('/glaz/api/root/finance', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({pin: pin})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(!data.error) {
+            document.getElementById('root-finance-total').innerText = data.total_today;
+            let html = '';
+            data.payments.forEach(p => {
+                html += `<div style="padding: 4px 0; border-bottom: 1px solid #222;">⏱ ${p.time} | Юзер: <code>${p.uid}</code> заплатил <span style="color:#03dac6; font-weight:bold;">${p.amount} ⭐️</span></div>`;
+            });
+            if(data.payments.length === 0) html = '🛸 Сегодня оплат за авторазбан пока не поступало.';
+            document.getElementById('root-finance-list').innerHTML = html;
+        }
+    });
 }
 
 // 2. Рисуем строчку для новой кнопки (ТЕПЕРЬ С ЦВЕТАМИ И ЭМОДЗИ)
@@ -1170,6 +1205,7 @@ function closeTicket() {
         }
     });
 }
+
     </script>
 </body>
 </html>
