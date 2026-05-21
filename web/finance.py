@@ -80,19 +80,19 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             "payments": formatted_list
         })
 
-    # Добавляем в web/finance.py
-    @app.route('/glaz/api/analytics/revenue', methods=['POST'])
+@app.route('/glaz/api/analytics/revenue', methods=['POST'])
     def api_get_revenue_stats():
         data = request.json
-        if data.get('pin') != ROOT_PIN: return jsonify({"error": "Unauthorized"}), 403
-    
-    # Агрегация: группируем по типу и суммируем
+        if data.get('pin') != ROOT_PIN: 
+            return jsonify({"error": "Unauthorized"}), 403
+        
+        # Агрегация: группируем по ДАТЕ и ТИПУ (для будущего графика-календаря)
         pipeline = [
-            {"$match": {"date": {"$exists": True}}}, # Можно фильтровать по дате здесь
             {"$group": {
-                "_id": "$type", 
+                "_id": {"date": "$date", "type": "$type"},
                 "total": {"$sum": "$amount"}
-            }}
+            }},
+            {"$sort": {"_id.date": 1}}
         ]
         stats = list(db['daily_revenue'].aggregate(pipeline))
         return jsonify(stats)
