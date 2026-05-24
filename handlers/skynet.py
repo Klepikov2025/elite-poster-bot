@@ -25,10 +25,24 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
     def ping_handler(message):
         bot.reply_to(message, f"👀 Я жив! ID этого чата: {message.chat.id}")
 
-    # 👇 🤖 МОДУЛЬ: АВТО-АДМИН ПОДДЕРЖКИ 🤖 👇
-    @bot.message_handler(func=lambda message: str(message.chat.id) == str(SUPPORT_GROUP_ID))
+    # 👇 🤖 МОДУЛЬ: АВТО-АДМИН ПОДДЕРЖКИ + ЛОВЕЦ ЗВЕЗД 🤖 👇
+    @bot.message_handler(func=lambda message: str(message.chat.id) == str(SUPPORT_GROUP_ID), content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'video_note', 'location', 'contact', 'successful_payment'])
     def auto_support_handler(message):
-        # 1. Игнорируем сообщения от самих админов
+        
+        # 1. ЛОВЕЦ ЗВЕЗД: В этой группе любое сообщение стоит 50 звезд. 
+        # Сбрасываем страйки в базе
+        if not message.from_user.is_bot:
+            db['paid_users'].update_one(
+                {"uid": message.from_user.id},
+                {"$set": {
+                    "status": 1,
+                    "strikes": 0,
+                    "timestamp": datetime.now()
+                }},
+                upsert=True
+            )
+
+        # 2. АВТО-АДМИН: Игнорируем сообщения от самих админов для авто-ответа
         if getattr(message, 'sender_chat', None) or message.from_user.id in [777000, 136817688, OWNER_ID]:
             return
             
@@ -38,10 +52,11 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 return
         except: pass
 
-        text = (message.text or "").lower()
+        # Берем текст или подпись к картинке
+        text = (message.text or message.caption or "").lower()
         response = None
 
-        # 2. База знаний Скайнета
+        # 3. База знаний Скайнета
         phrases_verification = [
             "Жду вас в боте @FAQMKBOT для прохождения верификации 🤝",
             "Здравствуйте! Проходите верификацию в боте @FAQMKBOT.",
@@ -55,7 +70,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             "Все вопросы по мутам и блокировкам решаем через @FAQMKBOT. Напишите туда."
         ]
 
-        # 3. Логика распознавания
+        # 4. Логика распознавания
         if any(word in text for word in ["верификаци", "вериф", "пройти"]):
             response = random.choice(phrases_verification)
         elif any(word in text for word in [
@@ -64,11 +79,12 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         ]):
             response = random.choice(phrases_restrictions)
 
-        # 4. Имитация живого человека и отправка
+        # 5. Имитация живого человека и отправка
         if response:
             bot.send_chat_action(message.chat.id, 'typing')
             time.sleep(1.5) 
             bot.reply_to(message, response)
+    # 👆 ========================================= 👆
 
     # 🔴 Красная зона (Глобал бан)
     RED_WORDS = [
