@@ -108,6 +108,43 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             "unanswered_tickets": db['support_tickets'].count_documents({"is_answered": False, "is_closed": {"$ne": True}})
         })
 
+    @app.route('/glaz/api/xray')
+    def api_xray():
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+        
+        total = users_collection.count_documents({})
+        banned = banned_collection.count_documents({})
+        vips = users_collection.count_documents({"is_vip": True})
+        queers = users_collection.count_documents({"is_queer": True})
+        
+        # Верифицированные, но без ВИП-статуса
+        verified_only = users_collection.count_documents({
+            "is_verified": True, 
+            "is_vip": {"$ne": True}, 
+            "is_queer": {"$ne": True}
+        })
+        
+        # 👇 СЧИТЫВАЕМ НАШИ ЖУЧКИ ИЗ БАЗЫ 👇
+        intent_vip = users_collection.count_documents({"intent_vip": True})
+        intent_support = users_collection.count_documents({"intent_support": True})
+        intent_ads = users_collection.count_documents({"intent_post_ads": True})
+        
+        # Призраки (мертвые души)
+        ghosts = total - (banned + vips + queers + verified_only)
+        if ghosts < 0: ghosts = 0
+
+        return jsonify({
+            "total": total,
+            "vips": vips,
+            "queers": queers,
+            "verified": verified_only,
+            "banned": banned,
+            "ghosts": ghosts,
+            "intent_vip": intent_vip,
+            "intent_support": intent_support,
+            "intent_ads": intent_ads
+        })
+
     @app.route('/glaz/api/chart_data')
     def api_chart_data():
         if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401

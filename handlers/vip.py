@@ -36,6 +36,9 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
 
     @bot.message_handler(func=lambda message: message.text == "👑 Вступить в VIP-чат")
     def handle_vip_join_button(message):
+        # 👇 НОВЫЙ ЖУЧОК СКАЙНЕТА 👇
+        users_collection.update_one({"_id": message.from_user.id}, {"$set": {"intent_vip": True}}, upsert=True)
+        # 👆 ==================== 👆
         send_vip_welcome(bot, message.chat.id, message.from_user.first_name)
 
     @bot.message_handler(func=lambda message: message.text == "👤 Партнерская программа")

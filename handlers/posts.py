@@ -13,6 +13,11 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
             bot.send_message(message.chat.id, "Пожалуйста, используйте ЛС для работы с ботом.")
             return
 
+        # 👇 НОВЫЙ ЖУЧОК СКАЙНЕТА 👇
+        from database import users_collection # <--- Убедись, что это есть сверху, или просто добавь тут
+        users_collection.update_one({"_id": message.from_user.id}, {"$set": {"intent_post_ads": True}}, upsert=True)
+        # 👆 ==================== 👆
+
         if is_banned_in_network(message.from_user.id):
             bot.send_message(message.chat.id, "🚫 Вы не можете публиковать объявления. Ваш аккаунт заблокирован в сети.")
             return

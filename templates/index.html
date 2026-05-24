@@ -128,6 +128,26 @@
             <div class="chart-block" style="width: 400px;"><h3 style="color: #bb86fc;">📊 Соотношение сил</h3><canvas id="statusChart" width="360" height="240"></canvas></div>
             <div class="chart-block" style="width: 625px;"><h3 style="color: #03dac6;">📍 Топ-10 активных городов сети</h3><canvas id="cityChart" width="580" height="240"></canvas></div>
         </div>
+<div class="charts-container" style="margin-top: 5px;">
+        <div class="chart-block" style="width: 100%; display: flex; gap: 20px; background: #121212; border: 1px solid #333; padding: 15px;">
+            
+            <div style="flex: 1; padding: 15px; background: #1e1e1e; border-radius: 8px; border-left: 4px solid #bb86fc;">
+                <h3 style="color: #bb86fc; margin-top: 0; text-align: left;">🔍 Рентген Базы</h3>
+                <div id="xray-content" style="font-size: 14px; color: #aaa; line-height: 1.8;">
+                    Загрузка сканера...
+                </div>
+            </div>
+
+            <div style="flex: 1; padding: 15px; background: #1e1e1e; border-radius: 8px; border-left: 4px solid #ffb74d;">
+                <h3 style="color: #ffb74d; margin-top: 0; text-align: left;">🎯 Истинные мотивы (Зачем пришли)</h3>
+                <div style="font-size: 12px; color: #666; margin-bottom: 10px;">Статистика срабатывания трекеров-жучков.</div>
+                <div id="motives-content" style="font-size: 14px; color: #aaa; line-height: 1.8;">
+                    Загрузка данных трекеров...
+                </div>
+            </div>
+
+        </div>
+    </div>
         <div class="search-container">
             <h3>🕵️‍♂️ Моментальный перехват досье</h3>
             <form method="POST" action="/glaz" class="search-box">
@@ -333,18 +353,34 @@
                 <button onclick="saveRootButtons()" class="btn btn-sm btn-danger mt-3" style="float: right;">💾 Сохранить в сеть</button>
                 <div style="clear: both;"></div>
 
-                <div style="background: rgba(3, 218, 198, 0.05); border: 1px solid #03dac6; padding: 15px; border-radius: 8px; margin-top: 20px;">
-                    <h5 style="margin: 0 0 10px 0; color: #03dac6; text-transform: uppercase; font-size: 13px; letter-spacing: 1px;">💰 Касса авторазбанов (За сегодня)</h5>
-                    <div style="font-size: 24px; font-weight: bold; color: #fff; margin-bottom: 10px;">
-                        Всего прилетело: <span id="root-finance-total" style="color: #ffb74d;">0</span> ⭐️
+                <div style="background: rgba(3, 218, 198, 0.05); border: 1px solid #03dac6; padding: 20px; border-radius: 8px; margin-top: 20px; text-align: center;">
+                    <h5 style="margin: 0 0 10px 0; color: #03dac6; text-transform: uppercase; font-size: 14px; letter-spacing: 1px; font-weight: bold;">
+                        💰 ОБЩАЯ КАССА ИМПЕРИИ (ЗА СЕГОДНЯ)
+                    </h5>
+                    <div style="display: flex; justify-content: center; align-items: baseline; gap: 15px; margin-bottom: 15px; background: #121212; padding: 10px; border-radius: 8px; border: 1px solid #333;">
+                        <div style="font-size: 32px; font-weight: bold; color: #ffb74d;">
+                            <span id="root-finance-total">0</span> ⭐️
+                        </div>
+                        <div style="font-size: 24px; font-weight: bold; color: #888;">
+                            ≈ <span id="root-finance-rubles">0</span> ₽
+                        </div>
                     </div>
-                    <div id="root-finance-list" style="font-size: 12px; color: #aaa; max-height: 120px; overflow-y: auto; font-family: monospace;">
+                    <div id="root-finance-list" style="font-size: 12px; color: #aaa; max-height: 120px; overflow-y: auto; font-family: monospace; text-align: left; background: #1e1e1e; padding: 10px; border-radius: 5px;">
                         📊 Сводка пуста.
                     </div>
                 </div>
 
                 <div style="background: rgba(187, 134, 252, 0.05); border: 1px solid #bb86fc; padding: 15px; border-radius: 8px; margin-top: 20px;">
-                    <h5 style="margin: 0 0 10px 0; color: #bb86fc; text-transform: uppercase; font-size: 13px; letter-spacing: 1px;">📈 Финансовая аналитика (Источники дохода)</h5>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h5 style="margin: 0; color: #bb86fc; text-transform: uppercase; font-size: 13px; letter-spacing: 1px;">📈 Финансовая аналитика</h5>
+                        
+                        <div style="display: flex; gap: 5px;">
+                            <button class="tab-btn active" id="btn-period-week" onclick="loadRootRevenue(sessionPin, 'week')" style="padding: 4px 10px; font-size: 11px;">Неделя</button>
+                            <button class="tab-btn" id="btn-period-month" onclick="loadRootRevenue(sessionPin, 'month')" style="padding: 4px 10px; font-size: 11px;">Месяц</button>
+                            <button class="tab-btn" id="btn-period-all" onclick="loadRootRevenue(sessionPin, 'all')" style="padding: 4px 10px; font-size: 11px;">Всё время</button>
+                        </div>
+                    </div>
+                    
                     <canvas id="revenueChart" width="600" height="250" style="margin: 0 auto; display: block;"></canvas>
                 </div>
 
@@ -764,6 +800,48 @@ function fireBroadcast() {
 }
 
         // Инициализация графиков
+        function loadXRay() {
+            fetch('/glaz/api/xray')
+            .then(res => res.json())
+            .then(data => {
+                // Отрисовка Рентгена (Левый блок)
+                let xrayHtml = `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>Всего в базе:</span> <b style="color:#fff;">${data.total}</b></div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>👑 Элита (VIP + QUEER):</span> <b style="color:#ffb74d;">${data.vips + data.queers}</b></div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>🛡 Обычные верифицированные:</span> <b style="color:#03dac6;">${data.verified}</b></div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>🔨 В Черном списке:</span> <b style="color:#cf6679;">${data.banned}</b></div>
+                    <hr style="border-color: #333; margin: 10px 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 5px; border-radius: 5px;">
+                        <span>👻 Призраки (Мертвые души):</span> 
+                        <b style="color:#888; font-size: 16px;">${data.ghosts}</b>
+                    </div>
+                `;
+                document.getElementById('xray-content').innerHTML = xrayHtml;
+
+                // Отрисовка Мотивов/Жучков (Правый блок)
+                // Считаем конверсию VIP: Купили VIP / Интересовались * 100
+                let vipConversion = data.intent_vip > 0 ? Math.round(((data.vips + data.queers) / data.intent_vip) * 100) : 0;
+                
+                let motivesHtml = `
+                    <div style="margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; color: #fff;">
+                            <span>👑 Хотели купить VIP:</span> <b>${data.intent_vip} чел.</b>
+                        </div>
+                        <div style="font-size: 11px; color: #ffb74d;">↳ Конверсия в реальную покупку: <b>${vipConversion}%</b></div>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px; color: #fff;">
+                        <span>📝 Создавали объявления:</span> <b>${data.intent_ads} чел.</b>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px; color: #fff;">
+                        <span>🆘 Обращались в поддержку:</span> <b>${data.intent_support} чел.</b>
+                    </div>
+                `;
+                document.getElementById('motives-content').innerHTML = motivesHtml;
+            });
+        }
+
         function initCharts() {
             fetch('/glaz/api/chart_data').then(res => res.json()).then(data => {
                 const ctxStatus = document.getElementById('statusChart').getContext('2d');
@@ -793,6 +871,8 @@ function fireBroadcast() {
                 }
             });
 
+            loadXRay(); // <--- ДОБАВЬ ЭТО СЮДА, ЧТОБЫ ЖУЧКИ ОБНОВЛЯЛИСЬ КАЖДЫЕ 5 СЕК
+
             // 2. Обновляем Живой Радар (Web-Логи)
             fetch('/glaz/api/radar').then(res => res.json()).then(data => {
                 const box = document.getElementById('radar-box');
@@ -813,6 +893,7 @@ function fireBroadcast() {
 
         window.onload = function() {
             initCharts();
+            loadXRay(); // <--- ВОТ ЭТА СТРОЧКА ЗАПУСКАЕТ РЕНТГЕН ПРИ ВХОДЕ
             let savedTab = localStorage.getItem('activeTab');
             if (savedTab && document.getElementById(savedTab)) { openTab(savedTab); }
         }
@@ -859,12 +940,22 @@ function loadRootFinance(pin) {
     .then(res => res.json())
     .then(data => {
         if(!data.error) {
-            document.getElementById('root-finance-total').innerText = data.total_today;
+            const totalStars = parseInt(data.total_today) || 0;
+            const totalRubles = Math.floor(totalStars * 1.6); // Конвертация по курсу 1.6
+            
+            // Красивый вывод с пробелами (например: 10 500)
+            document.getElementById('root-finance-total').innerText = totalStars.toLocaleString('ru-RU');
+            document.getElementById('root-finance-rubles').innerText = totalRubles.toLocaleString('ru-RU');
+            
             let html = '';
             data.payments.forEach(p => {
-                html += `<div style="padding: 4px 0; border-bottom: 1px solid #222;">⏱ ${p.time} | Юзер: <code>${p.uid}</code> заплатил <span style="color:#03dac6; font-weight:bold;">${p.amount} ⭐️</span></div>`;
+                const rubEquivalent = Math.floor(parseInt(p.amount) * 1.6);
+                html += `<div style="padding: 6px 0; border-bottom: 1px solid #222; display: flex; justify-content: space-between;">
+                            <span>⏱ ${p.time} | Юзер: <code>${p.uid}</code></span>
+                            <span><span style="color:#03dac6; font-weight:bold;">${p.amount} ⭐️</span> <span style="color:#888; font-size:10px;">(≈ ${rubEquivalent} ₽)</span></span>
+                         </div>`;
             });
-            if(data.payments.length === 0) html = '🛸 Сегодня оплат за авторазбан пока не поступало.';
+            if(data.payments.length === 0) html = '🛸 Сегодня оплат пока не поступало.';
             document.getElementById('root-finance-list').innerHTML = html;
         }
     });
@@ -1280,19 +1371,25 @@ function manageAd(sub_id, action) {
 
 let revenueChartInstance = null;
 
-function loadRootRevenue(pin) {
+// Теперь функция принимает второй параметр - период (по умолчанию 'week')
+function loadRootRevenue(pin, period = 'week') {
+    
+    // Переключаем активную кнопку (подсветка фиолетовым)
+    document.querySelectorAll('[id^="btn-period-"]').forEach(btn => btn.classList.remove('active'));
+    const activeBtn = document.getElementById('btn-period-' + period);
+    if(activeBtn) activeBtn.classList.add('active');
+
+    // Отправляем на сервер пароль + выбранный период
     fetch('/glaz/api/analytics/revenue', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({pin: pin})
+        body: JSON.stringify({pin: pin, period: period})
     })
     .then(res => res.json())
     .then(data => {
-        // Получаем все уникальные даты
         const dates = [...new Set(data.map(item => item._id.date))];
-        
-        // Массив типов, которые есть в базе
         const types = ['fine', 'ads', 'vip', 'donation'];
+        
         const datasets = types.map(type => {
             return {
                 label: type === 'fine' ? 'Штрафы' : type === 'ads' ? 'Реклама' : type === 'vip' ? 'VIP' : 'Донаты',
@@ -1302,7 +1399,7 @@ function loadRootRevenue(pin) {
                 }),
                 borderColor: type === 'fine' ? '#cf6679' : type === 'ads' ? '#03dac6' : type === 'vip' ? '#ffb74d' : '#bb86fc',
                 backgroundColor: 'transparent',
-                tension: 0.4, // Красивый изгиб линии
+                tension: 0.4,
                 borderWidth: 3
             };
         });
@@ -1311,7 +1408,7 @@ function loadRootRevenue(pin) {
         if(revenueChartInstance) revenueChartInstance.destroy();
         
         revenueChartInstance = new Chart(ctx, {
-            type: 'line', // Теперь это линия!
+            type: 'line',
             data: { labels: dates, datasets: datasets },
             options: {
                 responsive: false,
@@ -1324,6 +1421,7 @@ function loadRootRevenue(pin) {
         });
     });
 }
+
     </script>
 </body>
 </html>

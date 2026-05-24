@@ -79,18 +79,40 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             "payments": formatted_list
         })
 
-    @app.route('/glaz/api/analytics/revenue', methods=['POST'])
+@app.route('/glaz/api/analytics/revenue', methods=['POST'])
     def api_get_revenue_stats():
         data = request.json
         if data.get('pin') != ROOT_PIN: 
             return jsonify({"error": "Unauthorized"}), 403
         
-        pipeline = [
+        # 1. Получаем период из запроса вебки (по умолчанию неделя)
+        period = data.get('period', 'week')
+        pipeline = []
+        
+        # 2. Фильтр машины времени Скайнета
+        if period != 'all':
+            from datetime import timedelta # Импортируем инструмент для сдвига дней
+            days = 7 if period == 'week' else 30
+            # Генерируем список правильных дат за последние 7 или 30 дней
+            valid_dates = [(datetime.now() - timedelta(days=i)).strftime("%d.%m.%Y") for i in range(days)]
+            
+            # Говорим базе: отдай только те доходы, дата которых есть в нашем списке
+            pipeline.append({"$match": {"date": {"$in": valid_dates}}})
+            
+        # 3. Суммируем доходы по дням и типам
+        pipeline.extend([
             {"$group": {
                 "_id": {"date": "$date", "type": "$type"},
                 "total": {"$sum": "$amount"}
-            }},
-            {"$sort": {"_id.date": 1}}
-        ]
+            }}
+        ])
+        
         stats = list(db['daily_revenue'].aggregate(pipeline))
+        
+        # 4. Умная сортировка! Выстраиваем даты в правильном календарном порядке
+        try:
+            stats.sort(key=lambda x: datetime.strptime(x['_id']['date'], "%d.%m.%Y"))
+        except:
+            pass # Если попалась битая дата - игнорируем
+            
         return jsonify(stats)

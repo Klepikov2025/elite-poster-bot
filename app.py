@@ -468,6 +468,10 @@ def ban_user_everywhere(target_id, reason="Без причины", admin_name="�
 # ==================== 📩 СИСТЕМА ТИКЕТОВ (САППОРТ) ====================
 @bot.message_handler(func=lambda message: message.text == "💬 Написать в Поддержку" and message.chat.type == "private")
 def support_request_handler(message):
+    # 👇 НОВЫЙ ЖУЧОК СКАЙНЕТА 👇
+    users_collection.update_one({"_id": message.from_user.id}, {"$set": {"intent_support": True}}, upsert=True)
+    # 👆 ==================== 👆
+
     # 1. Просим юзера написать проблему
     msg = bot.send_message(
         message.chat.id, 
