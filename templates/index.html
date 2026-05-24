@@ -525,14 +525,30 @@
         let activeProxySession = null;
 
         function openTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-            event.currentTarget.classList.add('active');
+            const el = document.getElementById(tabId);
+            if (!el) {
+                console.warn("Вкладка не найдена:", tabId);
+                return;
+            }
+            
+            // Скрываем все вкладки
+            document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(e => e.classList.remove('active'));
+            
+            // Показываем нужную
+            el.classList.add('active');
+            
+            // Подсветка кнопки (безопасно)
+            const btn = (typeof event !== 'undefined' && event.currentTarget) 
+                ? event.currentTarget 
+                : document.querySelector(`[onclick="openTab('${tabId}')"]`);
+            if(btn) btn.classList.add('active');
+            
             localStorage.setItem('activeTab', tabId);
 
+            // Загружаем данные (только если вкладка открылась)
             if(tabId === 'tab-blackbox') loadProxySessions();
-            if(tabId === 'tab-system') loadSystemSettings();
+            if(tabId === 'tab-system') { loadDictionary(); loadSystemTexts(); }
             if(tabId === 'tab-quarantine') loadQuarantine();
             if(tabId === 'tab-support') loadSupportTickets();
             if(tabId === 'ads-tab') loadAds();
