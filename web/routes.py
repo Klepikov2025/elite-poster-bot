@@ -148,106 +148,88 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             ghosts=real_ghosts
         )
 
-    @app.route('/glaz/api/stats')
-    def api_stats():
-        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
-        return jsonify({
-            "total": users_collection.count_documents({}),
-            "vips": users_collection.count_documents({"is_vip": True}),
-            "queers": users_collection.count_documents({"is_queer": True}),
-            "banned": banned_collection.count_documents({}),
-            "unanswered_tickets": db['support_tickets'].count_documents({"is_answered": False, "is_closed": {"$ne": True}})
-        })
-
     @app.route('/glaz/api/xray')
     def api_xray():
-    if not session.get('logged_in'): 
-        return jsonify({"error": "Unauthorized"}), 401
-    
-    total = users_collection.count_documents({})
+        if not session.get('logged_in'): 
+            return jsonify({"error": "Unauthorized"}), 401
+        
+        total = users_collection.count_documents({})
+        vips = users_collection.count_documents({"is_vip": True})
+        queers = users_collection.count_documents({"is_queer": True})
+        verified_only = users_collection.count_documents({
+            "is_verified": True, 
+            "is_vip": {"$ne": True}, 
+            "is_queer": {"$ne": True}
+        })
+        banned = banned_collection.count_documents({})
 
-    vips = users_collection.count_documents({"is_vip": True})
-    queers = users_collection.count_documents({"is_queer": True})
-    verified_only = users_collection.count_documents({
-        "is_verified": True, 
-        "is_vip": {"$ne": True}, 
-        "is_queer": {"$ne": True}
-    })
-    banned = banned_collection.count_documents({})
+        # === ВОРОНКА ВЕРИФИКАЦИИ ===
+        in_verification = db['vip_funnel'].count_documents({})
 
-    # === ВОРОНКА ВЕРИФИКАЦИИ ===
-    in_verification = db['vip_funnel'].count_documents({})  # те, кто начал процесс
+        # === КЛАССИФИКАЦИЯ ОБЫЧНЫХ ПОЛЬЗОВАТЕЛЕЙ ===
+        active_regular = users_collection.count_documents({
+            "is_vip": {"$ne": True},
+            "is_queer": {"$ne": True},
+            "is_verified": {"$ne": True},
+            "$or": [
+                {"main_city": {"$exists": True, "$ne": "Не привязан"}},
+                {"posts_count": {"$gt": 0}},
+                {"intent_post_ads": True},
+                {"intent_support": True},
+                {"support_tickets": {"$gt": 0}}
+            ]
+        })
 
-    # === КЛАССИФИКАЦИЯ ОБЫЧНЫХ ПОЛЬЗОВАТЕЛЕЙ ===
-    
-    # 1. Активные / Полезные пользователи
-    active_regular = users_collection.count_documents({
-        "is_vip": {"$ne": True},
-        "is_queer": {"$ne": True},
-        "is_verified": {"$ne": True},
-        "$or": [
-            {"main_city": {"$exists": True, "$ne": "Не привязан"}},   # бот привязал город
-            {"posts_count": {"$gt": 0}},                              # создавал объявления
-            {"intent_post_ads": True},
-            {"intent_support": True},
-            {"support_tickets": {"$gt": 0}}                           # если будешь считать
-        ]
-    })
+        pending_vip = users_collection.count_documents({
+            "is_vip": {"$ne": True},
+            "is_queer": {"$ne": True},
+            "intent_vip": True
+        })
 
-    # 2. В процессе верификации (начали, но не завершили)
-    # (дублируем на всякий случай, если кто-то не попал в vip_funnel)
-    pending_vip = users_collection.count_documents({
-        "is_vip": {"$ne": True},
-        "is_queer": {"$ne": True},
-        "intent_vip": True
-    })
+        just_viewed = users_collection.count_documents({
+            "is_vip": {"$ne": True},
+            "is_queer": {"$ne": True},
+            "is_verified": {"$ne": True},
+            "first_seen": {"$exists": True},
+            "main_city": {"$exists": False},
+            "posts_count": {"$exists": False},
+            "intent_vip": {"$ne": True},
+            "intent_support": {"$ne": True},
+            "intent_post_ads": {"$ne": True}
+        })
 
-    # 3. Только посмотрели (есть first_seen, но ничего не делали)
-    just_viewed = users_collection.count_documents({
-        "is_vip": {"$ne": True},
-        "is_queer": {"$ne": True},
-        "is_verified": {"$ne": True},
-        "first_seen": {"$exists": True},
-        "main_city": {"$exists": False},
-        "posts_count": {"$exists": False},
-        "intent_vip": {"$ne": True},
-        "intent_support": {"$ne": True},
-        "intent_post_ads": {"$ne": True}
-    })
+        real_ghosts = users_collection.count_documents({
+            "is_vip": {"$ne": True},
+            "is_queer": {"$ne": True},
+            "is_verified": {"$ne": True},
+            "first_seen": {"$exists": False},
+            "main_city": {"$exists": False},
+            "posts_count": {"$exists": False},
+            "intent_vip": {"$ne": True},
+            "intent_support": {"$ne": True},
+            "intent_post_ads": {"$ne": True}
+        })
 
-    # 4. Реальные мёртвые души (полностью пустые)
-    real_ghosts = users_collection.count_documents({
-        "is_vip": {"$ne": True},
-        "is_queer": {"$ne": True},
-        "is_verified": {"$ne": True},
-        "first_seen": {"$exists": False},
-        "main_city": {"$exists": False},
-        "posts_count": {"$exists": False},
-        "intent_vip": {"$ne": True},
-        "intent_support": {"$ne": True},
-        "intent_post_ads": {"$ne": True}
-    })
+        # Жучки
+        intent_vip = users_collection.count_documents({"intent_vip": True})
+        intent_support = users_collection.count_documents({"intent_support": True})
+        intent_ads = users_collection.count_documents({"intent_post_ads": True})
 
-    # Жучки
-    intent_vip = users_collection.count_documents({"intent_vip": True})
-    intent_support = users_collection.count_documents({"intent_support": True})
-    intent_ads = users_collection.count_documents({"intent_post_ads": True})
-
-    return jsonify({
-        "total": total,
-        "vips": vips,
-        "queers": queers,
-        "verified": verified_only,
-        "banned": banned,
-        "in_verification": in_verification,      # ← Новое: в воронке
-        "active_regular": active_regular,        # ← Реально активные
-        "just_viewed": just_viewed,              # ← Только посмотрели
-        "ghosts": real_ghosts,                   # ← Мёртвые
-        "intent_vip": intent_vip,
-        "intent_support": intent_support,
-        "intent_ads": intent_ads,
-        "pending_vip": pending_vip
-    })
+        return jsonify({
+            "total": total,
+            "vips": vips,
+            "queers": queers,
+            "verified": verified_only,
+            "banned": banned,
+            "in_verification": in_verification,
+            "active_regular": active_regular,
+            "just_viewed": just_viewed,
+            "ghosts": real_ghosts,
+            "intent_vip": intent_vip,
+            "intent_support": intent_support,
+            "intent_ads": intent_ads,
+            "pending_vip": pending_vip
+        })
 
     @app.route('/glaz/api/chart_data')
     def api_chart_data():
