@@ -10,14 +10,18 @@ import telebot
 
 from config import (
     OWNER_ID, ADMIN_CHAT_IDS, VIP_CHAT_ID, BEYOND_CHAT_ID, PARNI_CHATS,
-    all_cities, STAFF_GROUP_ID, SUPPORT_GROUP_ID, JOURNAL_CHAT_ID, # <--- Добавили их сюда
+    all_cities, STAFF_GROUP_ID, SUPPORT_GROUP_ID, JOURNAL_CHAT_ID,
     chat_ids_mk, chat_ids_parni, chat_ids_ns,
     chat_ids_rainbow, chat_ids_gayznak, MAIN_CHANNEL_LINK
 )
 from database import users_collection, banned_collection, db, archive_collection
 from utils import escape_md, get_user_name
 
-@bot.message_handler(commands=['ping'])
+
+def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, safe_set_tag, add_radar_log, is_subscribed):
+    
+    # 👇 КОМАНДА-ШПИОН 👇
+    @bot.message_handler(commands=['ping'])
     def ping_handler(message):
         bot.reply_to(message, f"👀 Я жив! ID этого чата: {message.chat.id}")
 
@@ -55,23 +59,17 @@ from utils import escape_md, get_user_name
         if any(word in text for word in ["верификаци", "вериф", "пройти"]):
             response = random.choice(phrases_verification)
         elif any(word in text for word in [
-            # Старые триггеры
             "забанили", "мут", "не могу писать", "запрет", "ограничени", "блок",
-            # НОВЫЕ ТРИГГЕРЫ ИЗ ЧАТА ПОДДЕРЖКИ
             "разблок", "снять бан", "получил бан", "бан?", "оплатил", "звезд"
         ]):
             response = random.choice(phrases_restrictions)
 
         # 4. Имитация живого человека и отправка
         if response:
-            # Показываем статус "Печатает..."
             bot.send_chat_action(message.chat.id, 'typing')
-            # Ждем 1.5 секунды для реалистичности
             time.sleep(1.5) 
-            # Отвечаем конкретно на сообщение юзера (Reply)
             bot.reply_to(message, response)
     # 👆 ========================================= 👆
-
 
 def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, safe_set_tag, add_radar_log, is_subscribed):
     
