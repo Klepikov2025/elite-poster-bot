@@ -130,23 +130,24 @@
         </div>
 <div class="charts-container" style="margin-top: 5px;">
         <div class="chart-block" style="width: 100%; display: flex; gap: 20px; background: #121212; border: 1px solid #333; padding: 15px;">
-    
-    <div style="flex: 1; padding: 15px; background: #1e1e1e; border-radius: 8px; border-left: 4px solid #bb86fc;">
-        <h3 style="color: #bb86fc; margin-top: 0; text-align: left;">🔍 РЕНТГЕН БАЗЫ</h3>
-        <div id="xray-content" style="font-size: 14px; color: #aaa; line-height: 1.8;">
-            Загрузка сканера...
+            
+            <div style="flex: 1; padding: 15px; background: #1e1e1e; border-radius: 8px; border-left: 4px solid #bb86fc;">
+                <h3 style="color: #bb86fc; margin-top: 0; text-align: left;">🔍 Рентген Базы</h3>
+                <div id="xray-content" style="font-size: 14px; color: #aaa; line-height: 1.8;">
+                    Загрузка сканера...
+                </div>
+            </div>
+
+            <div style="flex: 1; padding: 15px; background: #1e1e1e; border-radius: 8px; border-left: 4px solid #ffb74d;">
+                <h3 style="color: #ffb74d; margin-top: 0; text-align: left;">🎯 Истинные мотивы (Зачем пришли)</h3>
+                <div style="font-size: 12px; color: #666; margin-bottom: 10px;">Статистика срабатывания трекеров-жучков.</div>
+                <div id="motives-content" style="font-size: 14px; color: #aaa; line-height: 1.8;">
+                    Загрузка данных трекеров...
+                </div>
+            </div>
+
         </div>
     </div>
-
-    <div style="flex: 1; padding: 15px; background: #1e1e1e; border-radius: 8px; border-left: 4px solid #ffb74d;">
-        <h3 style="color: #ffb74d; margin-top: 0; text-align: left;">🎯 Истинные мотивы (Зачем пришли)</h3>
-        <div style="font-size: 12px; color: #666; margin-bottom: 10px;">Статистика срабатывания трекеров-жучков.</div>
-        <div id="motives-content" style="font-size: 14px; color: #aaa; line-height: 1.8;">
-            Загрузка данных трекеров...
-        </div>
-    </div>
-
-</div>
         <div class="search-container">
             <h3>🕵️‍♂️ Моментальный перехват досье</h3>
             <form method="POST" action="/glaz" class="search-box">
@@ -525,28 +526,26 @@
         let activeProxySession = null;
 
         function openTab(tabId) {
+            // 1. Скрываем все вкладки и кнопки
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            // 2. Показываем нужную вкладку
             const el = document.getElementById(tabId);
-            if (!el) {
-                console.warn("Вкладка не найдена:", tabId);
-                return;
-            }
-            
-            // Скрываем все вкладки
-            document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(e => e.classList.remove('active'));
-            
-            // Показываем нужную
+            if (!el) return;
             el.classList.add('active');
             
-            // Подсветка кнопки (безопасно)
-            const btn = (typeof event !== 'undefined' && event.currentTarget) 
-                ? event.currentTarget 
-                : document.querySelector(`[onclick="openTab('${tabId}')"]`);
-            if(btn) btn.classList.add('active');
+            // 3. Подсвечиваем кнопку безопасно
+            if (typeof event !== 'undefined' && event.currentTarget) {
+                event.currentTarget.classList.add('active');
+            } else {
+                const btn = document.querySelector(`[onclick="openTab('${tabId}')"]`);
+                if(btn) btn.classList.add('active');
+            }
             
+            // 4. Сохраняем и загружаем данные
             localStorage.setItem('activeTab', tabId);
 
-            // Загружаем данные (только если вкладка открылась)
             if(tabId === 'tab-blackbox') loadProxySessions();
             if(tabId === 'tab-system') { loadDictionary(); loadSystemTexts(); }
             if(tabId === 'tab-quarantine') loadQuarantine();
@@ -816,77 +815,62 @@ function fireBroadcast() {
 
         // Инициализация графиков
         function loadXRay() {
-    fetch('/glaz/api/xray')
-    .then(res => res.json())
-    .then(data => {
-        // === РЕНТГЕН БАЗЫ ===
-        let xrayHtml = `
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                <span>Всего в базе:</span> 
-                <b style="color:#fff;">${data.total}</b>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                <span>👑 Элита (VIP + QUEER):</span> 
-                <b style="color:#ffb74d;">${data.vips + data.queers}</b>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                <span>✅ Верифицированные:</span> 
-                <b style="color:#03dac6;">${data.verified}</b>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                <span>👤 Активные обычные:</span> 
-                <b style="color:#bb86fc;">${data.active_regular}</b>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                <span>🔎 В процессе верификации:</span> 
-                <b style="color:#ffb74d;">${data.in_verification}</b>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                <span>👀 Только посмотрели:</span> 
-                <b style="color:#aaa;">${data.just_viewed}</b>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px;">
-                <span>☠️ Мёртвые души:</span> 
-                <b style="color:#888;">${data.ghosts}</b>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-top: 8px;">
-                <span>🚫 В ЧС:</span> 
-                <b style="color:#cf6679;">${data.banned}</b>
-            </div>
-        `;
-        document.getElementById('xray-content').innerHTML = xrayHtml;
+            fetch('/glaz/api/xray')
+            .then(res => res.json())
+            .then(data => {
+                // Отрисовка Рентгена (Левый блок) с новыми категориями
+                let xrayHtml = `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>Всего в базе:</span> <b style="color:#fff;">${data.total}</b></div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>👑 Элита (VIP + QUEER):</span> <b style="color:#ffb74d;">${data.vips + data.queers}</b></div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>🛡 Обычные верифицированные:</span> <b style="color:#03dac6;">${data.verified}</b></div>
+                    
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px; background: rgba(76, 175, 80, 0.1); padding: 3px 5px; border-radius: 4px;">
+                        <span>🏃‍♂️ Активные юзеры (Без VIP):</span> <b style="color:#4caf50;">${data.active_regular}</b>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px; background: rgba(255, 235, 59, 0.1); padding: 3px 5px; border-radius: 4px;">
+                        <span>⏳ В воронке верификации:</span> <b style="color:#ffeb3b;">${data.in_verification + data.pending_vip}</b>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>🔨 В Черном списке:</span> <b style="color:#cf6679;">${data.banned}</b></div>
+                    
+                    <hr style="border-color: #333; margin: 10px 0;">
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 5px; border-radius: 5px; margin-bottom: 5px;">
+                        <span>👀 Зеваки (Просто зашли в бота):</span> 
+                        <b style="color:#aaa; font-size: 14px;">${data.just_viewed}</b>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,0,0,0.05); padding: 5px; border-radius: 5px;">
+                        <span>👻 Мертвые души (Пустые):</span> 
+                        <b style="color:#666; font-size: 14px;">${data.ghosts}</b>
+                    </div>
+                `;
+                document.getElementById('xray-content').innerHTML = xrayHtml;
 
-        // === ИСТИННЫЕ МОТИВЫ ===
-        let vipConversion = data.intent_vip > 0 
-            ? Math.round(((data.vips + data.queers) / data.intent_vip) * 100) 
-            : 0;
-
-        let motivesHtml = `
-            <div style="margin-bottom: 12px;">
-                <div style="display: flex; justify-content: space-between;">
-                    <span>👑 Хотели VIP:</span> 
-                    <b>${data.intent_vip} чел.</b>
-                </div>
-                <div style="font-size: 12px; color: #ffb74d;">Конверсия: <b>${vipConversion}%</b></div>
-            </div>
-            
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                <span>📝 Создавали объявления:</span> 
-                <b>${data.intent_ads} чел.</b>
-            </div>
-            
-            <div style="display: flex; justify-content: space-between;">
-                <span>🆘 Писали в поддержку:</span> 
-                <b>${data.intent_support} чел.</b>
-            </div>
-        `;
-        document.getElementById('motives-content').innerHTML = motivesHtml;
-    })
-    .catch(err => {
-        console.error(err);
-        document.getElementById('xray-content').innerHTML = "Ошибка загрузки рентгена";
-    });
-}
+                // Отрисовка Мотивов/Жучков (Правый блок)
+                // Считаем конверсию VIP: Купили VIP / Интересовались * 100
+                let vipConversion = data.intent_vip > 0 ? Math.round(((data.vips + data.queers) / data.intent_vip) * 100) : 0;
+                
+                let motivesHtml = `
+                    <div style="margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; color: #fff;">
+                            <span>👑 Интересовались VIP:</span> <b>${data.intent_vip} чел.</b>
+                        </div>
+                        <div style="font-size: 11px; color: #ffb74d;">↳ Конверсия в реальную покупку: <b>${vipConversion}%</b></div>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px; color: #fff;">
+                        <span>📝 Создавали объявления:</span> <b>${data.intent_ads} чел.</b>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px; color: #fff;">
+                        <span>🆘 Обращались в поддержку:</span> <b>${data.intent_support} чел.</b>
+                    </div>
+                `;
+                document.getElementById('motives-content').innerHTML = motivesHtml;
+            });
+        }
 
         function initCharts() {
             fetch('/glaz/api/chart_data').then(res => res.json()).then(data => {
