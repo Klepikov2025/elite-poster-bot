@@ -4,6 +4,7 @@ import difflib
 import threading
 from datetime import datetime
 import pytz
+import random
 from telebot import types
 import telebot
 
@@ -52,6 +53,52 @@ YELLOW_COMMERCE_REGEX = [
 warned_users = {}  # Кэш отбивок подписок (chat_id, user_id) -> message_id
 
 def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, safe_set_tag, add_radar_log, is_subscribed):
+    
+    # 👇 🤖 МОДУЛЬ: АВТО-АДМИН ПОДДЕРЖКИ 🤖 👇
+    @bot.message_handler(func=lambda message: str(message.chat.id) == str(SUPPORT_GROUP_ID))
+    def auto_support_handler(message):
+        # 1. Игнорируем сообщения от самих админов (анонимных и обычных)
+        if getattr(message, 'sender_chat', None) or message.from_user.id in [777000, 136817688, OWNER_ID]:
+            return
+            
+        try:
+            member = bot.get_chat_member(message.chat.id, message.from_user.id)
+            if member.status in ['administrator', 'creator']:
+                return
+        except: pass
+
+        text = (message.text or "").lower()
+        response = None
+
+        # 2. База знаний Скайнета (Триггеры и Ответы)
+        phrases_verification = [
+            "Жду вас в боте @FAQMKBOT для прохождения верификации 🤝",
+            "Здравствуйте! Проходите верификацию в боте @FAQMKBOT.",
+            "Пишите в бот @FAQMKBOT, там проходит быстрая верификация.",
+            "Для верификации перейдите в @FAQMKBOT и нажмите /start"
+        ]
+        
+        phrases_restrictions = [
+            "Здравствуйте. Пишите в бот @FAQMKBOT, проверим ваш статус.",
+            "Если у вас ограничения, напишите в @FAQMKBOT, мы посмотрим причину.",
+            "Все вопросы по мутам и блокировкам решаем через @FAQMKBOT. Напишите туда."
+        ]
+
+        # 3. Логика распознавания
+        if any(word in text for word in ["верификаци", "вериф", "пройти"]):
+            response = random.choice(phrases_verification)
+        elif any(word in text for word in ["забанили", "мут", "не могу писать", "запрет", "ограничени", "блок"]):
+            response = random.choice(phrases_restrictions)
+
+        # 4. Имитация живого человека и отправка
+        if response:
+            # Показываем статус "Печатает..."
+            bot.send_chat_action(message.chat.id, 'typing')
+            # Ждем 1.5 секунды для реалистичности
+            time.sleep(1.5) 
+            # Отвечаем конкретно на сообщение юзера (Reply)
+            bot.reply_to(message, response)
+    # 👆 ========================================= 👆
     
     @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact', 'video_note'], func=lambda message: message.chat.type in ['group', 'supergroup'])
     def skynet_core_handler(message):
