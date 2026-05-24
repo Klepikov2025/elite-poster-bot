@@ -17,8 +17,10 @@ from config import (
 from database import users_collection, banned_collection, db, archive_collection
 from utils import escape_md, get_user_name
 
-def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, safe_set_tag, add_radar_log, is_subscribed):
-    
+@bot.message_handler(commands=['ping'])
+    def ping_handler(message):
+        bot.reply_to(message, f"👀 Я жив! ID этого чата: {message.chat.id}")
+
     # 👇 🤖 МОДУЛЬ: АВТО-АДМИН ПОДДЕРЖКИ 🤖 👇
     @bot.message_handler(func=lambda message: str(message.chat.id) == str(SUPPORT_GROUP_ID))
     def auto_support_handler(message):
@@ -70,6 +72,9 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             bot.reply_to(message, response)
     # 👆 ========================================= 👆
 
+
+def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, safe_set_tag, add_radar_log, is_subscribed):
+    
 
 # 🔴 Красная зона (Глобал бан)
     RED_WORDS = [
