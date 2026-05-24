@@ -701,27 +701,6 @@ def is_subscribed(user_id):
         print(f"Ошибка при проверке подписки для {user_id}: {e}")
         return False
 
-# ==================== ЛОВЕЦ ЗВЕЗД (ОПЛАТА 50 ЗВЕЗД В ГРУППЕ) ====================
-# Перечисляем абсолютно ВСЕ типы, чтобы бот ловил стикеры, кружки, фото, текст и т.д.
-@bot.message_handler(func=lambda message: str(message.chat.id) == str(SUPPORT_GROUP_ID), content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'video_note', 'location', 'contact', 'successful_payment'])
-def catch_paid_stars(message):
-    # Игнорируем сообщения от других ботов и системные уведомления
-    if message.from_user.is_bot: return
-    
-    uid = message.from_user.id
-    
-    # В этой группе любое сообщение стоит 50 звезд. 
-    # Сбрасываем страйки и ставим status: 1
-    db['paid_users'].update_one(
-        {"uid": uid},
-        {"$set": {
-            "status": 1,
-            "strikes": 0,  # <-- Обязательно обнуляем страйки тут!
-            "timestamp": datetime.now()
-        }},
-        upsert=True
-    )
-
 # === АКТИВАЦИЯ ВНЕШНИХ ХЭНДЛЕРОВ ===
 register_admin_handlers(
     bot, 
