@@ -87,7 +87,12 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         # 3. Логика распознавания
         if any(word in text for word in ["верификаци", "вериф", "пройти"]):
             response = random.choice(phrases_verification)
-        elif any(word in text for word in ["забанили", "мут", "не могу писать", "запрет", "ограничени", "блок"]):
+        elif any(word in text for word in [
+            # Старые триггеры
+            "забанили", "мут", "не могу писать", "запрет", "ограничени", "блок",
+            # НОВЫЕ ТРИГГЕРЫ ИЗ ЧАТА ПОДДЕРЖКИ
+            "разблок", "снять бан", "получил бан", "бан?", "оплатил", "звезд"
+        ]):
             response = random.choice(phrases_restrictions)
 
         # 4. Имитация живого человека и отправка
