@@ -1361,17 +1361,49 @@ function loadAds() {
     fetch('/glaz/api/ads/subs')
     .then(res => res.json())
     .then(data => {
+        
+        // 1. Выносим парсер даты наверх, чтобы использовать его дважды
+        const parseDate = (str) => {
+            if (!str || str.includes('ошибка') || str.includes('ПУСТО')) return 0;
+            let [datePart, timePart] = str.split(' ');
+            if (!datePart) return 0;
+            let [d, m, y] = datePart.split('.');
+            let [hr, min] = timePart ? timePart.split(':') : [0,0];
+            return new Date(y, m-1, d, hr, min).getTime();
+        };
+
+        // 2. Сортируем (Новые/Долгие сверху)
+        data.sort((a, b) => parseDate(b.end_date) - parseDate(a.end_date));
+
         const body = document.getElementById('ads-table-body');
         body.innerHTML = '';
+        
+        // Берем текущее время браузера в миллисекундах
+        const now = Date.now();
+
         data.forEach(sub => {
+            const endDateMs = parseDate(sub.end_date);
+            
+            // Проверяем: если дата корректная (больше 0) и она уже в прошлом
+            const isExpired = endDateMs > 0 && endDateMs < now;
+            
+            // Задаем стили в зависимости от статуса (если просрочено — делаем серым)
+            const rowStyle = isExpired 
+                ? "border-bottom: 1px solid #222; color: #666; background: rgba(255,255,255,0.02);" 
+                : "border-bottom: 1px solid #222;";
+                
+            // Для просроченных добавим зачеркивание даты и сделаем кнопки чуть прозрачными
+            const dateStyle = isExpired ? "text-decoration: line-through;" : "";
+            const btnOpacity = isExpired ? "opacity: 0.5;" : "";
+
             body.innerHTML += `
-            <tr style="border-bottom: 1px solid #222;">
+            <tr style="${rowStyle}">
                 <td style="padding: 10px;">${sub.uid}</td>
                 <td style="padding: 10px;">${sub.network}</td>
-                <td style="padding: 10px;">${sub.end_date}</td>
+                <td style="padding: 10px; ${dateStyle}">${sub.end_date}</td>
                 <td style="padding: 10px;">
-                    <button onclick="manageAd('${sub.id}', 'extend')">➕</button>
-                    <button onclick="manageAd('${sub.id}', 'delete')">🗑</button>
+                    <button class="act-btn unban" style="padding: 4px 8px; width: auto; ${btnOpacity}" onclick="manageAd('${sub.id}', 'extend')">➕</button>
+                    <button class="act-btn ban" style="padding: 4px 8px; width: auto; ${btnOpacity}" onclick="manageAd('${sub.id}', 'delete')">🗑</button>
                 </td>
             </tr>`;
         });
