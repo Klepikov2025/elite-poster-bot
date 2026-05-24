@@ -20,7 +20,7 @@ from utils import escape_md, get_user_name
 
 def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, safe_set_tag, add_radar_log, is_subscribed):
     
-    # 👇 КОМАНДА-ШПИОН 👇
+    # 👇 КОМАНДА-ШПИОН (Обрабатывается самой первой!) 👇
     @bot.message_handler(commands=['ping'])
     def ping_handler(message):
         bot.reply_to(message, f"👀 Я жив! ID этого чата: {message.chat.id}")
@@ -28,7 +28,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
     # 👇 🤖 МОДУЛЬ: АВТО-АДМИН ПОДДЕРЖКИ 🤖 👇
     @bot.message_handler(func=lambda message: str(message.chat.id) == str(SUPPORT_GROUP_ID))
     def auto_support_handler(message):
-        # 1. Игнорируем сообщения от самих админов (анонимных и обычных)
+        # 1. Игнорируем сообщения от самих админов
         if getattr(message, 'sender_chat', None) or message.from_user.id in [777000, 136817688, OWNER_ID]:
             return
             
@@ -41,7 +41,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         text = (message.text or "").lower()
         response = None
 
-        # 2. База знаний Скайнета (Триггеры и Ответы)
+        # 2. База знаний Скайнета
         phrases_verification = [
             "Жду вас в боте @FAQMKBOT для прохождения верификации 🤝",
             "Здравствуйте! Проходите верификацию в боте @FAQMKBOT.",
@@ -69,12 +69,8 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             bot.send_chat_action(message.chat.id, 'typing')
             time.sleep(1.5) 
             bot.reply_to(message, response)
-    # 👆 ========================================= 👆
 
-def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, safe_set_tag, add_radar_log, is_subscribed):
-    
-
-# 🔴 Красная зона (Глобал бан)
+    # 🔴 Красная зона (Глобал бан)
     RED_WORDS = [
         r"\bфен\b",          
         r"\bмеф\b", 
