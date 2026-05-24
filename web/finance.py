@@ -79,7 +79,7 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             "payments": formatted_list
         })
 
-@app.route('/glaz/api/analytics/revenue', methods=['POST'])
+    @app.route('/glaz/api/analytics/revenue', methods=['POST'])
     def api_get_revenue_stats():
         data = request.json
         if data.get('pin') != ROOT_PIN: 
@@ -91,7 +91,7 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
         
         # 2. Фильтр машины времени Скайнета
         if period != 'all':
-            from datetime import timedelta # Импортируем инструмент для сдвига дней
+            from datetime import timedelta, datetime
             days = 7 if period == 'week' else 30
             # Генерируем список правильных дат за последние 7 или 30 дней
             valid_dates = [(datetime.now() - timedelta(days=i)).strftime("%d.%m.%Y") for i in range(days)]
@@ -111,6 +111,7 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
         
         # 4. Умная сортировка! Выстраиваем даты в правильном календарном порядке
         try:
+            from datetime import datetime
             stats.sort(key=lambda x: datetime.strptime(x['_id']['date'], "%d.%m.%Y"))
         except:
             pass # Если попалась битая дата - игнорируем
