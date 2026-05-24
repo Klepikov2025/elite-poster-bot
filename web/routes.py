@@ -160,7 +160,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         })
 
     @app.route('/glaz/api/xray')
-def api_xray():
+    def api_xray():
     if not session.get('logged_in'): 
         return jsonify({"error": "Unauthorized"}), 401
     
