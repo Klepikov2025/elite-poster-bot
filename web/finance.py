@@ -63,9 +63,12 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             
         today_str = datetime.now().strftime("%d.%m.%Y")
         
-        today_payments = list(db['fine_payments'].find({"date": today_str}))
-        total_stars = sum(p.get('amount', 0) for p in today_payments)
+        # 🔥 ТЕПЕРЬ СЧИТАЕМ ВСЕ ТИПЫ ДОХОДОВ ЗА СЕГОДНЯ ИЗ DAILY_REVENUE
+        today_revenue = list(db['daily_revenue'].find({"date": today_str}))
+        total_stars = sum(r.get('amount', 0) for r in today_revenue)
         
+        # Оставляем детальный список логов для авторазбанов внизу блока
+        today_payments = list(db['fine_payments'].find({"date": today_str}))
         formatted_list = []
         for p in today_payments:
             formatted_list.append({

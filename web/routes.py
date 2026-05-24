@@ -90,65 +90,13 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             except ValueError:
                 search_error = "ID должен состоять только из цифр!"
 
-        # ==================== РЕНТГЕН БАЗЫ ====================
-        in_verification = db['vip_funnel'].count_documents({})
-
-        active_regular = users_collection.count_documents({
-            "is_vip": {"$ne": True},
-            "is_queer": {"$ne": True},
-            "is_verified": {"$ne": True},
-            "$or": [
-                {"main_city": {"$exists": True, "$ne": "Не привязан"}},
-                {"posts_count": {"$gt": 0}},
-                {"intent_post_ads": True},
-                {"intent_support": True},
-                {"intent_vip": True}
-            ]
-        })
-
-        just_viewed = users_collection.count_documents({
-            "is_vip": {"$ne": True},
-            "is_queer": {"$ne": True},
-            "is_verified": {"$ne": True},
-            "first_seen": {"$exists": True},
-            "main_city": {"$exists": False},
-            "posts_count": {"$exists": False},
-            "intent_vip": {"$ne": True},
-            "intent_support": {"$ne": True},
-            "intent_post_ads": {"$ne": True}
-        })
-
-        real_ghosts = users_collection.count_documents({
-            "is_vip": {"$ne": True},
-            "is_queer": {"$ne": True},
-            "is_verified": {"$ne": True},
-            "first_seen": {"$exists": False},
-            "main_city": {"$exists": False},
-            "posts_count": {"$exists": False},
-            "intent_vip": {"$ne": True},
-            "intent_support": {"$ne": True},
-            "intent_post_ads": {"$ne": True}
-        })
-        # =====================================================
-
         return render_template(
             'index.html', 
-            total=total_users, 
-            vips=vip_users, 
-            queers=queer_users, 
-            banned=banned_users,
-            user_data=user_data, 
-            search_error=search_error, 
-            search_id=search_id or "",
-            withdrawals=all_withdrawals, 
-            promos=all_promos,
-            in_verification=in_verification,
-            active_regular=active_regular,
-            just_viewed=just_viewed,
-            ghosts=real_ghosts
+            total=total_users, vips=vip_users, queers=queer_users, banned=banned_users,
+            user_data=user_data, search_error=search_error, search_id=search_id or "",
+            withdrawals=all_withdrawals, promos=all_promos
         )
 
-    # ====================== API РОУТЫ ======================
     @app.route('/glaz/api/stats')
     def api_stats():
         if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
@@ -175,45 +123,54 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         })
         banned = banned_collection.count_documents({})
 
+        # === ВОРОНКА ВЕРИФИКАЦИИ ===
         in_verification = db['vip_funnel'].count_documents({})
 
+        # === УМНАЯ КЛАССИФИКАЦИЯ ОБЫЧНЫХ ПОЛЬЗОВАТЕЛЕЙ ===
+        # Активные (у кого бот определил город или кто нажимал на кнопки создания рекламы/саппорта)
         active_regular = users_collection.count_documents({
             "is_vip": {"$ne": True},
             "is_queer": {"$ne": True},
             "is_verified": {"$ne": True},
             "$or": [
                 {"main_city": {"$exists": True, "$ne": "Не привязан"}},
-                {"posts_count": {"$gt": 0}},
                 {"intent_post_ads": True},
-                {"intent_support": True},
-                {"intent_vip": True}
+                {"intent_support": True}
             ]
         })
 
+        # В процессе верификации (заходили в меню, но не завершили кружок)
+        pending_vip = users_collection.count_documents({
+            "is_vip": {"$ne": True},
+            "is_queer": {"$ne": True},
+            "intent_vip": True
+        })
+
+        # Зеваки (зашли, получили первый контакт, но ничего не нажимали и город не привязался)
         just_viewed = users_collection.count_documents({
             "is_vip": {"$ne": True},
             "is_queer": {"$ne": True},
             "is_verified": {"$ne": True},
             "first_seen": {"$exists": True},
             "main_city": {"$exists": False},
-            "posts_count": {"$exists": False},
             "intent_vip": {"$ne": True},
             "intent_support": {"$ne": True},
             "intent_post_ads": {"$ne": True}
         })
 
+        # Настоящие мертвые души (старые аккаунты до внедрения логирования)
         real_ghosts = users_collection.count_documents({
             "is_vip": {"$ne": True},
             "is_queer": {"$ne": True},
             "is_verified": {"$ne": True},
             "first_seen": {"$exists": False},
             "main_city": {"$exists": False},
-            "posts_count": {"$exists": False},
             "intent_vip": {"$ne": True},
             "intent_support": {"$ne": True},
             "intent_post_ads": {"$ne": True}
         })
 
+        # Данные для счетчиков кнопок
         intent_vip = users_collection.count_documents({"intent_vip": True})
         intent_support = users_collection.count_documents({"intent_support": True})
         intent_ads = users_collection.count_documents({"intent_post_ads": True})
@@ -230,7 +187,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             "ghosts": real_ghosts,
             "intent_vip": intent_vip,
             "intent_support": intent_support,
-            "intent_ads": intent_ads
+            "intent_ads": intent_ads,
+            "pending_vip": pending_vip
         })
 
     @app.route('/glaz/api/chart_data')
