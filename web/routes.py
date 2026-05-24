@@ -148,6 +148,18 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             ghosts=real_ghosts
         )
 
+    # ====================== API РОУТЫ ======================
+    @app.route('/glaz/api/stats')
+    def api_stats():
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+        return jsonify({
+            "total": users_collection.count_documents({}),
+            "vips": users_collection.count_documents({"is_vip": True}),
+            "queers": users_collection.count_documents({"is_queer": True}),
+            "banned": banned_collection.count_documents({}),
+            "unanswered_tickets": db['support_tickets'].count_documents({"is_answered": False, "is_closed": {"$ne": True}})
+        })
+
     @app.route('/glaz/api/xray')
     def api_xray():
         if not session.get('logged_in'): 
@@ -163,10 +175,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         })
         banned = banned_collection.count_documents({})
 
-        # === ВОРОНКА ВЕРИФИКАЦИИ ===
         in_verification = db['vip_funnel'].count_documents({})
 
-        # === КЛАССИФИКАЦИЯ ОБЫЧНЫХ ПОЛЬЗОВАТЕЛЕЙ ===
         active_regular = users_collection.count_documents({
             "is_vip": {"$ne": True},
             "is_queer": {"$ne": True},
@@ -176,14 +186,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                 {"posts_count": {"$gt": 0}},
                 {"intent_post_ads": True},
                 {"intent_support": True},
-                {"support_tickets": {"$gt": 0}}
+                {"intent_vip": True}
             ]
-        })
-
-        pending_vip = users_collection.count_documents({
-            "is_vip": {"$ne": True},
-            "is_queer": {"$ne": True},
-            "intent_vip": True
         })
 
         just_viewed = users_collection.count_documents({
@@ -210,7 +214,6 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             "intent_post_ads": {"$ne": True}
         })
 
-        # Жучки
         intent_vip = users_collection.count_documents({"intent_vip": True})
         intent_support = users_collection.count_documents({"intent_support": True})
         intent_ads = users_collection.count_documents({"intent_post_ads": True})
@@ -227,8 +230,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             "ghosts": real_ghosts,
             "intent_vip": intent_vip,
             "intent_support": intent_support,
-            "intent_ads": intent_ads,
-            "pending_vip": pending_vip
+            "intent_ads": intent_ads
         })
 
     @app.route('/glaz/api/chart_data')
