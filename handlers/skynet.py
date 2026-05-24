@@ -136,6 +136,11 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             try: safe_set_tag(chat_id, user_id, final_tag)
             except: pass
 
+            # 👇 🛡️ ИММУНИТЕТ ДЛЯ ОДОБРЕННЫХ СПОНСОРОВ 🛡️ 👇
+            if custom_tag == "Спонсор_Одобрен":
+                return
+            # 👆 ======================================================= 👆
+
             # === 🤬 СЛОВАРЬ ИНКВИЗИТОРА (ТЯНЕМ ИЗ БАЗЫ) ===
             dict_settings = db['settings'].find_one({"_id": "skynet_dictionary"}) or {}
             live_red = RED_WORDS + [w['pattern'] for w in dict_settings.get('red', [])]
