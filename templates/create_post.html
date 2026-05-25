@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            padding: 15px; margin: 0;
+        }
+        
+        /* Стили для вкладок (Табов) */
+        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid var(--tg-theme-hint-color, #ccc); }
+        .tab-btn { 
+            flex: 1; padding: 12px; background: transparent; border: none; 
+            color: var(--tg-theme-hint-color, #888); font-weight: bold; font-size: 15px;
+            cursor: pointer; transition: 0.3s;
+        }
+        .tab-btn.active { 
+            color: var(--tg-theme-button-color, #3390ec); 
+            border-bottom: 3px solid var(--tg-theme-button-color, #3390ec); 
+        }
+
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: var(--tg-theme-hint-color, #999); font-size: 14px;}
+        input, select, textarea {
+            width: 100%; padding: 12px; margin-bottom: 20px; box-sizing: border-box;
+            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            color: var(--tg-theme-text-color, #000);
+            border: 1px solid var(--tg-theme-hint-color, #ccc);
+            border-radius: 10px; font-size: 16px;
+        }
+        button.main-btn {
+            width: 100%; padding: 14px;
+            background-color: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none; border-radius: 10px; font-size: 16px;
+            font-weight: bold; cursor: pointer;
+        }
+
+        /* Стили для карточек в "Мои анкеты" */
+        .post-card {
+            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            padding: 15px; border-radius: 10px; margin-bottom: 15px;
+            border: 1px solid var(--tg-theme-hint-color, #ccc);
+        }
+        .post-card h4 { margin: 0 0 5px 0; color: var(--tg-theme-button-color, #3390ec); }
+        .post-card p { font-size: 13px; margin: 0 0 10px 0; color: var(--tg-theme-text-color, #000); }
+        .delete-btn {
+            background: #cf6679; padding: 10px; font-size: 14px; width: 100%;
+            border:none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="tabs">
+        <button class="tab-btn active" id="tabCreateBtn" onclick="switchTab('create')">📝 Создать</button>
+        <button class="tab-btn" id="tabManageBtn" onclick="switchTab('manage')">📂 Мои анкеты</button>
+    </div>
+
+    <div id="tabCreate">
+        <label for="network">🌐 Выберите сеть:</label>
+        <select id="network" onchange="updateCities()">
+            <option value="" disabled selected>-- Выберите сеть --</option>
+            <option value="all" style="font-weight: bold;">🌍 Все сети (Рассылка)</option>
+            <option value="mk">Мужской Клуб</option>
+            <option value="parni">ПАРНИ 18+</option>
+            <option value="ns">НС</option>
+            <option value="rainbow">Радуга</option>
+            <option value="gayznak">Гей Знакомства</option>
+        </select>
+
+        <label for="city">📍 Выберите город:</label>
+        <select id="city" disabled>
+            <option value="">Сначала выберите сеть</option>
+        </select>
+
+        <label for="post_text">💬 Текст анкеты:</label>
+        <textarea id="post_text" rows="5" placeholder="Напишите о себе..."></textarea>
+
+        <label for="mediaInput">📸 Фото/Видео (до 10 файлов):</label>
+        <input type="file" id="mediaInput" accept="image/*,video/*" multiple onchange="previewMedia(event)">
+
+        <div id="previewWrapper" style="display: none; margin-bottom: 20px;">
+            <div id="previewContainer" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;"></div>
+            <button type="button" onclick="clearMedia()" style="background: #cf6679; border:none; padding:8px; border-radius:5px; color:white; width:100%;">🗑 Очистить файлы</button>
+        </div>
+
+        <button id="mainBtn" class="main-btn" onclick="sendData()">🚀 Опубликовать анкету</button>
+    </div>
+
+    <div id="tabManage" style="display: none;">
+        <div id="myPostsList">
+            <p style="text-align: center; color: var(--tg-theme-hint-color, #888);">Загрузка анкет...</p>
+        </div>
+    </div>
+
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.expand(); 
+
+        // === ЛОГИКА ВКЛАДОК ===
+        function switchTab(tab) {
+            if(tab === 'create') {
+                document.getElementById('tabCreate').style.display = 'block';
+                document.getElementById('tabManage').style.display = 'none';
+                document.getElementById('tabCreateBtn').classList.add('active');
+                document.getElementById('tabManageBtn').classList.remove('active');
+            } else {
+                document.getElementById('tabCreate').style.display = 'none';
+                document.getElementById('tabManage').style.display = 'block';
+                document.getElementById('tabManageBtn').classList.add('active');
+                document.getElementById('tabCreateBtn').classList.remove('active');
+                loadMyPosts(); // Загружаем посты с сервера
+            }
+        }
+
+        // === ЛОГИКА ЗАГРУЗКИ И УДАЛЕНИЯ ПОСТОВ ===
+        function loadMyPosts() {
+            let userId = tg.initDataUnsafe.user?.id || 0;
+            document.getElementById('myPostsList').innerHTML = '<p style="text-align: center;">Загрузка...</p>';
+            
+            fetch('/api/get_user_posts?user_id=' + userId)
+            .then(res => res.json())
+            .then(data => {
+                let list = document.getElementById('myPostsList');
+                if(data.posts.length === 0) {
+                    list.innerHTML = '<p style="text-align: center;">У вас пока нет активных анкет.</p>';
+                    return;
+                }
+                let html = '';
+                data.posts.forEach(p => {
+                    html += `
+                        <div class="post-card">
+                            <h4>${p.network} (${p.city})</h4>
+                            <p style="color: #888;">📅 ${p.time}</p>
+                            <p><em>"${p.text}"</em></p>
+                            <button class="delete-btn" onclick="deletePost('${p.id}')">🗑 Удалить из чата</button>
+                        </div>
+                    `;
+                });
+                list.innerHTML = html;
+            }).catch(e => {
+                document.getElementById('myPostsList').innerHTML = '<p style="text-align: center; color: red;">Ошибка сети.</p>';
+            });
+        }
+
+        function deletePost(postId) {
+            tg.showConfirm("Вы уверены, что хотите безвозвратно удалить эту анкету из чата?", function(confirm) {
+                if(confirm) {
+                    let userId = tg.initDataUnsafe.user?.id || 0;
+                    fetch('/api/delete_post', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ post_id: postId, user_id: userId })
+                    }).then(res => res.json())
+                      .then(data => {
+                          if(data.success) {
+                              tg.showAlert("Анкета успешно удалена из чата!");
+                              loadMyPosts(); // Обновляем список
+                          } else {
+                              tg.showAlert("Ошибка: " + data.message);
+                          }
+                      });
+                }
+            });
+        }
+
+        // === СТАРАЯ ЛОГИКА СОЗДАНИЯ (Города, Медиа, Отправка) ===
+        const cityData = {
+            "mk": ["Екатеринбург", "Челябинск", "Пермь", "Москва", "Санкт-Петербург", "Тюмень", "Ижевск", "Казань", "Оренбург", "Уфа", "Новосибирск", "Красноярск", "Барнаул", "Омск", "Саратов", "Воронеж", "Самара", "Волгоград", "Нижний Новгород", "Калининград", "Иркутск", "Кемерово", "Общая группа Юга", "ХМАО", "ЯМАЛ", "Казахстан"],
+            "parni": ["Екатеринбург", "Тюмень", "Омск", "Челябинск", "Пермь", "Курган", "ХМАО", "Уфа", "Новосибирск", "ЯМАЛ", "Оренбург", "Москва", "Санкт-Петербург", "Красноярск"],
+            "ns": ["Новосибирск", "Челябинск", "Пермь", "Уфа", "ЯМАЛ", "Москва", "ХМАО", "Екатеринбург", "Тюмень", "Санкт-Петербург"],
+            "rainbow": ["Екатеринбург"],
+            "gayznak": ["Красноярск", "Екатеринбург", "Пермь", "Тюмень", "Новосибирск", "Самара", "Казань", "Воронеж", "Кемерово", "Иркутск", "Челябинск", "Орёл", "Саратов", "Архангельск", "Ярославль", "Тверь", "Великий Новгород", "Владимир", "Мурманск", "Рязань", "Смоленск", "Тамбов", "Липецк", "Тула", "Брянск", "Волгоград"]
+        };
+
+        let allCitiesSet = new Set();
+        Object.values(cityData).forEach(cities => cities.forEach(c => allCitiesSet.add(c)));
+        cityData["all"] = Array.from(allCitiesSet).sort();
+
+        function updateCities() {
+            const network = document.getElementById("network").value;
+            const citySelect = document.getElementById("city");
+            citySelect.innerHTML = '<option value="" disabled selected>-- Выберите город --</option>';
+            if (cityData[network]) {
+                citySelect.disabled = false;
+                cityData[network].forEach(city => {
+                    let opt = document.createElement('option');
+                    opt.value = city; opt.innerHTML = city;
+                    citySelect.appendChild(opt);
+                });
+            } else { citySelect.disabled = true; }
+        }
+
+        function previewMedia(event) {
+            const files = event.target.files;
+            const wrapper = document.getElementById('previewWrapper');
+            const container = document.getElementById('previewContainer');
+            if (files.length > 10) {
+                tg.showAlert("🚫 Можно выбрать максимум 10 файлов!");
+                document.getElementById('mediaInput').value = ''; return;
+            }
+            container.innerHTML = ''; 
+            if (files.length > 0) {
+                wrapper.style.display = 'block';
+                for (let i = 0; i < files.length; i++) {
+                    let url = URL.createObjectURL(files[i]);
+                    let elem = document.createElement(files[i].type.startsWith('video/') ? 'video' : 'img');
+                    elem.src = url; elem.style.width = '30%'; elem.style.height = '80px';
+                    elem.style.objectFit = 'cover'; elem.style.borderRadius = '5px';
+                    container.appendChild(elem);
+                }
+            } else { wrapper.style.display = 'none'; }
+        }
+
+        function clearMedia() {
+            document.getElementById('mediaInput').value = '';
+            document.getElementById('previewWrapper').style.display = 'none';
+            document.getElementById('previewContainer').innerHTML = '';
+        }
+
+        function sendData() {
+            let text = document.getElementById("post_text").value.trim();
+            let network = document.getElementById("network").value;
+            let city = document.getElementById("city").value;
+
+            if (!text || !city || !network) { tg.showAlert("Пожалуйста, заполните текст и выберите сеть/город!"); return; }
+
+            document.getElementById("mainBtn").innerText = "⏳ Отправка в сеть...";
+            document.getElementById("mainBtn").disabled = true;
+
+            let formData = new FormData();
+            formData.append('user_id', tg.initDataUnsafe.user?.id || 0);
+            formData.append('text', text);
+            formData.append('network', network);
+            formData.append('city', city);
+
+            const fileInput = document.getElementById('mediaInput');
+            for (let i = 0; i < fileInput.files.length; i++) {
+                formData.append('media', fileInput.files[i]);
+            }
+
+            fetch('/api/submit_mini_app', { method: 'POST', body: formData })
+            .then(response => response.json())
+            .then(data => {
+                  if(data.status === "ok") { 
+                      tg.showAlert("✅ Опубликовано!");
+                      switchTab('manage'); // Перекидываем юзера во вкладку "Мои анкеты"
+                      
+                      // Очищаем форму создания
+                      document.getElementById("post_text").value = "";
+                      clearMedia();
+                      document.getElementById("mainBtn").innerText = "🚀 Опубликовать анкету";
+                      document.getElementById("mainBtn").disabled = false;
+                  } else {
+                      tg.showAlert("Ошибка: " + data.message);
+                      document.getElementById("mainBtn").innerText = "🚀 Опубликовать анкету";
+                      document.getElementById("mainBtn").disabled = false;
+                  }
+            }).catch(err => {
+                tg.showAlert("Ошибка связи с сервером!");
+                document.getElementById("mainBtn").innerText = "🚀 Опубликовать анкету";
+                document.getElementById("mainBtn").disabled = false;
+            });
+        }
+    </script>
+</body>
+</html>

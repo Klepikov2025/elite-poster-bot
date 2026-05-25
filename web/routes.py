@@ -574,3 +574,139 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             upsert=True
         )
         return jsonify({"status": "ok"})
+
+    # === РОУТЫ ДЛЯ МИНИ-АППКИ VIP ===
+    # 1. Отдаем саму страничку Мини-аппа
+    @app.route('/mini_app_post')
+    def mini_app_post():
+        return render_template('create_post.html')
+
+    # 2. Принимаем хардкорную FormData с текстом и файлами
+    @app.route('/api/submit_mini_app', methods=['POST'])
+    def submit_mini_app():
+        import io
+        user_id = request.form.get('user_id')
+        text = request.form.get('text')
+        network = request.form.get('network')
+        city = request.form.get('city')
+        uploaded_files = request.files.getlist('media')
+
+        if not user_id:
+            return jsonify({"status": "error", "message": "No user_id"}), 400
+
+        user_id = int(user_id)
+
+        # Вытаскиваем байты файлов из памяти сразу, пока запрос активен
+        files_to_process = []
+        for file in uploaded_files[:10]: # Ограничение Телеграма — до 10 файлов
+            filename = file.filename.lower()
+            is_video = filename.endswith(('.mp4', '.mov', '.avi', '.mkv', '.webm'))
+            files_to_process.append({
+                "bytes": file.read(),
+                "is_video": is_video
+            })
+
+        # Асинхронная фоновая отправка в Telegram
+        def background_upload(uid, txt, net, cty, f_list):
+            from database import temp_posts
+            from telebot import types
+            import io
+            
+            if f_list:
+                try: bot.send_message(uid, f"⏳ Получено {len(f_list)} файлов из Мини-аппа. Начинаю загрузку в Telegram...")
+                except: pass
+            
+            media_items = []
+            for f in f_list:
+                try:
+                    bio = io.BytesIO(f['bytes'])
+                    if f['is_video']:
+                        bio.name = "video.mp4"
+                        msg = bot.send_video(uid, bio)
+                        media_items.append({"type": "video", "id": msg.video.file_id})
+                    else:
+                        bio.name = "photo.jpg"
+                        msg = bot.send_photo(uid, bio)
+                        media_items.append({"type": "photo", "id": msg.photo[-1].file_id})
+                except Exception as e:
+                    print(f"Ошибка фоновой загрузки медиа: {e}")
+            
+            # Сохраняем готовый черновик в базу данных
+            temp_posts.update_one(
+                {"_id": uid},
+                {"$set": {
+                    "text": txt,
+                    "network": net,
+                    "city": cty,
+                    "media": media_items,
+                    "status": "ready_to_publish" # Меняем статус на "готов к публикации"
+                }},
+                upsert=True
+            )
+            
+            # Предлагаем кнопку финальной публикации в чате бота
+            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+            markup.add("🚀 Опубликовать анкету")
+            markup.add("Назад")
+            try:
+                bot.send_message(
+                    uid, 
+                    "✅ **Все медиафайлы успешно загружены через Мини-апп!**\n\nНажмите на кнопку ниже, чтобы запустить публикацию анкеты:", 
+                    reply_markup=markup, 
+                    parse_mode="Markdown"
+                )
+            except: pass
+
+        # Запускаем поток и мгновенно отвечаем фронтенду "ok", чтобы закрыть/переключить окно
+        threading.Thread(target=background_upload, args=(user_id, text, network, city, files_to_process), daemon=True).start()
+        return jsonify({"status": "ok"})
+
+# === API ДЛЯ УПРАВЛЕНИЯ АНКЕТАМИ В МИНИ-АППКЕ ===
+    
+    @app.route('/api/get_user_posts', methods=['GET'])
+    def api_get_user_posts():
+        user_id_str = request.args.get('user_id', '0')
+        user_id = int(user_id_str) if user_id_str.isdigit() else 0
+        
+        # Получаем посты юзера из базы, сортируем от новых к старым
+        posts = list(db['posts'].find({"user_id": user_id}).sort("time", -1))
+        
+        from utils import format_time
+        result = []
+        for p in posts:
+            time_str = format_time(p["time"]) if "time" in p else "Неизвестно"
+            text_preview = p.get("text", "")[:40] + "..." # Обрезаем длинный текст для превью
+            
+            result.append({
+                "id": str(p["_id"]),
+                "network": p.get("network", "Неизвестно"),
+                "city": p.get("city", "Неизвестно"),
+                "time": time_str,
+                "text": text_preview
+            })
+        return jsonify({"success": True, "posts": result})
+
+    @app.route('/api/delete_post', methods=['POST'])
+    def api_delete_post():
+        data = request.json
+        post_id = data.get('post_id')
+        user_id = data.get('user_id')
+        
+        from bson import ObjectId
+        post = db['posts'].find_one({"_id": ObjectId(post_id), "user_id": int(user_id)})
+        
+        if not post:
+            return jsonify({"success": False, "message": "Анкета не найдена"})
+            
+        # 🔥 Правильное удаление (как в posts.py)
+        chat_id = post.get("chat_id")
+        msg_ids = post.get("message_ids", [post.get("message_id")])
+        
+        if chat_id:
+            for m_id in msg_ids:
+                if m_id:
+                    try: bot.delete_message(chat_id, m_id)
+                    except: pass
+                    
+        db['posts'].delete_one({"_id": ObjectId(post_id)})
+        return jsonify({"success": True})

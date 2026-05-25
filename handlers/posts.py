@@ -2,7 +2,7 @@ from telebot import types
 from datetime import datetime
 import random
 from config import chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, all_cities
-from database import posts_collection, temp_posts
+from database import posts_collection, temp_posts, users_collection
 from utils import format_time, get_user_name, escape_md, clean_user_text, net_key_to_name
 
 def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real_vip):
@@ -14,7 +14,6 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
             return
 
         # 👇 НОВЫЙ ЖУЧОК СКАЙНЕТА 👇
-        from database import users_collection # <--- Убедись, что это есть сверху, или просто добавь тут
         users_collection.update_one({"_id": message.from_user.id}, {"$set": {"intent_post_ads": True}}, upsert=True)
         # 👆 ==================== 👆
 
@@ -22,10 +21,108 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
             bot.send_message(message.chat.id, "🚫 Вы не можете публиковать объявления. Ваш аккаунт заблокирован в сети.")
             return
 
-        # Очищаем старые черновики
-        temp_posts.delete_one({"_id": message.from_user.id})
+        # 👑 ЛОГИКА ДЛЯ VIP-ПОЛЬЗОВАТЕЛЕЙ
+        if is_real_vip(message.from_user.id):
+            # Очищаем старые ручные черновики, чтобы не было конфликтов
+            temp_posts.delete_one({"_id": message.from_user.id})
+            
+            # 🔥 ВАЖНО: Укажи тут свой домен Render!
+            APP_URL = "https://elite-poster-bot.onrender.com"
+            
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            # В ссылке передаем роут, который отдает HTML страничку
+            web_app_info = types.WebAppInfo(url=f"{APP_URL}/mini_app_post")
+            
+            markup.add(types.InlineKeyboardButton("🚀 Быстрое создание (Мини-апп)", web_app=web_app_info))
+            markup.add(types.InlineKeyboardButton("✍️ По шагам вручную", callback_data="manual_vip_post"))
+            
+            bot.send_message(
+                message.chat.id, 
+                "👑 **VIP-Публикация**\n\n"
+                "Выберите удобный способ создания объявления:\n\n"
+                "📱 **Мини-апп:** Удобная форма на одном экране.\n"
+                "🤖 **Вручную:** Классический пошаговый ввод в диалоге с ботом.", 
+                reply_markup=markup,
+                parse_mode="Markdown"
+            )
+        else:
+            markup = types.InlineKeyboardMarkup()
+            verify_button = types.InlineKeyboardButton(
+                text="🛠️ Пройти верификацию",
+                callback_data="start_verification", 
+                style="danger"          
+            )
+            markup.add(verify_button)
+            bot.send_message(
+                message.chat.id, 
+                "🔓 Вы не являетесь привилегированным участником.\n\n"
+                "Для публикации элитных объявлений необходимо получить статус VIP. "
+                "Пройдите быструю верификацию прямо здесь:", 
+                reply_markup=markup
+            )
 
-        msg = bot.send_message(message.chat.id, "✍️ **Напишите текст вашего объявления:**", parse_mode="Markdown")
+    # 🚀 ========================================================== 🚀
+    # 👇 ВОТ ЭТОТ НОВЫЙ БЛОК ВСТАВЛЯЕМ СЮДА 👇
+    # 🚀 ========================================================== 🚀
+    @bot.message_handler(func=lambda message: message.text == "🚀 Опубликовать анкету")
+    def finalize_mini_app_post(message):
+        uid = message.from_user.id
+        draft = temp_posts.find_one({"_id": uid, "status": "ready_to_publish"})
+        if not draft: return
+
+        media_type = None
+        file_id = uid
+
+        media_count = len(draft.get('media', []))
+        if media_count == 1:
+            media_type = draft['media'][0]['type']
+            file_id = draft['media'][0]['id']
+        elif media_count > 1:
+            media_type = "album"
+
+        # ⚡️ Берем сеть и город прямо из черновика Мини-аппа
+        network = draft.get('network', 'Неизвестно')
+        city = draft.get('city', 'Неизвестно')
+
+        markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+        markup.add("✅ Всё верно, публиковать!", "❌ Отмена")
+        
+        bot.send_message(
+            message.chat.id, 
+            f"📋 **Финальная проверка:**\n\n"
+            f"🌐 **Сеть:** {network}\n"
+            f"📍 **Город:** {city}\n\n"
+            f"📝 **Текст:**\n{draft['text']}\n\n"
+            f"Всё верно?", 
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
+        bot.register_next_step_handler(message, handle_mini_app_publish, draft['text'], network, city, media_type, file_id)
+
+    def handle_mini_app_publish(message, text, network, city, media_type, file_id):
+        if message.text == "✅ Всё верно, публиковать!":
+            bot.send_message(message.chat.id, "🚀 Запускаю рассылку...", reply_markup=types.ReplyKeyboardRemove())
+            
+            # Хак: подменяем message.text на название города, 
+            # так как твоя старая функция select_city_and_publish ждет город именно там
+            message.text = city
+            select_city_and_publish(message, text, network, media_type, file_id)
+        else:
+            bot.send_message(message.chat.id, "❌ Публикация отменена. Вы можете создать новое объявление из меню.", reply_markup=get_main_keyboard())
+            temp_posts.delete_one({"_id": message.from_user.id})
+    # 👆 КОНЕЦ НОВОГО БЛОКА 👆
+
+    # ==========================================================
+    # 👇 НИЖЕ ИДЕТ ТОЛЬКО СТАРЫЙ РУЧНОЙ МЕТОД (ЛЕГАСИ) 👇
+    # ==========================================================
+    
+    @bot.callback_query_handler(func=lambda call: call.data == "manual_vip_post")
+    def start_manual_vip_post(call):
+        bot.answer_callback_query(call.id)
+        try: bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+        except: pass
+        
+        msg = bot.send_message(call.message.chat.id, "✍️ **Напишите текст вашего объявления:**", parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_draft_text)
 
     def process_draft_text(message):
@@ -38,7 +135,6 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
             bot.register_next_step_handler(msg, process_draft_text)
             return
 
-        # Сохраняем текст в черновик
         temp_posts.update_one(
             {"_id": message.from_user.id},
             {"$set": {"text": message.text, "media": []}},
@@ -213,7 +309,7 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
             bot.register_next_step_handler(message, select_city_and_publish, text, selected_network, media_type, file_id)
         else:
             bot.send_message(message.chat.id, "❌ Ошибка! Выберите правильную сеть.")
-            bot.register_next_step_handler(message, process_text)
+            bot.register_next_step_handler(message, select_network, text, media_type, file_id) # Лучше возвращать на выбор сети!
 
     def select_city_and_publish(message, text, selected_network, media_type, file_id):
         if message.text == "Назад":
