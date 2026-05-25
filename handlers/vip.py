@@ -16,14 +16,22 @@ from utils import escape_md, get_user_name, get_referral_bonus, net_key_to_name
 
 # Выносим отдельно, так как эта функция нужна и для команды /start
 def send_vip_welcome(bot, chat_id, first_name):
+    # 🔥 Достаем динамическую цену из базы Скайнета
+    try:
+        prices = db['settings'].find_one({"_id": "skynet_pricing"})
+        current_vip_price = prices.get("vip_price", VIP_PRICE_STARS) if prices else VIP_PRICE_STARS
+    except Exception:
+        current_vip_price = VIP_PRICE_STARS
+
     welcome_text = (
         f"Приветствую, {escape_md(first_name)}! 👋\n\n"
         "Это бот отбора в ВИП-чат, вход после верификации (кружок с лицом) "
-        f"и оплаты взноса {VIP_PRICE_STARS}⭐️ единоразово!\n\n"
+        f"и оплаты взноса {current_vip_price}⭐️ единоразово!\n\n"
         "В случае, если вы заблокируете бот и не укажете фразу «Я отказываюсь от продолжения», "
         "вы будете заблокированы во всех сетях-партнерах.\n\n"
         "**ПРЕИМУЩЕСТВА УЧАСТИЯ В ВИП-ЧАТЕ:**\n"
         "1) лояльное отношение администраций сетей-партнеров;\n"
+    )
         "2) «золотой билет» - вступление в разные города сети;\n"
         "3) бесплатная публикация объявлений через специальный бот.\n\n"
         "Нажмите кнопку ниже, чтобы начать верификацию:"
@@ -213,28 +221,34 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
                 except: pass
 
         if "approve" in action:
-            cheap_stars_text = (
-                "💡 **Лайфхак: Как купить звёзды ДЕШЕВЛЕ официального курса?**\n\n"
-                "Перед оплатой рекомендуем приобрести звёзды через проверенный сервис. "
-                "Это выйдет значительно выгоднее, чем покупать их напрямую через Telegram.\n\n"
-                "**Инструкция:**\n"
-                "1️⃣ Перейдите по ссылке: https://t.me/Avrrorkastarbot?start=7924963993\n"
-                "2️⃣ Нажмите кнопку «⭐️ Купить звезды»\n"
-                "3️⃣ Выберите пункт «👤 Себе»\n"
-                "4️⃣ Выберите пакет «⭐️ 250 звезд»\n"
-                "5️⃣ Оплатите удобным способом\n\n"
-                "После покупки возвращайтесь сюда и оплачивайте VIP-доступ счетом ниже! 👇"
-            )
-            try: bot.send_message(user_id, cheap_stars_text, parse_mode="Markdown", disable_web_page_preview=True)
-            except: pass
-
             try:
+                # 1. Сначала достаем динамическую цену
+                prices_db = db['settings'].find_one({"_id": "skynet_pricing"})
+                current_vip_price = prices_db.get("vip_price", VIP_PRICE_STARS) if prices_db else VIP_PRICE_STARS
+
+                # 2. Формируем текст лайфхака с актуальной ценой!
+                cheap_stars_text = (
+                    "💡 **Лайфхак: Как купить звёзды ДЕШЕВЛЕ официального курса?**\n\n"
+                    "Перед оплатой рекомендуем приобрести звёзды через проверенный сервис. "
+                    "Это выйдет значительно выгоднее, чем покупать их напрямую через Telegram.\n\n"
+                    "**Инструкция:**\n"
+                    "1️⃣ Перейдите по ссылке: https://t.me/Avrrorkastarbot?start=7924963993\n"
+                    "2️⃣ Нажмите кнопку «⭐️ Купить звезды»\n"
+                    "3️⃣ Выберите пункт «👤 Себе»\n"
+                    f"4️⃣ Выберите пакет «⭐️ {current_vip_price} звезд» (Или введите сумму вручную)\n"
+                    "5️⃣ Оплатите удобным способом\n\n"
+                    "После покупки возвращайтесь сюда и оплачивайте VIP-доступ счетом ниже! 👇"
+                )
+                try: bot.send_message(user_id, cheap_stars_text, parse_mode="Markdown", disable_web_page_preview=True)
+                except: pass
+
+                # 3. Выставляем счет
                 markup = types.InlineKeyboardMarkup(row_width=1)
                 markup.add(
-                    types.InlineKeyboardButton("🎫 У меня есть промокод", callback_data=f"checkout_promo_vip_{VIP_PRICE_STARS}"),
-                    types.InlineKeyboardButton(f"💳 Оплатить {VIP_PRICE_STARS}⭐️", callback_data=f"checkout_pay_vip_{VIP_PRICE_STARS}")
+                    types.InlineKeyboardButton("🎫 У меня есть промокод", callback_data=f"checkout_promo_vip_{current_vip_price}"),
+                    types.InlineKeyboardButton(f"💳 Оплатить {current_vip_price}⭐️", callback_data=f"checkout_pay_vip_{current_vip_price}")
                 )
-                bot.send_message(user_id, f"💎 **Оформление VIP-доступа**\n\nСтоимость: **{VIP_PRICE_STARS}⭐️** (Доступ навсегда)\n\nЕсли у вас есть промокод на скидку, нажмите соответствующую кнопку ниже 👇", reply_markup=markup, parse_mode="Markdown")
+                bot.send_message(user_id, f"💎 **Оформление VIP-доступа**\n\nСтоимость: **{current_vip_price}⭐️** (Доступ навсегда)\n\nЕсли у вас есть промокод на скидку, нажмите соответствующую кнопку ниже 👇", reply_markup=markup, parse_mode="Markdown")
                 bot.send_message(call.message.chat.id, f"✅ Касса для оплаты VIP отправлена пользователю {user_id}.")
             except Exception as e:
                 if "bot was blocked by the user" in str(e).lower() or "forbidden" in str(e).lower():
