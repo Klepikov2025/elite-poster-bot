@@ -120,3 +120,43 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             pass # Если попалась битая дата - игнорируем
             
         return jsonify(stats)
+
+@app.route('/glaz/api/get_prices', methods=['GET'])
+    def api_get_prices():
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+        
+        prices = db['settings'].find_one({"_id": "skynet_pricing"})
+        if not prices:
+            # Откозоустойчивый дефолт, если в базе еще нет записи
+            prices = {
+                "vip_price": 250,
+                "reg_small_1": 105, "reg_small_7": 490, "reg_small_15": 720, "reg_small_30": 938,
+                "reg_big_1": 105, "reg_big_7": 656, "reg_big_15": 1288, "reg_big_30": 1563,
+                "vip_big_chat_1": 1095, "vip_big_chat_7": 7656
+            }
+        return jsonify(prices)
+
+    @app.route('/glaz/api/save_prices', methods=['POST'])
+    def api_save_prices():
+        if not session.get('logged_in'): return jsonify({"success": False, "error": "Unauthorized"}), 401
+        
+        data = request.json
+        db['settings'].update_one(
+            {"_id": "skynet_pricing"},
+            {"$set": {
+                "vip_price": int(data.get("vip_price", 250)),
+                "reg_small_1": int(data.get("reg_small_1", 105)),
+                "reg_small_7": int(data.get("reg_small_7", 490)),
+                "reg_small_15": int(data.get("reg_small_15", 720)),
+                "reg_small_30": int(data.get("reg_small_30", 938)),
+                "reg_big_1": int(data.get("reg_big_1", 105)),
+                "reg_big_7": int(data.get("reg_big_7", 656)),
+                "reg_big_15": int(data.get("reg_big_15", 1288)),
+                "reg_big_30": int(data.get("reg_big_30", 1563)),
+                "vip_big_chat_1": int(data.get("vip_big_chat_1", 1095)),
+                "vip_big_chat_7": int(data.get("vip_big_chat_7", 7656))
+            }},
+            upsert=True
+        )
+        add_radar_log("💰 Сетка тарифов (VIP и Реклама) изменена администратором")
+        return jsonify({"success": True, "message": "Финансовая матрица успешно обновлена!"})
