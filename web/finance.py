@@ -121,13 +121,12 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             
         return jsonify(stats)
 
-@app.route('/glaz/api/get_prices', methods=['GET'])
+    @app.route('/glaz/api/get_prices', methods=['GET'])
     def api_get_prices():
         if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
         
         prices = db['settings'].find_one({"_id": "skynet_pricing"})
         if not prices:
-            # Откозоустойчивый дефолт, если в базе еще нет записи
             prices = {
                 "vip_price": 250,
                 "reg_small_1": 105, "reg_small_7": 490, "reg_small_15": 720, "reg_small_30": 938,
