@@ -224,10 +224,21 @@
 
         function sendData() {
             let text = document.getElementById("post_text").value.trim();
-            let network = document.getElementById("network").value;
+            let networkKey = document.getElementById("network").value; // Получаем "rainbow"
             let city = document.getElementById("city").value;
 
-            if (!text || !city || !network) { tg.showAlert("Пожалуйста, заполните текст и выберите сеть/город!"); return; }
+            if (!text || !city || !networkKey) { tg.showAlert("Пожалуйста, заполните текст и выберите сеть/город!"); return; }
+
+            // 🔥 МАГИЯ ПЕРЕВОДА ДЛЯ ПИТОНА 🔥
+            const networkMap = {
+                "all": "Все сети",
+                "mk": "Мужской Клуб",
+                "parni": "ПАРНИ 18+",
+                "ns": "НС",
+                "rainbow": "Радуга",
+                "gayznak": "Гей Знакомства"
+            };
+            let network = networkMap[networkKey]; // Превращаем "rainbow" в "Радуга"
 
             document.getElementById("mainBtn").innerText = "⏳ Отправка в сеть...";
             document.getElementById("mainBtn").disabled = true;
@@ -235,7 +246,7 @@
             let formData = new FormData();
             formData.append('user_id', tg.initDataUnsafe.user?.id || 0);
             formData.append('text', text);
-            formData.append('network', network);
+            formData.append('network', network); // <-- Теперь сюда пойдет правильное русское название!
             formData.append('city', city);
 
             const fileInput = document.getElementById('mediaInput');
