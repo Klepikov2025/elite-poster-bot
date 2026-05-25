@@ -385,6 +385,45 @@
                 </div>
 
             </div>
+
+                <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #333; padding: 20px; border-radius: 10px; max-width: 1000px;">
+            <h3 style="color: #03dac6; margin-bottom: 10px; font-size: 18px;">💰 Управление тарифами сети (VIP и Реклама)</h3>
+            <p style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Изменения вступают в силу мгновенно для всех ботов. Пароль не требуется.</p>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                <div style="border: 1px solid #ffb74d; padding: 12px; border-radius: 8px; background: rgba(255,183,77,0.02);">
+                    <h4 style="color: #ffb74d; margin-top: 0; margin-bottom: 10px;">👑 VIP-Доступ</h4>
+                    <label style="font-size: 11px; color: #888;">Цена (звёзды ⭐️):</label>
+                    <input type="number" id="price-vip" class="search-input" style="width: 100%; padding: 6px; margin-top: 5px; box-sizing: border-box;">
+                </div>
+                <div style="border: 1px solid #bb86fc; padding: 12px; border-radius: 8px; background: rgba(187,134,252,0.02);">
+                    <h4 style="color: #bb86fc; margin-top: 0; margin-bottom: 10px;">🧩 Чаты &lt; 1000 юзеров</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div><label style="font-size: 10px; color: #888;">1 дн:</label><input type="number" id="price-sm-1" class="search-input" style="width:100%; padding:4px;"></div>
+                        <div><label style="font-size: 10px; color: #888;">7 дн:</label><input type="number" id="price-sm-7" class="search-input" style="width:100%; padding:4px;"></div>
+                        <div><label style="font-size: 10px; color: #888;">15 дн:</label><input type="number" id="price-sm-15" class="search-input" style="width:100%; padding:4px;"></div>
+                        <div><label style="font-size: 10px; color: #888;">30 дн:</label><input type="number" id="price-sm-30" class="search-input" style="width:100%; padding:4px;"></div>
+                    </div>
+                </div>
+                <div style="border: 1px solid #03dac6; padding: 12px; border-radius: 8px; background: rgba(3,218,198,0.02);">
+                    <h4 style="color: #03dac6; margin-top: 0; margin-bottom: 10px;">📢 Чаты &gt; 1000 юзеров</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div><label style="font-size: 10px; color: #888;">1 дн:</label><input type="number" id="price-bg-1" class="search-input" style="width:100%; padding:4px;"></div>
+                        <div><label style="font-size: 10px; color: #888;">7 дн:</label><input type="number" id="price-bg-7" class="search-input" style="width:100%; padding:4px;"></div>
+                        <div><label style="font-size: 10px; color: #888;">15 дн:</label><input type="number" id="price-bg-15" class="search-input" style="width:100%; padding:4px;"></div>
+                        <div><label style="font-size: 10px; color: #888;">30 дн:</label><input type="number" id="price-bg-30" class="search-input" style="width:100%; padding:4px;"></div>
+                    </div>
+                </div>
+                <div style="border: 1px solid #cf6679; padding: 12px; border-radius: 8px; background: rgba(207,102,121,0.02);">
+                    <h4 style="color: #cf6679; margin-top: 0; margin-bottom: 10px;">🎪 БИГ-Чаты сети</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div><label style="font-size: 10px; color: #888;">1 день:</label><input type="number" id="price-bigchat-1" class="search-input" style="width:100%; padding:4px;"></div>
+                        <div><label style="font-size: 10px; color: #888;">7 дней:</label><input type="number" id="price-bigchat-7" class="search-input" style="width:100%; padding:4px;"></div>
+                    </div>
+                </div>
+            </div>
+            <button onclick="saveNetworkPrices()" class="form-btn" style="background: #03dac6; color: #121212; width: 100%; font-weight: bold; font-size: 15px;">💾 Сохранить тарифную сетку</button>
+        </div>
             
             <div id="toggles-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 16px;">
             </div>
@@ -1100,7 +1139,7 @@ function removeDictWord(word, zone) {
 const originalOpenTab = openTab;
 openTab = function(tabId) {
     originalOpenTab(tabId);
-    if(tabId === 'tab-system') { loadDictionary(); loadSystemTexts(); loadSystemSettings(); } // <--- Добавлен вызов!
+    if(tabId === 'tab-system') { loadDictionary(); loadSystemTexts(); loadSystemSettings(); loadNetworkPrices(); } // <--- Добавлен вызов!
     if(tabId === 'tab-broadcast') loadTemplates();
     if(tabId === 'tab-support') loadSupportTickets();
 };
@@ -1482,6 +1521,55 @@ function loadRootRevenue(pin, period = 'week') {
         });
     });
 }
+
+function loadNetworkPrices() {
+            fetch('/glaz/api/get_prices')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('price-vip').value = data.vip_price || 250;
+                document.getElementById('price-sm-1').value = data.reg_small_1 || 105;
+                document.getElementById('price-sm-7').value = data.reg_small_7 || 490;
+                document.getElementById('price-sm-15').value = data.reg_small_15 || 720;
+                document.getElementById('price-sm-30').value = data.reg_small_30 || 938;
+                
+                document.getElementById('price-bg-1').value = data.reg_big_1 || 105;
+                document.getElementById('price-bg-7').value = data.reg_big_7 || 656;
+                document.getElementById('price-bg-15').value = data.reg_big_15 || 1288;
+                document.getElementById('price-bg-30').value = data.reg_big_30 || 1563;
+                
+                document.getElementById('price-bigchat-1').value = data.vip_big_chat_1 || 1095;
+                document.getElementById('price-bigchat-7').value = data.vip_big_chat_7 || 7656;
+            });
+        }
+
+        function saveNetworkPrices() {
+            const payload = {
+                vip_price: parseInt(document.getElementById('price-vip').value),
+                reg_small_1: parseInt(document.getElementById('price-sm-1').value),
+                reg_small_7: parseInt(document.getElementById('price-sm-7').value),
+                reg_small_15: parseInt(document.getElementById('price-sm-15').value),
+                reg_small_30: parseInt(document.getElementById('price-sm-30').value),
+                
+                reg_big_1: parseInt(document.getElementById('price-bg-1').value),
+                reg_big_7: parseInt(document.getElementById('price-bg-7').value),
+                reg_big_15: parseInt(document.getElementById('price-bg-15').value),
+                reg_big_30: parseInt(document.getElementById('price-bg-30').value),
+                
+                vip_big_chat_1: parseInt(document.getElementById('price-bigchat-1').value),
+                vip_big_chat_7: parseInt(document.getElementById('price-bigchat-7').value)
+            };
+
+            fetch('/glaz/api/save_prices', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) showToast(data.message);
+                else showToast("❌ Ошибка: " + data.error);
+            });
+        }
 
     </script>
 </body>
