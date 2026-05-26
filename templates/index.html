@@ -600,10 +600,24 @@
         }
 
         function fireAction(uid, actionName) {
+            // 👇 ДОБАВЛЯЕМ ПРЕДОХРАНИТЕЛЬ ДЛЯ ВЕБ-ПАНЕЛИ 👇
+            if (actionName === 'ban') {
+                if (!confirm("⚠️ ВНИМАНИЕ!\nВы собираетесь глобально забанить этого пользователя.\nУбедитесь, что он НЕ является VIP или QUEER (проверьте бейджики в досье).\n\nТочно снести его?")) {
+                    return;
+                }
+            }
+            // 👆 ========================================= 👆
+
             const formData = new FormData();
-            formData.append('uid', uid); formData.append('action', actionName);
+            formData.append('uid', uid); 
+            formData.append('action', actionName);
+            
             fetch('/glaz/user_action', { method: 'POST', body: formData })
-            .then(res => res.json()).then(data => { if(data.success) showToast(data.message); else showToast("❌ Ошибка: " + data.error); })
+            .then(res => res.json())
+            .then(data => { 
+                if(data.success) showToast(data.message); 
+                else showToast("❌ Ошибка: " + data.error); 
+            })
             .catch(() => showToast("❌ Критический сбой"));
         }
 
