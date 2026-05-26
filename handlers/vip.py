@@ -190,22 +190,58 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
         
         bot.send_message(message.chat.id, "✅ Ваша заявка аннулирована. Вы можете безопасно заблокировать бота.")
 
-    @bot.callback_query_handler(func=lambda call: call.data.startswith(("vip_approve_", "vip_retry_", "vip_reject_", "vip_ban_")))
+    @bot.callback_query_handler(func=lambda call: call.data.startswith(("vip_approve_", "vip_retry_", "vip_reject_", "vip_ban_", "vip_forceban_", "vip_cancelban_")))
     def handle_vip_decision(call):
         action, user_id_str = call.data.rsplit("_", 1)
         user_id = int(user_id_str)
-        
-        if user_id not in active_vip_requests:
-            bot.answer_callback_query(call.id, "❌ Коллега уже обработал эту заявку!", show_alert=True)
-            try: bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+        admin_info = get_user_name(call.from_user)
+
+        # 🛡️ 1. Обработка отмены (админ одумался)
+        if action == "vip_cancelban":
+            try: bot.edit_message_text("✅ Фух! Действие отменено. Платный клиент спасен! 🛡", call.message.chat.id, call.message.message_id)
             except: pass
             return
 
-        active_vip_requests.remove(user_id)
-        try: bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
-        except: pass
-        
-        admin_info = get_user_name(call.from_user)
+        # 🛡️ 2. ПРЕДОХРАНИТЕЛЬ ДЛЯ РУЧНОГО БАНА
+        if action == "vip_ban":
+            user_data = users_collection.find_one({"_id": user_id}) or {}
+            is_vip = user_data.get("is_vip", False)
+            is_queer = user_data.get("is_queer", False)
+            
+            if is_vip or is_queer:
+                status_name = "🏳️‍🌈 BEYOND" if is_queer else "👑 VIP"
+                warn_text = (
+                    f"⚠️ **СТОП! СРАБОТАЛА ЗАЩИТА СКАЙНЕТА!** ⚠️\n\n"
+                    f"Этот пользователь УЖЕ является премиум-клиентом: **{status_name}**!\n"
+                    f"Возможно, он просто перепутал ботов или прислал кружок по ошибке. "
+                    f"Блокируя его, вы навсегда выкинете действующего платного клиента из ВСЕХ чатов сети.\n\n"
+                    f"**Вы абсолютно уверены?**"
+                )
+                markup = types.InlineKeyboardMarkup()
+                markup.add(types.InlineKeyboardButton("🚨 ДА, СНЕСТИ ЕГО (ПЕРМАЧ)", callback_data=f"vip_forceban_{user_id}"))
+                markup.add(types.InlineKeyboardButton("Отмена (Сохранить клиента)", callback_data=f"vip_cancelban_{user_id}"))
+                bot.send_message(call.message.chat.id, warn_text, reply_markup=markup, parse_mode="Markdown")
+                return
+
+        # 3. Проверка на двойные клики (кроме форсированного бана)
+        if action in ["vip_approve", "vip_retry", "vip_reject", "vip_ban"]:
+            if user_id not in active_vip_requests:
+                bot.answer_callback_query(call.id, "❌ Коллега уже обработал эту заявку!", show_alert=True)
+                try: bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+                except: pass
+                return
+            active_vip_requests.remove(user_id)
+            try: bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+            except: pass
+
+        # 4. Обработка форсированного бана (убираем кнопки у подтверждения)
+        if action == "vip_forceban":
+            try: bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+            except: pass
+            if user_id in active_vip_requests:
+                active_vip_requests.remove(user_id)
+
+        # 5. Установка статусов для логов
         status_text = ""
         if "approve" in action: status_text = "✅ Одобрена (счет)"
         elif "retry" in action: status_text = "🔄 Запрошен повтор"
@@ -219,29 +255,27 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
                 try: bot.send_message(admin_id, notification_text, parse_mode="Markdown")
                 except: pass
 
+        # 6. ИСПОЛНЕНИЕ ПРИГОВОРОВ
         if "approve" in action:
+            cheap_stars_text = (
+                "💡 **Лайфхак: Как купить звёзды ДЕШЕВЛЕ официального курса?**\n\n"
+                "Перед оплатой рекомендуем приобрести звёзды через проверенный сервис. "
+                "Это выйдет значительно выгоднее, чем покупать их напрямую через Telegram.\n\n"
+                "**Инструкция:**\n"
+                "1️⃣ Перейдите по ссылке: https://t.me/Avrrorkastarbot?start=7924963993\n"
+                "2️⃣ Нажмите кнопку «⭐️ Купить звезды»\n"
+                "3️⃣ Выберите пункт «👤 Себе»\n"
+                "4️⃣ Выберите пакет «⭐️ 250 звезд»\n"
+                "5️⃣ Оплатите удобным способом\n\n"
+                "После покупки возвращайтесь сюда и оплачивайте VIP-доступ счетом ниже! 👇"
+            )
+            try: bot.send_message(user_id, cheap_stars_text, parse_mode="Markdown", disable_web_page_preview=True)
+            except: pass
+
             try:
-                # 1. Сначала достаем динамическую цену
                 prices_db = db['settings'].find_one({"_id": "skynet_pricing"})
                 current_vip_price = prices_db.get("vip_price", VIP_PRICE_STARS) if prices_db else VIP_PRICE_STARS
 
-                # 2. Формируем текст лайфхака с актуальной ценой!
-                cheap_stars_text = (
-                    "💡 **Лайфхак: Как купить звёзды ДЕШЕВЛЕ официального курса?**\n\n"
-                    "Перед оплатой рекомендуем приобрести звёзды через проверенный сервис. "
-                    "Это выйдет значительно выгоднее, чем покупать их напрямую через Telegram.\n\n"
-                    "**Инструкция:**\n"
-                    "1️⃣ Перейдите по ссылке: https://t.me/Avrrorkastarbot?start=7924963993\n"
-                    "2️⃣ Нажмите кнопку «⭐️ Купить звезды»\n"
-                    "3️⃣ Выберите пункт «👤 Себе»\n"
-                    f"4️⃣ Выберите пакет «⭐️ {current_vip_price} звезд» (Или введите сумму вручную)\n"
-                    "5️⃣ Оплатите удобным способом\n\n"
-                    "После покупки возвращайтесь сюда и оплачивайте VIP-доступ счетом ниже! 👇"
-                )
-                try: bot.send_message(user_id, cheap_stars_text, parse_mode="Markdown", disable_web_page_preview=True)
-                except: pass
-
-                # 3. Выставляем счет
                 markup = types.InlineKeyboardMarkup(row_width=1)
                 markup.add(
                     types.InlineKeyboardButton("🎫 У меня есть промокод", callback_data=f"checkout_promo_vip_{current_vip_price}"),
@@ -250,7 +284,7 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
                 bot.send_message(user_id, f"💎 **Оформление VIP-доступа**\n\nСтоимость: **{current_vip_price}⭐️** (Доступ навсегда)\n\nЕсли у вас есть промокод на скидку, нажмите соответствующую кнопку ниже 👇", reply_markup=markup, parse_mode="Markdown")
                 bot.send_message(call.message.chat.id, f"✅ Касса для оплаты VIP отправлена пользователю {user_id}.")
             except Exception as e:
-                if "bot was blocked by the user" in str(e).lower() or "forbidden" in str(e).lower():
+                if "bot was blocked" in str(e).lower() or "forbidden" in str(e).lower():
                     if user_id in safe_from_autoban:
                         bot.send_message(call.message.chat.id, f"ℹ️ Юзер {user_id} заблокировал бота, НО он официально отказался. Бан отменен.")
                         try: safe_from_autoban.remove(user_id)
@@ -263,11 +297,11 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
 
         elif "retry" in action:
             bot.send_message(call.message.chat.id, f"🔄 Запрос на повторный кружок отправлен пользователю {user_id}.")
-            retry_text = "⚠️ **Ваш кружок не принят**\n\nК сожалению, видео не соответствует требованиям (неверная дата/время, не слышно голоса или не видно лица).\n\nПожалуйста, **запишите кружок повторно**, четко сказав:\n💬 *«Привет админам вип-чата, сегодня [назовите дату], на часах [назовите время], хочу стать вип-участником»*"
+            retry_text = "⚠️ **Ваш кружок не принят**\n\nК сожалению, видео не соответствует требованиям.\nПожалуйста, **запишите кружок повторно**, четко сказав:\n💬 *«Привет админам вип-чата, сегодня [назовите дату], на часах [назовите время], хочу стать вип-участником»*"
             try:
                 bot.send_message(user_id, retry_text, parse_mode="Markdown")
                 pending_verification_users[user_id] = True
-            except: bot.send_message(call.message.chat.id, f"❌ Не удалось отправить уведомление пользователю {user_id} (возможно, бот заблокирован).")
+            except: bot.send_message(call.message.chat.id, f"❌ Не удалось отправить уведомление.")
 
         elif "reject" in action:
             bot.send_message(call.message.chat.id, f"❌ Вы отклонили заявку {user_id}.")
@@ -276,10 +310,19 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
             except: pass
 
         elif "ban" in action:
-            bot.send_message(call.message.chat.id, "🔨 Запускаю массовый бан...")
+            bot.send_message(call.message.chat.id, "🔨 Запускаю процесс бана...")
             db['vip_funnel'].delete_one({"_id": user_id})
-            count = ban_user_everywhere(user_id, reason="Не прошел модерацию кружка (бан админом)", admin_name=admin_info)
-            bot.send_message(call.message.chat.id, f"✅ Пользователь забанен в {count} чатах.")
+            
+            # Проверяем, нажал ли админ кнопку подтверждения (forceban)
+            is_force = "forceban" in action
+            
+            # Передаем команду в ядро
+            count = ban_user_everywhere(user_id, reason="Не прошел модерацию кружка (бан админом)", admin_name=admin_info, force=is_force)
+            
+            if count > 0:
+                bot.send_message(call.message.chat.id, f"✅ Пользователь забанен в {count} чатах.")
+            else:
+                bot.send_message(call.message.chat.id, "🛡 Бан отменен встроенной защитой Скайнета (пользователь — VIP).")
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith(("wd_pay_", "wd_reject_")))
     def handle_withdrawal_admin(call):
