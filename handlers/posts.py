@@ -137,7 +137,7 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
 
         temp_posts.update_one(
             {"_id": message.from_user.id},
-            {"$set": {"text": message.html or message.text, "media": []}},
+            {"$set": {"text": message.text, "media": []}},
             upsert=True
         )
 
