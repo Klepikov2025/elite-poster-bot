@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Глаз Саурона | ЦУП Империи</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.js"></script>
     <style>
         body { background-color: #121212; color: #ffffff; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; }
         .header-container { display: flex; justify-content: space-between; align-items: center; max-width: 1100px; margin: 0 auto 20px auto; }
@@ -239,6 +242,9 @@
                     <div style="padding: 15px; background: #1e1e1e; border-top: 1px solid #333; border-radius: 0 0 10px 10px;">
                         <textarea id="ticket-reply-text" class="form-control" placeholder="Написать ответ пользователю..." style="width: 100%; height: 60px; background: #121212; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 5px; margin-bottom: 10px; resize: vertical; box-sizing: border-box; font-size: 13px;"></textarea>
                         
+                        <label style="color: #aaa; font-size: 14px; display:block; margin-top:10px; margin-bottom:8px;">🎛 Кнопки для ответа (необязательно):</label>
+                        <div id="ticket-buttons-container" style="margin-bottom: 15px;"></div>
+                        <button onclick="addTicketButtonRow('', '')" class="tab-btn" style="color: #03dac6; border-color: #03dac6; margin-bottom: 20px; font-size: 12px; padding: 6px 12px;">➕ Добавить кнопку</button>
                         <div style="display: flex; gap: 10px;">
                             <button class="form-btn" style="flex: 2; background: #03dac6; color: #121212; font-weight: bold;" onclick="sendTicketReply()">📤 Отправить ответ</button>
                             <button class="form-btn" style="flex: 1; background: #252525; color: #aaa; border: 1px solid #444;" onclick="closeTicket()" onmouseover="this.style.color='#fff'; this.style.borderColor='#cf6679';" onmouseout="this.style.color='#aaa'; this.style.borderColor='#444';">✅ Вопрос Решен</button>
@@ -827,40 +833,34 @@ function addBroadcastButtonRow(text, url, style = 'default', emojiId = '') {
 }
 
 // 2. Модифицированный запуск рассылки с кнопками
+// Запуск рассылки
 function fireBroadcast() {
-    const txt = document.getElementById('broadcast-text').value;
+    const txt = $('#broadcast-text').summernote('code').trim(); // <-- Забираем HTML
     const tgt = document.getElementById('broadcast-target').value;
-    if(!txt.trim()) { showToast("⚠️ Введите текст рассылки!"); return; }
+    if(!txt || txt === '<p><br></p>') { showToast("⚠️ Введите текст рассылки!"); return; }
     
-    // Собираем все созданные кнопки с полей
     const rows = document.querySelectorAll('#broadcast-buttons-container .bc-btn-row');
     const buttons = [];
     rows.forEach(row => {
         const inputs = row.querySelectorAll('input');
         const select = row.querySelector('select');
-        
-        const bText = inputs[0].value.trim();
-        const bUrl = inputs[1].value.trim();
-        const bStyle = select.value;
-        const bEmojiId = inputs[2].value.trim();
-        
-        if(bText && bUrl) {
-            buttons.push({text: bText, url: bUrl, style: bStyle, emoji_id: bEmojiId});
-        }
+        const bText = inputs[0].value.trim(); const bUrl = inputs[1].value.trim();
+        const bStyle = select.value; const bEmojiId = inputs[2].value.trim();
+        if(bText && bUrl) { buttons.push({text: bText, url: bUrl, style: bStyle, emoji_id: bEmojiId}); }
     });
 
     const formData = new FormData(); 
     formData.append('text', txt); 
     formData.append('target', tgt);
-    formData.append('buttons', JSON.stringify(buttons)); // Запаковываем кнопки в JSON-строку
+    formData.append('buttons', JSON.stringify(buttons)); 
 
     fetch('/glaz/broadcast', { method: 'POST', body: formData })
     .then(res => res.json())
     .then(data => {
         if(data.success) { 
             showToast(data.message); 
-            document.getElementById('broadcast-text').value = ''; 
-            document.getElementById('broadcast-buttons-container').innerHTML = ''; // Очищаем кнопки
+            $('#broadcast-text').summernote('reset'); // <-- Очищаем редактор
+            document.getElementById('broadcast-buttons-container').innerHTML = ''; 
         }
     }).catch(() => showToast("❌ Ошибка отправки рассылки"));
 }
@@ -975,9 +975,28 @@ function fireBroadcast() {
 
         window.onload = function() {
             initCharts();
-            loadXRay(); // <--- ВОТ ЭТА СТРОЧКА ЗАПУСКАЕТ РЕНТГЕН ПРИ ВХОДЕ
+            loadXRay(); 
             let savedTab = localStorage.getItem('activeTab');
             if (savedTab && document.getElementById(savedTab)) { openTab(savedTab); }
+
+            // Редактор для Поддержки
+            $('#ticket-reply-text').summernote({
+                height: 150,
+                toolbar: [['style', ['bold', 'italic', 'underline', 'clear']], ['insert', ['link']], ['view', ['codeview']]],
+                placeholder: 'Напишите ответ пользователю...'
+            });
+            
+            // 👇 ДОБАВЛЯЕМ Редактор для Рассылки 👇
+            $('#broadcast-text').summernote({
+                height: 250,
+                toolbar: [
+                    ['style', ['bold', 'italic', 'underline', 'clear']],
+                    ['insert', ['link']],
+                    ['view', ['codeview']]
+                ],
+                placeholder: 'Введите текст рассылки...'
+            });
+            // 👆 ============================== 👆
         }
 
 let sessionPin = "";
@@ -1222,11 +1241,12 @@ function loadTemplates() {
     });
 }
 
+// Сохранение шаблона
 function saveTemplate() {
     const name = document.getElementById('template-name').value.trim();
-    const txt = document.getElementById('broadcast-text').value.trim();
+    const txt = $('#broadcast-text').summernote('code').trim(); // <-- Забираем HTML
     const tgt = document.getElementById('broadcast-target').value;
-    if(!name || !txt) { showToast("⚠️ Введите название и текст рассылки!"); return; }
+    if(!name || !txt || txt === '<p><br></p>') { showToast("⚠️ Введите название и текст рассылки!"); return; }
 
     const rows = document.querySelectorAll('#broadcast-buttons-container .bc-btn-row');
     const buttons = [];
@@ -1260,8 +1280,9 @@ function toggleAutopilot(id, interval) {
     });
 }
 
+// Загрузка шаблона в редактор
 function loadTemplateToForm(t) {
-    document.getElementById('broadcast-text').value = t.text;
+    $('#broadcast-text').summernote('code', t.text); // <-- Вставляем HTML в редактор
     document.getElementById('broadcast-target').value = t.target;
     document.getElementById('broadcast-buttons-container').innerHTML = '';
     if(t.buttons) { t.buttons.forEach(b => addBroadcastButtonRow(b.text, b.url, b.style, b.emoji_id)); }
@@ -1364,25 +1385,54 @@ function openTicket(uid, name) {
     });
 }
 
+// 👇 НОВАЯ ФУНКЦИЯ ДЛЯ ОТРИСОВКИ КНОПОК В САППОРТЕ 👇
+function addTicketButtonRow(text, url) {
+    const row = document.createElement('div');
+    row.style.cssText = "display:flex; gap:10px; margin-bottom:10px;";
+    row.className = "ticket-btn-row";
+    row.innerHTML = `
+        <input type="text" placeholder="Текст кнопки (напр: Оплатить)" value="${text}" class="form-control" style="width: 45%; background: #222; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 5px;">
+        <input type="text" placeholder="Ссылка (https://...)" value="${url}" class="form-control" style="width: 45%; background: #222; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 5px;">
+        <button onclick="this.parentElement.remove()" class="btn btn-danger" style="background: #cf6679; border: none; padding: 8px 12px; border-radius: 5px; color: white; cursor: pointer;">❌</button>
+    `;
+    document.getElementById('ticket-buttons-container').appendChild(row);
+}
+
 function sendTicketReply() {
     if(!currentActiveUid) { showToast("⚠️ Выберите диалог из списка!"); return; }
     
-    const textEl = document.getElementById('ticket-reply-text');
-    const text = textEl.value.trim();
-    if(!text) { showToast("⚠️ Напишите текст ответа!"); return; }
+    // Получаем готовый HTML-код из визуального редактора Summernote
+    const text = $('#ticket-reply-text').summernote('code').trim();
+    
+    // Проверка, если редактор пустой (Summernote оставляет пустые теги <p><br></p>)
+    if(!text || text === '<p><br></p>') { showToast("⚠️ Напишите текст ответа!"); return; }
+
+    // Собираем кнопки из нашего нового интерфейса
+    const rows = document.querySelectorAll('#ticket-buttons-container .ticket-btn-row');
+    const buttons = [];
+    rows.forEach(row => {
+        const inputs = row.querySelectorAll('input');
+        const bText = inputs[0].value.trim();
+        const bUrl = inputs[1].value.trim();
+        if(bText && bUrl) {
+            buttons.push({text: bText, url: bUrl});
+        }
+    });
 
     fetch('/glaz/api/tickets/reply', {
         method: 'POST', 
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ uid: currentActiveUid, text: text })
+        // Отправляем на сервер текст в HTML и собранные кнопки
+        body: JSON.stringify({ uid: currentActiveUid, text: text, buttons: buttons }) 
     })
     .then(res => res.json())
     .then(data => {
         if(data.success) {
             showToast("✅ Ответ отправлен!");
-            textEl.value = ''; // Очищаем поле ввода
-            openTicket(currentActiveUid, currentActiveName); // Перезагружаем чат, чтобы ответ появился в ленте
-            loadSupportTickets(); // Обновляем левую панель контактов
+            $('#ticket-reply-text').summernote('reset'); // Очищаем визуальный редактор
+            document.getElementById('ticket-buttons-container').innerHTML = ''; // Очищаем кнопки
+            openTicket(currentActiveUid, currentActiveName); 
+            loadSupportTickets(); 
         } else {
             showToast("❌ Ошибка: " + (data.error || "Не удалось отправить"));
         }
