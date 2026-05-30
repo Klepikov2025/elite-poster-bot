@@ -95,6 +95,20 @@
         input:checked + .slider:before { transform: translateX(22px); }
 
         .footer { text-align: center; margin-top: 50px; color: #888; font-size: 14px; }
+        
+        /* 👇 Темная тема для визуального редактора Summernote 👇 */
+        .note-editor.note-lite { background: #121212 !important; border: 1px solid #444 !important; color: #fff !important; }
+        .note-editor.note-lite .note-editing-area .note-editable { background: #1e1e1e !important; color: #fff !important; }
+        .note-editor.note-lite .note-toolbar { background: #252525 !important; border-bottom: 1px solid #444 !important; margin: 0 !important; padding: 5px !important; }
+        .note-editor.note-lite .note-btn { background: #333 !important; color: #fff !important; border: 1px solid #555 !important; margin-right: 5px !important; }
+        .note-editor.note-lite .note-btn:hover { background: #bb86fc !important; color: #121212 !important; border-color: #bb86fc !important; }
+        .note-editor.note-lite .note-placeholder { color: #888 !important; }
+        .note-modal-content { background: #1e1e1e !important; color: #fff !important; border: 1px solid #444 !important; }
+        .note-modal-header, .note-modal-footer { border-color: #333 !important; }
+        .note-form-label { color: #aaa !important; }
+        .note-input { background: #121212 !important; color: #fff !important; border: 1px solid #555 !important; }
+        /* 👆 ================================================== 👆 */
+
     </style>
 </head>
 <body>
@@ -985,24 +999,31 @@ function fireBroadcast() {
             let savedTab = localStorage.getItem('activeTab');
             if (savedTab && document.getElementById(savedTab)) { openTab(savedTab); }
 
-            // Редактор для Поддержки
+            // 👇 ОБЩИЕ ЖЕСТКИЕ НАСТРОЙКИ РЕДАКТОРА (Только то, что понимает Телеграм) 👇
+            const minimalToolbar = {
+                toolbar: [
+                    ['style', ['bold', 'italic', 'underline', 'strikethrough', 'clear']],
+                    ['insert', ['link']],
+                    ['view', ['codeview']] // Кнопка просмотра HTML (на всякий случай)
+                ],
+                disableDragAndDrop: true, // Запрещаем кидать картинки в текст
+                dialogsInBody: true // Исправляет баг с отображением окон (вставки ссылок)
+            };
+
+            // 1. Включаем для Поддержки
             $('#ticket-reply-text').summernote({
+                ...minimalToolbar,
                 height: 150,
-                toolbar: [['style', ['bold', 'italic', 'underline', 'clear']], ['insert', ['link']], ['view', ['codeview']]],
-                placeholder: 'Напишите ответ пользователю...'
+                placeholder: 'Напишите ответ пользователю. Можно выделять текст и вставлять ссылки мышкой...'
             });
             
-            // 👇 ДОБАВЛЯЕМ Редактор для Рассылки 👇
+            // 2. Включаем для Рассылки
             $('#broadcast-text').summernote({
+                ...minimalToolbar,
                 height: 250,
-                toolbar: [
-                    ['style', ['bold', 'italic', 'underline', 'clear']],
-                    ['insert', ['link']],
-                    ['view', ['codeview']]
-                ],
                 placeholder: 'Введите текст рассылки...'
             });
-            // 👆 ============================== 👆
+            // 👆 ====================================================================== 👆
         }
 
 let sessionPin = "";
