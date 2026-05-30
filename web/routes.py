@@ -509,7 +509,15 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         # ⏰ ТАЙМЕР: Проверка на отложенный запуск
         if run_at_str:
             try:
-                run_at_ts = datetime.strptime(run_at_str, "%Y-%m-%dT%H:%M").timestamp()
+                import pytz # На всякий случай импортируем библиотеку
+                
+                # Указываем ваш часовой пояс (если нужна Москва, напишите 'Europe/Moscow')
+                tz = pytz.timezone('Asia/Yekaterinburg') 
+                
+                # Читаем время и привязываем к нему часовой пояс
+                naive_dt = datetime.strptime(run_at_str, "%Y-%m-%dT%H:%M")
+                run_at_ts = tz.localize(naive_dt).timestamp()
+                
                 if run_at_ts > time.time():
                     db['scheduled_broadcasts'].insert_one({
                         "text": text, "target": target, "buttons": buttons_list,
