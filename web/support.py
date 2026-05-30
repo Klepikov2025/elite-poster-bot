@@ -1,5 +1,6 @@
 from flask import request, jsonify, session
 from database import db
+from telebot import types  # <--- Добавили библиотеку для кнопок
 
 def register_support_routes(app, bot, add_radar_log):
     
@@ -41,11 +42,22 @@ def register_support_routes(app, bot, add_radar_log):
         uid = data.get('uid')
         text = data.get('text')
         
+        # Получаем кнопки с веб-панели (если их нет, будет пустой список)
+        buttons_raw = data.get('buttons', [])
+        
+        # Собираем клавиатуру с кнопками
+        markup = None
+        if buttons_raw:
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            for btn in buttons_raw:
+                markup.add(types.InlineKeyboardButton(text=btn["text"], url=btn["url"]))
+        
         try:
             bot.send_message(
                 int(uid), 
-                f"👨‍💻 **Ответ Службы Поддержки:**\n\n{text}", 
-                parse_mode="Markdown"
+                f"👨‍💻 <b>Ответ Службы Поддержки:</b>\n\n{text}", 
+                parse_mode="HTML",   # <--- ГЛАВНОЕ: Перевели на HTML!
+                reply_markup=markup  # <--- Прикрепили кнопки
             )
             db['support_tickets'].update_many(
                 {"uid": int(uid), "is_answered": False},

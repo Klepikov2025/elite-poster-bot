@@ -417,7 +417,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             dead_count = 0
             for u in cursor:
                 try:
-                    bot.send_message(u['_id'], txt, parse_mode="Markdown", disable_web_page_preview=True, reply_markup=markup)
+                    bot.send_message(u['_id'], txt, parse_mode="HTML", disable_web_page_preview=True, reply_markup=markup)
                     count += 1
                 except Exception as e:
                     err_text = str(e).lower()
