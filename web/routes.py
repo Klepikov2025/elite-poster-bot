@@ -423,53 +423,125 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         except Exception as e:
             return jsonify({"success": False, "error": str(e)})
 
+    # 👇 НОВЫЙ БЛОК: ТРЕКИНГ КЛИКОВ, ТАЙМЕР И РАССЫЛКА 👇
+    @app.route('/t/<link_id>')
+    def track_link(link_id):
+        # Находим шпионскую ссылку, плюсуем клик и перекидываем юзера
+        link_data = db['tracked_links'].find_one_and_update(
+            {"_id": link_id}, {"$inc": {"clicks": 1}}
+        )
+        if link_data: return redirect(link_data["url"])
+        return "Ссылка не найдена или устарела", 404
+
+    def execute_broadcast(txt, tgt, btns_list):
+        from telebot import types
+        markup = None
+        if btns_list:
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            for btn in btns_list:
+                kwargs = {"text": btn["text"], "url": btn["url"]}
+                if btn.get("style") and btn["style"] != "default": kwargs["style"] = btn["style"]
+                if btn.get("emoji_id"): kwargs["icon_custom_emoji_id"] = btn["emoji_id"]
+                markup.add(types.InlineKeyboardButton(**kwargs))
+                
+        add_radar_log(f"🚀 Запуск рассылки для: {tgt}")
+        cursor = users_collection.find({}) if tgt == 'all' else users_collection.find({"is_vip": True}) if tgt == 'vip' else users_collection.find({"is_queer": True}) if tgt == 'queer' else None
+        if not cursor: return
+        count = 0
+        dead_count = 0
+        for u in cursor:
+            try:
+                bot.send_message(u['_id'], txt, parse_mode="HTML", disable_web_page_preview=True, reply_markup=markup)
+                count += 1
+            except Exception as e:
+                err_text = str(e).lower()
+                if "parse entities" in err_text:
+                    try:
+                        bot.send_message(u['_id'], txt, disable_web_page_preview=True, reply_markup=markup)
+                        count += 1
+                    except Exception as inner_e:
+                        if "deactivated" in str(inner_e).lower() or "blocked" in str(inner_e).lower():
+                            users_collection.delete_one({"_id": u['_id']})
+                            dead_count += 1
+                elif "deactivated" in err_text or "blocked" in err_text:
+                    users_collection.delete_one({"_id": u['_id']})
+                    dead_count += 1
+        add_radar_log(f"✅ Рассылка: Доставлено {count}. 💀 Вывезено трупов: {dead_count}")
+        try: bot.send_message(STAFF_GROUP_ID, f"🚀 **Рассылка завершена!**\nЦель: {tgt}\n✅ Доставлено: {count} чел.\n💀 Мертвых душ удалено: {dead_count}")
+        except: pass
+
+    # Демон, который проверяет отложенные рассылки каждую минуту
+    def scheduled_daemon():
+        while True:
+            try:
+                now = time.time()
+                tasks = list(db['scheduled_broadcasts'].find({"status": "pending", "run_at": {"$lte": now}}))
+                for t in tasks:
+                    db['scheduled_broadcasts'].update_one({"_id": t["_id"]}, {"$set": {"status": "done"}})
+                    execute_broadcast(t["text"], t["target"], t["buttons"])
+            except Exception as e: print(e)
+            time.sleep(30)
+            
+    threading.Thread(target=scheduled_daemon, daemon=True).start()
+
     @app.route('/glaz/broadcast', methods=['POST'])
     def glaz_broadcast():
         if not session.get('logged_in'): return jsonify({"success": False}), 401
         text = request.form.get('text')
         target = request.form.get('target')
+        run_at_str = request.form.get('run_at')
         buttons_raw = request.form.get('buttons', '[]')
+        
         try: buttons_list = json.loads(buttons_raw)
         except: buttons_list = []
-        def bg_broadcast(txt, tgt, btns_list):
-            from telebot import types
-            markup = None
-            if btns_list:
-                markup = types.InlineKeyboardMarkup(row_width=1)
-                for btn in btns_list:
-                    kwargs = {"text": btn["text"], "url": btn["url"]}
-                    if btn.get("style") and btn["style"] != "default": kwargs["style"] = btn["style"]
-                    if btn.get("emoji_id"): kwargs["icon_custom_emoji_id"] = btn["emoji_id"]
-                    markup.add(types.InlineKeyboardButton(**kwargs))
-            add_radar_log(f"🚀 Запуск рассылки для: {tgt}")
-            cursor = users_collection.find({}) if tgt == 'all' else users_collection.find({"is_vip": True}) if tgt == 'vip' else users_collection.find({"is_queer": True}) if tgt == 'queer' else None
-            if not cursor: return
-            count = 0
-            dead_count = 0
-            for u in cursor:
-                try:
-                    bot.send_message(u['_id'], txt, parse_mode="HTML", disable_web_page_preview=True, reply_markup=markup)
-                    count += 1
-                except Exception as e:
-                    err_text = str(e).lower()
-                    if "parse entities" in err_text:
-                        try:
-                            bot.send_message(u['_id'], txt, disable_web_page_preview=True, reply_markup=markup)
-                            count += 1
-                        except Exception as inner_e:
-                            if "deactivated" in str(inner_e).lower():
-                                users_collection.delete_one({"_id": u['_id']})
-                                dead_count += 1
-                    elif "deactivated" in err_text:
-                        users_collection.delete_one({"_id": u['_id']})
-                        dead_count += 1
-                        if SkynetSettings.get().get("auto_corpse_removal", True):
-                            threading.Thread(target=background_corpse_removal, args=(u['_id'],), daemon=True).start() 
-            add_radar_log(f"✅ Рассылка: Доставлено {count}. 💀 Вывезено трупов: {dead_count}")
-            try: bot.send_message(STAFF_GROUP_ID, f"🚀 **Рассылка завершена!**\nЦель: {tgt}\n✅ Доставлено: {count} чел.\n💀 Удалено мертвых душ из базы: {dead_count}")
-            except: pass
-        threading.Thread(target=bg_broadcast, args=(text, target, buttons_list), daemon=True).start()
+
+        # 🎯 ТРЕКЕР КЛИКОВ: Превращаем обычные ссылки в наши трекеры
+        host_url = request.url_root.replace('http://', 'https://')
+        for btn in buttons_list:
+            if btn.get("url") and btn["url"].startswith("http"):
+                link_id = str(uuid.uuid4())[:8]
+                db['tracked_links'].insert_one({
+                    "_id": link_id, "url": btn["url"], "clicks": 0, 
+                    "name": btn["text"], "timestamp": time.time()
+                })
+                btn["url"] = f"{host_url}t/{link_id}"
+
+        # ⏰ ТАЙМЕР: Проверка на отложенный запуск
+        if run_at_str:
+            try:
+                run_at_ts = datetime.strptime(run_at_str, "%Y-%m-%dT%H:%M").timestamp()
+                if run_at_ts > time.time():
+                    db['scheduled_broadcasts'].insert_one({
+                        "text": text, "target": target, "buttons": buttons_list,
+                        "run_at": run_at_ts, "status": "pending"
+                    })
+                    add_radar_log(f"⏰ Рассылка отложена до {run_at_str.replace('T', ' ')}")
+                    return jsonify({"success": True, "message": "⏰ Рассылка успешно поставлена в очередь!"})
+            except Exception as e: print("Ошибка таймера:", e)
+
+        # 🚀 ЗАПУСК СЕЙЧАС (если дата не указана)
+        threading.Thread(target=execute_broadcast, args=(text, target, buttons_list), daemon=True).start()
         return jsonify({"success": True, "message": "🚀 Рассылка запущена в фоне!"})
+
+    @app.route('/glaz/api/broadcast_stats')
+    def api_broadcast_stats():
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+        # Собираем очередь
+        scheduled = list(db['scheduled_broadcasts'].find({"status": "pending"}).sort("run_at", 1))
+        sched_res = [{"id": str(s["_id"]), "target": s["target"], "time": datetime.fromtimestamp(s["run_at"]).strftime("%d.%m.%Y %H:%M")} for s in scheduled]
+        # Собираем статистику кликов
+        links = list(db['tracked_links'].find().sort("timestamp", -1).limit(50))
+        links_res = [{"id": L["_id"], "name": L.get("name", "Кнопка"), "url": L.get("url", ""), "clicks": L.get("clicks", 0), "time": datetime.fromtimestamp(L.get("timestamp", time.time())).strftime("%d.%m.%Y %H:%M")} for L in links]
+            
+        return jsonify({"scheduled": sched_res, "links": links_res})
+    
+    @app.route('/glaz/api/cancel_broadcast', methods=['POST'])
+    def api_cancel_broadcast():
+        if not session.get('logged_in'): return jsonify({"success": False}), 401
+        from bson import ObjectId
+        db['scheduled_broadcasts'].delete_one({"_id": ObjectId(request.json.get("id"))})
+        return jsonify({"success": True})
+    # 👆 ================================================== 👆
 
     @app.route('/glaz/api/dictionary', methods=['GET'])
     def get_dictionary():
