@@ -96,26 +96,19 @@
 
         .footer { text-align: center; margin-top: 50px; color: #888; font-size: 14px; }
         
-        /* 👇 Бронебойная темная тема для Summernote 👇 */
-        .note-editor.note-lite { border: 1px solid #444 !important; background: #1e1e1e !important; }
-        .note-editor.note-lite .note-toolbar { background-color: #252525 !important; border-bottom: 1px solid #444 !important; padding: 5px !important; margin: 0 !important; }
-        .note-editor.note-lite .note-btn { color: #fff !important; background-color: #333 !important; border: 1px solid #555 !important; box-shadow: none !important; }
-        .note-editor.note-lite .note-btn i, .note-editor.note-lite .note-btn span { color: #fff !important; }
+        /* 👇 АБСОЛЮТНО БРОНЕБОЙНАЯ ТЕМА РЕДАКТОРА 👇 */
+        .note-editor.note-lite, .note-editor.note-lite .note-editing-area .note-editable { border: 1px solid #444 !important; background-color: #1e1e1e !important; }
+        .note-editor.note-lite .note-toolbar { background-color: #252525 !important; border-bottom: 1px solid #444 !important; margin: 0 !important; padding: 5px !important; }
+        .note-editor.note-lite .note-btn { color: #fff !important; background-color: #333 !important; border: 1px solid #555 !important; }
         .note-editor.note-lite .note-btn:hover { background-color: #03dac6 !important; color: #121212 !important; border-color: #03dac6 !important; }
-        .note-editor.note-lite .note-btn:hover i, .note-editor.note-lite .note-btn:hover span { color: #121212 !important; }
-        .note-editor.note-lite .note-editing-area .note-editable { background-color: #1e1e1e !important; color: #ffffff !important; }
+        .note-editor.note-lite .note-btn i, .note-editor.note-lite .note-btn span { color: inherit !important; }
         
-        /* Жестко красим текст в белый, а ссылки в фиолетовый */
-        .note-editor.note-lite .note-editing-area .note-editable p,
-        .note-editor.note-lite .note-editing-area .note-editable span,
-        .note-editor.note-lite .note-editing-area .note-editable b,
-        .note-editor.note-lite .note-editing-area .note-editable u,
-        .note-editor.note-lite .note-editing-area .note-editable i,
-        .note-editor.note-lite .note-editing-area .note-editable div { color: #ffffff !important; }
-        .note-editor.note-lite .note-editing-area .note-editable a { color: #bb86fc !important; text-decoration: underline !important; }
-        
-        .note-editor.note-lite .note-placeholder { color: #888 !important; }
-        /* 👆 ================================================== 👆 */
+        /* ЯДЕРНЫЙ УДАР ПО ЧЕРНОМУ ТЕКСТУ */
+        .note-editable { color: #ffffff !important; }
+        .note-editable * { color: #ffffff !important; background-color: transparent !important; }
+        .note-editable a, .note-editable a * { color: #bb86fc !important; text-decoration: underline !important; }
+        .note-placeholder { color: #888 !important; }
+        /* 👆 ========================================= 👆 */
 
     </style>
 </head>
@@ -314,7 +307,8 @@
                     <option value="vip">👑 Только VIP Элита</option>
                     <option value="queer">🏳️‍🌈 Только участники QUEER</option>
                 </select>
-                <button class="form-btn" style="background: #03dac6; color: #121212; font-weight: bold; font-size: 18px;" onclick="fireBroadcast()">🚀 ЗАПУСТИТЬ</button>
+                <button class="form-btn" style="background: #3390ec; color: #fff; font-weight: bold; font-size: 16px;" onclick="previewBroadcast()">👀 ТЕСТ (ЛС)</button>
+                <button class="form-btn" style="flex: 1; background: #03dac6; color: #121212; font-weight: bold; font-size: 16px;" onclick="fireBroadcast()">🚀 ЗАПУСТИТЬ РАССЫЛКУ</button>
             </div>
 
             <div style="margin-top: 30px; border-top: 2px dashed #333; padding-top: 20px;">
@@ -922,6 +916,37 @@ function fireBroadcast() {
     }).catch(() => showToast("❌ Ошибка отправки рассылки"));
 }
 // 👆 ========================================= 👆
+
+// 👇 НОВАЯ ФУНКЦИЯ ПРЕДПРОСМОТРА РАССЫЛКИ 👇
+function previewBroadcast() {
+    let rawHtml = $('#broadcast-text').summernote('code');
+    if(!rawHtml || rawHtml === '<p><br></p>') { showToast("⚠️ Введите текст для теста!"); return; }
+    
+    // Очищаем HTML перед тестом
+    const cleanText = cleanTelegramHtml(rawHtml);
+    
+    const rows = document.querySelectorAll('#broadcast-buttons-container .bc-btn-row');
+    const buttons = [];
+    rows.forEach(row => {
+        const inputs = row.querySelectorAll('input');
+        const select = row.querySelector('select');
+        if(inputs[0].value.trim() && inputs[1].value.trim()) { 
+            buttons.push({text: inputs[0].value.trim(), url: inputs[1].value.trim(), style: select.value, emoji_id: inputs[2].value.trim()}); 
+        }
+    });
+
+    fetch('/glaz/api/preview_broadcast', { 
+        method: 'POST', 
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: cleanText, buttons: buttons}) 
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) showToast("✅ Тестовое сообщение отправлено вам в ЛС!");
+        else showToast("❌ Ошибка: " + (data.error || "Сбой"));
+    });
+}
+// 👆 ====================================== 👆
 
         // Инициализация графиков
         function loadXRay() {
