@@ -833,12 +833,17 @@ function addBroadcastButtonRow(text, url, style = 'default', emojiId = '') {
 }
 
 // 2. Модифицированный запуск рассылки с кнопками
-// Запуск рассылки
+// 👇 ОБНОВЛЕННАЯ ФУНКЦИЯ РАССЫЛКИ (С ЗАЩИТОЙ) 👇
 function fireBroadcast() {
-    const txt = $('#broadcast-text').summernote('code').trim(); // <-- Забираем HTML
+    // 1. Берем сырой HTML из редактора
+    let rawHtml = $('#broadcast-text').summernote('code');
     const tgt = document.getElementById('broadcast-target').value;
-    if(!txt || txt === '<p><br></p>') { showToast("⚠️ Введите текст рассылки!"); return; }
+    if(!rawHtml || rawHtml === '<p><br></p>') { showToast("⚠️ Введите текст рассылки!"); return; }
     
+    // 🛡 2. ПРОПУСКАЕМ ЧЕРЕЗ САНИТАРА ДЛЯ ТЕЛЕГРАМА
+    const cleanText = cleanTelegramHtml(rawHtml);
+    
+    // 3. Собираем кнопки
     const rows = document.querySelectorAll('#broadcast-buttons-container .bc-btn-row');
     const buttons = [];
     rows.forEach(row => {
@@ -850,7 +855,7 @@ function fireBroadcast() {
     });
 
     const formData = new FormData(); 
-    formData.append('text', txt); 
+    formData.append('text', cleanText); // Отправляем чистый текст!
     formData.append('target', tgt);
     formData.append('buttons', JSON.stringify(buttons)); 
 
@@ -859,11 +864,12 @@ function fireBroadcast() {
     .then(data => {
         if(data.success) { 
             showToast(data.message); 
-            $('#broadcast-text').summernote('reset'); // <-- Очищаем редактор
+            $('#broadcast-text').summernote('reset'); 
             document.getElementById('broadcast-buttons-container').innerHTML = ''; 
         }
     }).catch(() => showToast("❌ Ошибка отправки рассылки"));
 }
+// 👆 ========================================= 👆
 
         // Инициализация графиков
         function loadXRay() {
@@ -1398,16 +1404,60 @@ function addTicketButtonRow(text, url) {
     document.getElementById('ticket-buttons-container').appendChild(row);
 }
 
+// 👇 НОВАЯ ФУНКЦИЯ-САНИТАР (ОЧИЩАЕТ HTML ДЛЯ ТЕЛЕГРАМА) 👇
+function cleanTelegramHtml(html) {
+    // 1. Превращаем параграфы и отступы в обычные переносы строк (\n)
+    let text = html.replace(/<p><br><\/p>/gi, '\n');
+    text = text.replace(/<\/p>/gi, '\n');
+    text = text.replace(/<br\s*\/?>/gi, '\n');
+    text = text.replace(/<\/div>/gi, '\n');
+    
+    // 2. Создаем временный элемент для безопасной зачистки тегов
+    const temp = document.createElement('div');
+    temp.innerHTML = text;
+    
+    function cleanNode(node) {
+        // Список тегов, которые Телеграм РАЗРЕШАЕТ
+        const allowedTags = ['B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'DEL', 'A', 'CODE', 'PRE'];
+        for (let i = node.childNodes.length - 1; i >= 0; i--) {
+            const child = node.childNodes[i];
+            if (child.nodeType === 1) { // Если это HTML-элемент
+                cleanNode(child); // Проверяем его внутренности
+                if (!allowedTags.includes(child.nodeName)) {
+                    // Если тег запрещен (например, SPAN), уничтожаем тег, но оставляем текст внутри него
+                    const fragment = document.createDocumentFragment();
+                    while (child.firstChild) fragment.appendChild(child.firstChild);
+                    node.replaceChild(fragment, child);
+                } else {
+                    // Если тег разрешен (например, A или B), удаляем все стили и классы (оставляем только ссылку href)
+                    const attrs = child.attributes;
+                    for (let j = attrs.length - 1; j >= 0; j--) {
+                        if (child.nodeName === 'A' && attrs[j].name === 'href') continue;
+                        child.removeAttribute(attrs[j].name);
+                    }
+                }
+            }
+        }
+    }
+    cleanNode(temp);
+    
+    // Возвращаем чистый код, убирая лишние пробелы и пустые строки
+    return temp.innerHTML.replace(/\n\s*\n/g, '\n\n').trim();
+}
+// 👆 ==================================================== 👆
+
+// 👇 ОБНОВЛЕННАЯ ФУНКЦИЯ ОТПРАВКИ ОТВЕТА (С ЗАЩИТОЙ) 👇
 function sendTicketReply() {
     if(!currentActiveUid) { showToast("⚠️ Выберите диалог из списка!"); return; }
     
-    // Получаем готовый HTML-код из визуального редактора Summernote
-    const text = $('#ticket-reply-text').summernote('code').trim();
+    // 1. Берем сырой HTML из редактора
+    let rawHtml = $('#ticket-reply-text').summernote('code');
+    if(!rawHtml || rawHtml === '<p><br></p>') { showToast("⚠️ Напишите текст ответа!"); return; }
     
-    // Проверка, если редактор пустой (Summernote оставляет пустые теги <p><br></p>)
-    if(!text || text === '<p><br></p>') { showToast("⚠️ Напишите текст ответа!"); return; }
+    // 🛡 2. ПРОПУСКАЕМ ЧЕРЕЗ САНИТАРА ДЛЯ ТЕЛЕГРАМА
+    const cleanText = cleanTelegramHtml(rawHtml);
 
-    // Собираем кнопки из нашего нового интерфейса
+    // 3. Собираем кнопки
     const rows = document.querySelectorAll('#ticket-buttons-container .ticket-btn-row');
     const buttons = [];
     rows.forEach(row => {
@@ -1419,18 +1469,18 @@ function sendTicketReply() {
         }
     });
 
+    // 4. Отправляем ЧИСТЫЙ текст
     fetch('/glaz/api/tickets/reply', {
         method: 'POST', 
         headers: {'Content-Type': 'application/json'},
-        // Отправляем на сервер текст в HTML и собранные кнопки
-        body: JSON.stringify({ uid: currentActiveUid, text: text, buttons: buttons }) 
+        body: JSON.stringify({ uid: currentActiveUid, text: cleanText, buttons: buttons }) 
     })
     .then(res => res.json())
     .then(data => {
         if(data.success) {
             showToast("✅ Ответ отправлен!");
-            $('#ticket-reply-text').summernote('reset'); // Очищаем визуальный редактор
-            document.getElementById('ticket-buttons-container').innerHTML = ''; // Очищаем кнопки
+            $('#ticket-reply-text').summernote('reset'); 
+            document.getElementById('ticket-buttons-container').innerHTML = ''; 
             openTicket(currentActiveUid, currentActiveName); 
             loadSupportTickets(); 
         } else {
@@ -1438,6 +1488,7 @@ function sendTicketReply() {
         }
     });
 }
+// 👆 ============================================== 👆
 
 function closeTicket() {
     if(!currentActiveUid) { showToast("⚠️ Выберите диалог для закрытия!"); return; }
