@@ -392,6 +392,37 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         except: pass
         return jsonify({"success": True})
 
+    @app.route('/glaz/api/preview_broadcast', methods=['POST'])
+    def api_preview_broadcast():
+        if not session.get('logged_in'): return jsonify({"success": False, "error": "Unauthorized"}), 401
+        
+        data = request.json
+        txt = data.get('text', '')
+        buttons_list = data.get('buttons', [])
+        
+        from telebot import types
+        markup = None
+        if buttons_list:
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            for btn in buttons_list:
+                kwargs = {"text": btn["text"], "url": btn["url"]}
+                if btn.get("style") and btn["style"] != "default": kwargs["style"] = btn["style"]
+                if btn.get("emoji_id"): kwargs["icon_custom_emoji_id"] = btn["emoji_id"]
+                markup.add(types.InlineKeyboardButton(**kwargs))
+                
+        try:
+            # Отправляем тестовое сообщение создателю (OWNER_ID берется из config.py)
+            bot.send_message(
+                OWNER_ID, 
+                f"👀 **ПРЕДПРОСМОТР РАССЫЛКИ:**\n\n{txt}", 
+                parse_mode="HTML", 
+                disable_web_page_preview=True, 
+                reply_markup=markup
+            )
+            return jsonify({"success": True})
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)})
+
     @app.route('/glaz/broadcast', methods=['POST'])
     def glaz_broadcast():
         if not session.get('logged_in'): return jsonify({"success": False}), 401
