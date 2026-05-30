@@ -292,7 +292,16 @@
         </div>
     </div>
 
-    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+    <div id="tab-broadcast" class="tab-content">
+        <div class="panel-block" style="max-width: 1000px;">
+            <h3 style="color: #bb86fc;">🚀 Центр Рассылок</h3>
+            
+            <textarea id="broadcast-text"></textarea>
+            
+            <div id="broadcast-buttons-container" style="margin-top: 15px; margin-bottom: 15px;"></div>
+            <button onclick="addBroadcastButtonRow('', '')" class="tab-btn" style="color: #03dac6; border-color: #03dac6; margin-bottom: 20px; font-size: 12px; padding: 6px 12px;">➕ Добавить кнопку (URL)</button>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                 <select id="broadcast-target" class="form-input" style="flex: 1;">
                     <option value="all">🌐 Всем пользователям базы</option>
                     <option value="vip">👑 Только VIP Элита</option>
@@ -341,9 +350,8 @@
                     </tbody>
                 </table>
             </div>
-            </div>
+        </div>
     </div>
-
     <div id="tab-mass" class="tab-content">
         <div class="panel-block" style="max-width: 800px;">
             <h3 style="color: #cf6679;">💥 Оружие Массового Поражения</h3>
