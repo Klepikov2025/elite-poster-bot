@@ -96,17 +96,25 @@
 
         .footer { text-align: center; margin-top: 50px; color: #888; font-size: 14px; }
         
-        /* 👇 Темная тема для визуального редактора Summernote 👇 */
-        .note-editor.note-lite { background: #121212 !important; border: 1px solid #444 !important; color: #fff !important; }
-        .note-editor.note-lite .note-editing-area .note-editable { background: #1e1e1e !important; color: #fff !important; }
-        .note-editor.note-lite .note-toolbar { background: #252525 !important; border-bottom: 1px solid #444 !important; margin: 0 !important; padding: 5px !important; }
-        .note-editor.note-lite .note-btn { background: #333 !important; color: #fff !important; border: 1px solid #555 !important; margin-right: 5px !important; }
-        .note-editor.note-lite .note-btn:hover { background: #bb86fc !important; color: #121212 !important; border-color: #bb86fc !important; }
+        /* 👇 Бронебойная темная тема для Summernote 👇 */
+        .note-editor.note-lite { border: 1px solid #444 !important; background: #1e1e1e !important; }
+        .note-editor.note-lite .note-toolbar { background-color: #252525 !important; border-bottom: 1px solid #444 !important; padding: 5px !important; margin: 0 !important; }
+        .note-editor.note-lite .note-btn { color: #fff !important; background-color: #333 !important; border: 1px solid #555 !important; box-shadow: none !important; }
+        .note-editor.note-lite .note-btn i, .note-editor.note-lite .note-btn span { color: #fff !important; }
+        .note-editor.note-lite .note-btn:hover { background-color: #03dac6 !important; color: #121212 !important; border-color: #03dac6 !important; }
+        .note-editor.note-lite .note-btn:hover i, .note-editor.note-lite .note-btn:hover span { color: #121212 !important; }
+        .note-editor.note-lite .note-editing-area .note-editable { background-color: #1e1e1e !important; color: #ffffff !important; }
+        
+        /* Жестко красим текст в белый, а ссылки в фиолетовый */
+        .note-editor.note-lite .note-editing-area .note-editable p,
+        .note-editor.note-lite .note-editing-area .note-editable span,
+        .note-editor.note-lite .note-editing-area .note-editable b,
+        .note-editor.note-lite .note-editing-area .note-editable u,
+        .note-editor.note-lite .note-editing-area .note-editable i,
+        .note-editor.note-lite .note-editing-area .note-editable div { color: #ffffff !important; }
+        .note-editor.note-lite .note-editing-area .note-editable a { color: #bb86fc !important; text-decoration: underline !important; }
+        
         .note-editor.note-lite .note-placeholder { color: #888 !important; }
-        .note-modal-content { background: #1e1e1e !important; color: #fff !important; border: 1px solid #444 !important; }
-        .note-modal-header, .note-modal-footer { border-color: #333 !important; }
-        .note-form-label { color: #aaa !important; }
-        .note-input { background: #121212 !important; color: #fff !important; border: 1px solid #555 !important; }
         /* 👆 ================================================== 👆 */
 
     </style>
