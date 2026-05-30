@@ -328,14 +328,15 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
             is_privileged = is_real_vip(user_id)
 
             if is_privileged:
-                # 1. Извлекаем имя юзера в правильном HTML-формате
-                user_name_html = f'<a href="tg://user?id={user_id}">{message.from_user.first_name}</a>'
+                # 1. Защищаем имя юзера от поломки HTML-кода (если у него в имени есть знаки < >)
+                safe_name = message.from_user.first_name.replace('<', '').replace('>', '')
+                user_name_html = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
 
-                # 2. Анимированный ВЕРХ (Буквы V I P)
+                # 2. ВАЖНО: Телеграм запрещает ставить буквы (V, I, P) внутрь тегов. Там ОБЯЗАНЫ быть смайлики (например 👑)
                 vip_top_stickers = (
-                    '<tg-emoji emoji-id="5467688183229610037">V</tg-emoji>'
-                    '<tg-emoji emoji-id="5467466378233543299">I</tg-emoji>'
-                    '<tg-emoji emoji-id="5467630896955815565">P</tg-emoji>\n\n'
+                    '<tg-emoji emoji-id="5467688183229610037">👑</tg-emoji>'
+                    '<tg-emoji emoji-id="5467466378233543299">👑</tg-emoji>'
+                    '<tg-emoji emoji-id="5467630896955815565">👑</tg-emoji>\n\n'
                 )
 
                 # 3. Анимированный НИЗ (Галочка и Звезды)
@@ -344,7 +345,7 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
                     '<tg-emoji emoji-id="6215039782955783886">🌟</tg-emoji> <b>Привилегированный участник</b> <tg-emoji emoji-id="6215039782955783886">🌟</tg-emoji>'
                 )
 
-                # 4. Обновленные заголовки (без старого Markdown)
+                # 4. Обновленные заголовки
                 headers = [
                     f"💎 VIP-СООБЩЕНИЕ от {user_name_html}! 💎",
                     f"🚨 🔥 Срочное объявление от {user_name_html}! 🚨",
@@ -367,8 +368,9 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
                     f"🏷️ Объявление с особыми правами: {user_name_html}"
                 ]
 
-                # 5. Склеиваем всё вместе (без escape_md, так как мы теперь работаем с HTML)
-                full_text = f"{vip_top_stickers}{random.choice(headers)}\n\n{clean_user_text(text)}{vip_bottom}"
+                # 5. Склеиваем всё вместе и ЗАЩИЩАЕМ текст пользователя, чтобы он не сломал разметку
+                safe_text = clean_user_text(text).replace('<', '&lt;').replace('>', '&gt;')
+                full_text = f"{vip_top_stickers}{random.choice(headers)}\n\n{safe_text}{vip_bottom}"
 
                 markup_inline = types.InlineKeyboardMarkup()
                 markup_inline.add(
