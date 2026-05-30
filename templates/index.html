@@ -292,23 +292,38 @@
         </div>
     </div>
 
-    <div id="tab-broadcast" class="tab-content">
-        <div class="panel-block" style="max-width: 800px;">
-            <h3 style="color: #bb86fc;">🚀 Мега-Рассылка (Global Broadcast)</h3>
-            <p style="color: #aaa; margin-bottom: 15px;">Рассылка сообщений в ЛС от имени бота. Поддерживается Markdown.</p>
-            <textarea id="broadcast-text" class="mass-textarea" style="height: 200px;" placeholder="*Внимание!*\nЗавтра стартует новая акция..."></textarea>
-            
-            <label style="color: #aaa; font-size: 14px; display:block; margin-bottom:8px;">🎛 Кнопки для этого поста (необязательно):</label>
-            <div id="broadcast-buttons-container" style="margin-bottom: 15px;"></div>
-            <button onclick="addBroadcastButtonRow('', '')" class="tab-btn" style="color: #03dac6; border-color: #03dac6; margin-bottom: 20px; font-size: 12px; padding: 6px 12px;">➕ Добавить кнопку</button>
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <select id="broadcast-target" class="form-input">
+    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <select id="broadcast-target" class="form-input" style="flex: 1;">
                     <option value="all">🌐 Всем пользователям базы</option>
                     <option value="vip">👑 Только VIP Элита</option>
                     <option value="queer">🏳️‍🌈 Только участники QUEER</option>
                 </select>
+                <input type="datetime-local" id="broadcast-time" class="form-input" style="flex: 1;" title="Оставьте пустым для мгновенной отправки">
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                 <button class="form-btn" style="background: #3390ec; color: #fff; font-weight: bold; font-size: 16px;" onclick="previewBroadcast()">👀 ТЕСТ (ЛС)</button>
-                <button class="form-btn" style="flex: 1; background: #03dac6; color: #121212; font-weight: bold; font-size: 16px;" onclick="fireBroadcast()">🚀 ЗАПУСТИТЬ РАССЫЛКУ</button>
+                <button class="form-btn" style="flex: 1; background: #03dac6; color: #121212; font-weight: bold; font-size: 16px;" onclick="fireBroadcast()">🚀 ЗАПУСТИТЬ / ЗАПЛАНИРОВАТЬ</button>
+            </div>
+            
+            <div style="margin-top: 30px; border-top: 2px dashed #333; padding-top: 20px;">
+                <h3 style="color: #ffb74d; margin-bottom: 15px;">⏰ Очередь и 📊 Статистика кликов (CTR)</h3>
+                <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 300px;">
+                        <h4 style="color: #aaa; margin-top: 0;">Ожидают отправки:</h4>
+                        <table class="admin-table">
+                            <thead><tr><th>Время</th><th>Аудитория</th><th>Отмена</th></tr></thead>
+                            <tbody id="scheduled-tbody"><tr><td colspan="3" style="text-align: center; color:#888;">Пусто</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div style="flex: 1; min-width: 300px;">
+                        <h4 style="color: #03dac6; margin-top: 0;">Живой трекер нажатий:</h4>
+                        <table class="admin-table">
+                            <thead><tr><th>Кнопка</th><th>Клики</th><th>Дата</th></tr></thead>
+                            <tbody id="clicks-tbody"><tr><td colspan="3" style="text-align: center; color:#888;">Пусто</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
             <div style="margin-top: 30px; border-top: 2px dashed #333; padding-top: 20px;">
@@ -627,6 +642,7 @@
 
             if(tabId === 'tab-broadcast') {
                 loadTemplates();
+                loadBroadcastStats(); // <--- ДОБАВИТЬ ЭТУ СТРОКУ
                 if (!$('#broadcast-text').hasClass('sn-loaded')) {
                     $('#broadcast-text').summernote({ ...minimalToolbar, height: 250, placeholder: 'Введите текст рассылки...' });
                     $('#broadcast-text').addClass('sn-loaded');
@@ -879,17 +895,15 @@ function addBroadcastButtonRow(text, url, style = 'default', emojiId = '') {
 }
 
 // 2. Модифицированный запуск рассылки с кнопками
-// 👇 ОБНОВЛЕННАЯ ФУНКЦИЯ РАССЫЛКИ (С ЗАЩИТОЙ) 👇
+// 👇 ОБНОВЛЕННАЯ ЛОГИКА РАССЫЛКИ, ТАЙМЕРА И СТАТИСТИКИ 👇
 function fireBroadcast() {
-    // 1. Берем сырой HTML из редактора
     let rawHtml = $('#broadcast-text').summernote('code');
     const tgt = document.getElementById('broadcast-target').value;
-    if(!rawHtml || rawHtml === '<p><br></p>') { showToast("⚠️ Введите текст рассылки!"); return; }
+    const runAt = document.getElementById('broadcast-time').value; // <-- Забираем дату таймера
     
-    // 🛡 2. ПРОПУСКАЕМ ЧЕРЕЗ САНИТАРА ДЛЯ ТЕЛЕГРАМА
+    if(!rawHtml || rawHtml === '<p><br></p>') { showToast("⚠️ Введите текст рассылки!"); return; }
     const cleanText = cleanTelegramHtml(rawHtml);
     
-    // 3. Собираем кнопки
     const rows = document.querySelectorAll('#broadcast-buttons-container .bc-btn-row');
     const buttons = [];
     rows.forEach(row => {
@@ -901,8 +915,9 @@ function fireBroadcast() {
     });
 
     const formData = new FormData(); 
-    formData.append('text', cleanText); // Отправляем чистый текст!
+    formData.append('text', cleanText); 
     formData.append('target', tgt);
+    formData.append('run_at', runAt); // <-- Передаем дату Питон-серверу
     formData.append('buttons', JSON.stringify(buttons)); 
 
     fetch('/glaz/broadcast', { method: 'POST', body: formData })
@@ -912,10 +927,50 @@ function fireBroadcast() {
             showToast(data.message); 
             $('#broadcast-text').summernote('reset'); 
             document.getElementById('broadcast-buttons-container').innerHTML = ''; 
+            document.getElementById('broadcast-time').value = ''; 
+            loadBroadcastStats(); // <-- Обновляем таблички
         }
-    }).catch(() => showToast("❌ Ошибка отправки рассылки"));
+    }).catch(() => showToast("❌ Ошибка отправки"));
 }
-// 👆 ========================================= 👆
+
+function loadBroadcastStats() {
+    fetch('/glaz/api/broadcast_stats').then(res => res.json()).then(data => {
+        // Очередь
+        let schedHtml = '';
+        data.scheduled.forEach(s => {
+            schedHtml += `<tr>
+                <td><span style="color:#ffb74d;">${s.time}</span></td>
+                <td>${s.target === 'all' ? 'Всем' : s.target === 'vip' ? 'VIP' : 'QUEER'}</td>
+                <td><button class="act-btn ban" style="padding:4px 8px; width:auto;" onclick="cancelBroadcast('${s.id}')">❌</button></td>
+            </tr>`;
+        });
+        if(!schedHtml) schedHtml = '<tr><td colspan="3" style="text-align: center; color:#888;">Нет запланированных рассылок</td></tr>';
+        document.getElementById('scheduled-tbody').innerHTML = schedHtml;
+
+        // Клики
+        let linksHtml = '';
+        data.links.forEach(l => {
+            linksHtml += `<tr>
+                <td title="${l.url}"><strong>${l.name}</strong></td>
+                <td><span style="color:#03dac6; font-size:16px; font-weight:bold;">${l.clicks}</span></td>
+                <td><span style="font-size:11px; color:#888;">${l.time}</span></td>
+            </tr>`;
+        });
+        if(!linksHtml) linksHtml = '<tr><td colspan="3" style="text-align: center; color:#888;">Статистика пуста</td></tr>';
+        document.getElementById('clicks-tbody').innerHTML = linksHtml;
+    });
+}
+
+function cancelBroadcast(id) {
+    if(!confirm("Отменить запланированную рассылку?")) return;
+    fetch('/glaz/api/cancel_broadcast', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id: id})
+    }).then(res => res.json()).then(data => {
+        if(data.success) { showToast("🚫 Рассылка отменена"); loadBroadcastStats(); }
+    });
+}
+// 👆 ======================================================== 👆
 
 // 👇 НОВАЯ ФУНКЦИЯ ПРЕДПРОСМОТРА РАССЫЛКИ 👇
 function previewBroadcast() {
