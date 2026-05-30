@@ -137,7 +137,7 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
 
         temp_posts.update_one(
             {"_id": message.from_user.id},
-            {"$set": {"text": message.text, "media": []}},
+            {"$set": {"text": message.html or message.text, "media": []}},
             upsert=True
         )
 
@@ -328,31 +328,47 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
             is_privileged = is_real_vip(user_id)
 
             if is_privileged:
-                vip_tag = "\n\n✅ *Анкета проверена администрацией сети*\n\n⭐️ *Привилегированный участник* ⭐️"
-                user_name_md = get_user_name(message.from_user)
+                # 1. Извлекаем имя юзера в правильном HTML-формате
+                user_name_html = f'<a href="tg://user?id={user_id}">{message.from_user.first_name}</a>'
 
+                # 2. Анимированный ВЕРХ (Буквы V I P)
+                vip_top_stickers = (
+                    '<tg-emoji emoji-id="5467688183229610037">V</tg-emoji>'
+                    '<tg-emoji emoji-id="5467466378233543299">I</tg-emoji>'
+                    '<tg-emoji emoji-id="5467630896955815565">P</tg-emoji>\n\n'
+                )
+
+                # 3. Анимированный НИЗ (Галочка и Звезды)
+                vip_bottom = (
+                    '\n\n<tg-emoji emoji-id="5949582599012750373">✅</tg-emoji> <b>Анкета проверена администрацией сети</b>\n\n'
+                    '<tg-emoji emoji-id="6215039782955783886">🌟</tg-emoji> <b>Привилегированный участник</b> <tg-emoji emoji-id="6215039782955783886">🌟</tg-emoji>'
+                )
+
+                # 4. Обновленные заголовки (без старого Markdown)
                 headers = [
-                    f"💎 VIP-СООБЩЕНИЕ от {user_name_md}! 💎",
-                    f"🚨 🔥 Срочное объявление от {user_name_md}! 🚨",
-                    f"👑 {user_name_md} публикует элитное объявление: 👑",
-                    f"🌟 Особое сообщение от привилегированного пользователя {user_name_md}: 🌟",
-                    f"🔒 Только для избранных: сообщение от {user_name_md} 🔒",
-                    f"📣 Важное объявление от {user_name_md}!",
-                    f"🌐 Объявление уровня PREMIUM от {user_name_md}!",
-                    f"📢 Привилегированное сообщение от {user_name_md}:",
-                    f"🛑 Эксклюзив! {user_name_md} пишет:",
-                    f"💼 Серьёзное объявление от проверенного участника {user_name_md}",
-                    f"💠 {user_name_md} публикует объявление с высоким приоритетом",
-                    f"🪙 {user_name_md} использует привилегию VIP для объявления:",
-                    f"⚠️ Срочно на всех экранах: {user_name_md} врывается с объявлением!",
-                    f"🔥 {user_name_md} бросает вызов одиночеству!",
-                    f"🚀 {user_name_md} не ждёт — он действует! Объявление внутри:",
-                    f"🥵 Горячо! {user_name_md} делится откровенным сообщением:",
-                    f"⚡ Найдено ВИП-сообщение! Проверь, что пишет {user_name_md}",
-                    f"🧿 Внимание! VIP-сообщение от {user_name_md}",
-                    f"🏷️ Объявление с особыми правами: {user_name_md}"
+                    f"💎 VIP-СООБЩЕНИЕ от {user_name_html}! 💎",
+                    f"🚨 🔥 Срочное объявление от {user_name_html}! 🚨",
+                    f"👑 {user_name_html} публикует элитное объявление: 👑",
+                    f"🌟 Особое сообщение от привилегированного пользователя {user_name_html}: 🌟",
+                    f"🔒 Только для избранных: сообщение от {user_name_html} 🔒",
+                    f"📣 Важное объявление от {user_name_html}!",
+                    f"🌐 Объявление уровня PREMIUM от {user_name_html}!",
+                    f"📢 Привилегированное сообщение от {user_name_html}:",
+                    f"🛑 Эксклюзив! {user_name_html} пишет:",
+                    f"💼 Серьёзное объявление от проверенного участника {user_name_html}",
+                    f"💠 {user_name_html} публикует объявление с высоким приоритетом",
+                    f"🪙 {user_name_html} использует привилегию VIP для объявления:",
+                    f"⚠️ Срочно на всех экранах: {user_name_html} врывается с объявлением!",
+                    f"🔥 {user_name_html} бросает вызов одиночеству!",
+                    f"🚀 {user_name_html} не ждёт — он действует! Объявление внутри:",
+                    f"🥵 Горячо! {user_name_html} делится откровенным сообщением:",
+                    f"⚡ Найдено ВИП-сообщение! Проверь, что пишет {user_name_html}",
+                    f"🧿 Внимание! VIP-сообщение от {user_name_html}",
+                    f"🏷️ Объявление с особыми правами: {user_name_html}"
                 ]
-                full_text = f"{random.choice(headers)}\n\n{escape_md(clean_user_text(text))}{vip_tag}"
+
+                # 5. Склеиваем всё вместе (без escape_md, так как мы теперь работаем с HTML)
+                full_text = f"{vip_top_stickers}{random.choice(headers)}\n\n{clean_user_text(text)}{vip_bottom}"
 
                 markup_inline = types.InlineKeyboardMarkup()
                 markup_inline.add(
@@ -398,17 +414,19 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
                             sent_album = bot.send_media_group(chat_id, media_list)
                             for msg in sent_album: ids_to_store.append(msg.message_id)
                             
-                            sent_text = bot.send_message(chat_id, full_text, parse_mode="Markdown", reply_markup=markup_inline)
+                            sent_text = bot.send_message(chat_id, full_text, parse_mode="HTML", reply_markup=markup_inline)
                             ids_to_store.append(sent_text.message_id)
                             
                         elif media_type == "photo":
-                            sent_message = bot.send_photo(chat_id, file_id, caption=full_text, parse_mode="Markdown", reply_markup=markup_inline)
+                            sent_message = bot.send_photo(chat_id, file_id, caption=full_text, parse_mode="HTML", reply_markup=markup_inline)
                             ids_to_store.append(sent_message.message_id)
+                            
                         elif media_type == "video":
-                            sent_message = bot.send_video(chat_id, file_id, caption=full_text, parse_mode="Markdown", reply_markup=markup_inline)
+                            sent_message = bot.send_video(chat_id, file_id, caption=full_text, parse_mode="HTML", reply_markup=markup_inline)
                             ids_to_store.append(sent_message.message_id)
+                            
                         else:
-                            sent_message = bot.send_message(chat_id, full_text, parse_mode="Markdown", reply_markup=markup_inline)
+                            sent_message = bot.send_message(chat_id, full_text, parse_mode="HTML", reply_markup=markup_inline)
                             ids_to_store.append(sent_message.message_id)
 
                         post_data = {
