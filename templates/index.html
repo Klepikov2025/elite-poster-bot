@@ -583,6 +583,7 @@
         let currentListData = [];
         let activeProxySession = null;
 
+        // 👇 ПОЛНОСТЬЮ ОБНОВЛЕННАЯ ФУНКЦИЯ ПЕРЕКЛЮЧЕНИЯ ВКЛАДОК 👇
         function openTab(tabId) {
             // 1. Скрываем все вкладки и кнопки
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -601,15 +602,44 @@
                 if(btn) btn.classList.add('active');
             }
             
-            // 4. Сохраняем и загружаем данные
+            // 4. Сохраняем текущую вкладку
             localStorage.setItem('activeTab', tabId);
 
+            // 5. Загружаем данные для конкретной вкладки
             if(tabId === 'tab-blackbox') loadProxySessions();
-            if(tabId === 'tab-system') { loadDictionary(); loadSystemTexts(); loadSystemSettings();}
             if(tabId === 'tab-quarantine') loadQuarantine();
-            if(tabId === 'tab-support') loadSupportTickets();
             if(tabId === 'ads-tab') loadAds();
+            if(tabId === 'tab-system') { 
+                loadDictionary(); loadSystemTexts(); loadSystemSettings(); loadNetworkPrices(); 
+            }
+            
+            // 🛡 ИНИЦИАЛИЗАЦИЯ ВИЗУАЛЬНОГО РЕДАКТОРА (ТОЛЬКО КОГДА ВКЛАДКА ВИДИМА!)
+            const minimalToolbar = {
+                toolbar: [
+                    ['style', ['bold', 'italic', 'underline', 'strikethrough', 'clear']],
+                    ['insert', ['link']],
+                    ['view', ['codeview']]
+                ],
+                disableDragAndDrop: true, dialogsInBody: true
+            };
+
+            if(tabId === 'tab-broadcast') {
+                loadTemplates();
+                if (!$('#broadcast-text').hasClass('sn-loaded')) {
+                    $('#broadcast-text').summernote({ ...minimalToolbar, height: 250, placeholder: 'Введите текст рассылки...' });
+                    $('#broadcast-text').addClass('sn-loaded');
+                }
+            }
+
+            if(tabId === 'tab-support') {
+                loadSupportTickets();
+                if (!$('#ticket-reply-text').hasClass('sn-loaded')) {
+                    $('#ticket-reply-text').summernote({ ...minimalToolbar, height: 150, placeholder: 'Напишите ответ пользователю...' });
+                    $('#ticket-reply-text').addClass('sn-loaded');
+                }
+            }
         }
+        // 👆 ============================================================== 👆
 
         function showToast(text) {
             const container = document.getElementById('toast-container');
@@ -998,32 +1028,6 @@ function fireBroadcast() {
             loadXRay(); 
             let savedTab = localStorage.getItem('activeTab');
             if (savedTab && document.getElementById(savedTab)) { openTab(savedTab); }
-
-            // 👇 ОБЩИЕ ЖЕСТКИЕ НАСТРОЙКИ РЕДАКТОРА (Только то, что понимает Телеграм) 👇
-            const minimalToolbar = {
-                toolbar: [
-                    ['style', ['bold', 'italic', 'underline', 'strikethrough', 'clear']],
-                    ['insert', ['link']],
-                    ['view', ['codeview']] // Кнопка просмотра HTML (на всякий случай)
-                ],
-                disableDragAndDrop: true, // Запрещаем кидать картинки в текст
-                dialogsInBody: true // Исправляет баг с отображением окон (вставки ссылок)
-            };
-
-            // 1. Включаем для Поддержки
-            $('#ticket-reply-text').summernote({
-                ...minimalToolbar,
-                height: 150,
-                placeholder: 'Напишите ответ пользователю. Можно выделять текст и вставлять ссылки мышкой...'
-            });
-            
-            // 2. Включаем для Рассылки
-            $('#broadcast-text').summernote({
-                ...minimalToolbar,
-                height: 250,
-                placeholder: 'Введите текст рассылки...'
-            });
-            // 👆 ====================================================================== 👆
         }
 
 let sessionPin = "";
@@ -1195,15 +1199,6 @@ function removeDictWord(word, zone) {
     .then(data => { if(data.success) loadDictionary(); });
 }
 
-// Загружаем словарь при открытии вкладки "Система"
-const originalOpenTab = openTab;
-openTab = function(tabId) {
-    originalOpenTab(tabId);
-    if(tabId === 'tab-system') { loadDictionary(); loadSystemTexts(); loadSystemSettings(); loadNetworkPrices(); } // <--- Добавлен вызов!
-    if(tabId === 'tab-broadcast') loadTemplates();
-    if(tabId === 'tab-support') loadSupportTickets();
-};
-
 // === ГОЛОС САУРОНА (Связь с юзером) ===
 function sendSauronMessage(uid) {
     const textEl = document.getElementById('sauron-msg-text-' + uid);
@@ -1268,12 +1263,16 @@ function loadTemplates() {
     });
 }
 
-// Сохранение шаблона
+// 👇 ОБНОВЛЕННАЯ ФУНКЦИЯ СОХРАНЕНИЯ ШАБЛОНА (С ОЧИСТКОЙ HTML) 👇
 function saveTemplate() {
     const name = document.getElementById('template-name').value.trim();
-    const txt = $('#broadcast-text').summernote('code').trim(); // <-- Забираем HTML
     const tgt = document.getElementById('broadcast-target').value;
-    if(!name || !txt || txt === '<p><br></p>') { showToast("⚠️ Введите название и текст рассылки!"); return; }
+    
+    // Берем сырой HTML и сразу очищаем его нашим Санитаром!
+    let rawHtml = $('#broadcast-text').summernote('code');
+    if(!name || !rawHtml || rawHtml === '<p><br></p>') { showToast("⚠️ Введите название и текст рассылки!"); return; }
+    
+    const cleanText = cleanTelegramHtml(rawHtml);
 
     const rows = document.querySelectorAll('#broadcast-buttons-container .bc-btn-row');
     const buttons = [];
@@ -1286,11 +1285,12 @@ function saveTemplate() {
 
     fetch('/glaz/api/templates/save', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name: name, text: txt, target: tgt, buttons: buttons})
+        body: JSON.stringify({name: name, text: cleanText, target: tgt, buttons: buttons})
     }).then(res => res.json()).then(data => {
         if(data.success) { showToast("✅ Шаблон сохранен!"); document.getElementById('template-name').value = ''; loadTemplates(); }
     });
 }
+// 👆 ===================================================================== 👆
 
 function deleteTemplate(id) {
     if(!confirm("Удалить этот шаблон?")) return;
