@@ -563,7 +563,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         word = data.get('word', '').strip().lower()
         zone = data.get('zone')
         exact = data.get('exact', False)
-        if not word or zone not in ['red', 'yellow']: return jsonify({"success": False, "error": "Некорректные данные"})
+        if not word or zone not in ['red', 'yellow', 'black']: return jsonify({"success": False, "error": "Некорректные данные"})
         if exact: pattern = rf"\b{word}\b"
         else: pattern = rf"\b{word}[а-я]*\b"
         new_entry = {"word": word, "pattern": pattern, "exact": exact}
