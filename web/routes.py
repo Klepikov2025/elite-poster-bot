@@ -949,5 +949,31 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                 bot.send_message(uid, f"✅ **Оплата успешно получена!**\n\nДоступ к сети **{network}** ({city}) открыт на {days} дней.\nНажмите «Создать новое объявление».", parse_mode="Markdown")
             except: pass
 
+        # 💖 5. ДОНАТЫ (ЧАЕВЫЕ)
+        elif payload_str.startswith("donation_"):
+            uid = int(payload_str.replace("donation_", ""))
+            
+            # Записываем деньги в кассу (amount_rub получаем от CryptoBot)
+            db['daily_revenue'].insert_one({
+                "type": "donation", 
+                "amount": amount_rub, 
+                "timestamp": time.time(), 
+                "date": datetime.now().strftime("%d.%m.%Y")
+            })
+            
+            try:
+                bot.send_message(
+                    uid, 
+                    f"💖 **Огромное спасибо за ваш крипто-донат ({amount_rub} руб.)!**\nЭти средства очень помогут нашему проекту развиваться.", 
+                    parse_mode="Markdown"
+                )
+                bot.send_message(
+                    STAFF_GROUP_ID, 
+                    f"💸 **КРИПТО-ДОНАТ!** Пользователь `{uid}` только что отправил чаевые: **{amount_rub} руб.**! 🎉", 
+                    parse_mode="Markdown"
+                )
+            except: 
+                pass
+
         return jsonify({"status": "ok"}), 200
     # 👆 ============================================================== 👆
