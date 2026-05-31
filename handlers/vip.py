@@ -162,9 +162,18 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
         active_vip_requests.add(message.from_user.id)
         bot.send_message(message.chat.id, f"⏳ {escape_md(message.from_user.first_name)}, проверяем вашу анкету, подождите...")
 
+        # 👇 ДОСТАЕМ АКТУАЛЬНУЮ ЦЕНУ ИЗ ВЕБ-ПАНЕЛИ 👇
+        try:
+            prices = db['settings'].find_one({"_id": "skynet_pricing"})
+            current_vip_price = prices.get("vip_price", VIP_PRICE_STARS) if prices else VIP_PRICE_STARS
+        except Exception:
+            current_vip_price = VIP_PRICE_STARS
+        # 👆 ========================================= 👆
+
         markup = types.InlineKeyboardMarkup(row_width=1)
         markup.add(
-            types.InlineKeyboardButton("✅ Одобрить (Счет на 250⭐️)", callback_data=f"vip_approve_{message.from_user.id}"),
+            # Теперь цена в кнопке подставится сама!
+            types.InlineKeyboardButton(f"✅ Одобрить (Счет на {current_vip_price}⭐️)", callback_data=f"vip_approve_{message.from_user.id}"),
             types.InlineKeyboardButton("🔄 Запросить повторно", callback_data=f"vip_retry_{message.from_user.id}"),
             types.InlineKeyboardButton("❌ Отказать (Нарушения)", callback_data=f"vip_reject_{message.from_user.id}"),
             types.InlineKeyboardButton("🔨 Забанить везде", callback_data=f"vip_ban_{message.from_user.id}")
@@ -257,6 +266,14 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
 
         # 6. ИСПОЛНЕНИЕ ПРИГОВОРОВ
         if "approve" in action:
+            # 👇 СНАЧАЛА ДОСТАЕМ АКТУАЛЬНУЮ ЦЕНУ 👇
+            try:
+                prices_db = db['settings'].find_one({"_id": "skynet_pricing"})
+                current_vip_price = prices_db.get("vip_price", VIP_PRICE_STARS) if prices_db else VIP_PRICE_STARS
+            except:
+                current_vip_price = VIP_PRICE_STARS
+            # 👆 ================================ 👆
+
             cheap_stars_text = (
                 "💡 **Лайфхак: Как купить звёзды ДЕШЕВЛЕ официального курса?**\n\n"
                 "Перед оплатой рекомендуем приобрести звёзды через проверенный сервис. "
@@ -265,7 +282,7 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
                 "1️⃣ Перейдите по ссылке: https://t.me/Avrrorkastarbot?start=7924963993\n"
                 "2️⃣ Нажмите кнопку «⭐️ Купить звезды»\n"
                 "3️⃣ Выберите пункт «👤 Себе»\n"
-                "4️⃣ Выберите пакет «⭐️ 250 звезд»\n"
+                f"4️⃣ Выберите пакет «⭐️ {current_vip_price} звезд»\n" # <--- Цена подставится автоматически!
                 "5️⃣ Оплатите удобным способом\n\n"
                 "После покупки возвращайтесь сюда и оплачивайте VIP-доступ счетом ниже! 👇"
             )
@@ -273,9 +290,7 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
             except: pass
 
             try:
-                prices_db = db['settings'].find_one({"_id": "skynet_pricing"})
-                current_vip_price = prices_db.get("vip_price", VIP_PRICE_STARS) if prices_db else VIP_PRICE_STARS
-
+                # Цену мы уже достали выше, поэтому этот кусок стал чище
                 markup = types.InlineKeyboardMarkup(row_width=1)
                 markup.add(
                     types.InlineKeyboardButton("🎫 У меня есть промокод", callback_data=f"checkout_promo_vip_{current_vip_price}"),
