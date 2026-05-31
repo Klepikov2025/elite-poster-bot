@@ -553,8 +553,12 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
 
     @app.route('/glaz/api/dictionary', methods=['GET'])
     def get_dictionary():
-        data = db['settings'].find_one({"_id": "skynet_dictionary"}) or {"red": [], "yellow": []}
-        return jsonify({"red": data.get("red", []), "yellow": data.get("yellow", [])})
+        data = db['settings'].find_one({"_id": "skynet_dictionary"}) or {"red": [], "yellow": [], "black": []}
+        return jsonify({
+            "red": data.get("red", []), 
+            "yellow": data.get("yellow", []), 
+            "black": data.get("black", [])
+        })
 
     @app.route('/glaz/api/dictionary/add', methods=['POST'])
     def add_dictionary_word():
