@@ -6,38 +6,43 @@ import os
 import random
 import requests # <--- Добавить, если еще нет
 
-# 👇 ПРОКАЧАННЫЙ КАССИР CRYPTOBOT 👇
+# 👇 ЖЕЛЕЗОБЕТОННЫЙ КАССИР CRYPTOBOT 👇
 def get_crypto_pay_url(custom_payload, amount_stars, description):
+    import os
+    import requests
+    
     amount_rub = int(amount_stars * 1.8)
     API_TOKEN = os.getenv("CRYPTO_TOKEN")
     
     if not API_TOKEN:
-        print("❌ ОШИБКА: Токен CRYPTO_TOKEN не найден в настройках Render!")
+        print("❌ ОШИБКА: Токен CRYPTO_TOKEN не найден!", flush=True)
         return None
 
-    # Если токен из @CryptoTestnetBot, закомментируйте первую ссылку и раскомментируйте вторую:
-    url = "https://pay.cryptobot.net/api/createInvoice" # ДЛЯ РЕАЛЬНЫХ ДЕНЕГ
-    # url = "https://testnet-pay.cryptobot.net/api/createInvoice" # ДЛЯ ТЕСТОВ
-    
+    url = "https://pay.cryptobot.net/api/createInvoice"
     headers = {"Crypto-Pay-API-Token": API_TOKEN}
+    
+    # Убрали всё лишнее, оставили только то, что 100% поддерживает API
     payload = {
-        "currency_type": "fiat",
-        "fiat": "RUB",
         "amount": str(amount_rub),
+        "fiat": "RUB",
         "asset": "USDT", 
         "payload": custom_payload,
-        "description": description,
-        "allow_anonymous": False
+        "description": description
     }
     
     try:
-        res = requests.post(url, json=payload, headers=headers).json()
+        print(f"⏳ CryptoBot: запрос чека на {amount_rub} RUB...", flush=True)
+        response = requests.post(url, json=payload, headers=headers)
+        res = response.json()
+        
+        print(f"🤖 CryptoBot ОТВЕТ: {res}", flush=True) # <-- МГНОВЕННО ВЫВЕДЕТ В ЛОГИ RENDER
+        
         if res.get("ok"): 
             return res["result"]["pay_url"]
         else:
-            print(f"❌ CryptoBot отказал в генерации: {res}") # Теперь мы увидим точную причину!
+            print(f"❌ CryptoBot ОТКАЗАЛ: {res}", flush=True)
     except Exception as e: 
-        print(f"❌ Ошибка связи с CryptoBot: {e}")
+        print(f"❌ Ошибка связи с CryptoBot: {e}", flush=True)
         
     return None
 # 👆 ================================= 👆
