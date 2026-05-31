@@ -496,6 +496,15 @@
                     </label>
                     <button onclick="addDictWord('yellow')" class="btn btn-sm" style="background: #ffb74d; color: #121212; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%;">➕ Добавить в Мут-лист</button>
                 </div>
+<div style="flex: 1; border: 1px solid #bb86fc; padding: 15px; border-radius: 8px; background: rgba(187, 134, 252, 0.05);">
+                    <h4 style="color: #bb86fc; margin-top: 0;">⚫ Черная зона (Реклама)</h4>
+                    <div id="dict-black-list" style="margin-bottom: 15px; min-height: 50px; display: flex; flex-wrap: wrap; gap: 5px;"></div>
+                    <input type="text" id="dict-black-input" class="form-control" placeholder="Например: вирт" style="width: 100%; margin-bottom: 10px; background: #222; color: #fff; border: 1px solid #555; padding: 8px; box-sizing: border-box;">
+                    <label style="font-size: 12px; color: #aaa; display: flex; align-items: center; gap: 5px; margin-bottom: 10px;">
+                        <input type="checkbox" id="dict-black-exact"> Точное совпадение
+                    </label>
+                    <button onclick="addDictWord('black')" class="btn btn-sm" style="background: #bb86fc; color: #121212; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%;">➕ Блокировать в рекламе</button>
+                </div>
             </div>
         </div>
         <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #333; padding: 20px; border-radius: 10px; max-width: 1000px;">
@@ -1242,15 +1251,22 @@ function loadDictionary() {
     fetch('/glaz/api/dictionary')
     .then(res => res.json())
     .then(data => {
-        renderDictList('red', data.red);
-        renderDictList('yellow', data.yellow);
+        renderDictList('red', data.red || []);
+        renderDictList('yellow', data.yellow || []);
+        renderDictList('black', data.black || []); // <--- Учим загружать Черную зону
     });
 }
 
 function renderDictList(zone, words) {
     const container = document.getElementById(`dict-${zone}-list`);
+    if(!container) return;
+    
     let html = '';
-    const color = zone === 'red' ? '#cf6679' : '#ffb74d';
+    // Выбираем цвет в зависимости от зоны
+    let color = '#ffb74d'; // по умолчанию желтый
+    if (zone === 'red') color = '#cf6679'; // красный
+    if (zone === 'black') color = '#bb86fc'; // фиолетовый для рекламы
+
     words.forEach(item => {
         const exactIcon = item.exact ? '🎯' : '🔤';
         html += `<div style="background: #2d2d2d; border: 1px solid ${color}; padding: 3px 8px; border-radius: 15px; font-size: 12px; display: flex; align-items: center; gap: 5px;">
