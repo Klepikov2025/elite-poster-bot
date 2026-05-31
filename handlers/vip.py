@@ -6,7 +6,6 @@ import os
 import random
 import requests # <--- Добавить, если еще нет
 
-# 👇 ЖЕЛЕЗОБЕТОННЫЙ КАССИР CRYPTOBOT 👇
 def get_crypto_pay_url(custom_payload, amount_stars, description):
     import os
     import requests
@@ -18,24 +17,32 @@ def get_crypto_pay_url(custom_payload, amount_stars, description):
         print("❌ ОШИБКА: Токен CRYPTO_TOKEN не найден!", flush=True)
         return None
 
-    url = "https://pay.cryptobot.net/api/createInvoice"
-    headers = {"Crypto-Pay-API-Token": API_TOKEN}
+    # 👇 1. ИСПРАВЛЕННЫЙ ДОМЕН 👇
+    url = "https://pay.crypt.bot/api/createInvoice"
     
-    # Убрали всё лишнее, оставили только то, что 100% поддерживает API
+    # 👇 2. ДОБАВЛЕН USER-AGENT ДЛЯ ОБХОДА БЛОКИРОВОК 👇
+    headers = {
+        "Crypto-Pay-API-Token": API_TOKEN,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+    
+    # 👇 3. ПРАВИЛЬНОЕ ФОРМИРОВАНИЕ СЧЕТА В РУБЛЯХ 👇
     payload = {
-        "amount": str(amount_rub),
-        "fiat": "RUB",
-        "asset": "USDT", 
+        "currency_type": "fiat", # Строго указываем, что сумма в фиате!
+        "fiat": "RUB",           # Валюта чека
+        "amount": str(amount_rub), 
+        # "asset": "USDT",       # Эту строку лучше убрать! Тогда юзер сам выберет, чем платить (TON, USDT или BTC)
         "payload": custom_payload,
         "description": description
     }
     
     try:
         print(f"⏳ CryptoBot: запрос чека на {amount_rub} RUB...", flush=True)
-        response = requests.post(url, json=payload, headers=headers)
+        # Добавлен timeout=10, чтобы Render не висел вечно при сбоях сети
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
         res = response.json()
         
-        print(f"🤖 CryptoBot ОТВЕТ: {res}", flush=True) # <-- МГНОВЕННО ВЫВЕДЕТ В ЛОГИ RENDER
+        print(f"🤖 CryptoBot ОТВЕТ: {res}", flush=True) 
         
         if res.get("ok"): 
             return res["result"]["pay_url"]
@@ -45,7 +52,6 @@ def get_crypto_pay_url(custom_payload, amount_stars, description):
         print(f"❌ Ошибка связи с CryptoBot: {e}", flush=True)
         
     return None
-# 👆 ================================= 👆
 
 from config import (
     VIP_PRICE_STARS, ADMIN_CHAT_IDS, STAFF_GROUP_ID,
