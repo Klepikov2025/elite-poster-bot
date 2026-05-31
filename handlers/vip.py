@@ -41,7 +41,7 @@ def get_crypto_pay_url(custom_payload, amount_stars, description, asset=None):
         res = response.json()
         
         if res.get("ok"): 
-            return res["result"]["pay_url"]
+            return res["result"]["mini_app_invoice_url"]
     except Exception as e: 
         print(f"❌ Ошибка связи с CryptoBot: {e}", flush=True)
         
