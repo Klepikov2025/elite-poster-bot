@@ -6,28 +6,39 @@ import os
 import random
 import requests # <--- Добавить, если еще нет
 
-# 👇 УНИВЕРСАЛЬНЫЙ КАССИР CRYPTOBOT 👇
+# 👇 ПРОКАЧАННЫЙ КАССИР CRYPTOBOT 👇
 def get_crypto_pay_url(custom_payload, amount_stars, description):
     amount_rub = int(amount_stars * 1.8)
-    
     API_TOKEN = os.getenv("CRYPTO_TOKEN")
-    url = "https://pay.cryptobot.net/api/createInvoice"
-    headers = {"Crypto-Pay-API-Token": API_TOKEN}
     
+    if not API_TOKEN:
+        print("❌ ОШИБКА: Токен CRYPTO_TOKEN не найден в настройках Render!")
+        return None
+
+    # Если токен из @CryptoTestnetBot, закомментируйте первую ссылку и раскомментируйте вторую:
+    url = "https://pay.cryptobot.net/api/createInvoice" # ДЛЯ РЕАЛЬНЫХ ДЕНЕГ
+    # url = "https://testnet-pay.cryptobot.net/api/createInvoice" # ДЛЯ ТЕСТОВ
+    
+    headers = {"Crypto-Pay-API-Token": API_TOKEN}
     payload = {
         "currency_type": "fiat",
         "fiat": "RUB",
         "amount": str(amount_rub),
         "asset": "USDT", 
-        "payload": custom_payload, # <-- Теперь маячок передается гибко
+        "payload": custom_payload,
         "description": description,
         "allow_anonymous": False
     }
     
     try:
         res = requests.post(url, json=payload, headers=headers).json()
-        if res.get("ok"): return res["result"]["pay_url"]
-    except Exception as e: print(f"Ошибка CryptoBot: {e}")
+        if res.get("ok"): 
+            return res["result"]["pay_url"]
+        else:
+            print(f"❌ CryptoBot отказал в генерации: {res}") # Теперь мы увидим точную причину!
+    except Exception as e: 
+        print(f"❌ Ошибка связи с CryptoBot: {e}")
+        
     return None
 # 👆 ================================= 👆
 
