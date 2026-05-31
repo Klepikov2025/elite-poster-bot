@@ -3,3 +3,5 @@ pyTelegramBotAPI==4.32.0   # ← обновляем до свежей верси
 gunicorn==20.1.0
 pytz==2023.3
 pymongo
+requests>=2.31.0
+urllib3>=2.0.0
