@@ -825,3 +825,129 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                     
         db['posts'].delete_one({"_id": ObjectId(post_id)})
         return jsonify({"success": True})
+
+# 👇 УНИВЕРСАЛЬНЫЙ КРИПТО-КАССИР ДЛЯ VIP, ШТРАФОВ И ГОРОДОВ 👇
+    @app.route('/glaz/api/cryptobot_webhook', methods=['POST'])
+    def cryptobot_webhook():
+        import random
+        from config import VIP_CHAT_ID # Подтягиваем настройки
+        
+        data = request.json
+        if not data or data.get("update_type") != "invoice_paid":
+            return jsonify({"status": "ignored"}), 200
+            
+        invoice = data.get("payload", {})
+        payload_str = invoice.get("payload", "") 
+        amount_rub = float(invoice.get("amount", 0))
+
+        # 👑 1. ОПЛАТА VIP-КЛУБА
+        if payload_str.startswith("vip_"):
+            uid = int(payload_str.replace("vip_", ""))
+            db['vip_funnel'].delete_one({"_id": uid})
+            try:
+                users_collection.update_one({"_id": uid}, {"$set": {"is_vip": True}}, upsert=True)
+                unmute_user_everywhere(uid)
+                unban_user_everywhere(uid)
+                users_collection.update_one({"_id": uid}, {"$unset": {"shame_tag": ""}})
+                archive_collection.update_one({"target": str(uid)}, {"$unset": {"banned_in_support": "", "strikes": ""}})
+            except Exception as e: print(e)
+            
+            try: 
+                bot.send_message(STAFF_GROUP_ID, f"🤑 **УСПЕШНАЯ ОПЛАТА VIP КРИПТОЙ!**\nЮзер: `{uid}`\nСумма: {amount_rub} руб.")
+                invite = bot.create_chat_invite_link(VIP_CHAT_ID, member_limit=1)
+                bot.send_message(uid, f"🎉 **Крипто-оплата успешно получена!**\n👉 [ВХОД В VIP-КЛУБ]({invite.invite_link})", parse_mode="Markdown", disable_web_page_preview=True)
+            except: pass
+
+        # 🚨 2. ОПЛАТА ШТРАФА (АМНИСТИЯ)
+        elif payload_str.startswith("fine_"):
+            uid = int(payload_str.replace("fine_", ""))
+            now = datetime.now()
+            ticket_num = now.strftime("%d%m%Y%H%M%S") + f"-{random.randint(100, 999)}"
+            
+            db['skynet_tasks'].insert_one({"uid": uid, "action": "fine_unban", "timestamp": now})
+            archive_collection.update_one({"target": str(uid)}, {"$push": {"history": {"date": now.strftime("%d.%m.%Y %H:%M"), "action": "Разблокировка (Крипта)", "reason": "Штраф оплачен"}}}, upsert=True)
+            
+            # 👇 ДОСТАЕМ THREAD_ID ДЛЯ ЗАКРЫТИЯ ТОПИКА 👇
+            user_data = db['paid_users'].find_one({"uid": uid})
+            thread_id = user_data.get("thread_id") if user_data else None
+            
+            db['paid_users'].update_one({"uid": uid}, {"$set": {"status": 0}, "$unset": {"topic_type": ""}})
+            
+            try:
+                # Отправляем отчет прямо в топик и ЗАКРЫВАЕМ его
+                if thread_id:
+                    bot.send_message(STAFF_GROUP_ID, f"🤑 **ШТРАФ ОПЛАЧЕН КРИПТОЙ!**\nЮзер: `{uid}`\nСумма: {amount_rub} руб.", message_thread_id=thread_id)
+                    bot.close_forum_topic(STAFF_GROUP_ID, thread_id)
+                else:
+                    bot.send_message(STAFF_GROUP_ID, f"🤑 **ШТРАФ ОПЛАЧЕН КРИПТОЙ!**\nЮзер: `{uid}`\nСумма: {amount_rub} руб.")
+                    
+                bot.send_message(uid, f"✅ **Оплата штрафа получена!**\n\nОграничения сняты. Уникальный номер: `{ticket_num}`\n*Больше не нарушайте правила!*", parse_mode="Markdown")
+            except: pass
+
+        # 🏙 3. ОПЛАТА ДОСТУПА К ГОРОДУ
+        elif payload_str.startswith("city_"):
+            # Формат: city_123456789_Екатеринбург
+            parts = payload_str.split("_", 2)
+            uid = int(parts[1])
+            purchased_city = parts[2]
+            
+            users_collection.update_one({"_id": uid}, {"$addToSet": {"purchased_cities": purchased_city}}, upsert=True)
+            try:
+                bot.send_message(STAFF_GROUP_ID, f"🤑 **ПРОПУСК В ГОРОД КРИПТОЙ!**\nЮзер: `{uid}`\nГород: {purchased_city}")
+                bot.send_message(uid, f"🎉 **Оплата получена!** Доступ к городу **{purchased_city}** открыт.\n\n*Так как ссылки одноразовые, отправьте боту команду /start или нажмите на кнопку выбора города еще раз, чтобы получить их.*", parse_mode="Markdown")
+            except: pass
+
+        # 📢 4. ОПЛАТА РЕКЛАМЫ
+        elif payload_str.startswith("ad_access_"):
+            # Расшифровываем маячок: ad_access_7_mk_Екатеринбург___123456789
+            actual_payload, uid_str = payload_str.split("___")
+            uid = int(uid_str)
+            
+            # Пишем доход
+            db['daily_revenue'].insert_one({"type": "ads", "amount": amount_rub, "timestamp": time.time(), "date": datetime.now().strftime("%d.%m.%Y")})
+            
+            has_pin = "_pin" in actual_payload
+            clean_payload = actual_payload.replace("_pin", "")
+            parts = clean_payload.split('_')
+            
+            if "discount" in actual_payload:
+                days = int(parts[3])
+                net_key = parts[4]
+                city = parts[5]
+                promo_code = parts[6]
+                db['promocodes'].update_one({"_id": promo_code}, {"$inc": {"used_count": 1}})
+            else:
+                days = int(parts[2])
+                net_key = parts[3]
+                city = parts[4]
+                
+            names = {"mk": "Мужской Клуб", "parni": "ПАРНИ 18+", "ns": "НС", "rainbow": "Радуга", "gayznak": "Гей Знакомства"}
+            network = names.get(net_key, net_key)
+
+            # Вычисляем срок годности по Екатеринбургу (как в mpserv.py)
+            from datetime import timedelta
+            import pytz
+            ekb_tz = pytz.timezone('Asia/Yekaterinburg')
+            now_ekb = datetime.now(ekb_tz)
+            end_date = now_ekb + timedelta(days=days)
+
+            # 💥 ЗАПИСЬ В БАЗУ ДАННЫХ
+            db['ad_subscriptions'].insert_one({
+                "user_id": uid,
+                "network": network,
+                "city": city,
+                "end_date": end_date,
+                "purchase_date": now_ekb,
+                "has_pin": has_pin 
+            })
+            
+            try:
+                bot.send_message(STAFF_GROUP_ID, f"💰 **Новая продажа Рекламы (КРИПТА)!**\nЮзер: `{uid}`\nСеть: **{network}**\nГород: **{city}**\nСрок: **{days}** дн.", parse_mode="Markdown")
+            except: pass
+
+            try:
+                bot.send_message(uid, f"✅ **Оплата успешно получена!**\n\nДоступ к сети **{network}** ({city}) открыт на {days} дней.\nНажмите «Создать новое объявление».", parse_mode="Markdown")
+            except: pass
+
+        return jsonify({"status": "ok"}), 200
+    # 👆 ============================================================== 👆

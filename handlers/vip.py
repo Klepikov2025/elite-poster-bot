@@ -2,7 +2,34 @@ from telebot import types
 import time
 from datetime import datetime
 import pytz
+import os
 import random
+import requests # <--- Добавить, если еще нет
+
+# 👇 УНИВЕРСАЛЬНЫЙ КАССИР CRYPTOBOT 👇
+def get_crypto_pay_url(custom_payload, amount_stars, description):
+    amount_rub = int(amount_stars * 1.8)
+    
+    API_TOKEN = os.getenv("CRYPTO_TOKEN")
+    url = "https://pay.cryptobot.net/api/createInvoice"
+    headers = {"Crypto-Pay-API-Token": API_TOKEN}
+    
+    payload = {
+        "currency_type": "fiat",
+        "fiat": "RUB",
+        "amount": str(amount_rub),
+        "asset": "USDT", 
+        "payload": custom_payload, # <-- Теперь маячок передается гибко
+        "description": description,
+        "allow_anonymous": False
+    }
+    
+    try:
+        res = requests.post(url, json=payload, headers=headers).json()
+        if res.get("ok"): return res["result"]["pay_url"]
+    except Exception as e: print(f"Ошибка CryptoBot: {e}")
+    return None
+# 👆 ================================= 👆
 
 from config import (
     VIP_PRICE_STARS, ADMIN_CHAT_IDS, STAFF_GROUP_ID,
@@ -290,13 +317,18 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
             except: pass
 
             try:
-                # Цену мы уже достали выше, поэтому этот кусок стал чище
+                # 👇 ВЫЗЫВАЕМ НАШУ ФУНКЦИЮ И ГЕНЕРИРУЕМ КРИПТО-ССЫЛКУ! 👇
+                crypto_url = get_crypto_pay_url(f"vip_{user_id}", current_vip_price, f"Оплата VIP Клуба ({current_vip_price}⭐️)")
+
                 markup = types.InlineKeyboardMarkup(row_width=1)
-                markup.add(
-                    types.InlineKeyboardButton("🎫 У меня есть промокод", callback_data=f"checkout_promo_vip_{current_vip_price}"),
-                    types.InlineKeyboardButton(f"💳 Оплатить {current_vip_price}⭐️", callback_data=f"checkout_pay_vip_{current_vip_price}")
-                )
-                bot.send_message(user_id, f"💎 **Оформление VIP-доступа**\n\nСтоимость: **{current_vip_price}⭐️** (Доступ навсегда)\n\nЕсли у вас есть промокод на скидку, нажмите соответствующую кнопку ниже 👇", reply_markup=markup, parse_mode="Markdown")
+                markup.add(types.InlineKeyboardButton("🎫 У меня есть промокод", callback_data=f"checkout_promo_vip_{current_vip_price}"))
+                markup.add(types.InlineKeyboardButton(f"⭐️ Оплатить {current_vip_price} Звезд", callback_data=f"checkout_pay_vip_{current_vip_price}"))
+                
+                # 👇 ДОБАВЛЯЕМ 3-Ю КНОПКУ, ЕСЛИ ССЫЛКА УСПЕШНО СОЗДАЛАСЬ 👇
+                if crypto_url:
+                    markup.add(types.InlineKeyboardButton("🤖 Оплатить Криптой (USDT / TON)", url=crypto_url))
+
+                bot.send_message(user_id, f"💎 **Оформление VIP-доступа**\n\nСтоимость: **{current_vip_price}⭐️** (Доступ навсегда)\n\nВыберите удобный способ оплаты ниже 👇", reply_markup=markup, parse_mode="Markdown")
                 bot.send_message(call.message.chat.id, f"✅ Касса для оплаты VIP отправлена пользователю {user_id}.")
             except Exception as e:
                 if "bot was blocked" in str(e).lower() or "forbidden" in str(e).lower():
