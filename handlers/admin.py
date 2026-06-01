@@ -75,6 +75,43 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
         )
         bot.send_message(message.chat.id, f"🎉 **Промокод создан!**\n\nКод: `{code}`\nСкидка: **{discount}%**\nДействует на: **{target}**\nЛимит: **{limit}** активаций.", parse_mode="Markdown")
 
+    @bot.message_handler(commands=['airdrop'])
+    def handle_create_airdrop(message):
+        try:
+            staff_member = bot.get_chat_member(STAFF_GROUP_ID, message.from_user.id)
+            if staff_member.status not in ['administrator', 'creator']: return
+        except Exception: return 
+        
+        args = message.text.split()
+        if len(args) < 4:
+            bot.reply_to(message, "❌ **Ошибка!** Формат: `/airdrop [ИМЯ_КОДА] [СУММА_ОЧКОВ] [КОЛ-ВО_АКТИВАЦИЙ]`\n\n*Пример:* `/airdrop START50 50 10`", parse_mode="Markdown")
+            return
+
+        code_name = args[1].upper()
+        try:
+            points = int(args[2])
+            limit = int(args[3])
+        except ValueError:
+            bot.reply_to(message, "❌ Ошибка: сумма и количество должны быть числами.")
+            return
+
+        # Создаем многоразовый код на очки в базе
+        db['promocodes'].update_one(
+            {"_id": code_name},
+            {"$set": {
+                "type": "airdrop",
+                "value": points,
+                "target": "points",
+                "usage_limit": limit,
+                "used_count": 0,
+                "activated_by": [], # Список тех, кто уже ввел код (чтобы не абузили)
+                "is_active": True
+            }},
+            upsert=True
+        )
+
+        bot.reply_to(message, f"🎁 **Аирдроп успешно создан!**\n\nКод: `{code_name}`\nДает: **{points} очков**\nЛимит: **{limit} активаций**\n\n_Кидайте его в чаты!_", parse_mode="Markdown")
+
     @bot.message_handler(commands=['get_report'])
     def get_detailed_report(message):
         if message.from_user.id != OWNER_ID: return
