@@ -668,6 +668,38 @@ def unban_user_everywhere(target_id):
 
 # --- ФУНКЦИЯ: ГЛОБАЛЬНЫЙ МУТ (ДЛЯ РЕКЛАМЩИКОВ И НАРУШИТЕЛЕЙ) ---
 def mute_user_everywhere(target_id, reason="Без причины", admin_name="Система", user_link=None, trigger_text=None, mute_time=0, origin_chat=None):
+    
+    # 👇 МАГИЯ ЩИТА ИММУНИТЕТА (ЗАЩИТА ОТ АВТО-МУТОВ) 👇
+    # Достаем данные юзера из базы
+    user_paid_data = db['paid_users'].find_one({"uid": target_id}) or {}
+    
+    if user_paid_data.get("immunity", 0) > 0:
+        # 1. Списываем один щит
+        db['paid_users'].update_one({"uid": target_id}, {"$inc": {"immunity": -1}})
+        
+        # 2. Пишем в веб-радар
+        add_radar_log(f"🛡 ЩИТ СРАБОТАЛ: {target_id} спасен от мута ({reason})")
+        
+        # 3. Пишем юзеру в ЛС, что он чудом спасся
+        try:
+            bot.send_message(
+                target_id, 
+                f"⛔️ **Скайнет зафиксировал нарушение!**\nПричина: {reason}\n\n"
+                f"Но ваш **🛡 Щит Иммунитета поглотил удар!** Вы избежали глобального мута.\n"
+                f"_Щит разрушен. Будьте осторожны в следующий раз!_",
+                parse_mode="Markdown"
+            )
+        except: pass
+        
+        # 4. Уведомляем админов
+        try:
+            bot.send_message(STAFF_GROUP_ID, f"🛡 **БРОНЯ ПРОБИТА:** Скайнет пытался выдать мут `{target_id}` за ({reason}), но **Щит Иммунитета** поглотил удар!", parse_mode="Markdown")
+        except: pass
+        
+        # 5. ПРЕРЫВАЕМ ФУНКЦИЮ! Мут не выдается (возвращаем 0).
+        return 0
+    # 👆 ======================================================== 👆
+
     # --- СОХРАНЯЕМ ПРИЧИНУ ДЛЯ АМНИСТИИ В ПАРНЯХ ---
     users_collection.update_one({"_id": target_id}, {"$set": {"last_mute_reason": reason}}, upsert=True)
     chats_to_mute = {}
