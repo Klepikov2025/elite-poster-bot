@@ -114,7 +114,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
     ]
 
     warned_users = {}  # Кэш отбивок подписок (chat_id, user_id) -> message_id
-    
+   
     @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact', 'video_note'], func=lambda message: message.chat.type in ['group', 'supergroup'])
     def skynet_core_handler(message):
         
@@ -128,9 +128,14 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         # Игнорируем служебные чаты: Поддержку, Журнал логов и чат Админов
         if str(chat_id) in [str(SUPPORT_GROUP_ID), str(STAFF_GROUP_ID), str(JOURNAL_CHAT_ID)]:
             return
-        # 👆 👆 👆
         
         raw_text = message.text or message.caption or ""
+        
+        # 👇 ИММУНИТЕТ ДЛЯ КАЗИНО (ЧТОБЫ ПЫЛЕСОС НЕ УДАЛЯЛ КОМАНДЫ) 👇
+        if raw_text and raw_text.lower().startswith(('/spin', '/казино', '/рулетка')):
+            return # Просто игнорируем это сообщение, Секретарь сам на него ответит!
+        # 👆 ======================================================= 👆
+
         text = raw_text.lower()
         trigger_text = raw_text if raw_text else "Без текста (медиа)"
         user_link = get_user_name(message.from_user)
