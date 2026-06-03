@@ -150,6 +150,37 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
     user_id = message.from_user.id
     chat_id = message.chat.id
     
+    # 👇 1. СИСТЕМА УЧЕТА CPA ТРАФИКА (ПЕРЕХВАТ ССЫЛКИ + АНТИФРОД) 👇
+    if message.invite_link and message.invite_link.name and message.invite_link.name.startswith("cpa_"):
+        agent_id = int(message.invite_link.name.split("_")[1])
+        
+        # Ищем, был ли этот юзер когда-либо в нашей базе
+        existing_traffic = db['cpa_traffic'].find_one({"new_user_id": user_id})
+        
+        if not existing_traffic:
+            # ✅ ЮЗЕР УНИКАЛЬНЫЙ!
+            db['cpa_traffic'].insert_one({
+                "new_user_id": user_id,
+                "agent_id": agent_id, 
+                "status": "hold", 
+                "join_time": time.time(), 
+                "chat_id": chat_id
+            })
+            
+            # Радуем Агента быстрым дофамином
+            try:
+                bot.send_message(
+                    agent_id, 
+                    f"👀 **У вас новый реферал!**\nПользователь подал заявку по вашей ссылке.\n⏳ _Скайнет поместил его в карантин. Если он выживет 48 часов, вы получите 15 очков!_",
+                    parse_mode="Markdown"
+                )
+            except: pass
+        else:
+            # ❌ ЮЗЕР УЖЕ ЕСТЬ В СЕТИ (Или зашел по ссылке другого агента ранее)
+            # Просто тихо плюсуем счетчик "Дубликаты", чтобы агент видел клики, но не получал спам в ЛС
+            db['paid_users'].update_one({"uid": agent_id}, {"$inc": {"cpa_duplicates": 1}}, upsert=True)
+    # 👆 ============================================================= 👆
+    
     # 1. ФИКСИРУЕМ ЗАЯВКУ В СТАТИСТИКЕ (Строго 1 раз за весь период!)
     req_id = f"{user_id}_{chat_id}"
     
@@ -1053,6 +1084,61 @@ def skynet_listener():
 threading.Thread(target=vip_funnel_sniper, daemon=True).start()
 threading.Thread(target=skynet_listener, daemon=True).start()
 # ============================================================================
+
+# ==================== ДЕМОН CPA-СЕТИ (БУХГАЛТЕР) ====================
+def cpa_tracker_daemon():
+    while True:
+        try:
+            now = time.time()
+            # 172800 секунд = 48 часов. 
+            # (💡 Для тестов можешь поставить 60 секунд, чтобы проверить сразу)
+            HOLD_TIME = 172800 
+            
+            # Ищем всех, кто висит в заморозке
+            pending_traffic = db['cpa_traffic'].find({"status": "hold"})
+            
+            for record in pending_traffic:
+                if now - record['join_time'] > HOLD_TIME:
+                    new_user_id = record['new_user_id']
+                    agent_id = record['agent_id']
+                    
+                    # Проверяем, не убил ли Скайнет этого новичка за спам?
+                    is_banned = banned_collection.find_one({"_id": new_user_id})
+                    
+                    if is_banned:
+                        # Трафик оказался спамером. Забраковано!
+                        db['cpa_traffic'].update_one({"_id": record['_id']}, {"$set": {"status": "fraud"}})
+                    else:
+                        # Трафик ВЫЖИЛ! Одобряем и платим Агенту
+                        db['cpa_traffic'].update_one({"_id": record['_id']}, {"$set": {"status": "approved"}})
+                        
+                        # 1. Начисляем базовые 15 очков + 1 в счетчик рефералов
+                        paid_collection = db['paid_users']
+                        paid_collection.update_one({"uid": agent_id}, {"$inc": {"bounty_points": 15, "cpa_refs": 1}}, upsert=True)
+                        
+                        agent_data = paid_collection.find_one({"uid": agent_id})
+                        total_refs = agent_data.get("cpa_refs", 0)
+                        
+                        msg_text = f"🎉 **CPA-Сеть:** Ваш реферал успешно прошел проверку Скайнета (48 часов)!\nВам начислено **+15 Очков Бдительности**! 💰\n_Всего приведено: {total_refs} чел._"
+                        
+                        # 2. ПРОВЕРКА НА ЮБИЛЕЙ (Каждый 10-й человек)
+                        if total_refs > 0 and total_refs % 10 == 0:
+                            paid_collection.update_one({"uid": agent_id}, {"$inc": {"bounty_points": 50}})
+                            msg_text += f"\n\n🎊 **ЮБИЛЕЙ!** Вы привели {total_refs} человек! Ловите бонусный куш: **+50 Очков** сверху! 🎰"
+                            
+                        # Отправляем радостное письмо Агенту
+                        try: bot.send_message(agent_id, msg_text, parse_mode="Markdown")
+                        except: pass
+                        
+        except Exception as e:
+            print(f"Ошибка CPA Tracker: {e}")
+        
+        # Демон спит 1 час, потом снова проверяет базу
+        time.sleep(3600)
+
+# Запускаем Демона CPA при старте сервера
+threading.Thread(target=cpa_tracker_daemon, daemon=True).start()
+# =====================================================================
 
 # 🤖 ФОНОВЫЙ ДЕМОН АВТОПИЛОТА
 def autopilot_daemon():
