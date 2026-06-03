@@ -280,6 +280,104 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
             unmuted_count = unmute_user_everywhere(target_id)
             bot.send_message(message.chat.id, f"✅ Юзер `{target_id}` верифицирован как `{new_tag}` и глобально размучен в {unmuted_count} чатах!")
 
+    @bot.message_handler(commands=['cpa'])
+    def cpa_admin_stats(message):
+        # Доступ только для Руководства и Staff-группы
+        try:
+            staff_member = bot.get_chat_member(STAFF_GROUP_ID, message.from_user.id)
+            if staff_member.status not in ['administrator', 'creator'] and message.from_user.id != OWNER_ID: 
+                return
+        except Exception: 
+            return 
+            
+        args = message.text.split()
+        
+        # =================================================================
+        # 1. ДЕТАЛЬНАЯ СТАТИСТИКА ПО КОНКРЕТНОМУ АГЕНТУ (/cpa 123456789)
+        # =================================================================
+        if len(args) > 1:
+            try:
+                target_agent_id = int(args[1])
+            except ValueError:
+                bot.send_message(message.chat.id, "❌ Ошибка: ID агента должен состоять только из цифр.")
+                return
+                
+            bot.send_message(message.chat.id, f"🔄 Собираю досье на агента `{target_agent_id}`...")
+            
+            # Считаем воронку прямиком из базы Скайнета
+            agent_hold = db['cpa_traffic'].count_documents({"agent_id": target_agent_id, "status": "hold"})
+            agent_approved = db['cpa_traffic'].count_documents({"agent_id": target_agent_id, "status": "approved"})
+            agent_fraud = db['cpa_traffic'].count_documents({"agent_id": target_agent_id, "status": "fraud"})
+            
+            # Достаем дубликаты из базы Секретаря
+            agent_data = db['paid_users'].find_one({"uid": target_agent_id}) or {}
+            agent_duplicates = agent_data.get("cpa_duplicates", 0)
+            
+            total_agent_leads = agent_hold + agent_approved + agent_fraud + agent_duplicates
+            
+            report_text = (
+                f"🕵️‍♂️ **ДОСЬЕ АГЕНТА: `{target_agent_id}`**\n\n"
+                f"👁 Всего переходов по его ссылкам: **{total_agent_leads}**\n"
+                f"🔄 Дубликаты (уже были в сети): **{agent_duplicates}**\n"
+                f"⏳ На проверке Скайнета (48ч): **{agent_hold}**\n"
+                f"🚫 Отбраковано (боты/спам): **{agent_fraud}**\n"
+                f"✅ **Одобрено (живые):** **{agent_approved}**\n\n"
+                f"💡 _Одобрено = количество человек, за которых агент получил выплату._"
+            )
+            bot.send_message(message.chat.id, report_text, parse_mode="Markdown")
+            return
+
+        # =================================================================
+        # 2. ОБЩАЯ СТАТИСТИКА (Если написали просто /cpa)
+        # =================================================================
+        bot.send_message(message.chat.id, "🔄 Собираю общую аналитику по CPA-сети, подождите...")
+
+        total_hold = db['cpa_traffic'].count_documents({"status": "hold"})
+        total_approved = db['cpa_traffic'].count_documents({"status": "approved"})
+        total_fraud = db['cpa_traffic'].count_documents({"status": "fraud"})
+        
+        total_leads = total_hold + total_approved + total_fraud
+        conversion = round((total_approved / total_leads * 100), 1) if total_leads > 0 else 0
+
+        # Делаем агрегацию (ТОП-5) прямо средствами MongoDB
+        pipeline = [
+            {"$match": {"status": "approved"}},
+            {"$group": {"_id": "$agent_id", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 5}
+        ]
+        top_agents = list(db['cpa_traffic'].aggregate(pipeline))
+
+        report_text = (
+            f"📈 **ОБЩАЯ АНАЛИТИКА CPA-СЕТИ**\n\n"
+            f"👥 **Уникальных заявок:** {total_leads}\n"
+            f"✅ **Одобрено (Живые):** {total_approved}\n"
+            f"🚫 **Отбраковано Скайнетом:** {total_fraud}\n"
+            f"⏳ **В карантине (48ч):** {total_hold}\n\n"
+            f"🔥 **Средняя конверсия:** {conversion}%\n\n"
+            f"🏆 **ТОП-5 АГЕНТОВ (По живому трафику):**\n"
+        )
+
+        if not top_agents:
+            report_text += "_Пока нет одобренного трафика._"
+        else:
+            for idx, agent in enumerate(top_agents, 1):
+                agent_id = agent['_id']
+                count = agent['count']
+                
+                # Ищем количество брака конкретно у этого агента
+                fraud_by_agent = db['cpa_traffic'].count_documents({"agent_id": agent_id, "status": "fraud"})
+                
+                # Пытаемся достать имя агента (если есть) или выводим ID
+                user_info = db['users'].find_one({"_id": agent_id})
+                agent_name = f"ID `{agent_id}`"
+                if user_info and "first_name" in user_info:
+                    agent_name = f"[{escape_md(user_info.get('first_name', 'Агент'))}](tg://user?id={agent_id})"
+                
+                report_text += f"{idx}. {agent_name} — **{count}** живых | 🗑 Мусор: {fraud_by_agent}\n"
+
+        bot.send_message(message.chat.id, report_text, parse_mode="Markdown")
+
     @bot.message_handler(commands=['unban'])
     def global_unban_user(message):
         try:
