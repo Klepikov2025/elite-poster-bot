@@ -462,7 +462,13 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
         elif "reject" in action:
             bot.send_message(call.message.chat.id, f"❌ Вы отклонили заявку {user_id}.")
             db['vip_funnel'].delete_one({"_id": user_id})
-            try: bot.send_message(user_id, "К сожалению, ваша заявка отклонена из-за нарушений.")
+            
+            # 👇 НОВЫЙ ТЕКСТ ОТКАЗА 👇
+            reject_text = (
+                "❌ **К сожалению, ваша заявка отклонена из-за нарушений.**\n\n"
+                "Уточнить причину ограничений можно у операторов в поддержке: @FAQMKBOT"
+            )
+            try: bot.send_message(user_id, reject_text, parse_mode="Markdown")
             except: pass
 
         elif "ban" in action:
