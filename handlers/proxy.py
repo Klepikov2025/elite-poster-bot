@@ -4,7 +4,7 @@ import pytz
 import time
 
 from config import STAFF_GROUP_ID, ADMIN_CHAT_IDS
-from database import proxy_sessions, posts_collection
+from database import proxy_sessions, posts_collection, banned_collection, archive_collection
 from utils import get_user_name, escape_md
 
 # Локальное хранилище для жалоб на скам
@@ -46,6 +46,16 @@ def register_proxy_handlers(bot, ban_user_everywhere):
             bot.answer_callback_query(call.id, "❌ Вы не можете откликнуться на свое же объявление!", show_alert=True)
             return
 
+        # 👇 ЩИТ СКАЙНЕТА: Проверяем гостя по базе глобальных банов 👇
+        if banned_collection.find_one({"_id": user_id}):
+            bot.answer_callback_query(
+                call.id, 
+                "🚫 Доступ ограничен. Вы заблокированы в сети за нарушения правил. За что? Ответ тут: @FAQMKBOT", 
+                show_alert=True
+            )
+            return
+        # 👆 ================================================== 👆
+
         bot.answer_callback_query(call.id)
         msg = bot.send_message(
             user_id, 
@@ -58,7 +68,7 @@ def register_proxy_handlers(bot, ban_user_everywhere):
 
     def process_proxy_first_message(message, vip_id):
         if not message.text and not message.photo and not message.video and not message.voice:
-            bot.send_message(message.chat.id, "❌ Ошибка: Поддерживается только текст, фото, видео или голос.")
+            bot.send_message(message.chat.id, "❌ Ошибка: Поддерживается только текст, photo, video или голос.")
             return
 
         guest_id = message.from_user.id
@@ -71,8 +81,21 @@ def register_proxy_handlers(bot, ban_user_everywhere):
         )
         log_proxy_message(session_id, guest_id, message)
         
+        # 👇 НОВОЕ: ИНТЕЛЛЕКТУАЛЬНОЕ ДОСЬЕ НА ГОСТЯ 👇
+        user_record = archive_collection.find_one({"target": str(guest_id)})
+        ban_count = 0
+        if user_record and "history" in user_record:
+            ban_count = len(user_record["history"])
+
+        if ban_count == 0:
+            reputation = "🟢 <b>Репутация:</b> Чисто (Нарушений: 0)"
+        else:
+            reputation = f"⚠️ <b>Внимание:</b> Подозрительный аккаунт (Нарушений: {ban_count})"
+        # 👆 ========================================== 👆
+        
         markup = types.InlineKeyboardMarkup(row_width=1)
         markup.add(
+            types.InlineKeyboardButton("🔚 Завершить диалог (Мирно)", callback_data=f"px_close_{session_id}"),
             types.InlineKeyboardButton("🛑 Заблокировать диалог", callback_data=f"px_block_{session_id}"),
             types.InlineKeyboardButton("🚨 Заблокировать и сообщить администратору", callback_data=f"px_report_{session_id}")
         )
@@ -83,10 +106,12 @@ def register_proxy_handlers(bot, ban_user_everywhere):
         else:
             guest_link = f'<a href="tg://user?id={guest_id}">{clean_name}</a>'
         
+        # 👇 ОБНОВЛЕННЫЙ ТЕКСТ УВЕДОМЛЕНИЯ С ДОСЬЕ 👇
         msg_alert = bot.send_message(
             vip_id, 
-            f"💌 <b>Новый отклик от {guest_link}!</b>\n<i>Сделайте Reply (свайп влево) на это сообщение или на медиа ниже, чтобы ответить.</i>", 
-            parse_mode="HTML"
+            f"💌 <b>Новый отклик от {guest_link}!</b>\n{reputation}\n\n<i>Просто введите ответ ниже (он отправится автоматически, свайпать влево не обязательно).</i>", 
+            parse_mode="HTML",
+            reply_markup=types.ForceReply(selective=True)
         )
         
         sent_msg = bot.copy_message(vip_id, message.chat.id, message.message_id, reply_markup=markup)
@@ -115,20 +140,27 @@ def register_proxy_handlers(bot, ban_user_everywhere):
         log_proxy_message(session_id, user_id, message)
         
         if user_id == guest_id:
+            # 👇 ТУТ ТОЖЕ ОБНОВИЛИ НАБОР КНОПОК ДЛЯ VIP 👇
             markup = types.InlineKeyboardMarkup(row_width=1)
             markup.add(
+                types.InlineKeyboardButton("🔚 Завершить диалог (Мирно)", callback_data=f"px_close_{session_id}"),
                 types.InlineKeyboardButton("🛑 Заблокировать диалог", callback_data=f"px_block_{session_id}"),
                 types.InlineKeyboardButton("🚨 Заблокировать и сообщить администратору", callback_data=f"px_report_{session_id}")
             )
             sent_msg = bot.copy_message(recipient_id, message.chat.id, message.message_id, reply_markup=markup)
         else:
-            sent_msg = bot.copy_message(recipient_id, message.chat.id, message.message_id)
+            # 👇 ДОБАВИЛИ ForceReply ДЛЯ ГОСТЯ — его поле ввода автоматически привяжется к сообщению VIP! 👇
+            sent_msg = bot.copy_message(recipient_id, message.chat.id, message.message_id, reply_markup=types.ForceReply(selective=True))
             
         proxy_sessions.update_one({"_id": session_id}, {"$set": {f"msgs_{recipient_id}_{sent_msg.message_id}": True}})
 
-    @bot.callback_query_handler(func=lambda call: call.data.startswith("px_block_") or call.data.startswith("px_report_"))
+    @bot.callback_query_handler(func=lambda call: call.data.startswith(("px_block_", "px_report_", "px_close_")))
     def handle_proxy_actions(call):
-        action = "block" if call.data.startswith("px_block_") else "report"
+        # Оцифровываем действие
+        if call.data.startswith("px_block_"): action = "block"
+        elif call.data.startswith("px_report_"): action = "report"
+        else: action = "close"
+        
         session_id = call.data.split("_", 2)[2]
         
         session = proxy_sessions.find_one({"_id": session_id})
@@ -144,10 +176,17 @@ def register_proxy_handlers(bot, ban_user_everywhere):
         try: bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
         except: pass
         
-        bot.send_message(vip_id, "🛑 Диалог завершен. Собеседник отключен от канала связи.")
-        try: bot.send_message(guest_id, "🛑 VIP-пользователь завершил диалог. Вы больше не можете ему написать.")
-        except: pass
+        # 👇 ДЕЛИМ УВЕДОМЛЕНИЯ НА ВЕЖЛИВЫЕ И ЖЕСТКИЕ 👇
+        if action == "close":
+            bot.send_message(vip_id, "🔚 Диалог успешно завершен. Сессия связи закрыта.")
+            try: bot.send_message(guest_id, "🔚 VIP-пользователь завершил диалог. Сессия связи закрыта.")
+            except: pass
+        else:
+            bot.send_message(vip_id, "🛑 Диалог завершен. Собеседник отключен от канала связи.")
+            try: bot.send_message(guest_id, "🛑 VIP-пользователь завершил диалог. Вы больше не можете ему написать.")
+            except: pass
         
+        # Логика репорта (оставляем без изменений)
         if action == "report":
             history = session.get("history", [])
             log_text = f"🗄 **СКАЙНЕТ: ПЕРЕХВАТ ДИАЛОГА (ЖАЛОБА VIP)**\n\n"
