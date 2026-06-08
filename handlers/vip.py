@@ -2,6 +2,8 @@ from telebot import types
 import time
 from datetime import datetime
 import pytz
+import tempfile
+import threading
 import os
 import random
 import requests # <--- Добавить, если еще нет
@@ -56,6 +58,66 @@ from database import (
     update_user_stats, get_user_stats, get_pending_ref, delete_pending_ref
 )
 from utils import escape_md, get_user_name, get_referral_bonus, net_key_to_name
+
+def analyze_vip_video_speech(bot, file_id, admin_chat_ids):
+    """Фоновая задача для распознавания речи из VIP-кружка через Groq API"""
+    groq_key = os.getenv("GROQ_API_KEY")
+    if not groq_key: return
+
+    temp_video_path = None
+    listening_msgs = []
+    
+    # 1. Отправляем во все админские чаты плашку "Слушаю..." и запоминаем её ID
+    for admin_id in admin_chat_ids:
+        try:
+            msg = bot.send_message(admin_id, "⏳ *Скайнет слушает VIP-кружок...*", parse_mode="Markdown")
+            listening_msgs.append((admin_id, msg.message_id))
+        except: pass
+
+    try:
+        file_info = bot.get_file(file_id)
+        downloaded_file = bot.download_file(file_info.file_path)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_video:
+            temp_video.write(downloaded_file)
+            temp_video_path = temp_video.name
+
+        url = "https://api.groq.com/openai/v1/audio/transcriptions"
+        headers = {"Authorization": f"Bearer {groq_key}"}
+        
+        with open(temp_video_path, "rb") as audio_file:
+            files = {"file": ("video.mp4", audio_file, "video/mp4")}
+            data = {"model": "whisper-large-v3", "language": "ru", "response_format": "json"}
+            response = requests.post(url, headers=headers, files=files, data=data)
+
+        if response.status_code == 200:
+            text = response.json().get("text", "").lower()
+            
+            # Ищем ключевые слова из фразы: "Привет админам вип-чата, сегодня [дата], на часах [время], хочу стать вип-участником"
+            keywords = ["привет", "админ", "вип", "сегодня", "час", "хочу", "стать", "участник"]
+            matches = sum(1 for k in keywords if k in text)
+            score = int((matches / len(keywords)) * 100)
+
+            if score >= 70:
+                verdict = f"✅ **Шаблон подтвержден ({score}%)!** Можете выставлять счет."
+            else:
+                verdict = f"⚠️ **Совпадение низкое ({score}%). Послушайте вручную.**"
+
+            msg_text = f"🤖 **Нейросеть Скайнета (STT):**\nРаспознанный текст:\n_«{text}»_\n\n{verdict}"
+        else:
+            msg_text = "⚠️ *Ошибка нейросети.* Проверьте кружок вручную."
+
+        # 2. Заменяем плашку "Слушаю..." на готовый результат ИИ
+        for chat_id, msg_id in listening_msgs:
+            try: bot.edit_message_text(msg_text, chat_id=chat_id, message_id=msg_id, parse_mode="Markdown")
+            except: pass
+
+    except Exception as e:
+        print(f"Ошибка при работе STT (VIP): {e}")
+    finally:
+        if temp_video_path and os.path.exists(temp_video_path):
+            try: os.remove(temp_video_path)
+            except: pass
 
 # Выносим отдельно, так как эта функция нужна и для команды /start
 def send_vip_welcome(bot, chat_id, first_name):
@@ -205,31 +267,53 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
         active_vip_requests.add(message.from_user.id)
         bot.send_message(message.chat.id, f"⏳ {escape_md(message.from_user.first_name)}, проверяем вашу анкету, подождите...")
 
-        # 👇 ДОСТАЕМ АКТУАЛЬНУЮ ЦЕНУ ИЗ ВЕБ-ПАНЕЛИ 👇
+        # 👇 ДОСТАЕМ АКТУАЛЬНУЮ ЦЕНУ ИЗ ВЕБ-ПАНЕЛИ
         try:
             prices = db['settings'].find_one({"_id": "skynet_pricing"})
             current_vip_price = prices.get("vip_price", VIP_PRICE_STARS) if prices else VIP_PRICE_STARS
         except Exception:
             current_vip_price = VIP_PRICE_STARS
-        # 👆 ========================================= 👆
+
+        # 👇 ДОСТАЕМ ДОСЬЕ ИЗ БАЗ СКАЙНЕТА
+        user_id = message.from_user.id
+        user_record = archive_collection.find_one({"target": str(user_id)}) or archive_collection.find_one({"target": message.from_user.username})
+        skynet_ban = banned_collection.find_one({"_id": user_id})
+
+        dossier_text = "🟢 **История чиста.** Отличный кандидат."
+        if user_record and "history" in user_record:
+            dossier_text = "⚠️ **Досье пользователя (последние 5 записей):**\n"
+            for entry in user_record["history"][-5:]:
+                reason = entry.get('reason', 'Не указана')
+                if not reason: reason = 'Не указана'
+                dossier_text += f"• {entry['date']} — {entry['action']} ({reason})\n"
+
+        if skynet_ban:
+            dossier_text += f"\n🚨 **АКТИВНЫЙ БАН В СЕТИ:** {skynet_ban.get('reason', 'Не указана')}"
+        # 👆 ================================ 👆
 
         markup = types.InlineKeyboardMarkup(row_width=1)
         markup.add(
-            # Теперь цена в кнопке подставится сама!
-            types.InlineKeyboardButton(f"✅ Одобрить (Счет на {current_vip_price}⭐️)", callback_data=f"vip_approve_{message.from_user.id}"),
-            types.InlineKeyboardButton("🔄 Запросить повторно", callback_data=f"vip_retry_{message.from_user.id}"),
-            types.InlineKeyboardButton("❌ Отказать (Нарушения)", callback_data=f"vip_reject_{message.from_user.id}"),
-            types.InlineKeyboardButton("🔨 Забанить везде", callback_data=f"vip_ban_{message.from_user.id}")
+            types.InlineKeyboardButton(f"✅ Одобрить (Счет на {current_vip_price}⭐️)", callback_data=f"vip_approve_{user_id}"),
+            types.InlineKeyboardButton("🔄 Запросить повторно", callback_data=f"vip_retry_{user_id}"),
+            types.InlineKeyboardButton("❌ Отказать (Нарушения)", callback_data=f"vip_reject_{user_id}"),
+            types.InlineKeyboardButton("🔨 Забанить везде", callback_data=f"vip_ban_{user_id}")
         )
 
         for admin_id in ADMIN_CHAT_IDS:
             try:
-                bot.send_message(admin_id, f"🚨 **Заявка в VIP!**\nОт: {get_user_name(message.from_user)}\nID: `{message.from_user.id}`", parse_mode="Markdown")
+                # Отправляем инфу с пришитым досье!
+                bot.send_message(admin_id, f"🚨 **Заявка в VIP!**\nОт: {get_user_name(message.from_user)}\nID: `{user_id}`\n\n{dossier_text}", parse_mode="Markdown")
                 bot.forward_message(admin_id, message.chat.id, message.message_id)
                 bot.send_message(admin_id, "Действие:", reply_markup=markup)
             except: pass
         
-        pending_verification_users[message.from_user.id] = False
+        pending_verification_users[user_id] = False
+
+        # 🔥 ЗАПУСКАЕМ НЕЙРОСЕТЬ В ФОНЕ 🔥
+        threading.Thread(
+            target=analyze_vip_video_speech, 
+            args=(bot, message.video_note.file_id, ADMIN_CHAT_IDS)
+        ).start()
 
     @bot.message_handler(func=lambda message: message.text and message.text.strip().lower() in ["я отказываюсь от продолжения", "отказываюсь от продолжения"])
     def handle_refusal(message):
