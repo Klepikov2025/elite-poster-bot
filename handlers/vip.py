@@ -55,7 +55,8 @@ from config import (
 )
 from database import (
     db, users_collection, archive_collection, withdrawals_collection,
-    update_user_stats, get_user_stats, get_pending_ref, delete_pending_ref
+    update_user_stats, get_user_stats, get_pending_ref, delete_pending_ref,
+    banned_collection
 )
 from utils import escape_md, get_user_name, get_referral_bonus, net_key_to_name
 
