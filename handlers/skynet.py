@@ -125,8 +125,14 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         user_id = message.from_user.id
         
         # 👇 ДОБАВЛЯЕМ ЭТОТ БЛОК 👇
-        # Игнорируем служебные чаты: Поддержку, Журнал логов и чат Админов
-        if str(chat_id) in [str(SUPPORT_GROUP_ID), str(STAFF_GROUP_ID), str(JOURNAL_CHAT_ID)]:
+        # Игнорируем служебные чаты и внутренние элитные клубы (VIP и BEYOND)
+        if str(chat_id) in [
+            str(SUPPORT_GROUP_ID), 
+            str(STAFF_GROUP_ID), 
+            str(JOURNAL_CHAT_ID), 
+            str(VIP_CHAT_ID), 
+            str(BEYOND_CHAT_ID)
+        ]:
             return
         
         raw_text = message.text or message.caption or ""
