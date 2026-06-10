@@ -144,6 +144,7 @@
         </div>
         <div class="charts-container">
             <div class="chart-block" style="width: 400px;"><h3 style="color: #bb86fc;">📊 Соотношение сил</h3><canvas id="statusChart" width="360" height="240"></canvas></div>
+            <div class="chart-block" style="width: 400px;"><h3 style="color: #03dac6;">🧠 Удовлетворенность саппортом</h3><canvas id="ratingsChart" width="360" height="240"></canvas></div>
             <div class="chart-block" style="width: 625px;"><h3 style="color: #03dac6;">📍 Топ-10 активных городов сети</h3><canvas id="cityChart" width="580" height="240"></canvas></div>
         </div>
 <div class="charts-container" style="margin-top: 5px;">
@@ -304,6 +305,12 @@
                     <div style="padding: 15px; background: #252525; border-bottom: 1px solid #333; font-weight: bold; color: #03dac6; text-align: center;">
                         📩 Служба Поддержки
                         <button style="background: none; border:none; cursor:pointer;" onclick="loadSupportTickets()">🔄</button>
+                    </div>
+                    <div style="margin: 10px; background: rgba(207, 102, 121, 0.05); border: 1px solid #cf6679; padding: 10px; border-radius: 8px;">
+                        <span style="color: #cf6679; font-weight: bold; font-size: 12px; display: block; margin-bottom: 5px;">🚨 РАДАР ГНЕВА (Жалобы 1-2⭐️)</span>
+                        <div id="wrath-radar-box" style="font-size: 11px; color: #ccc; max-height: 100px; overflow-y: auto;">
+                            Сканирование эфира...
+                        </div>
                     </div>
                     <div id="tickets-list-container">
                         <div style="padding: 20px; text-align: center; color: #888;">Загрузка сообщений...</div>
@@ -1182,12 +1189,57 @@ function previewBroadcast() {
             });
         }
 
+        let ratingsChartInstance = null;
+
         function initCharts() {
             fetch('/glaz/api/chart_data').then(res => res.json()).then(data => {
                 const ctxStatus = document.getElementById('statusChart').getContext('2d');
                 statusChart = new Chart(ctxStatus, { type: 'doughnut', data: { labels: ['Обычные юзеры', 'VIP Элита', 'BEYOND', 'Черный Список'], datasets: [{ data: data.status_values, backgroundColor: ['#444444', '#ffb74d', '#f6a5c0', '#cf6679'], borderWidth: 1, borderColor: '#121212' }] }, options: { responsive: false, plugins: { legend: { labels: { color: '#fff' } } } } });
                 const ctxCity = document.getElementById('cityChart').getContext('2d');
                 cityChart = new Chart(ctxCity, { type: 'bar', data: { labels: data.city_labels, datasets: [{ label: 'Участников', data: data.city_values, backgroundColor: 'rgba(3, 218, 198, 0.6)', borderColor: '#03dac6', borderWidth: 1 }] }, options: { responsive: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: '#252525' }, ticks: { color: '#fff' } }, y: { grid: { color: '#252525' }, ticks: { color: '#fff' } } } } });
+            });
+
+            // Подгружаем аналитику оценок
+            updateRatingsPanel();
+        }
+
+        function updateRatingsPanel() {
+            fetch('/glaz/api/ratings_analytics')
+            .then(res => res.json())
+            .then(data => {
+                // Отрисовка сравнительного графика саппорта
+                const labels = data.stats.map(item => `${item.admin} (${item.count} шт)`);
+                const scores = data.stats.map(item => item.avg);
+
+                const ctxRatings = document.getElementById('ratingsChart').getContext('2d');
+                if(ratingsChartInstance) ratingsChartInstance.destroy();
+                
+                ratingsChartInstance = new Chart(ctxRatings, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{ data: scores, backgroundColor: ['#03dac6', '#bb86fc', '#ffb74d', '#3390ec'], borderWidth: 1 }]
+                    },
+                    options: {
+                        responsive: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { min: 1, max: 5, ticks: { color: '#fff' }, grid: { color: '#252525' } },
+                            x: { ticks: { color: '#fff' }, grid: { color: '#252525' } }
+                        }
+                    }
+                });
+
+                // Отрисовка Радара Гнева
+                let radarHtml = '';
+                data.bad_list.forEach(item => {
+                    radarHtml += `<div style="padding: 4px 0; border-bottom: 1px dashed #444; display: flex; justify-content: space-between; align-items: center;">
+                        <span>⏱ ${item.time} | <b>${item.admin_id}</b> ❌</span>
+                        <button class="tab-btn" style="padding: 2px 6px; font-size: 10px; margin: 0; border-color: #cf6679; color: #cf6679;" onclick="document.querySelector('[name=search_id]').value='${item.uid}'; openTab('tab-main');">Обыск ${item.rating}⭐</button>
+                    </div>`;
+                });
+                if(data.bad_list.length === 0) radarHtml = '<div style="color: #666; font-style: italic;">Жалоб нет, все довольны 🕊️</div>';
+                document.getElementById('wrath-radar-box').innerHTML = radarHtml;
             });
         }
 
@@ -1212,6 +1264,7 @@ function previewBroadcast() {
             });
 
             loadXRay(); // <--- ДОБАВЬ ЭТО СЮДА, ЧТОБЫ ЖУЧКИ ОБНОВЛЯЛИСЬ КАЖДЫЕ 5 СЕК
+            updateRatingsPanel(); // <--- ДОБАВИТЬ ЭТУ СТРОКУ ДЛЯ ЖИВОГО РАДАРА ОЦЕНОК
 
             // 2. Обновляем Живой Радар (Web-Логи)
             fetch('/glaz/api/radar').then(res => res.json()).then(data => {
