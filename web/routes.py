@@ -70,6 +70,16 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                     if uid > 7800000000 and first_seen > 0 and (time.time() - first_seen) < 172800:
                         is_quarantine = True
 
+                    # 💎 ВЫТАСКИВАЕМ СОКРОВИЩА ИЗ ПЛАТЕЖНОЙ БАЗЫ СКАЙНЕТА
+                    p_info = db['paid_users'].find_one({"uid": uid}) or {}
+                    
+                    # Расчет остатка таймера кружка верификации
+                    v_timer = p_info.get("verif_timer")
+                    seconds_left = 0
+                    if v_timer:
+                        diff = (datetime.now() - v_timer).total_seconds()
+                        seconds_left = max(0, int(300 - diff))
+
                     user_data = {
                         "id": uid,
                         "is_quarantine": is_quarantine,
@@ -82,7 +92,18 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                         "shame_tag": u_info.get("shame_tag", "Отсутствует") if u_info else "Отсутствует",
                         "banned": True if b_info else False,
                         "ban_reason": detected_reason,
-                        "history": history_list
+                        "history": history_list,
+                        
+                        # Новые поля для админки
+                        "points": p_info.get("bounty_points", 0),
+                        "shards": p_info.get("jackpot_shards", 0),
+                        "cashback": p_info.get("cashback_balance", 0),
+                        "immunity": p_info.get("immunity", 0),
+                        "strikes": p_info.get("strikes", 0),
+                        "admin_notes": p_info.get("admin_notes", ""),
+                        "ai_memory": p_info.get("dialog_history", [])[-6:], # Последние 6 реплик
+                        "secret_code": p_info.get("secret_code", ""),
+                        "verif_seconds_left": seconds_left
                     }
                     add_radar_log(f"🔎 Обыск досье: {uid}")
                 else:
@@ -355,6 +376,48 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         if log_to_staff and staff_msg:
             try: bot.send_message(STAFF_GROUP_ID, staff_msg, parse_mode="Markdown")
             except: pass
+        return jsonify({"success": True, "message": msg})
+
+    @app.route('/glaz/api/add_balance', methods=['POST'])
+    def api_add_balance():
+        if not session.get('logged_in'): 
+            return jsonify({"success": False, "error": "Unauthorized"}), 401
+        
+        uid = int(request.form.get('uid'))
+        currency = request.form.get('currency') # Ожидаем 'points' или 'shards'
+        amount = int(request.form.get('amount', 0))
+        
+        admin_info = "Web-Саурон 👁️"
+        
+        if amount == 0:
+            return jsonify({"success": False, "error": "Сумма не может быть нулем"})
+
+        if currency == 'points':
+            db['paid_users'].update_one({"uid": uid}, {"$inc": {"bounty_points": amount}}, upsert=True)
+            msg = f"💰 Очки Бдительности {'добавлены' if amount > 0 else 'списаны'}: {amount}"
+            add_radar_log(f"💰 БАЛАНС ОЧКОВ [{amount}]: {uid}")
+            staff_msg = f"💰 **ВЕБ-АДМИНКА: ИЗМЕНЕНИЕ ОЧКОВ**\n\n• **Юзер:** `{uid}`\n• **Изменение:** `{amount}` очков"
+            user_msg = f"🎁 **Уведомление!**\nАдминистрация изменила ваш баланс Очков Бдительности на **{amount}**."
+            
+        elif currency == 'shards':
+            db['paid_users'].update_one({"uid": uid}, {"$inc": {"jackpot_shards": amount}}, upsert=True)
+            msg = f"🧩 Осколки {'добавлены' if amount > 0 else 'списаны'}: {amount}"
+            add_radar_log(f"🧩 БАЛАНС ОСКОЛКОВ [{amount}]: {uid}")
+            staff_msg = f"🧩 **ВЕБ-АДМИНКА: ИЗМЕНЕНИЕ ОСКОЛКОВ**\n\n• **Юзер:** `{uid}`\n• **Изменение:** `{amount}` осколков"
+            user_msg = f"🧩 **Уведомление!**\nАдминистрация изменила ваш баланс Осколков на **{amount}**."
+            
+        else:
+            return jsonify({"success": False, "error": "Неизвестная валюта"})
+
+        # Отправляем уведомления
+        try: bot.send_message(STAFF_GROUP_ID, staff_msg, parse_mode="Markdown")
+        except: pass
+        
+        # Если начисляем в плюс, радуем юзера сообщением
+        if amount > 0:
+            try: bot.send_message(uid, user_msg, parse_mode="Markdown")
+            except: pass
+
         return jsonify({"success": True, "message": msg})
 
     @app.route('/glaz/api/system_settings')
@@ -977,3 +1040,106 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
 
         return jsonify({"status": "ok"}), 200
     # 👆 ============================================================== 👆
+
+# 👇 НОВЫЕ РОУТЫ ДЛЯ РЕДАКТОРА ШАБЛОНОВ И БАЗЫ ЗНАНИЙ ИИ 👇
+
+    @app.route('/glaz/api/get_bot_template', methods=['GET'])
+    def api_get_bot_template():
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+        name = request.args.get('name')
+        if not name: return jsonify({"error": "No name"}), 400
+        
+        # Ищем текст в базе
+        doc = db['bot_templates'].find_one({"_id": name})
+        if doc:
+            return jsonify({"text": doc["text"]})
+            
+        # Если в базе пусто, берем из стандартного файла
+        from utils.templates import TEMPLATES, NETWORK_LINKS
+        if name == "network_links":
+            return jsonify({"text": NETWORK_LINKS})
+        elif name == "ai_system_prompt":
+            return jsonify({"text": "Ты строгий, но понимающий ИИ-модератор поддержки..."}) # Дефолтный промпт
+        else:
+            return jsonify({"text": TEMPLATES.get(name, "Шаблон не найден")})
+
+    @app.route('/glaz/api/save_bot_template', methods=['POST'])
+    def api_save_bot_template():
+        if not session.get('logged_in'): return jsonify({"success": False}), 401
+        data = request.json
+        name = data.get("name")
+        text = data.get("text")
+        
+        if name and text:
+            db['bot_templates'].update_one(
+                {"_id": name},
+                {"$set": {"text": text}},
+                upsert=True
+            )
+            # Сигналим в радар
+            add_radar_log(f"📝 Администратор обновил системный текст: {name}")
+            return jsonify({"success": True})
+        return jsonify({"error": "Bad data"}), 400
+
+    @app.route('/glaz/api/ai_prompt', methods=['GET'])
+    def api_get_prompt_legacy():
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+        doc = db['bot_templates'].find_one({"_id": "ai_system_prompt"})
+        return jsonify({"prompt": doc["text"] if doc else "Здесь живут инструкции для ИИ..."})
+
+    @app.route('/glaz/api/ai_prompt/save', methods=['POST'])
+    def api_save_prompt_legacy():
+        if not session.get('logged_in'): return jsonify({"success": False}), 401
+        text = request.json.get("prompt")
+        db['bot_templates'].update_one({"_id": "ai_system_prompt"}, {"$set": {"text": text}}, upsert=True)
+        add_radar_log("🧠 Инструкции нейросети обновлены!")
+        return jsonify({"success": True})
+        
+    # 👆 ======================================================== 👆
+
+# 👇 РОУТЫ ДЛЯ СВЕРХПРОКАЧАННОГО ДОСЬЕ УЧАСТНИКА 👇
+
+    @app.route('/glaz/api/user/save_inventory', methods=['POST'])
+    def api_user_save_inventory():
+        if not session.get('logged_in'): return jsonify({"success": False}), 401
+        data = request.json
+        uid = int(data.get("uid"))
+        
+        db['paid_users'].update_one(
+            {"uid": uid},
+            {"$set": {
+                "bounty_points": int(data.get("points", 0)),
+                "jackpot_shards": int(data.get("shards", 0)),
+                "cashback_balance": int(data.get("cashback", 0)),
+                "immunity": int(data.get("immunity", 0))
+            }},
+            upsert=True
+        )
+        add_radar_log(f"💰 Web-Изменение инвентаря у юзера {uid}")
+        return jsonify({"success": True})
+
+    @app.route('/glaz/api/user/reset_strikes', methods=['POST'])
+    def api_user_reset_strikes():
+        if not session.get('logged_in'): return jsonify({"success": False}), 401
+        uid = int(request.json.get("uid"))
+        db['paid_users'].update_one({"uid": uid}, {"$set": {"strikes": 0}})
+        add_radar_log(f"🕊️ Счетчик страйков обнулен для {uid}")
+        return jsonify({"success": True})
+
+    @app.route('/glaz/api/user/clear_ai_memory', methods=['POST'])
+    def api_user_clear_ai_memory():
+        if not session.get('logged_in'): return jsonify({"success": False}), 401
+        uid = int(request.json.get("uid"))
+        db['paid_users'].update_one({"uid": uid}, {"$unset": {"dialog_history": ""}})
+        add_radar_log(f"🧠 Память ИИ стерта для юзера {uid} (Люди в черном 🕶️)")
+        return jsonify({"success": True})
+
+    @app.route('/glaz/api/user/save_notes', methods=['POST'])
+    def api_user_save_notes():
+        if not session.get('logged_in'): return jsonify({"success": False}), 401
+        data = request.json
+        uid = int(data.get("uid"))
+        notes = data.get("notes", "").strip()
+        
+        db['paid_users'].update_one({"uid": uid}, {"$set": {"admin_notes": notes}}, upsert=True)
+        return jsonify({"success": True})

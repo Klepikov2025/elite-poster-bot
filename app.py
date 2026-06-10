@@ -1041,28 +1041,38 @@ def skynet_listener():
                         )
                     
                     elif task['action'] == "fine_unban":
-                        # 🔥 АБСОЛЮТНО БРОНЕБОЙНАЯ ЛОГИКА ШТРАХОВ И ТЕГОВ 🔥
-                        # Пытаемся достать сумму из задачи или ищем последний платеж в fine_payments
-                        amount = task.get('amount') or task.get('price')
-                        if not amount:
-                            last_pay = db['fine_payments'].find_one({"uid": target_uid}, sort=[("timestamp", -1)])
-                            amount = last_pay.get('amount', 0) if last_pay else 0
+                    # 🔥 АБСОЛЮТНО БРОНЕБОЙНАЯ ЛОГИКА ШТРАХОВ И ТЕГОВ 🔥
+                    # Пытаемся достать сумму из задачи или ищем последний платеж в fine_payments
+                    amount = task.get('amount') or task.get('price')
+                    if not amount:
+                        last_pay = db['fine_payments'].find_one({"uid": target_uid}, sort=[("timestamp", -1)])
+                        amount = last_pay.get('amount', 0) if last_pay else 0
+                    
+                    if int(amount) == 650:
+                        # Особый случай: покупка свободного тега за 650 звезд
+                        users_collection.update_one(
+                            {"_id": target_uid}, 
+                            {"$set": {"custom_tag": "Свободен"}, "$unset": {"shame_tag": ""}},
+                            upsert=True
+                        )
+                        add_radar_log(f"🎖️ Юзер {target_uid} оплатил 650⭐️ и получил тег 'Свободен'")
                         
-                        if int(amount) == 650:
-                            # Особый случай: покупка свободного тега за 650 звезд
-                            users_collection.update_one(
-                                {"_id": target_uid}, 
-                                {"$set": {"custom_tag": "Свободен"}, "$unset": {"shame_tag": ""}},
-                                upsert=True
-                            )
-                            add_radar_log(f"🎖️ Юзер {target_uid} оплатил 650⭐️ и получил тег 'Свободен'")
-                        else:
-                            # Обычный штраф: принудительно выжигаем custom_tag (none) и shame_tag
-                            users_collection.update_one(
-                                {"_id": target_uid}, 
-                                {"$unset": {"shame_tag": "", "custom_tag": ""}}
-                            )
-                            add_radar_log(f"🧹 Юзер {target_uid} оплатил обычный штраф ({amount}⭐️), теги сброшены")
+                    elif int(amount) == 750:
+                        # 🔥 НОВЫЙ КЕЙС: Покупка статуса Спонсора за 750 звезд 🔥
+                        users_collection.update_one(
+                            {"_id": target_uid}, 
+                            {"$set": {"custom_tag": "Спонсор_Одобрен"}, "$unset": {"shame_tag": ""}},
+                            upsert=True
+                        )
+                        add_radar_log(f"💎 Юзер {target_uid} оплатил 750⭐️ и получил тег 'Спонсор_Одобрен'")
+                        
+                    else:
+                        # Обычный штраф: принудительно выжигаем custom_tag (none) и shame_tag
+                        users_collection.update_one(
+                            {"_id": target_uid}, 
+                            {"$unset": {"shame_tag": "", "custom_tag": ""}}
+                        )
+                        add_radar_log(f"🧹 Юзер {target_uid} оплатил обычный штраф ({amount}⭐️), теги сброшены")
                     
                     # 3. ОТЧЕТ В ФЛУДИЛКУ АДМИНАМ!
                     if task['action'] == "fine_unban":

@@ -213,6 +213,67 @@
                         ✉️ Отправить сообщение от имени Бота
                     </button>
                 </div>
+
+                {% if user_data.verif_seconds_left > 0 %}
+                <div style="margin-top: 15px; background: rgba(255, 235, 59, 0.1); border: 1px solid #ffeb3b; padding: 12px; border-radius: 8px; animation: pulse 2s infinite; text-align: center;">
+                    <span style="color: #ffeb3b; font-weight: bold; font-size: 14px;">⏳ ПРЯМО СЕЙЧАС В ВОРОНКЕ ЗАПИСИ КРУЖКА!</span><br>
+                    <span style="font-size: 13px; color: #eee;">Выдан код: <b style="color: #fff; background: #222; padding: 2px 6px; border-radius: 4px;">{{ user_data.secret_code }}</b> | Осталось времени: <b>{{ user_data.verif_seconds_left }} сек.</b></span>
+                </div>
+                {% endif %}
+
+                <div class="info-row" style="margin-top: 15px; background: #252525; padding: 10px 15px; border-radius: 8px;">
+                    <span class="info-label" style="color: #cf6679; font-weight: bold;">⚡ Штрафные страйки спама:</span>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <span style="font-size: 16px; font-weight: bold; color: {% if user_data.strikes >= 3 %}#cf6679{% else %}#ffb74d{% endif %};">{{ user_data.strikes }} / 3 {% if user_data.strikes >= 3 %}[ЗАБЛОКИРОВАН]{% endif %}</span>
+                        <button type="button" class="tab-btn" style="padding: 4px 10px; font-size: 11px; border-color: #03dac6; color: #03dac6; margin: 0;" onclick="resetStrikes({{ user_data.id }})">🔄 Обнулить счетчик</button>
+                    </div>
+                </div>
+
+                <div style="margin-top: 15px; background: #1a1a1a; padding: 15px; border-radius: 8px; border: 1px solid #444;">
+                    <span style="color: #ffb74d; font-weight: bold; font-size: 14px; display: block; margin-bottom: 12px;">💰 Кошелёк и Инвентарь Артефактов</span>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="font-size: 11px; color: #aaa;">Очки бдительности:</label>
+                            <input type="number" id="inv-points" class="search-input" style="width:100%; padding:6px; margin-top:3px;" value="{{ user_data.points }}">
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: #aaa;">Осколки рулетки:</label>
+                            <input type="number" id="inv-shards" class="search-input" style="width:100%; padding:6px; margin-top:3px;" value="{{ user_data.shards }}">
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: #aaa;">Кэшбэк-баланс (руб):</label>
+                            <input type="number" id="inv-cashback" class="search-input" style="width:100%; padding:6px; margin-top:3px;" value="{{ user_data.cashback }}">
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: #aaa;">Щиты Иммунитета:</label>
+                            <input type="number" id="inv-immunity" class="search-input" style="width:100%; padding:6px; margin-top:3px;" value="{{ user_data.immunity }}">
+                        </div>
+                    </div>
+                    <button type="button" class="form-btn" style="width: 100%; background: #ffb74d; color: #121212; padding: 8px; font-size: 13px; font-weight: bold; margin-top: 12px;" onclick="saveInventory({{ user_data.id }})">💾 Сохранить инвентарь</button>
+                </div>
+
+                <div style="margin-top: 15px; background: #1a1a1a; padding: 15px; border-radius: 8px; border: 1px solid #bb86fc;">
+                    <span style="color: #bb86fc; font-weight: bold; font-size: 14px; display: block; margin-bottom: 10px;">🧠 Текущий контекст памяти ИИ (Последние реплики)</span>
+                    <div style="max-height: 150px; overflow-y: auto; background: #0d0d0d; padding: 10px; border-radius: 5px; font-size: 12px; font-family: sans-serif; margin-bottom: 10px; border: 1px solid #222;">
+                        {% if user_data.ai_memory %}
+                            {% for msg in user_data.ai_memory %}
+                                <div style="margin-bottom: 6px; border-bottom: 1px dashed #222; padding-bottom: 4px;">
+                                    <b>{% if msg.role == 'user' %}👤 Юзер{% else %}🤖 Бот{% endif %}:</b> {{ msg.content }}
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <span style="color: #666; font-style: italic;">ИИ ничего не помнит об этом пользователе...</span>
+                        {% endif %}
+                    </div>
+                    <button type="button" class="form-btn" style="width: 100%; background: #a134eb; color: #fff; padding: 10px; font-size: 13px; font-weight: bold;" onclick="clearAIMemory({{ user_data.id }})">🕶️ Стереть краткосрочную память ИИ</button>
+                </div>
+
+                <div style="margin-top: 15px; background: #1a1a1a; padding: 15px; border-radius: 8px; border: 1px solid #333;">
+                    <span style="color: #aaa; font-weight: bold; font-size: 14px; display: block; margin-bottom: 8px;">📝 Внутренние заметки администрации (Скрытые стикеры)</span>
+                    <textarea id="admin-user-notes" class="form-control" placeholder="Напишите сюда комментарий (например: 'Мутный парень, обещал купить VIP с зарплаты 15 числа'). Пользователь об этом не узнает." style="width: 100%; height: 60px; background: #121212; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 5px; font-size: 13px; box-sizing: border-box; margin-bottom: 8px; resize: vertical;">{{ user_data.admin_notes }}</textarea>
+                    <button type="button" class="form-btn" style="width: 100%; background: #444; color: #fff; padding: 6px; font-size: 12px;" onclick="saveAdminNotes({{ user_data.id }})">📌 Сохранить пометку</button>
+                </div>
+
                 <div class="actions-grid">
                     <button type="button" class="act-btn ban" onclick="fireAction({{ user_data.id }}, 'ban')">🔨 Забанить везде</button>
                     <button type="button" class="act-btn unban" onclick="fireAction({{ user_data.id }}, 'unban')">🕊️ Амнистировать</button>
@@ -510,6 +571,44 @@
                 </div>
             </div>
         </div>
+        <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #03dac6; padding: 20px; border-radius: 10px; max-width: 1000px; box-shadow: 0 0 15px rgba(3, 218, 198, 0.05);">
+            <h3 style="color: #03dac6; margin-bottom: 10px; font-size: 18px; display: flex; align-items: center; gap: 8px;">
+                🧠 База Знаний ИИ (Системный Промпт)
+            </h3>
+            <p style="color: #aaa; font-size: 13px; margin-bottom: 15px;">Редактируйте инструкции для нейросети напрямую. Изменения вступают в силу мгновенно, перезагрузка сервера не требуется.</p>
+            
+            <textarea id="ai-system-prompt" class="form-control" style="width: 100%; height: 250px; background: #121212; color: #03dac6; border: 1px solid #333; padding: 15px; margin-bottom: 15px; border-radius: 5px; font-family: monospace; font-size: 13px; resize: vertical; box-sizing: border-box;" placeholder="Здесь живут инструкции для ИИ..."></textarea>
+            
+            <button class="form-btn" style="background: #03dac6; color: #121212; width: 100%; font-weight: bold; font-size: 16px;" onclick="saveAIPrompt()">💾 Обновить нейронную сеть</button>
+        </div>
+
+        <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #333; padding: 20px; border-radius: 10px; max-width: 1000px;">
+            <h3 style="color: #bb86fc; margin-bottom: 10px; font-size: 18px;">📝 Редактор Системных Шаблонов Бота</h3>
+            <p style="color: #aaa; font-size: 13px; margin-bottom: 15px;">Управление текстами меню, прайс-листами и системными ответами.</p>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <select id="template-selector" class="form-control" style="flex: 1; background: #222; color: #fff; border: 1px solid #555; padding: 10px; border-radius: 5px;" onchange="loadSelectedTemplate()">
+                    <option value="" disabled selected>-- Выберите шаблон для редактирования --</option>
+                    <option value="ai_system_prompt" style="color: #03dac6; font-weight: bold;">🧠 Базовый Промпт ИИ (Инструкция)</option>
+                    <option value="network_links" style="color: #bb86fc; font-weight: bold;">📍 Системные ссылки на чаты (NETWORK_LINKS)</option>
+                    <option value="tpl_18">🛑 18+: Проверка возраста</option>
+                    <option value="tpl_nark_react">⛔️ Наркотики: Реакция на сообщение</option>
+                    <option value="tpl_verif">🛡 Верификация: Сработала система (Кружок)</option>
+                    <option value="tpl_mp">💰 Коммерция: Ограничение МП</option>
+                    <option value="tpl_sponsor">💎 Спонсор: Предложение спонсорства</option>
+                    <option value="tpl_nark">⛔️ Наркотики: Упоминание веществ</option>
+                    <option value="tpl_flood">🔇 Флуд: Ограничение сообщений</option>
+                    <option value="tpl_vip">🤖 VIP: Блокировка бота</option>
+                    <option value="tpl_bio">🔗 БИО: Ссылка в профиле</option>
+                    <option value="tpl_minor">👶 18-: Реакция на несовершеннолетнего</option>
+                </select>
+            </div>
+            
+            <textarea id="template-editor-text" class="form-control" style="width: 100%; height: 200px; background: #222; color: #fff; border: 1px solid #555; padding: 15px; margin-bottom: 15px; border-radius: 5px; font-family: sans-serif; font-size: 14px; resize: vertical; box-sizing: border-box;" disabled placeholder="Выберите шаблон в выпадающем списке..."></textarea>
+            
+            <button id="save-template-btn" class="form-btn" style="background: #bb86fc; color: #121212; width: 100%; font-weight: bold; font-size: 16px; opacity: 0.5;" disabled onclick="saveSelectedTemplate()">💾 Сохранить шаблон</button>
+        </div>
+
         <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #333; padding: 20px; border-radius: 10px; max-width: 1000px;">
             <h3 style="color: #bb86fc; margin-bottom: 10px; font-size: 18px;">📝 Конструктор Правил и Приветствий</h3>
             <p style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Редактируйте системные сообщения Скайнета. Используйте тег <code>{user_link}</code>, чтобы бот обращался к нарушителю по имени.</p>
@@ -648,6 +747,7 @@
             if(tabId === 'ads-tab') loadAds();
             if(tabId === 'tab-system') { 
                 loadDictionary(); loadSystemTexts(); loadSystemSettings(); loadNetworkPrices(); 
+                loadAIPrompt(); // <--- ДОБАВИТЬ ЭТУ СТРОКУ
             }
             
             // 🛡 ИНИЦИАЛИЗАЦИЯ ВИЗУАЛЬНОГО РЕДАКТОРА (ТОЛЬКО КОГДА ВКЛАДКА ВИДИМА!)
@@ -1773,7 +1873,7 @@ function loadRootRevenue(pin, period = 'week') {
     });
 }
 
-function loadNetworkPrices() {
+        function loadNetworkPrices() {
             fetch('/glaz/api/get_prices')
             .then(res => res.json())
             .then(data => {
@@ -1819,6 +1919,134 @@ function loadNetworkPrices() {
             .then(data => {
                 if(data.success) showToast(data.message);
                 else showToast("❌ Ошибка: " + data.error);
+            });
+        }
+
+        // === ЛОГИКА ДЛЯ МОЗГА СКАЙНЕТА (ПРОМПТ ИИ) ===
+        function loadAIPrompt() {
+            fetch('/glaz/api/ai_prompt')
+            .then(res => res.json())
+            .then(data => {
+                if(data.prompt) document.getElementById('ai-system-prompt').value = data.prompt;
+            });
+        }
+
+        function saveAIPrompt() {
+            const promptText = document.getElementById('ai-system-prompt').value.trim();
+            if(!promptText) { showToast("⚠️ Промпт не может быть пустым!"); return; }
+
+            fetch('/glaz/api/ai_prompt/save', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ prompt: promptText })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) showToast("🧠 База знаний ИИ успешно обновлена!");
+                else showToast("❌ Ошибка сохранения промпта");
+            });
+        }
+
+        // === ЛОГИКА ДЛЯ РЕДАКТОРА ШАБЛОНОВ ===
+        function loadSelectedTemplate() {
+            const tplName = document.getElementById('template-selector').value;
+            if(!tplName) return;
+            
+            document.getElementById('template-editor-text').value = "Загрузка данных из базы...";
+            
+            fetch('/glaz/api/get_bot_template?name=' + tplName)
+            .then(res => res.json())
+            .then(data => {
+                const editor = document.getElementById('template-editor-text');
+                const btn = document.getElementById('save-template-btn');
+                
+                editor.value = data.text || '';
+                editor.disabled = false;
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            });
+        }
+
+        function saveSelectedTemplate() {
+            const tplName = document.getElementById('template-selector').value;
+            const tplText = document.getElementById('template-editor-text').value;
+            
+            fetch('/glaz/api/save_bot_template', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ name: tplName, text: tplText })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) showToast("✅ Шаблон успешно сохранен в базе!");
+                else showToast("❌ Ошибка: " + (data.error || "Сбой сохранения"));
+            });
+        }
+
+        // === ФУНКЦИИ УПРАВЛЕНИЯ ПАРАМЕТРАМИ ДОСЬЕ ПОЛЬЗОВАТЕЛЯ ===
+        function saveInventory(uid) {
+            const payload = {
+                uid: uid,
+                points: document.getElementById('inv-points').value,
+                shards: document.getElementById('inv-shards').value,
+                cashback: document.getElementById('inv-cashback').value,
+                immunity: document.getElementById('inv-immunity').value
+            };
+
+            fetch('/glaz/api/user/save_inventory', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) showToast("💰 Балансы и инвентарь успешно обновлены!");
+            });
+        }
+
+        function resetStrikes(uid) {
+            if(!confirm("Сбросить счетчик спама и страйков для этого пользователя?")) return;
+
+            fetch('/glaz/api/user/reset_strikes', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ uid: uid })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    showToast("🕊️ Страйки обнулены. Доступ к поддержке открыт!");
+                    location.reload(); 
+                }
+            });
+        }
+
+        function clearAIMemory(uid) {
+            fetch('/glaz/api/user/clear_ai_memory', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ uid: uid })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    showToast("🕶️ Нейросеть успешно забыла этот диалог!");
+                    location.reload();
+                }
+            });
+        }
+
+        function saveAdminNotes(uid) {
+            const notesText = document.getElementById('admin-user-notes').value;
+
+            fetch('/glaz/api/user/save_notes', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ uid: uid, notes: notesText })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) showToast("📌 Секретная пометка админа сохранена!");
             });
         }
 
