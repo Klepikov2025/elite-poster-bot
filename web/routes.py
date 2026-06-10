@@ -1041,7 +1041,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         return jsonify({"status": "ok"}), 200
     # 👆 ============================================================== 👆
 
-# 👇 НОВЫЕ РОУТЫ ДЛЯ РЕДАКТОРА ШАБЛОНОВ И БАЗЫ ЗНАНИЙ ИИ 👇
+    # 👇 РОУТЫ ДЛЯ РЕДАКТОРА ШАБЛОНОВ И БАЗЫ ЗНАНИЙ ИИ 👇
 
     @app.route('/glaz/api/get_bot_template', methods=['GET'])
     def api_get_bot_template():
@@ -1076,7 +1076,6 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                 {"$set": {"text": text}},
                 upsert=True
             )
-            # Сигналим в радар
             add_radar_log(f"📝 Администратор обновил системный текст: {name}")
             return jsonify({"success": True})
         return jsonify({"error": "Bad data"}), 400
@@ -1085,7 +1084,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
     def api_get_prompt_legacy():
         if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
         doc = db['bot_templates'].find_one({"_id": "ai_system_prompt"})
-        return jsonify({"prompt": doc["text"] if doc else "Здесь живут инструкции для ИИ..."})
+        return jsonify({"prompt": doc["text"] if doc else ""})
 
     @app.route('/glaz/api/ai_prompt/save', methods=['POST'])
     def api_save_prompt_legacy():
@@ -1097,8 +1096,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         
     # 👆 ======================================================== 👆
 
-# 👇 РОУТЫ ДЛЯ СВЕРХПРОКАЧАННОГО ДОСЬЕ УЧАСТНИКА 👇
-
+        
     @app.route('/glaz/api/user/save_inventory', methods=['POST'])
     def api_user_save_inventory():
         if not session.get('logged_in'): return jsonify({"success": False}), 401
