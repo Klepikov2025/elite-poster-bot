@@ -1182,7 +1182,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         for item in raw_stats:
             stats.append({
                 "admin": item["_id"],
-                "avg": round(item["avg_score"], 2),
+                "avg": round(item.get("avg_score") or 0, 2), # 🔥 ПРЕДОХРАНИТЕЛЬ УСТАНОВЛЕН 🔥
                 "count": item["total_tickets"]
             })
             
