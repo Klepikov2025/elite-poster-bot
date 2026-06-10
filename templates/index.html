@@ -9,6 +9,14 @@
 <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.js"></script>
     <style>
+        /* 👇 ВСТАВЛЯЕМ НАШУ АНИМАЦИЮ СЮДА 👇 */
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 235, 59, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 235, 59, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 235, 59, 0); }
+        }
+        /* 👆 ============================== 👆 */
+
         body { background-color: #121212; color: #ffffff; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; }
         .header-container { display: flex; justify-content: space-between; align-items: center; max-width: 1100px; margin: 0 auto 20px auto; }
         h1 { color: #bb86fc; text-transform: uppercase; letter-spacing: 2px; margin: 0; }
@@ -216,10 +224,25 @@
                 </div>
 
                 {% if user_data.verif_seconds_left > 0 %}
-                <div style="margin-top: 15px; background: rgba(255, 235, 59, 0.1); border: 1px solid #ffeb3b; padding: 12px; border-radius: 8px; animation: pulse 2s infinite; text-align: center;">
+                <div id="live-timer-box" style="margin-top: 15px; background: rgba(255, 235, 59, 0.1); border: 1px solid #ffeb3b; padding: 12px; border-radius: 8px; animation: pulse 2s infinite; text-align: center;">
                     <span style="color: #ffeb3b; font-weight: bold; font-size: 14px;">⏳ ПРЯМО СЕЙЧАС В ВОРОНКЕ ЗАПИСИ КРУЖКА!</span><br>
-                    <span style="font-size: 13px; color: #eee;">Выдан код: <b style="color: #fff; background: #222; padding: 2px 6px; border-radius: 4px;">{{ user_data.secret_code }}</b> | Осталось времени: <b>{{ user_data.verif_seconds_left }} сек.</b></span>
+                    <span style="font-size: 13px; color: #eee;">Выдан код: <b style="color: #fff; background: #222; padding: 2px 6px; border-radius: 4px;">{{ user_data.secret_code }}</b> | Осталось времени: <b id="live-sec">{{ user_data.verif_seconds_left }}</b> <b>сек.</b></span>
                 </div>
+                <script>
+                    // Оживляем таймер!
+                    let timeLeft = parseInt(document.getElementById('live-sec').innerText);
+                    let liveTimer = setInterval(function() {
+                        timeLeft--;
+                        if (timeLeft <= 0) {
+                            clearInterval(liveTimer);
+                            document.getElementById('live-timer-box').style.borderColor = '#cf6679';
+                            document.getElementById('live-timer-box').style.background = 'rgba(207, 102, 121, 0.1)';
+                            document.getElementById('live-timer-box').innerHTML = '<span style="color: #cf6679; font-weight: bold; font-size: 14px;">🛑 Время на запись кружка вышло!</span>';
+                        } else {
+                            document.getElementById('live-sec').innerText = timeLeft;
+                        }
+                    }, 1000);
+                </script>
                 {% endif %}
 
                 <div class="info-row" style="margin-top: 15px; background: #252525; padding: 10px 15px; border-radius: 8px;">
