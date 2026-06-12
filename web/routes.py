@@ -497,41 +497,62 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         return "Ссылка не найдена или устарела", 404
 
     def execute_broadcast(txt, tgt, btns_list):
-        from telebot import types
-        markup = None
-        if btns_list:
-            markup = types.InlineKeyboardMarkup(row_width=1)
-            for btn in btns_list:
-                kwargs = {"text": btn["text"], "url": btn["url"]}
-                if btn.get("style") and btn["style"] != "default": kwargs["style"] = btn["style"]
-                if btn.get("emoji_id"): kwargs["icon_custom_emoji_id"] = btn["emoji_id"]
-                markup.add(types.InlineKeyboardButton(**kwargs))
+    from telebot import types
+    import time # Не забудь убедиться, что time импортирован
+    
+    markup = None
+    if btns_list:
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        for btn in btns_list:
+            kwargs = {"text": btn["text"], "url": btn["url"]}
+            if btn.get("style") and btn["style"] != "default": kwargs["style"] = btn["style"]
+            if btn.get("emoji_id"): kwargs["icon_custom_emoji_id"] = btn["emoji_id"]
+            markup.add(types.InlineKeyboardButton(**kwargs))
+            
+    add_radar_log(f"🚀 Запуск рассылки для: {tgt}")
+    cursor = users_collection.find({}) if tgt == 'all' else users_collection.find({"is_vip": True}) if tgt == 'vip' else users_collection.find({"is_queer": True}) if tgt == 'queer' else None
+    if not cursor: return
+    
+    count = 0
+    dead_count = 0
+    
+    for u in cursor:
+        try:
+            bot.send_message(u['_id'], txt, parse_mode="HTML", disable_web_page_preview=True, reply_markup=markup)
+            count += 1
+            time.sleep(0.05) # 🔥 Искусственная пауза (~20 сообщений в секунду)
+            
+        except Exception as e:
+            err_text = str(e).lower()
+            
+            # 🔥 Обработка лимитов Telegram (Too Many Requests)
+            if "too many requests" in err_text:
+                try:
+                    # Пытаемся вытащить время ожидания из ошибки (обычно пишут retry after X)
+                    import re
+                    wait_time = int(re.search(r'retry after (\d+)', err_text).group(1))
+                except:
+                    wait_time = 3 # Если не вышло, ждем 3 секунды
                 
-        add_radar_log(f"🚀 Запуск рассылки для: {tgt}")
-        cursor = users_collection.find({}) if tgt == 'all' else users_collection.find({"is_vip": True}) if tgt == 'vip' else users_collection.find({"is_queer": True}) if tgt == 'queer' else None
-        if not cursor: return
-        count = 0
-        dead_count = 0
-        for u in cursor:
-            try:
-                bot.send_message(u['_id'], txt, parse_mode="HTML", disable_web_page_preview=True, reply_markup=markup)
-                count += 1
-            except Exception as e:
-                err_text = str(e).lower()
-                if "parse entities" in err_text:
-                    try:
-                        bot.send_message(u['_id'], txt, disable_web_page_preview=True, reply_markup=markup)
-                        count += 1
-                    except Exception as inner_e:
-                        if "deactivated" in str(inner_e).lower() or "blocked" in str(inner_e).lower():
-                            users_collection.delete_one({"_id": u['_id']})
-                            dead_count += 1
-                elif "deactivated" in err_text or "blocked" in err_text:
-                    users_collection.delete_one({"_id": u['_id']})
-                    dead_count += 1
-        add_radar_log(f"✅ Рассылка: Доставлено {count}. 💀 Вывезено трупов: {dead_count}")
-        try: bot.send_message(STAFF_GROUP_ID, f"🚀 **Рассылка завершена!**\nЦель: {tgt}\n✅ Доставлено: {count} чел.\n💀 Мертвых душ удалено: {dead_count}")
-        except: pass
+                time.sleep(wait_time)
+                # Можно попробовать отправить повторно, но для массовой рассылки проще пропустить или добавить логику ретрая
+                
+            elif "parse entities" in err_text:
+                try:
+                    bot.send_message(u['_id'], txt, disable_web_page_preview=True, reply_markup=markup)
+                    count += 1
+                    time.sleep(0.05)
+                except Exception as inner_e:
+                    if "deactivated" in str(inner_e).lower() or "blocked" in str(inner_e).lower():
+                        users_collection.delete_one({"_id": u['_id']})
+                        dead_count += 1
+            elif "deactivated" in err_text or "blocked" in err_text:
+                users_collection.delete_one({"_id": u['_id']})
+                dead_count += 1
+
+    add_radar_log(f"✅ Рассылка: Доставлено {count}. 💀 Вывезено трупов: {dead_count}")
+    try: bot.send_message(STAFF_GROUP_ID, f"🚀 **Рассылка завершена!**\nЦель: {tgt}\n✅ Доставлено: {count} чел.\n💀 Мертвых душ удалено: {dead_count}")
+    except: pass
 
     # Демон, который проверяет отложенные рассылки каждую минуту
     def scheduled_daemon():
