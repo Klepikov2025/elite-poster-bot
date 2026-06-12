@@ -1,11 +1,22 @@
 from telebot import types
 import time
+import re
 from config import (
     STAFF_GROUP_ID, OWNER_ID, PARNI_CHATS, VIP_CHAT_ID, BEYOND_CHAT_ID,
     chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak
 )
 from database import users_collection, db, banned_collection, archive_collection
 from utils import get_user_name
+
+def parse_time_string(time_str):
+    match = re.match(r"^(\d+)([smhd])$", time_str.lower())
+    if not match: return None
+    val, unit = int(match.group(1)), match.group(2)
+    if unit == 's': return val
+    elif unit == 'm': return val * 60
+    elif unit == 'h': return val * 3600
+    elif unit == 'd': return val * 86400
+    return None
 
 def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unban_user_everywhere, unmute_user_everywhere, unmute_in_parni_only):
 
@@ -27,22 +38,48 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
         bot.send_message(message.chat.id, f"✅ Готово! Юзер `{target_id}` забанен в {count} чатах. Отчет отправлен в Журнал.", parse_mode="Markdown")
 
     @bot.message_handler(commands=['mute'])
-    def handle_manual_mute(message):
+    def handle_unified_mute(message):
         if message.chat.id != STAFF_GROUP_ID: return
+        
         args = message.text.split(maxsplit=2)
         if len(args) < 2:
-            bot.send_message(message.chat.id, "❌ Формат: `/mute [ID] [Причина]`", parse_mode="Markdown")
+            bot.send_message(message.chat.id, "❌ Формат: `/mute [ID] [Время(необяз)] [Причина]`\nПример: `/mute 12345 1h Спам`", parse_mode="Markdown")
             return
+            
         try: target_id = int(args[1])
         except ValueError:
             bot.send_message(message.chat.id, "❌ Ошибка: ID должен быть числом!")
             return
-        reason = args[2] if len(args) > 2 else "Не указана"
+            
+        reason = "Не указана"
+        mute_time = 0
+        duration_text = "навсегда"
+        
+        # Если есть 3-й аргумент, проверяем, время это или просто причина
+        if len(args) > 2:
+            sub_args = args[2].split(maxsplit=1)
+            parsed_seconds = parse_time_string(sub_args[0])
+            
+            if parsed_seconds:
+                # Нашли время!
+                mute_time = int(time.time()) + parsed_seconds
+                duration_text = f"на {sub_args[0]}"
+                if len(sub_args) > 1:
+                    reason = sub_args[1] # Причина идет после времени
+            else:
+                # Времени нет, всё остальное — это причина
+                reason = args[2]
+
         admin_info = get_user_name(message.from_user)
+        
+        # Обновляем причину в базе (для ПАРНИ 18+)
         users_collection.update_one({"_id": target_id}, {"$set": {"last_mute_reason": reason}}, upsert=True)
-        bot.send_message(message.chat.id, "🤐 Запускаю глобальный мут...")
-        count = mute_user_everywhere(target_id, reason=reason, admin_name=admin_info)
-        bot.send_message(message.chat.id, f"✅ Юзер `{target_id}` замучен в {count} чатах. Причина сохранена.")
+        
+        bot.send_message(message.chat.id, f"🤐 Запускаю глобальный мут {duration_text}...")
+        
+        # Передаем параметр mute_time в ядро Скайнета
+        count = mute_user_everywhere(target_id, reason=reason, admin_name=admin_info, mute_time=mute_time)
+        bot.send_message(message.chat.id, f"✅ Юзер `{target_id}` замучен в {count} чатах {duration_text}. Причина сохранена.")
 
     @bot.message_handler(commands=['addpromo'])
     def create_custom_promo(message):

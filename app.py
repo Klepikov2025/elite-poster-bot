@@ -1085,6 +1085,29 @@ def skynet_listener():
                     
                     # 4. Закрываем задачу
                     db['skynet_tasks'].update_one({"_id": task['_id']}, {"$set": {"status": "done"}})
+                
+                # 👇 ДОБАВЛЯЕМ НОВЫЙ БЛОК: ПРИКАЗЫ ОТ ШПИОНА 👇
+                elif task['action'] == "global_ban":
+                    ban_user_everywhere(
+                        target_id=task['uid'], 
+                        reason=task.get('reason', 'Шпионаж'), 
+                        admin_name="Скайнет (Шпион) 🕵️‍♂️", 
+                        trigger_text=task.get('trigger_text', ''), 
+                        origin_chat=task.get('origin_chat', '')
+                    )
+                    db['skynet_tasks'].update_one({"_id": task['_id']}, {"$set": {"status": "done"}})
+                    
+                elif task['action'] == "global_mute":
+                    mute_user_everywhere(
+                        target_id=task['uid'], 
+                        reason=task.get('reason', 'Шпионаж'), 
+                        admin_name="Андрюшенька (Спецагент_Шпион) 🕵️‍♂️", 
+                        trigger_text=task.get('trigger_text', ''), 
+                        origin_chat=task.get('origin_chat', '')
+                    )
+                    db['skynet_tasks'].update_one({"_id": task['_id']}, {"$set": {"status": "done"}})
+                # 👆 ======================================== 👆
+
         except Exception as e:
             print(f"Ошибка слушателя: {e}")
             
