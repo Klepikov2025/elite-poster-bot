@@ -1091,9 +1091,9 @@ def skynet_listener():
                     ban_user_everywhere(
                         target_id=task['uid'], 
                         reason=task.get('reason', 'Шпионаж'), 
-                        admin_name="Скайнет (Шпион) 🕵️‍♂️", 
+                        admin_name="Андрюшенька (Спецагент Шпион) 🕵️‍♂️", 
                         trigger_text=task.get('trigger_text', ''), 
-                        origin_chat=task.get('origin_chat', '')
+                        origin_chat=escape_md(task.get('origin_chat', '')) # 👈 Экранируем название чата!
                     )
                     db['skynet_tasks'].update_one({"_id": task['_id']}, {"$set": {"status": "done"}})
                     
@@ -1101,12 +1101,11 @@ def skynet_listener():
                     mute_user_everywhere(
                         target_id=task['uid'], 
                         reason=task.get('reason', 'Шпионаж'), 
-                        admin_name="Андрюшенька (Спецагент_Шпион) 🕵️‍♂️", 
+                        admin_name="Андрюшенька (Спецагент Шпион) 🕵️‍♂️",  # <--- Убрали подчеркивание!
                         trigger_text=task.get('trigger_text', ''), 
-                        origin_chat=task.get('origin_chat', '')
+                        origin_chat=escape_md(task.get('origin_chat', ''))
                     )
                     db['skynet_tasks'].update_one({"_id": task['_id']}, {"$set": {"status": "done"}})
-                # 👆 ======================================== 👆
 
         except Exception as e:
             print(f"Ошибка слушателя: {e}")
