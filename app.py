@@ -306,21 +306,24 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
             return
 
         # --- ФАЗА 3: Гео-контроль (Единый город + Метод первой двери + Монетизация) ---
-        target_city = None
+        possible_cities = []
         for city_name, networks in all_cities.items():
             for net, groups in networks.items():
                 if any(g['chat_id'] == chat_id for g in groups):
-                    target_city = city_name
-                    break
+                    possible_cities.append(city_name)
         
-        if target_city:
+        if possible_cities:
             user_data = users_collection.find_one({"_id": user_id}) or {}
             main_city = user_data.get("main_city")
             purchased_cities = user_data.get("purchased_cities", [])
 
+            # Берем первый город для системных сообщений/пейвола (по умолчанию)
+            primary_target_city = possible_cities[0]
+
             if main_city:
                 # 📍 СЦЕНАРИЙ А: Юзер уже привязан к городу
-                if main_city == target_city or target_city in purchased_cities:
+                # Пускаем, если его родной город ИЛИ купленный город есть в списке допустимых для этого чата
+                if main_city in possible_cities or any(c in purchased_cities for c in possible_cities):
                     bot.approve_chat_join_request(chat_id, user_id)
                     db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
                     return
@@ -330,15 +333,15 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
                     
                     markup = types.InlineKeyboardMarkup(row_width=1)
                     markup.add(
-                        types.InlineKeyboardButton(f"🎟 Купить пропуск в г. {target_city} (250⭐️)", callback_data=f"buy_city_{target_city}"),
+                        types.InlineKeyboardButton(f"🎟 Купить пропуск в г. {primary_target_city} (250⭐️)", callback_data=f"buy_city_{primary_target_city}"),
                         types.InlineKeyboardButton("👑 Купить VIP (Все города)", callback_data="start_verification")
                     )
                     try:
                         bot.send_message(
                             user_id, 
-                            f"❌ Ваша заявка в чат **{target_city}** отклонена.\n\n"
+                            f"❌ Ваша заявка в чат **{primary_target_city}** отклонена.\n\n"
                             f"По правилам сети за вами закреплен город: **{main_city}**.\n\n"
-                            f"Вы можете приобрести разовый пропуск (откроет доступ к сетям МК, Парни 18+, НС и др. в г. {target_city}), либо стать VIP-участником для неограниченного доступа везде.",
+                            f"Вы можете приобрести разовый пропуск, либо стать VIP-участником для неограниченного доступа везде.",
                             reply_markup=markup,
                             parse_mode="Markdown"
                         )
@@ -346,8 +349,7 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
                     return
             else:
                 # 📍 СЦЕНАРИЙ Б: Метод «Первой двери» для новичков
-                # Намертво привязываем к городу и СРАЗУ пускаем
-                users_collection.update_one({"_id": user_id}, {"$set": {"main_city": target_city}}, upsert=True)
+                users_collection.update_one({"_id": user_id}, {"$set": {"main_city": primary_target_city}}, upsert=True)
                 
                 bot.approve_chat_join_request(chat_id, user_id)
                 db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
