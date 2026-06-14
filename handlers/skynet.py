@@ -163,8 +163,8 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     
                     if not is_duplicate:
                         # Уникальное фото - сохраняем и сбрасываем счетчик спама
-                        new_files = [file_unique_id] + recent_files[:2]
-                        new_hashes = [current_hash] + recent_hashes[:2]
+                        new_files = [file_unique_id] + recent_files[:9] # <--- СДЕЛАЛИ 10 (текущий + 9 старых)
+                        new_hashes = [current_hash] + recent_hashes[:9] # <--- СДЕЛАЛИ 10
                         db['photo_memory'].update_one(
                             {"_id": user_id}, 
                             {"$set": {"recent_file_ids": new_files, "recent_hashes": new_hashes, "spam_count": 0}}, 
@@ -498,6 +498,10 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
 
             if len(raw_text) > 30:
                 clean_current = re.sub(r'\s+', '', text)
+                
+                # =======================================================
+                # 1. РАДАР ТВИНКОВ (Ищем совпадения с базой забаненных)
+                # =======================================================
                 recent_bans = list(db['blacklisted_texts'].find().sort("_id", -1).limit(30))
                 for bad in recent_bans:
                     clean_bad = bad.get("clean_text", "")
@@ -516,7 +520,48 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         markup.add(types.InlineKeyboardButton("🔨 ЗАБАНИТЬ ВЕЗДЕ", callback_data=f"radar_ban_{user_id}"))
                         try: bot.send_message(STAFF_GROUP_ID, report, parse_mode="Markdown", reply_markup=markup)
                         except: pass
-                        return
+                        return # Если это твинк - сразу выходим
+
+                # =======================================================
+                # 👇 2. ТЕКСТОВЫЙ АНТИ-БАЯН (Запрет на копипаст в чатах) 👇
+                # =======================================================
+                user_text_memory = db['text_memory'].find_one({"_id": user_id}) or {}
+                recent_texts = user_text_memory.get("recent_texts", [])
+                text_spam_count = user_text_memory.get("spam_count", 0)
+                
+                is_text_duplicate = False
+                for old_text in recent_texts:
+                    similarity = difflib.SequenceMatcher(None, clean_current, old_text).ratio()
+                    if similarity > 0.85: # Если текст совпадает на 85% и выше
+                        is_text_duplicate = True
+                        break
+                
+                if is_text_duplicate:
+                    text_spam_count += 1
+                    db['text_memory'].update_one({"_id": user_id}, {"$set": {"spam_count": text_spam_count}}, upsert=True)
+                    
+                    try: bot.delete_message(chat_id, message.message_id)
+                    except: pass
+                    
+                    if text_spam_count >= 3:
+                        mute_time = int(time.time()) + 259200
+                        # Мутим юзера на 3 дня
+                        mute_user_everywhere(user_id, reason="Рецидив: Текстовый спам (Анти-Копипаст)", admin_name="Скайнет 📝", mute_time=mute_time)
+                        
+                        bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими копипастами и улетел в мут на 3 дня. Здесь чат для общения, а не доска объявлений. Научись креативить!", parse_mode="Markdown")
+                        db['text_memory'].update_one({"_id": user_id}, {"$set": {"spam_count": 0}})
+                    else:
+                        bot.send_message(chat_id, f"🥱 {user_link}, этот текст мы уже видели. Хватит копипастить одно и то же, прояви фантазию! (Страйк {text_spam_count}/3)", parse_mode="Markdown")
+                    return # Прерываем, чтобы дальше по коду не шло
+                else:
+                    # Текст уникальный -> сохраняем в память (запоминаем последние 10)
+                    new_texts = [clean_current] + recent_texts[:9]
+                    db['text_memory'].update_one(
+                        {"_id": user_id}, 
+                        {"$set": {"recent_texts": new_texts, "spam_count": 0}}, 
+                        upsert=True
+                    )
+                # 👆 ========================================================= 👆
 
             # === 🛡 КАРАНТИН НОВОРЕГОВ ===
             if sys_settings.get("quarantine_active", True):
@@ -525,7 +570,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     first_seen = time.time()
                     users_collection.update_one({"_id": user_id}, {"$set": {"first_seen": first_seen}}, upsert=True)
                 seconds_passed = time.time() - first_seen
-                if user_id > 7800000000 and seconds_passed < 172800:
+                if user_id > 7800000000 and seconds_passed < 432000:
                     try: bot.delete_message(chat_id, message.message_id)
                     except: pass
                     try: 
@@ -533,14 +578,14 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             STAFF_GROUP_ID, 
                             f"🥷 **КАРАНТИН:** Удалено сообщение от новорега {user_link} (`{user_id}`).\n"
                             f"📍 Чат: {chat_title}\n"
-                            f"🕒 Прошло: {int(seconds_passed // 3600)}ч. из 48ч.",
+                            f"🕒 Прошло: {int(seconds_passed // 3600)}ч. из 120ч.",
                             parse_mode="Markdown"
                         )
                     except: pass
                     try:
                         # 📝 ТЯНЕМ ТЕКСТ КАРАНТИНА ИЗ БАЗЫ
                         db_texts = db['settings'].find_one({"_id": "skynet_texts"}) or {}
-                        raw_text_quarantine = db_texts.get("quarantine_warn", "🚨 {user_link}, **Защита от спама!**\nВаш аккаунт создан недавно. Для безопасности сети действует карантин 48 часов.\nПодождите, или пройдите верификацию в [Службе Поддержки](https://t.me/MK_MensClubSUPPORT).")
+                        raw_text_quarantine = db_texts.get("quarantine_warn", "🚨 {user_link}, **Защита от спама!**\nВаш аккаунт создан недавно. Для безопасности сети действует карантин 120 часов.\nПодождите, или пройдите верификацию в [Службе Поддержки](https://t.me/MK_MensClubSUPPORT).")
                         
                         warning_msg = bot.send_message(
                             chat_id, 
