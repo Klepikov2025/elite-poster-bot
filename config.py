@@ -4,6 +4,11 @@ import os
 TOKEN = os.getenv('BOT_TOKEN')
 MONGO_URI = os.getenv('MONGO_URI')
 
+# 🤖 ТОКЕНЫ НЕЙРОСЕТЕЙ (Тянутся из переменных окружения Render)
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+HF_TOKEN = os.getenv('HF_TOKEN')
+OPENROUTER_KEY = os.getenv('OPENROUTER_KEY')
+
 ADMIN_CHAT_IDS = [479938867, 7235010425]
 OWNER_ID = 479938867
 
