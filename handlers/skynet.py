@@ -525,153 +525,6 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         except: pass
                         
                         if text_spam_count >= 3:
-                        mute_time = int(time.time()) + 259200
-                        # Мутим юзера на 3 дня
-                        mute_user_everywhere(user_id, reason="Рецидив: Текстовый спам (Анти-Копипаст)", admin_name="Скайнет 📝", mute_time=mute_time)
-                        
-                        # 🔥 ГЕНЕРИРУЕМ ЖЕСТКОЕ УНИЖЕНИЕ ЧЕРЕЗ ИИ ДЛЯ КОПИПАСТЕРОВ 🔥
-                        if GROQ_API_KEY:
-                            prompt_text = f"Ты жестокий, токсичный и очень саркастичный ИИ-модератор.\nПользователь {user_link} только что в 3-й раз подряд скопипастил в чат один и тот же шаблонный текст-анкету. За это ты выписал ему блокировку на 3 дня.\nСгенерируй для него короткое публичное унижение (2-3 предложения), чтобы весь чат поржал.\nОфициально РАЗРЕШЕНО использовать жесткий мат, ругательства, черный юмор и ледяной сарказм. Высмей его лень, отсутствие фантазии, неумение общаться как живой человек и то, что он отправился на парашу на 3 дня.\nОбязательно вставь переменную {user_link} в текст."
-
-                            data_text = {
-                                "model": "llama-3.3-70b-versatile",
-                                "messages": [{"role": "user", "content": prompt_text}],
-                                "temperature": 0.8,
-                                "max_tokens": 150
-                            }
-                            try:
-                                resp_text = requests.post("https://api.groq.com/openai/v1/chat/completions", headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}, json=data_text, timeout=10)
-                                if resp_text.status_code == 200:
-                                    insult = resp_text.json()["choices"][0]["message"]["content"].strip()
-                                    bot.send_message(chat_id, f"👁 **СКАЙНЕТ (Анти-Копипаст):**\n{insult}", parse_mode="Markdown")
-                                else:
-                                    bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими копипастами и улетел в мут на 3 дня. Здесь чат для общения, а не доска объявлений. Научись креативить!", parse_mode="Markdown")
-                            except:
-                                bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими копипастами и улетел в мут на 3 дня. Здесь чат для общения, а не доска объявлений. Научись креативить!", parse_mode="Markdown")
-                        else:
-                            bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими копипастами и улетел в мут на 3 дня. Здесь чат для общения, а не доска объявлений. Научись креативить!", parse_mode="Markdown")
-                        
-                        db['text_memory'].update_one({"_id": user_id}, {"$set": {"spam_count": 0}})
-                        else:
-                            text_phrases = [
-                                f"🥱 {user_link}, этот текст мы уже видели. Хватит копипастить одно и то же, прояви фантазию! (Страйк {text_spam_count}/3)",
-                                f"🤖 {user_link}, обнаружен дубликат текста. Чат создан для общения, а не для Ctrl+C -> Ctrl+V. Перепиши анкету! (Страйк {text_spam_count}/3)",
-                                f"📝 {user_link}, Скайнет засек копипаст. Публикация заготовленных шаблонов запрещена. (Страйк {text_spam_count}/3)",
-                                f"♻️ {user_link}, у тебя заело кнопки копировать-вставить? Напиши что-то новое ручками, хватит спамить! (Страйк {text_spam_count}/3)",
-                                f"🔎 {user_link}, индекс уникальности твоего текста пробил дно. Перестань публиковать одинаковые объявы. (Страйк {text_spam_count}/3)",
-                                f"📜 {user_link}, мы не доска бесплатных объявлений на столбе. Попробуй поздороваться и пообщаться вживую! (Страйк {text_spam_count}/3)",
-                                f"🚨 {user_link}, моя текстовая память отлично помнит эту пасту. Меняй текст, или скоро уйдешь в мут. (Страйк {text_spam_count}/3)",
-                                f"🥱 {user_link}, опять эта заезженная анкета... Попробуй хотя бы слова местами поменять для приличия. (Страйк {text_spam_count}/3)",
-                                f"⌨️ {user_link}, нейросети видят 100% плагиат твоего же прошлого сообщения. Мы тут за живое общение! (Страйк {text_spam_count}/3)",
-                                f"🤖 {user_link}, Скайнет против бото-поведения. Хватит слать шаблоны по таймеру, включай мозг. (Страйк {text_spam_count}/3)"
-                            ]
-                            warn_msg = bot.send_message(chat_id, random.choice(text_phrases), parse_mode="Markdown")
-                            
-                            def delete_text_warn():
-                                time.sleep(300)
-                                try: bot.delete_message(chat_id, warn_msg.message_id)
-                                except: pass
-                            threading.Thread(target=delete_text_warn, daemon=True).start()
-            # 👆 ========================================================= 👆
-
-            # 2. А ТОЛЬКО ПОТОМ разрешаем VIP/QUEER писать что угодно (кроме коммерции и копипаста)
-            if any([is_vip, is_queer, is_verified, custom_tag]): return 
-            if chat_id in PARNI_CHATS: return
-
-            if not is_subscribed(user_id):
-                try: bot.delete_message(chat_id, message.message_id)
-                except: pass
-                key = (chat_id, user_id)
-                if key not in warned_users:
-                    # === МАГИЯ ТВОЕГО КОНСТРУКТОРА (С ЦВЕТАМИ И ЭМОДЗИ) ===
-                    markup = types.InlineKeyboardMarkup(row_width=1)
-                    
-                    db_buttons = db['settings'].find_one({"_id": "skynet_buttons"})
-                    
-                    if db_buttons and db_buttons.get("buttons"):
-                        for btn in db_buttons["buttons"]:
-                            # Базовые параметры (Текст и Ссылка)
-                            kwargs = {"text": btn["text"], "url": btn["url"]}
-                            
-                            # Если выбран цвет (и это не дефолт)
-                            if btn.get("style") and btn["style"] != "default":
-                                kwargs["style"] = btn["style"]
-                                
-                            # Если указан ID кастомного эмодзи
-                            if btn.get("emoji_id"):
-                                kwargs["icon_custom_emoji_id"] = btn["emoji_id"]
-                                
-                            markup.add(types.InlineKeyboardButton(**kwargs))
-                    else:
-                        # Если база пустая (страховка)
-                        markup.add(types.InlineKeyboardButton(text="Подписаться на МК", url="https://t.me/clubofrm"))
-                    # ======================================================
-
-                    sent = bot.send_message(chat_id, "❗ Внимание, чтобы писать в чате вам необходимо подписаться на наш основной канал.\n\nБез подписки на канал ваши сообщения будут удаляться автоматически. Вступая в чат, я подтверждаю совершеннолетие и обязуюсь соблюдать правила, с которыми ознакомлен и согласен.", reply_markup=markup)
-                    warned_users[key] = sent.message_id
-                    def auto_delete():
-                        time.sleep(120)
-                        try: bot.delete_message(chat_id, sent.message_id)
-                        except: pass
-                        if key in warned_users: del warned_users[key]
-                    threading.Thread(target=auto_delete, daemon=True).start()
-                return
-
-            if len(raw_text) > 30:
-                clean_current = re.sub(r'\s+', '', text)
-                
-                # =======================================================
-            # 🛡 РАДАР ТВИНКОВ И ТЕКСТОВЫЙ АНТИ-БАЯН
-            # (Работает везде КРОМЕ "ПАРНИ 18+". Элита и Админы имеют иммунитет, "Верифицирован МК" - НЕТ)
-            # =======================================================
-            is_elite = is_vip or is_queer or custom_tag in ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "Спонсор_Одобрен"]
-            is_admin = custom_tag and custom_tag not in ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "𝐐𝐔𝐄𝐄𝐑 ♛", "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕", "Верифицирован МК", "Not verified", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска", "Параметры FAKE", "Свободен", "Спонсор_Одобрен"]
-
-            if chat_id not in PARNI_CHATS and not (is_elite or is_admin or user_id in ADMIN_CHAT_IDS or user_id == OWNER_ID):
-                if len(raw_text) > 30:
-                    clean_current = re.sub(r'\s+', '', text)
-                    
-                    # 1. РАДАР ТВИНКОВ
-                    recent_bans = list(db['blacklisted_texts'].find().sort("_id", -1).limit(30))
-                    for bad in recent_bans:
-                        clean_bad = bad.get("clean_text", "")
-                        if not clean_bad: continue
-                        similarity = difflib.SequenceMatcher(None, clean_current, clean_bad).ratio()
-                        if similarity > 0.85: 
-                            try: bot.delete_message(chat_id, message.message_id) 
-                            except: pass
-                            report = (
-                                f"🚨 **РАДАР ТВИНКОВ СРАБОТАЛ!** 🚨\n"
-                                f"Юзер {user_link} (`{user_id}`) отправил анкету, которая на **{int(similarity * 100)}%** совпадает с текстом нарушителя `{bad['uid']}`!\n\n"
-                                f"📝 **Текст:** _{escape_md(raw_text[:200])}_\n\n"
-                                f"🤖 **Действие:** Скайнет тихо удалил сообщение (Shadowban).\nВыдать ему глобальный БАН?"
-                            )
-                            markup = types.InlineKeyboardMarkup()
-                            markup.add(types.InlineKeyboardButton("🔨 ЗАБАНИТЬ ВЕЗДЕ", callback_data=f"radar_ban_{user_id}"))
-                            try: bot.send_message(STAFF_GROUP_ID, report, parse_mode="Markdown", reply_markup=markup)
-                            except: pass
-                            return # Если это твинк - сразу выходим
-
-                    # 2. ТЕКСТОВЫЙ АНТИ-БАЯН
-                    user_text_memory = db['text_memory'].find_one({"_id": user_id}) or {}
-                    recent_texts = user_text_memory.get("recent_texts", [])
-                    text_spam_count = user_text_memory.get("spam_count", 0)
-                    
-                    is_text_duplicate = False
-                    for old_text in recent_texts:
-                        similarity = difflib.SequenceMatcher(None, clean_current, old_text).ratio()
-                        if similarity > 0.85: # Если текст совпадает на 85% и выше
-                            is_text_duplicate = True
-                            break
-                    
-                    if is_text_duplicate:
-                        text_spam_count += 1
-                        db['text_memory'].update_one({"_id": user_id}, {"$set": {"spam_count": text_spam_count}}, upsert=True)
-                        
-                        try: bot.delete_message(chat_id, message.message_id)
-                        except: pass
-                        
-                        if text_spam_count >= 3:
                             mute_time = int(time.time()) + 259200
                             # Мутим юзера на 3 дня
                             mute_user_everywhere(user_id, reason="Рецидив: Текстовый спам (Анти-Копипаст)", admin_name="Скайнет 📝", mute_time=mute_time)
@@ -728,7 +581,49 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             {"$set": {"recent_texts": new_texts, "spam_count": 0}}, 
                             upsert=True
                         )
-            # 👆 ========================================================= 👆
+
+            # 2. А ТОЛЬКО ПОТОМ разрешаем VIP/QUEER писать что угодно (кроме коммерции и копипаста)
+            if any([is_vip, is_queer, is_verified, custom_tag]): return 
+            if chat_id in PARNI_CHATS: return
+
+            if not is_subscribed(user_id):
+                try: bot.delete_message(chat_id, message.message_id)
+                except: pass
+                key = (chat_id, user_id)
+                if key not in warned_users:
+                    # === МАГИЯ ТВОЕГО КОНСТРУКТОРА (С ЦВЕТАМИ И ЭМОДЗИ) ===
+                    markup = types.InlineKeyboardMarkup(row_width=1)
+                    
+                    db_buttons = db['settings'].find_one({"_id": "skynet_buttons"})
+                    
+                    if db_buttons and db_buttons.get("buttons"):
+                        for btn in db_buttons["buttons"]:
+                            # Базовые параметры (Текст и Ссылка)
+                            kwargs = {"text": btn["text"], "url": btn["url"]}
+                            
+                            # Если выбран цвет (и это не дефолт)
+                            if btn.get("style") and btn["style"] != "default":
+                                kwargs["style"] = btn["style"]
+                                
+                            # Если указан ID кастомного эмодзи
+                            if btn.get("emoji_id"):
+                                kwargs["icon_custom_emoji_id"] = btn["emoji_id"]
+                                
+                            markup.add(types.InlineKeyboardButton(**kwargs))
+                    else:
+                        # Если база пустая (страховка)
+                        markup.add(types.InlineKeyboardButton(text="Подписаться на МК", url="https://t.me/clubofrm"))
+                    # ======================================================
+
+                    sent = bot.send_message(chat_id, "❗ Внимание, чтобы писать в чате вам необходимо подписаться на наш основной канал.\n\nБез подписки на канал ваши сообщения будут удаляться автоматически. Вступая в чат, я подтверждаю совершеннолетие и обязуюсь соблюдать правила, с которыми ознакомлен и согласен.", reply_markup=markup)
+                    warned_users[key] = sent.message_id
+                    def auto_delete():
+                        time.sleep(120)
+                        try: bot.delete_message(chat_id, sent.message_id)
+                        except: pass
+                        if key in warned_users: del warned_users[key]
+                    threading.Thread(target=auto_delete, daemon=True).start()
+                return
 
             # === 🛡 КАРАНТИН НОВОРЕГОВ ===
             if sys_settings.get("quarantine_active", True):
