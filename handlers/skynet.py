@@ -122,10 +122,10 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             bot_tags = ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "𝐐𝐔𝐄𝐄𝐑 ♛", "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕", "Верифицирован МК", "Not verified", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска", "Параметры FAKE", "Свободен", "Спонсор_Одобрен"]
             current_tag = user_data.get("custom_tag", "")
             
-            # Элита (Випы, Квиры и Спонсоры)
+            # Элита (Випы, Квиры и Спонсоры - ТЕПЕРЬ СПОНСОРЫ ТОЖЕ ПОД ЗАЩИТОЙ)
             is_elite = (user_data.get("is_vip", False) or 
                         user_data.get("is_queer", False) or 
-                        current_tag in ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜"])
+                        current_tag in ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "Спонсор_Одобрен"])
             
             # Админы (у них кастомный тег, которого нет в списке дефолтных системных)
             is_admin = current_tag and current_tag not in bot_tags
@@ -163,8 +163,8 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     
                     if not is_duplicate:
                         # Уникальное фото - сохраняем и сбрасываем счетчик спама
-                        new_files = [file_unique_id] + recent_files[:9] # <--- СДЕЛАЛИ 10 (текущий + 9 старых)
-                        new_hashes = [current_hash] + recent_hashes[:9] # <--- СДЕЛАЛИ 10
+                        new_files = [file_unique_id] + recent_files[:9] 
+                        new_hashes = [current_hash] + recent_hashes[:9] 
                         db['photo_memory'].update_one(
                             {"_id": user_id}, 
                             {"$set": {"recent_file_ids": new_files, "recent_hashes": new_hashes, "spam_count": 0}}, 
@@ -201,6 +201,16 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                                 insult = resp_text.json()["choices"][0]["message"]["content"].strip()
                                 bot.send_message(chat_id, f"👁 **СКАЙНЕТ (Анти-Баян):**\n{insult}", parse_mode="Markdown")
                             else:
+                                bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими ебучими баянами и улетел в мут на 3 дня. Отдыхай, креативный ты наш.", parse_mode="Markdown")
+                        except:
+                            bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими ебучими баянами и улетел в мут на 3 дня. Отдыхай, креативный ты наш.", parse_mode="Markdown")
+                    else:
+                        bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими ебучими баянами и улетел в мут на 3 дня. Отдыхай, креативный ты наш.", parse_mode="Markdown")
+                    
+                    # Сбрасываем счетчик после мута
+                    db['photo_memory'].update_one({"_id": user_id}, {"$set": {"spam_count": 0}})
+                    
+                else:
                     # Предупреждение (1 или 2 раз) со случайными фразами и автоудалением через 5 минут
                     phrases = [
                         f"🥱 {user_link}, моя зрительная память подсказывает, что это ебучее фото мы уже видели. Смени ракурс! (Страйк {spam_count}/3)",
