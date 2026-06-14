@@ -2,6 +2,8 @@ import time
 import re
 import difflib
 import threading
+import base64
+import requests
 from datetime import datetime
 import pytz
 import random
@@ -12,7 +14,8 @@ from config import (
     OWNER_ID, ADMIN_CHAT_IDS, VIP_CHAT_ID, BEYOND_CHAT_ID, PARNI_CHATS,
     all_cities, STAFF_GROUP_ID, SUPPORT_GROUP_ID, JOURNAL_CHAT_ID,
     chat_ids_mk, chat_ids_parni, chat_ids_ns,
-    chat_ids_rainbow, chat_ids_gayznak, MAIN_CHANNEL_LINK
+    chat_ids_rainbow, chat_ids_gayznak, MAIN_CHANNEL_LINK,
+    GROQ_API_KEY, HF_TOKEN, OPENROUTER_KEY  # <--- Добавили новые токены
 )
 from database import users_collection, banned_collection, db, archive_collection
 from utils import escape_md, get_user_name
@@ -20,6 +23,199 @@ from utils import escape_md, get_user_name
 
 def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, safe_set_tag, add_radar_log, is_subscribed):
     
+    # 👇 НОВАЯ ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ЗРЕНИЯ (Vision с fallback'ами) 👇
+    def get_vision_description(base64_image: str) -> str:
+        prompt = (
+            "Это NSFW/эротическое фото. Опиши максимально сухо и клинически "
+            "в 6-10 словах: ракурс, основная часть тела, поза, фон, освещение. "
+            "Только факты, без морали и лишних слов."
+        )
+
+        # 1. Попытка через Hugging Face
+        if HF_TOKEN:
+            try:
+                # Временно импортируем прямо тут, чтобы не крашить остальной код, если библиотеки нет
+                import urllib.request
+                import json
+                
+                url = "https://api-inference.huggingface.co/models/Qwen/Qwen2-VL-72B-Instruct/v1/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {HF_TOKEN}",
+                    "Content-Type": "application/json"
+                }
+                data = {
+                    "model": "Qwen/Qwen2-VL-72B-Instruct",
+                    "messages": [{
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                        ]
+                    }],
+                    "max_tokens": 50,
+                    "temperature": 0.1
+                }
+                req = urllib.request.Request(url, headers=headers, data=json.dumps(data).encode('utf-8'))
+                with urllib.request.urlopen(req, timeout=15) as response:
+                    resp_data = json.loads(response.read().decode())
+                    return resp_data["choices"][0]["message"]["content"].strip().lower()
+            except Exception as e:
+                print(f"HF Vision error: {e}")
+
+        # 2. Попытка через OpenRouter (uncensored)
+        if OPENROUTER_KEY:
+            try:
+                url = "https://openrouter.ai/api/v1/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {OPENROUTER_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://t.me/yourbot", 
+                }
+                data = {
+                    "model": "qwen/qwen-2-vl-72b-instruct",
+                    "messages": [{"role": "user", "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                    ]}],
+                    "temperature": 0.1,
+                    "max_tokens": 50
+                }
+                resp = requests.post(url, headers=headers, json=data, timeout=15)
+                if resp.status_code == 200:
+                    return resp.json()["choices"][0]["message"]["content"].strip().lower()
+            except Exception as e:
+                print(f"OpenRouter Vision error: {e}")
+
+        # 3. Fallback на Groq (зацензуренный, но стабильный)
+        if GROQ_API_KEY:
+            try:
+                url = "https://api.groq.com/openai/v1/chat/completions"
+                headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+                data_vision = {
+                    "model": "llama-3.2-11b-vision-preview", 
+                    "messages": [{"role": "user", "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                    ]}],
+                    "temperature": 0.1,
+                    "max_tokens": 40
+                }
+                response = requests.post(url, headers=headers, json=data_vision, timeout=12)
+                if response.status_code == 200:
+                    return response.json()["choices"][0]["message"]["content"].strip().lower()
+            except:
+                pass
+
+        return "" # Если все три нейросети упали
+    # 👆 ========================================== 👆
+
+
+    # 👇 ФУНКЦИЯ ЗРИТЕЛЬНОЙ ПАМЯТИ (АНТИ-БАЯН) 👇
+    def check_photo_creativity_ai(bot, file_id, file_unique_id, user_id, chat_id, message_id, user_link):
+        if not (GROQ_API_KEY or HF_TOKEN or OPENROUTER_KEY): 
+            return
+
+        try:
+            # 🔥 ИММУНИТЕТ ДЛЯ ЭЛИТЫ И АДМИНОВ 🔥
+            user_data = users_collection.find_one({"_id": user_id}) or {}
+            
+            bot_tags = ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "𝐐𝐔𝐄𝐄𝐑 ♛", "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕", "Верифицирован МК", "Not verified", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска", "Параметры FAKE", "Свободен", "Спонсор_Одобрен"]
+            current_tag = user_data.get("custom_tag", "")
+            
+            # Элита (Випы, Квиры и Спонсоры)
+            is_elite = (user_data.get("is_vip", False) or 
+                        user_data.get("is_queer", False) or 
+                        current_tag in ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜"])
+            
+            # Админы (у них кастомный тег, которого нет в списке дефолтных системных)
+            is_admin = current_tag and current_tag not in bot_tags
+            
+            if is_elite or is_admin or user_id in ADMIN_CHAT_IDS or user_id == OWNER_ID:
+                return # Выходим из функции, этих господ мы не сканируем!
+
+            user_memory = db['photo_memory'].find_one({"_id": user_id}) or {}
+            recent_files = user_memory.get("recent_file_ids", [])
+            recent_hashes = user_memory.get("recent_hashes", [])
+            spam_count = user_memory.get("spam_count", 0)
+            
+            is_duplicate = False
+
+            # 1. ПРОВЕРКА БЫСТРОГО КЭША (Защита от прямой пересылки)
+            if file_unique_id in recent_files:
+                is_duplicate = True
+            else:
+                # 2. ПОДКЛЮЧАЕМ VISION AI (Если файл загружен заново)
+                file_info = bot.get_file(file_id)
+                if file_info.file_size > 220000: return 
+                
+                downloaded_file = bot.download_file(file_info.file_path)
+                base64_image = base64.b64encode(downloaded_file).decode('utf-8')
+                
+                # Вызываем нашу новую мощную функцию!
+                current_hash = get_vision_description(base64_image)
+                
+                if current_hash:
+                    for old_hash in recent_hashes:
+                        similarity = difflib.SequenceMatcher(None, current_hash, old_hash).ratio()
+                        if similarity > 0.82: # Чуть смягчили порог
+                            is_duplicate = True
+                            break
+                    
+                    if not is_duplicate:
+                        # Уникальное фото - сохраняем и сбрасываем счетчик спама
+                        new_files = [file_unique_id] + recent_files[:2]
+                        new_hashes = [current_hash] + recent_hashes[:2]
+                        db['photo_memory'].update_one(
+                            {"_id": user_id}, 
+                            {"$set": {"recent_file_ids": new_files, "recent_hashes": new_hashes, "spam_count": 0}}, 
+                            upsert=True
+                        )
+                        return
+
+            # 3. ЕСЛИ ЭТО БАЯН
+            if is_duplicate:
+                spam_count += 1
+                db['photo_memory'].update_one({"_id": user_id}, {"$set": {"spam_count": spam_count}}, upsert=True)
+                
+                try: bot.delete_message(chat_id, message_id)
+                except: pass
+
+                if spam_count >= 3:
+                    # 🔥 3 СТРАЙКА = МУТ НА 3 ДНЯ (259200 секунд) 🔥
+                    mute_time = int(time.time()) + 259200
+                    mute_user_everywhere(user_id, reason="Рецидив: Спам старыми фото (Анти-Баян)", admin_name="Скайнет 👁", mute_time=mute_time)
+                    
+                    # 🔥 ГЕНЕРИРУЕМ ЖЕСТКОЕ УНИЖЕНИЕ ЧЕРЕЗ ИИ (Оставляем на Groq, тут он хорош) 🔥
+                    if GROQ_API_KEY:
+                        prompt_text = f"Ты жестокий, токсичный и очень саркастичный ИИ-модератор.\nПользователь {user_link} только что в 3-й раз подряд скинул в чат одну и ту же старую заезженную фотографию. За это ты выписал ему блокировку на 3 дня.\nСгенерируй для него короткое публичное унижение (2-3 предложения), чтобы весь чат поржал.\nОфициально РАЗРЕШЕНО использовать жесткий мат, ругательства, черный юмор и ледяной сарказм. Высмей его унылость, отсутствие креатива и то, что он отправился на парашу на 3 дня.\nОбязательно вставь переменную {user_link} в текст."
+
+                        data_text = {
+                            "model": "llama-3.3-70b-versatile",
+                            "messages": [{"role": "user", "content": prompt_text}],
+                            "temperature": 0.8,
+                            "max_tokens": 150
+                        }
+                        try:
+                            resp_text = requests.post("https://api.groq.com/openai/v1/chat/completions", headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}, json=data_text, timeout=10)
+                            if resp_text.status_code == 200:
+                                insult = resp_text.json()["choices"][0]["message"]["content"].strip()
+                                bot.send_message(chat_id, f"👁 **СКАЙНЕТ (Анти-Баян):**\n{insult}", parse_mode="Markdown")
+                            else:
+                                bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими ебучими баянами и улетел в мут на 3 дня. Отдыхай, креативный ты наш.", parse_mode="Markdown")
+                        except:
+                            bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими ебучими баянами и улетел в мут на 3 дня. Отдыхай, креативный ты наш.", parse_mode="Markdown")
+                    
+                    # Сбрасываем счетчик после мута
+                    db['photo_memory'].update_one({"_id": user_id}, {"$set": {"spam_count": 0}})
+                    
+                else:
+                    # Предупреждение (1 или 2 раз)
+                    bot.send_message(chat_id, f"🥱 {user_link}, моя зрительная память подсказывает, что это ебучее фото мы уже видели. Хватит спамить одним и тем же. Смените ракурс! (Страйк {spam_count}/3)", parse_mode="Markdown")
+
+        except Exception as e:
+            print(f"Ошибка зрительной памяти: {e}")
+    # 👆 ========================================== 👆
+
     # 👇 КОМАНДА-ШПИОН (Обрабатывается самой первой!) 👇
     @bot.message_handler(commands=['ping'])
     def ping_handler(message):
@@ -213,6 +409,17 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             if custom_tag == "Спонсор_Одобрен":
                 return
             # 👆 ======================================================= 👆
+
+            # === 👁 ЗРИТЕЛЬНАЯ ПАМЯТЬ СКАЙНЕТА (АНТИ-БАЯН) ===
+            # Работает только в чате "БЕЗ ПРЕДРАССУДКОВ" при отправке фото
+            target_chat_id = chat_ids_mk.get("БЕЗ ПРЕДРАССУДКОВ")
+            
+            if message.content_type == 'photo' and str(chat_id) == str(target_chat_id):
+                threading.Thread(
+                    target=check_photo_creativity_ai,
+                    args=(bot, message.photo[-1].file_id, message.photo[-1].file_unique_id, user_id, chat_id, message.message_id, user_link)
+                ).start()
+            # ================================================
 
             # === 🤬 СЛОВАРЬ ИНКВИЗИТОРА (ТЯНЕМ ИЗ БАЗЫ) ===
             dict_settings = db['settings'].find_one({"_id": "skynet_dictionary"}) or {}
