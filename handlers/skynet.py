@@ -484,17 +484,29 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 if len(raw_text) > 30:
                     clean_current = re.sub(r'\s+', '', text)
                     
-                    # 1. РАДАР ТВИНКОВ
-                    recent_bans = list(db['blacklisted_texts'].find().sort("_id", -1).limit(30))
+                    # 1. РАДАР ТВИНКОВ (ПРОКАЧАННЫЙ)
+                    # Увеличили память Скайнета: теперь он помнит 100 последних забаненных текстов
+                    recent_bans = list(db['blacklisted_texts'].find().sort("_id", -1).limit(150))
+                    
                     for bad in recent_bans:
                         clean_bad = bad.get("clean_text", "")
                         if not clean_bad: continue
                         similarity = difflib.SequenceMatcher(None, clean_current, clean_bad).ratio()
-                        if similarity > 0.85: 
+                        
+                        # 🔥 ДИНАМИЧЕСКАЯ ЧУВСТВИТЕЛЬНОСТЬ 🔥
+                        # Если это карантинник (новорег), Скайнет бьет строже - при совпадении от 75%
+                        is_newbie = user_id > 7800000000
+                        threshold = 0.75 if is_newbie else 0.85 
+                        
+                        if similarity > threshold: 
                             try: bot.delete_message(chat_id, message.message_id) 
                             except: pass
+                            
+                            newbie_alert = "⚠️ **ЭТО НОВОРЕГ! Порог чувствительности был снижен до 75%**\n" if is_newbie else ""
+                            
                             report = (
                                 f"🚨 **РАДАР ТВИНКОВ СРАБОТАЛ!** 🚨\n"
+                                f"{newbie_alert}"
                                 f"Юзер {user_link} (`{user_id}`) отправил анкету, которая на **{int(similarity * 100)}%** совпадает с текстом нарушителя `{bad['uid']}`!\n\n"
                                 f"📝 **Текст:** _{escape_md(raw_text[:200])}_\n\n"
                                 f"🤖 **Действие:** Скайнет тихо удалил сообщение (Shadowban).\nВыдать ему глобальный БАН?"
@@ -503,7 +515,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             markup.add(types.InlineKeyboardButton("🔨 ЗАБАНИТЬ ВЕЗДЕ", callback_data=f"radar_ban_{user_id}"))
                             try: bot.send_message(STAFF_GROUP_ID, report, parse_mode="Markdown", reply_markup=markup)
                             except: pass
-                            return
+                            return # Выходим, чтобы текст не пошел дальше по фильтрам
 
                     # 2. ТЕКСТОВЫЙ АНТИ-БАЯН
                     user_text_memory = db['text_memory'].find_one({"_id": user_id}) or {}
