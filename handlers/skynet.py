@@ -540,8 +540,9 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             except: pass
                             return # Выходим, чтобы текст не пошел дальше по фильтрам
 
-                    # 2. ТЕКСТОВЫЙ АНТИ-БАЯН
-                    user_text_memory = db['text_memory'].find_one({"_id": user_id}) or {}
+                    # 2. ТЕКСТОВЫЙ АНТИ-БАЯН (ПОЧАТОВЫЙ)
+                    text_memory_id = f"{user_id}_{chat_id}"
+                    user_text_memory = db['text_memory'].find_one({"_id": text_memory_id}) or {}
                     recent_texts = user_text_memory.get("recent_texts", [])
                     text_spam_count = user_text_memory.get("spam_count", 0)
                     
@@ -554,7 +555,8 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     
                     if is_text_duplicate:
                         text_spam_count += 1
-                        db['text_memory'].update_one({"_id": user_id}, {"$set": {"spam_count": text_spam_count}}, upsert=True)
+                        # 🔥 ИСПРАВЛЕНО ТУТ: Сохраняем страйк для конкретного чата
+                        db['text_memory'].update_one({"_id": text_memory_id}, {"$set": {"spam_count": text_spam_count}}, upsert=True)
                         
                         try: bot.delete_message(chat_id, message.message_id)
                         except: pass
@@ -610,7 +612,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             else:
                                 bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими копипастами и улетел в мут на 3 дня. Здесь чат для общения, а не доска объявлений. Научись креативить!", parse_mode="Markdown")
                             
-                            db['text_memory'].update_one({"_id": user_id}, {"$set": {"spam_count": 0}})
+                            db['text_memory'].update_one({"_id": text_memory_id}, {"$set": {"spam_count": 0}})
                         else:
                             text_phrases = [
                                 f"🥱 {user_link}, этот текст мы уже видели. Хватит копипастить одно и то же, прояви фантазию! (Страйк {text_spam_count}/3)",
@@ -636,7 +638,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         # Текст уникальный -> сохраняем в память (запоминаем последние 10)
                         new_texts = [clean_current] + recent_texts[:9]
                         db['text_memory'].update_one(
-                            {"_id": user_id}, 
+                            {"_id": text_memory_id}, 
                             {"$set": {"recent_texts": new_texts, "spam_count": 0}}, 
                             upsert=True
                         )
