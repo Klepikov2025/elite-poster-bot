@@ -353,6 +353,40 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
     ]
 
     warned_users = {}  # Кэш отбивок подписок (chat_id, user_id) -> message_id
+
+    # === 🚪 РАДАР НА ВХОДЕ В ЧАТ (УБИЙСТВО ДО ПЕРВОГО СООБЩЕНИЯ) 🚪 ===
+    @bot.message_handler(content_types=['new_chat_members'])
+    def face_control_on_entry(message):
+        chat_id = message.chat.id
+        
+        # Игнорируем служебные чаты
+        if str(chat_id) in [str(SUPPORT_GROUP_ID), str(STAFF_GROUP_ID), str(JOURNAL_CHAT_ID)]:
+            return
+            
+        chat_title = escape_md(message.chat.title) if message.chat.title else f"Чат {chat_id}"
+
+        for new_user in message.new_chat_members:
+            if new_user.id == bot.get_me().id: continue # Игнорируем добавление самого бота
+            
+            user_id = new_user.id
+            user_link = get_user_name(new_user)
+            
+            full_name = f"{new_user.first_name or ''} {new_user.last_name or ''}".lower()
+            clean_name = re.sub(r'[\.\,\_\|\-\s+]', '', full_name)
+            
+            name_triggers = [
+                r"жмина", r"впрофил", r"смотрипрофиль", r"ссылкав", r"ссылкув", 
+                r"децк", r"детск", r"дэти", r"цэпэ", r"цп\b", r"порно", r"поорно", 
+                r"каналв", r"переходив", r"меня", r"тме", r"tme", r"заработ", 
+                r"инвест", r"крипт", r"профэл"
+            ]
+            
+            if any(re.search(p, clean_name) for p in name_triggers):
+                try: bot.delete_message(chat_id, message.message_id) # Удаляем плашку "Вступил в группу"
+                except: pass
+                # Мгновенный пермабан по всем базам!
+                ban_user_everywhere(user_id, reason="Запрещенное/Рекламное ИМЯ на входе", admin_name="Скайнет 🚪", user_link=user_link, trigger_text=full_name, origin_chat=chat_title)
+    # ===================================================================
    
     @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact', 'video_note'], func=lambda message: message.chat.type in ['group', 'supergroup'])
     def skynet_core_handler(message):
@@ -386,17 +420,21 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         user_link = get_user_name(message.from_user)
         chat_title = escape_md(message.chat.title) if message.chat.title else f"Чат {chat_id}"
 
-        # === 🛑 ФЕЙС-КОНТРОЛЬ: ПРОВЕРКА ИМЕНИ НА СПАМ И ЦП 🛑 ===
+        # === 🛑 ФЕЙС-КОНТРОЛЬ v2.0 (Бронебойный) 🛑 ===
         full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".lower()
+        # Вычищаем все точки, запятые, слеши и пробелы, чтобы снять маскировку!
+        clean_name = re.sub(r'[\.\,\_\|\-\s+]', '', full_name)
+        
         name_triggers = [
-            r"жми\s*на", r"в\s*профил", r"смотри\s*профиль", r"ссылка\s*в", r"ссылку\s*в", 
-            r"дец\.*к", r"детск", r"цп\b", r"порно", r"канал\s*в", r"переходи\s*в", r"м\,е\,\,н\,я", r"т\.м\/",
-            r"заработ", r"инвест", r"крипт" # <- Добавил еще частых спамеров!
+            r"жмина", r"впрофил", r"смотрипрофиль", r"ссылкав", r"ссылкув", 
+            r"децк", r"детск", r"дэти", r"цэпэ", r"цп\b", r"порно", r"поорно", 
+            r"каналв", r"переходив", r"меня", r"тме", r"tme", r"заработ", 
+            r"инвест", r"крипт", r"профэл"
         ]
-        if any(re.search(p, full_name) for p in name_triggers):
+        
+        if any(re.search(p, clean_name) for p in name_triggers):
             try: bot.delete_message(chat_id, message.message_id)
             except: pass
-            # Бьем кувалдой пермабана!
             ban_user_everywhere(user_id, reason="Запрещенное/Рекламное ИМЯ профиля", admin_name="Скайнет 🛡", user_link=user_link, trigger_text=full_name, origin_chat=chat_title)
             return
         # ========================================================
