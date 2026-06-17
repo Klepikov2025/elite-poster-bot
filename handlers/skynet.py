@@ -447,21 +447,29 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             try:
                 member = bot.get_chat_member(chat_id, user_id)
                 current_tag = getattr(member, 'custom_title', None)
-                bot_tags = ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "𝐐𝐔𝐄𝐄𝐑 ♛", "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕", "Верифицирован МК", "Not verified", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска"]
-                if current_tag and current_tag not in bot_tags:
-                    users_collection.update_one({"_id": user_id}, {"$set": {"custom_tag": current_tag}}, upsert=True)
-                    custom_tag = current_tag 
-            except: pass
-
-            final_tag = "Not verified"
-            if custom_tag: final_tag = custom_tag
-            elif is_vip and is_queer: final_tag = "𝓟𝓡𝓔𝓜𝓘𝓤𝓜"
-            elif is_queer: final_tag = "𝐐𝐔𝐄𝐄𝐑 ♛"
-            elif is_vip: final_tag = "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕"
-            elif is_verified: final_tag = "Верифицирован МК"
-            elif shame_tag: final_tag = shame_tag
-
-            try: safe_set_tag(chat_id, user_id, final_tag)
+                
+                # Системные теги сети
+                bot_tags = ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "𝐐𝐔𝐄𝐄𝐑 ♛", "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕", "Верифицирован МК", "Not verified", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска", "Параметры FAKE", "Свободен", "Спонсор_Одобрен"]
+                
+                if current_tag:
+                    # Если тег кастомный (уникальный) - просто сохраняем
+                    if current_tag not in bot_tags:
+                        users_collection.update_one({"_id": user_id}, {"$set": {"custom_tag": current_tag}}, upsert=True)
+                        custom_tag = current_tag
+                    
+                    # 🔥 ЕСЛИ ТЕГ СИСТЕМНЫЙ - СИНХРОНИЗИРУЕМ ЕГО С БАЗОЙ И ДАЕМ ИММУНИТЕТ 🔥
+                    elif current_tag == "Верифицирован МК":
+                        is_verified = True
+                        users_collection.update_one({"_id": user_id}, {"$set": {"is_verified": True}}, upsert=True)
+                    elif current_tag == "Спонсор_Одобрен":
+                        custom_tag = "Спонсор_Одобрен"
+                        users_collection.update_one({"_id": user_id}, {"$set": {"custom_tag": "Спонсор_Одобрен"}}, upsert=True)
+                    elif current_tag in ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕"]:
+                        is_vip = True
+                        users_collection.update_one({"_id": user_id}, {"$set": {"is_vip": True}}, upsert=True)
+                    elif current_tag == "𝐐𝐔𝐄𝐄𝐑 ♛":
+                        is_queer = True
+                        users_collection.update_one({"_id": user_id}, {"$set": {"is_queer": True}}, upsert=True)
             except: pass
 
             # 👇 🛡️ ИММУНИТЕТ ДЛЯ ОДОБРЕННЫХ СПОНСОРОВ 🛡️ 👇
