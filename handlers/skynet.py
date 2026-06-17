@@ -727,20 +727,46 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                                 can_send_messages=False
                             )
                         except: pass
+
+                    # 📨 ПОПЫТКА ОТПРАВИТЬ ИНСТРУКЦИЮ В ЛС
+                    try:
+                        bot.send_message(
+                            user_id, 
+                            "🚨 **Защита от спама (Карантин)!**\n\nВаш аккаунт создан недавно. Для безопасности сети действует карантин 120 часов.\nВаши сообщения в чате временно отключены.\n\n🛠 Чтобы снять ограничения досрочно, пройдите быструю верификацию в [Службе Поддержки](https://t.me/MK_MensClubSUPPORT).",
+                            parse_mode="Markdown",
+                            disable_web_page_preview=True
+                        )
+                    except:
+                        # Если телега запретила писать в ЛС - кидаем "Фантомную" отбивку в чат
+                        try:
+                            safe_name = escape_md(message.from_user.first_name or "Пользователь")
+                            ghost_msg = bot.send_message(
+                                chat_id,
+                                f"🚨 *{safe_name}*, сработала защита от спама!\nВаш аккаунт в карантине (120ч).\n🛠 Для досрочного снятия ограничений пройдите верификацию в [Службе Поддержки](https://t.me/MK_MensClubSUPPORT).",
+                                parse_mode="Markdown",
+                                disable_web_page_preview=True
+                            )
+                            # Удаляем через 15 секунд, чтобы не мусорить
+                            def delete_ghost():
+                                time.sleep(15)
+                                try: bot.delete_message(chat_id, ghost_msg.message_id)
+                                except: pass
+                            threading.Thread(target=delete_ghost, daemon=True).start()
+                        except: pass
                     
-                    # Отправляем лог ТОЛЬКО админам, в публичный чат ничего не пишем!
+                    # Отправляем лог ТОЛЬКО админам
                     try: 
                         bot.send_message(
                             STAFF_GROUP_ID, 
                             f"🥷 **ГЛУХОЙ КАРАНТИН:** Новорег {user_link} (`{user_id}`) попытался проспамить.\n"
                             f"📍 Чат: {chat_title}\n"
-                            f"🔒 Выдан системный мут на остаток карантина. В чат отбивка НЕ отправлена.",
+                            f"🔒 Выдан системный мут на остаток карантина.",
                             parse_mode="Markdown",
                             disable_web_page_preview=True
                         )
                     except: pass
                     
-                    return # Полностью прерываем обработку (никаких ИИ, никаких проверок) 
+                    return # Полностью прерываем обработку 
 
             # === 📏 ОПЕРАЦИЯ "1 МАЯ" ===
             if sys_settings.get("may_1_active", True):
