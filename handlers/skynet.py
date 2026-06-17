@@ -386,8 +386,24 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         user_link = get_user_name(message.from_user)
         chat_title = escape_md(message.chat.title) if message.chat.title else f"Чат {chat_id}"
 
+        # === 🛑 ФЕЙС-КОНТРОЛЬ: ПРОВЕРКА ИМЕНИ НА СПАМ И ЦП 🛑 ===
+        full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".lower()
+        name_triggers = [
+            r"жми\s*на", r"в\s*профил", r"смотри\s*профиль", r"ссылка\s*в", r"ссылку\s*в", 
+            r"дец\.*к", r"детск", r"цп\b", r"порно", r"канал\s*в", r"переходи\s*в", r"м\,е\,\,н\,я", r"т\.м\/",
+            r"заработ", r"инвест", r"крипт" # <- Добавил еще частых спамеров!
+        ]
+        if any(re.search(p, full_name) for p in name_triggers):
+            try: bot.delete_message(chat_id, message.message_id)
+            except: pass
+            # Бьем кувалдой пермабана!
+            ban_user_everywhere(user_id, reason="Запрещенное/Рекламное ИМЯ профиля", admin_name="Скайнет 🛡", user_link=user_link, trigger_text=full_name, origin_chat=chat_title)
+            return
+        # ========================================================
+
         try:
             user_data = users_collection.find_one({"_id": user_id}) or {}
+            # ... и дальше пошел твой код (is_vip, is_queer и т.д.)
             is_vip = user_data.get("is_vip", False)
             is_queer = user_data.get("is_queer", False)
             is_verified = user_data.get("is_verified", False)
@@ -604,13 +620,13 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                                     resp_text = requests.post("https://api.groq.com/openai/v1/chat/completions", headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}, json=data_text, timeout=10)
                                     if resp_text.status_code == 200:
                                         insult = resp_text.json()["choices"][0]["message"]["content"].strip()
-                                        bot.send_message(chat_id, f"👁 **СКАЙНЕТ (Анти-Копипаст):**\n{insult}", parse_mode="Markdown")
+                                        bot.send_message(chat_id, f"👁 **СКАЙНЕТ (Анти-Копипаст):**\n{insult}", parse_mode="Markdown", disable_web_page_preview=True)
                                     else:
-                                        bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими копипастами и улетел в мут на 3 дня. Здесь чат для общения, а не доска объявлений. Научись креативить!", parse_mode="Markdown")
+                                        bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими копипастами и улетел в мут на 3 дня. Здесь чат для общения, а не доска объявлений. Научись креативить!", parse_mode="Markdown", disable_web_page_preview=True)
                                 except:
-                                    bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими копипастами и улетел в мут на 3 дня. Здесь чат для общения, а не доска объявлений. Научись креативить!", parse_mode="Markdown")
+                                    bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими копипастами и улетел в мут на 3 дня. Здесь чат для общения, а не доска объявлений. Научись креативить!", parse_mode="Markdown", disable_web_page_preview=True)
                             else:
-                                bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими копипастами и улетел в мут на 3 дня. Здесь чат для общения, а не доска объявлений. Научись креативить!", parse_mode="Markdown")
+                                bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими копипастами и улетел в мут на 3 дня. Здесь чат для общения, а не доска объявлений. Научись креативить!", parse_mode="Markdown", disable_web_page_preview=True)
                             
                             db['text_memory'].update_one({"_id": text_memory_id}, {"$set": {"spam_count": 0}})
                         else:
@@ -686,43 +702,45 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     threading.Thread(target=auto_delete, daemon=True).start()
                 return
 
-            # === 🛡 КАРАНТИН НОВОРЕГОВ ===
+            # === 🛡 ГЛУХОЙ КАРАНТИН НОВОРЕГОВ (HARD MUTE) ===
             if sys_settings.get("quarantine_active", True):
                 first_seen = user_data.get('first_seen')
                 if not first_seen:
                     first_seen = time.time()
                     users_collection.update_one({"_id": user_id}, {"$set": {"first_seen": first_seen}}, upsert=True)
                 seconds_passed = time.time() - first_seen
+                
+                # Если это новорег и прошло меньше 120 часов (432000 сек)
                 if user_id > 7800000000 and seconds_passed < 432000:
                     try: bot.delete_message(chat_id, message.message_id)
                     except: pass
+                    
+                    # 🤐 ФИЗИЧЕСКИЙ МУТ НА ОСТАТОК ВРЕМЕНИ 🤐
+                    remaining_time = int(432000 - seconds_passed)
+                    if remaining_time > 0:
+                        try:
+                            # Физически забираем права писать в этом конкретном чате!
+                            bot.restrict_chat_member(
+                                chat_id, 
+                                user_id, 
+                                until_date=int(time.time()) + remaining_time,
+                                can_send_messages=False
+                            )
+                        except: pass
+                    
+                    # Отправляем лог ТОЛЬКО админам, в публичный чат ничего не пишем!
                     try: 
                         bot.send_message(
                             STAFF_GROUP_ID, 
-                            f"🥷 **КАРАНТИН:** Удалено сообщение от новорега {user_link} (`{user_id}`).\n"
+                            f"🥷 **ГЛУХОЙ КАРАНТИН:** Новорег {user_link} (`{user_id}`) попытался проспамить.\n"
                             f"📍 Чат: {chat_title}\n"
-                            f"🕒 Прошло: {int(seconds_passed // 3600)}ч. из 120ч.",
-                            parse_mode="Markdown"
-                        )
-                    except: pass
-                    try:
-                        # 📝 ТЯНЕМ ТЕКСТ КАРАНТИНА ИЗ БАЗЫ
-                        db_texts = db['settings'].find_one({"_id": "skynet_texts"}) or {}
-                        raw_text_quarantine = db_texts.get("quarantine_warn", "🚨 {user_link}, **Защита от спама!**\nВаш аккаунт создан недавно. Для безопасности сети действует карантин 120 часов.\nПодождите, или пройдите верификацию в [Службе Поддержки](https://t.me/MK_MensClubSUPPORT).")
-                        
-                        warning_msg = bot.send_message(
-                            chat_id, 
-                            raw_text_quarantine.replace("{user_link}", user_link), 
+                            f"🔒 Выдан системный мут на остаток карантина. В чат отбивка НЕ отправлена.",
                             parse_mode="Markdown",
                             disable_web_page_preview=True
                         )
-                        def delete_quarantine_warning():
-                            time.sleep(300) 
-                            try: bot.delete_message(chat_id, warning_msg.message_id)
-                            except: pass
-                        threading.Thread(target=delete_quarantine_warning, daemon=True).start()
                     except: pass
-                    return 
+                    
+                    return # Полностью прерываем обработку (никаких ИИ, никаких проверок) 
 
             # === 📏 ОПЕРАЦИЯ "1 МАЯ" ===
             if sys_settings.get("may_1_active", True):
