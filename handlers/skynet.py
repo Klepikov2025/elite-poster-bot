@@ -371,12 +371,19 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             user_id = new_user.id
             user_link = get_user_name(new_user)
             
-            full_name = f"{new_user.first_name or ''} {new_user.last_name or ''}".lower()
+            full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".lower()
+            # 1. Вычищаем все знаки препинания и пробелы
             clean_name = re.sub(r'[\.\,\_\|\-\s+]', '', full_name)
-            
+        
+            # 🔥 2. ДЕШИФРАТОР (Анти-замена букв) 🔥
+            # Переводим английские буквы-шпионы обратно в русские
+            homoglyphs = str.maketrans('aeopcxykmtbh', 'аеорсхукмтвн')
+            clean_name = clean_name.translate(homoglyphs)
+        
             name_triggers = [
                 r"жмина", r"впрофил", r"смотрипрофиль", r"ссылкав", r"ссылкув", 
-                r"децк", r"детск", r"дэти", r"цэпэ", r"цп\b", r"порно", r"поорно", 
+                r"децк", r"детск", r"дэти", r"деток", r"дети", r"малолет", r"школниц",
+                r"цэпэ", r"цп\b", r"порно", r"поорно", r"ебут", r"трах", 
                 r"каналв", r"переходив", r"меня", r"тме", r"tme", r"заработ", 
                 r"инвест", r"крипт", r"профэл"
             ]
