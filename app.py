@@ -75,9 +75,13 @@ def add_radar_log(text):
         "ts": time.time()
     })
 
-# ==================== ФУНКЦИИ, ТРЕБУЮЩИЕ BOT ====================
 def is_banned_in_network(user_id):
-    """Проверяет статус пользователя в самых крупных (якорных) чатах сети"""
+    """Проверяет статус пользователя в базе Скайнета и в крупных чатах сети"""
+    # 1. СНАЧАЛА ПРОВЕРЯЕМ БАЗУ СКАЙНЕТА (Самое надежное)
+    if banned_collection.find_one({"_id": user_id}):
+        return True
+
+    # 2. ДВОЙНАЯ ПРОВЕРКА ПО ФИЗИЧЕСКИМ ЯКОРЯМ
     anchor_chats = [
         VIP_CHAT_ID,
         chat_ids_mk.get("БЕЗ ПРЕДРАССУДКОВ"), 
@@ -1134,7 +1138,7 @@ def skynet_listener():
                 # 👇 ДОБАВЛЯЕМ НОВЫЙ БЛОК: ПРИКАЗЫ ОТ ШПИОНА 👇
                 elif task['action'] == "global_ban":
                     ban_user_everywhere(
-                        target_id=task['uid'], 
+                        target_id=int(task['uid']), # 🔥 ИСПРАВЛЕНИЕ: Жестко конвертируем строку в число!
                         reason=task.get('reason', 'Шпионаж'), 
                         admin_name="Андрюшенька (Спецагент Шпион) 🕵️‍♂️", 
                         trigger_text=task.get('trigger_text', ''), 
@@ -1144,9 +1148,9 @@ def skynet_listener():
                     
                 elif task['action'] == "global_mute":
                     mute_user_everywhere(
-                        target_id=task['uid'], 
+                        target_id=int(task['uid']), # 🔥 ИСПРАВЛЕНИЕ: Жестко конвертируем строку в число!
                         reason=task.get('reason', 'Шпионаж'), 
-                        admin_name="Андрюшенька (Спецагент Шпион) 🕵️‍♂️",  # <--- Убрали подчеркивание!
+                        admin_name="Андрюшенька (Спецагент Шпион) 🕵️‍♂️",  
                         trigger_text=task.get('trigger_text', ''), 
                         origin_chat=escape_md(task.get('origin_chat', ''))
                     )
