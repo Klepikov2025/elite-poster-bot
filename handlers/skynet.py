@@ -870,15 +870,20 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         threading.Thread(target=delete_warning_may, daemon=True).start()
                         return
 
-            safe_age = re.sub(r'(от|парня|мальчика|мужчину|ищу|для)\s*18\b|\b18\s*-\s*\d{2}\b|\b18\s*\+|\b18\s*(см|cm)\b', '', text)
-            if re.search(r'\b18\s*(лет|год|годик|y\.?o\.?)\b|\b18\s*[/\\-]\s*1\d{2}\b|\b(мне|я)\s*18\b', safe_age):
+            # Очищаем от безопасных контекстов (ищу от 18 до 21, 18-25, 18+, и размеры 18-21 см)
+            safe_age = re.sub(r'(от|парня|мальчика|мужчину|ищу|для)\s*(?:1[89]|2[0-1])\b|\b(?:1[89]|2[0-1])\s*-\s*\d{2}\b|\b(?:1[89]|2[0-1])\s*\+|\b(?:1[89]|2[0-1])\s*(см|cm)\b', '', text)
+            
+            # Ловим, если юзер пишет про свой возраст от 18 до 21 включительно
+            if re.search(r'\b(?:1[89]|2[0-1])\s*(лет|год|годик|y\.?o\.?)\b|\b(?:1[89]|2[0-1])\s*[/\\-]\s*1\d{2}\b|\b(мне|я)\s*(?:1[89]|2[0-1])\b', safe_age):
                 bot.delete_message(chat_id, message.message_id)
-                mute_user_everywhere(user_id, reason="Оранжевая зона: 18 лет", admin_name="Скайнет 🔞", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
+                mute_user_everywhere(user_id, reason="Оранжевая зона: Возраст 18-21", admin_name="Скайнет 🔞", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
                 markup = types.InlineKeyboardMarkup()
                 markup.add(types.InlineKeyboardButton("🛠 Пройти верификацию 🔞", url="https://t.me/FAQMKBOT"))
-                # 📝 ТЯНЕМ ТЕКСТ 18+ ИЗ БАЗЫ
+                
+                # 📝 ТЯНЕМ ТЕКСТ ИЗ БАЗЫ
                 db_texts = db['settings'].find_one({"_id": "skynet_texts"}) or {}
-                raw_text_minor = db_texts.get("minor_warn", "🚨 {user_link}, **Внимание!**\nВаша анкета попала под автоматический фильтр безопасности сети. Пройдите обязательную верификацию 🔞.")
+                # Слегка адаптировал дефолтный текст, чтобы он подходил под новые рамки
+                raw_text_minor = db_texts.get("minor_warn", "🚨 {user_link}, **Внимание!**\nВаша анкета попала под автоматический фильтр безопасности сети. Вашего возрастного диапазона проходят обязательную верификацию 🔞.")
                 
                 warning_msg = bot.send_message(chat_id, raw_text_minor.replace("{user_link}", user_link), reply_markup=markup, parse_mode="Markdown", disable_web_page_preview=True)
                 def delete_warning_18():
