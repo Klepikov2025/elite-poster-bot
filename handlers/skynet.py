@@ -125,7 +125,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             # Элита (Випы, Квиры и Спонсоры - ТЕПЕРЬ СПОНСОРЫ ТОЖЕ ПОД ЗАЩИТОЙ)
             is_elite = (user_data.get("is_vip", False) or 
                         user_data.get("is_queer", False) or 
-                        current_tag in ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "Спонсор_Одобрен"])
+                        current_tag in ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜",  "Спонсор_Одобрен", "Свободен"])
             
             # Админы (у них кастомный тег, которого нет в списке дефолтных системных)
             is_admin = current_tag and current_tag not in bot_tags
@@ -403,18 +403,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
 
         chat_id = message.chat.id
         user_id = message.from_user.id
-        
-        # 👇 ДОБАВЛЯЕМ ЭТОТ БЛОК 👇
-        # Игнорируем служебные чаты и внутренние элитные клубы (VIP и BEYOND)
-        if str(chat_id) in [
-            str(SUPPORT_GROUP_ID), 
-            str(STAFF_GROUP_ID), 
-            str(JOURNAL_CHAT_ID), 
-            str(VIP_CHAT_ID), 
-            str(BEYOND_CHAT_ID)
-        ]:
-            return
-        
+           
         raw_text = message.text or message.caption or ""
         
         # 👇 ИММУНИТЕТ ДЛЯ КАЗИНО (ЧТОБЫ ПЫЛЕСОС НЕ УДАЛЯЛ КОМАНДЫ) 👇
@@ -471,51 +460,66 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
 
             sys_settings = db['settings'].find_one({"_id": "skynet"}) or {"quarantine_active": True, "may_1_active": True}
 
-            try:
-                m_vip = bot.get_chat_member(VIP_CHAT_ID, user_id)
-                is_physically_there = getattr(m_vip, 'is_member', False) if m_vip.status == 'restricted' else True
-                actual_vip = m_vip.status in ['member', 'administrator', 'creator'] or (m_vip.status == 'restricted' and is_physically_there)
-                if is_vip != actual_vip:
-                    is_vip = actual_vip
-                    users_collection.update_one({"_id": user_id}, {"$set": {"is_vip": is_vip}}, upsert=True)
-            except: pass
-
-            try:
-                m_beyond = bot.get_chat_member(BEYOND_CHAT_ID, user_id)
-                is_physically_there_q = getattr(m_beyond, 'is_member', False) if m_beyond.status == 'restricted' else True
-                actual_queer = m_beyond.status in ['member', 'administrator', 'creator'] or (m_beyond.status == 'restricted' and is_physically_there_q)
-                if is_queer != actual_queer:
-                    is_queer = actual_queer
-                    users_collection.update_one({"_id": user_id}, {"$set": {"is_queer": is_queer}}, upsert=True)
-            except: pass
-
-            try:
-                member = bot.get_chat_member(chat_id, user_id)
-                current_tag = getattr(member, 'custom_title', None)
+            
+            # 👇 🛡️ УМНАЯ СИСТЕМА ТЕГОВ (СИНХРОНИЗАЦИЯ + РАЗДАЧА) 🛡️ 👇
+            
+            # 1. ГЛУБОКАЯ СИНХРОНИЗАЦИЯ (Раз в 10 минут или при первом сообщении)
+            # Сначала узнаем, кто перед нами, чтобы не сбить ему корону!
+            last_check = user_data.get("last_api_check", 0)
+            if time.time() - last_check > 600:
+                users_collection.update_one({"_id": user_id}, {"$set": {"last_api_check": time.time()}})
                 
-                # Системные теги сети
-                bot_tags = ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "𝐐𝐔𝐄𝐄𝐑 ♛", "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕", "Верифицирован МК", "Not verified", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска", "Параметры FAKE", "Свободен", "Спонсор_Одобрен"]
-                
-                if current_tag:
-                    # Если тег кастомный (уникальный) - просто сохраняем
-                    if current_tag not in bot_tags:
-                        users_collection.update_one({"_id": user_id}, {"$set": {"custom_tag": current_tag}}, upsert=True)
-                        custom_tag = current_tag
+                try:
+                    m_vip = bot.get_chat_member(VIP_CHAT_ID, user_id)
+                    is_physically_there = getattr(m_vip, 'is_member', False) if m_vip.status == 'restricted' else True
+                    actual_vip = m_vip.status in ['member', 'administrator', 'creator'] or (m_vip.status == 'restricted' and is_physically_there)
+                    if is_vip != actual_vip:
+                        is_vip = actual_vip
+                        users_collection.update_one({"_id": user_id}, {"$set": {"is_vip": is_vip}}, upsert=True)
+                except: pass
+
+                try:
+                    m_beyond = bot.get_chat_member(BEYOND_CHAT_ID, user_id)
+                    is_physically_there_q = getattr(m_beyond, 'is_member', False) if m_beyond.status == 'restricted' else True
+                    actual_queer = m_beyond.status in ['member', 'administrator', 'creator'] or (m_beyond.status == 'restricted' and is_physically_there_q)
+                    if is_queer != actual_queer:
+                        is_queer = actual_queer
+                        users_collection.update_one({"_id": user_id}, {"$set": {"is_queer": is_queer}}, upsert=True)
+                except: pass
+
+                try:
+                    member = bot.get_chat_member(chat_id, user_id)
+                    current_tag = getattr(member, 'custom_title', None)
+                    bot_tags = ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "𝐐𝐔𝐄𝐄𝐑 ♛", "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕", "Верифицирован МК", "Not verified", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска", "Параметры FAKE", "Свободен", "Спонсор_Одобрен", "чернильница"]
                     
-                    # 🔥 ЕСЛИ ТЕГ СИСТЕМНЫЙ - СИНХРОНИЗИРУЕМ ЕГО С БАЗОЙ И ДАЕМ ИММУНИТЕТ 🔥
-                    elif current_tag == "Верифицирован МК":
-                        is_verified = True
-                        users_collection.update_one({"_id": user_id}, {"$set": {"is_verified": True}}, upsert=True)
-                    elif current_tag == "Спонсор_Одобрен":
-                        custom_tag = "Спонсор_Одобрен"
-                        users_collection.update_one({"_id": user_id}, {"$set": {"custom_tag": "Спонсор_Одобрен"}}, upsert=True)
-                    elif current_tag in ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕"]:
-                        is_vip = True
-                        users_collection.update_one({"_id": user_id}, {"$set": {"is_vip": True}}, upsert=True)
-                    elif current_tag == "𝐐𝐔𝐄𝐄𝐑 ♛":
-                        is_queer = True
-                        users_collection.update_one({"_id": user_id}, {"$set": {"is_queer": True}}, upsert=True)
-            except: pass
+                    if current_tag:
+                        if current_tag not in bot_tags:
+                            users_collection.update_one({"_id": user_id}, {"$set": {"custom_tag": current_tag}}, upsert=True)
+                            custom_tag = current_tag
+                        elif current_tag == "Верифицирован МК":
+                            is_verified = True
+                            users_collection.update_one({"_id": user_id}, {"$set": {"is_verified": True}}, upsert=True)
+                        elif current_tag == "Спонсор_Одобрен":
+                            custom_tag = "Спонсор_Одобрен"
+                            users_collection.update_one({"_id": user_id}, {"$set": {"custom_tag": "Спонсор_Одобрен"}}, upsert=True)
+                except: pass
+
+            # 2. Вычисляем, какой тег ДОЛЖЕН быть у юзера:
+            target_tag = "Not verified"
+            if custom_tag: target_tag = custom_tag
+            elif is_vip and is_queer: target_tag = "𝓟𝓡𝓔𝓜𝓘𝓤𝓜"
+            elif is_queer: target_tag = "𝐐𝐔𝐄𝐄𝐑 ♛"
+            elif is_vip: target_tag = "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕"
+            elif is_verified: target_tag = "Верифицирован МК"
+            elif shame_tag: target_tag = shame_tag
+
+            # 3. МГНОВЕННАЯ РАЗДАЧА (Только если локальная память говорит, что тег отличается)
+            if user_data.get(f"tag_{chat_id}") != target_tag:
+                try: 
+                    safe_set_tag(chat_id, user_id, target_tag)
+                    users_collection.update_one({"_id": user_id}, {"$set": {f"tag_{chat_id}": target_tag}}, upsert=True)
+                except: pass
+            # 👆 ========================================================================= 👆
 
             # 👇 🛡️ ИММУНИТЕТ ДЛЯ ОДОБРЕННЫХ СПОНСОРОВ 🛡️ 👇
             if custom_tag == "Спонсор_Одобрен":
@@ -569,7 +573,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             # 🛡 РАДАР ТВИНКОВ И ТЕКСТОВЫЙ АНТИ-БАЯН
             # (Работает везде КРОМЕ "ПАРНИ 18+". Элита и Админы имеют иммунитет, "Верифицирован МК" - НЕТ)
             # =======================================================
-            is_elite = is_vip or is_queer or custom_tag in ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜"]
+            is_elite = is_vip or is_queer or custom_tag in ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "Спонсор_Одобрен", "Свободен"]
             is_admin = custom_tag and custom_tag not in ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "𝐐𝐔𝐄𝐄𝐑 ♛", "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕", "Верифицирован МК", "Not verified", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска", "Параметры FAKE", "Свободен", "Спонсор_Одобрен"]
 
             if chat_id not in PARNI_CHATS and not (is_elite or is_admin or user_id in ADMIN_CHAT_IDS or user_id == OWNER_ID):
