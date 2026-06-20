@@ -954,8 +954,15 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             # Проверяем наличие "хорошего" статуса (они проходят без лимитов)
             has_good_tag = is_vip or is_queer or is_verified or (custom_tag and custom_tag not in bad_tags)
             
-            # Применяем ко всем обычным юзерам (кроме ПАРНИ 18+, если там нет лимитов)
-            if not has_good_tag and chat_id not in PARNI_CHATS and not is_admin:
+            # 🔥 ЧАТЫ СВОБОДНОГО ОБЩЕНИЯ (БЕЗ АНТИФЛУДА) 🔥
+            free_chats = [
+                chat_ids_mk.get("Мужской Чат")
+                # Если захотите сделать другие чаты свободными, просто добавьте их сюда через запятую
+                # например: chat_ids_mk.get("БЕЗ ПРЕДРАССУДКОВ")
+            ]
+            
+            # Применяем ко всем обычным юзерам (кроме ПАРНИ 18+, свободных чатов и админов)
+            if not has_good_tag and chat_id not in PARNI_CHATS and chat_id not in free_chats and not is_admin:
                 
                 # 🔥 ОПРЕДЕЛЯЕМ ЖЕСТКИЕ ЧАТЫ 🔥
                 hard_flood_chats = [
