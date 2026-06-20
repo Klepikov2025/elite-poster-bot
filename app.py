@@ -26,7 +26,7 @@ from config import (
     VIP_CHAT_ID, BEYOND_CHAT_ID, NON_CITIES,
     chat_ids_mk, chat_ids_parni, chat_ids_ns, 
     chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS,
-    all_cities, insert_to_all
+    all_cities, insert_to_all, GROQ_API_KEYS  # <--- ДОБАВИЛИ СЮДА!
 )
 
 from database import (
@@ -1066,6 +1066,42 @@ def vip_funnel_sniper():
             
         time.sleep(43200)
 
+# 👇 УМНАЯ ПРОВЕРКА УЛИК ОТ ШПИОНОВ 👇
+def ai_context_checker(text, zone="black"):
+    if not GROQ_API_KEYS or not text:
+        return True # Если нет ключей или текста, верим Андрюшеньке на слово
+
+    if zone == "black":
+        prompt = f"""Ты модератор. Сообщение: "{text}"
+1. Автор СЕЙЧАС младше 18 лет?
+2. Ищет интим с несовершеннолетними?
+(Жалобы, прошлое или размеры - НЕ нарушение). Ответь СТРОГО: BAN или SKIP."""
+    elif zone == "orange":
+        prompt = f"""Ты модератор. Сообщение: "{text}"
+Автору СЕЙЧАС от 18 до 21 года?
+(Размеры "20 см" или поиск "ищу 20 летнего" - НЕ нарушение). Ответь СТРОГО: BAN или SKIP."""
+    elif zone == "yellow":
+        prompt = f"""Ты модератор. Сообщение: "{text}"
+Это коммерция/эскорт (ищет МП, спонсора, платные встречи)?
+(Подарки на день рождения/праздники, быт - НЕ нарушение). Ответь СТРОГО: BAN или SKIP."""
+    else:
+        return True
+
+    import requests
+    for key in GROQ_API_KEYS:
+        try:
+            resp = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}], "temperature": 0.0, "max_tokens": 10},
+                timeout=5
+            )
+            if resp.status_code == 200:
+                return "BAN" in resp.json()["choices"][0]["message"]["content"].strip().upper()
+        except: continue
+    return True
+# 👆 ===================================== 👆
+
 # ==================== СЛУШАТЕЛЬ СЕКРЕТАРЯ (РАЗБАН ПО КНОПКЕ) ====================
 def skynet_listener():
     while True:
@@ -1135,25 +1171,44 @@ def skynet_listener():
                     # 4. Закрываем задачу
                     db['skynet_tasks'].update_one({"_id": task['_id']}, {"$set": {"status": "done"}})
                 
-                # 👇 ДОБАВЛЯЕМ НОВЫЙ БЛОК: ПРИКАЗЫ ОТ ШПИОНА 👇
-                elif task['action'] == "global_ban":
-                    ban_user_everywhere(
-                        target_id=int(task['uid']), # 🔥 ИСПРАВЛЕНИЕ: Жестко конвертируем строку в число!
-                        reason=task.get('reason', 'Шпионаж'), 
-                        admin_name="Андрюшенька (Спецагент Шпион) 🕵️‍♂️", 
-                        trigger_text=task.get('trigger_text', ''), 
-                        origin_chat=escape_md(task.get('origin_chat', ''))
-                    )
-                    db['skynet_tasks'].update_one({"_id": task['_id']}, {"$set": {"status": "done"}})
+                # 👇 ИСПОЛНЕНИЕ ПРИКАЗОВ ОТ ШПИОНА (С ДВОЙНОЙ ПРОВЕРКОЙ ИИ) 👇
+                elif task['action'] in ["global_ban", "global_mute"]:
+                    trigger_text = task.get('trigger_text', '')
+                    reason = task.get('reason', 'Шпионаж')
                     
-                elif task['action'] == "global_mute":
-                    mute_user_everywhere(
-                        target_id=int(task['uid']), # 🔥 ИСПРАВЛЕНИЕ: Жестко конвертируем строку в число!
-                        reason=task.get('reason', 'Шпионаж'), 
-                        admin_name="Андрюшенька (Спецагент Шпион) 🕵️‍♂️",  
-                        trigger_text=task.get('trigger_text', ''), 
-                        origin_chat=escape_md(task.get('origin_chat', ''))
-                    )
+                    # 🔥 СУДЬЯ СКАЙНЕТ ПРОВЕРЯЕТ УЛИКИ АНДРЮШЕНЬКИ 🔥
+                    is_guilty = True
+                    if trigger_text:
+                        if "Черная зона" in reason:
+                            is_guilty = ai_context_checker(trigger_text, zone="black")
+                        elif "Оранжевая зона" in reason:
+                            is_guilty = ai_context_checker(trigger_text, zone="orange")
+                        elif "Желтая зона" in reason:
+                            is_guilty = ai_context_checker(trigger_text, zone="yellow")
+
+                    if is_guilty:
+                        # ИИ подтвердил вину -> Наказываем!
+                        if task['action'] == "global_ban":
+                            ban_user_everywhere(
+                                target_id=int(task['uid']), 
+                                reason=reason, 
+                                admin_name="Андрюшенька (Спецагент Шпион) 🕵️‍♂️", 
+                                trigger_text=trigger_text, 
+                                origin_chat=escape_md(task.get('origin_chat', ''))
+                            )
+                        else:
+                            mute_user_everywhere(
+                                target_id=int(task['uid']), 
+                                reason=reason, 
+                                admin_name="Андрюшенька (Спецагент Шпион) 🕵️‍♂️",  
+                                trigger_text=trigger_text, 
+                                origin_chat=escape_md(task.get('origin_chat', ''))
+                            )
+                    else:
+                        # 🛡 ИИ ОПРАВДАЛ ЮЗЕРА! Ордер аннулирован.
+                        print(f"🛡 СКАЙНЕТ ОТМЕНИЛ АРЕСТ! Андрюшенька ошибся. Улика: {trigger_text}")
+
+                    # В любом случае закрываем задачу, чтобы не зациклилась
                     db['skynet_tasks'].update_one({"_id": task['_id']}, {"$set": {"status": "done"}})
 
         except Exception as e:
