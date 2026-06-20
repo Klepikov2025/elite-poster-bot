@@ -947,5 +947,59 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     users_collection.update_one({"_id": user_id}, {"$set": {"shame_tag": new_tag}}, upsert=True)
                 except: pass
 
-        except Exception as e:
-            print(f"Ошибка Единого Ядра в модуле Skynet: {e}")
+            # === ⏳ УМНЫЙ АНТИФЛУД (6 ЧАСОВ) ДЛЯ НЕВЕРИФИЦИРОВАННЫХ ===
+            # Определяем, какие теги считаются "плохими" (не дают иммунитета)
+            bad_tags = ["Not verified", "Параметры FAKE", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска", "чернильница"]
+            
+            # Проверяем наличие "хорошего" статуса
+            has_good_tag = is_vip or is_queer or is_verified or (custom_tag and custom_tag not in bad_tags)
+            
+            # Применяем ко всем обычным юзерам (кроме ПАРНИ 18+, если там нет лимитов)
+            if not has_good_tag and chat_id not in PARNI_CHATS and not is_admin:
+                
+                def apply_smart_flood_limit():
+                    # 🕒 ПАУЗА 2 СЕКУНДЫ (Чтобы пропустить медиа-альбомы)
+                    time.sleep(2) 
+                    try:
+                        # 6 часов = 21600 секунд
+                        mute_until = int(time.time()) + 21600 
+                        bot.restrict_chat_member(
+                            chat_id, 
+                            user_id, 
+                            until_date=mute_until,
+                            can_send_messages=False
+                        )
+                        
+                        # Мотивационная отбивка
+                        flood_text = (
+                            f"⏱ {user_link}, ваше объявление опубликовано! Следующее можно отправить **только через 6 часов**.\n\n"
+                            f"🚀 *Хотите публиковать без ограничений и ожиданий?*\n"
+                            f"Пройдите бесплатную верификацию или станьте VIP-участником!"
+                        )
+
+                        # 👇 ДОБАВЛЯЕМ КНОПКИ 👇
+                        markup = types.InlineKeyboardMarkup(row_width=1)
+                        markup.add(
+                            types.InlineKeyboardButton("🛠 Пройти верификацию", url="https://t.me/FAQMKBOT"),
+                            types.InlineKeyboardButton("👑 Купить VIP-статус", url="https://t.me/Elitepost_bot") 
+                        )
+                        
+                        flood_msg = bot.send_message(
+                            chat_id, 
+                            flood_text, 
+                            parse_mode="Markdown", 
+                            disable_web_page_preview=True,
+                            reply_markup=markup
+                        )
+                        
+                        # Удаляем рекламу через 45 секунд, чтобы не мусорить в чате
+                        time.sleep(45)
+                        try: bot.delete_message(chat_id, flood_msg.message_id)
+                        except: pass
+                        
+                    except Exception as e:
+                        print(f"Ошибка умного антифлуда: {e}")
+                        
+                # Запускаем в отдельном потоке, чтобы не тормозить Скайнет
+                threading.Thread(target=apply_smart_flood_limit, daemon=True).start()
+            # ==========================================================
