@@ -263,7 +263,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
     def ai_context_checker(text, zone="black"):
         """Проверяет контекст сообщения через ИИ. Возвращает True (банить) или False (пропустить)"""
         if not GROQ_API_KEYS:
-            return True # Если ключей нет, баним по старинке
+            return True 
 
         if zone == "black":
             prompt = f"""Ты строгий модератор. Прочитай это сообщение из чата: "{text}"
@@ -278,6 +278,14 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
 Признается ли автор, что ему СЕЙЧАС от 18 до 21 года включительно?
 ВНИМАНИЕ: Если он ищет кого-то ("ищу 20 летнего"), говорит о размерах ("20 см") или о прошлом - это НЕ нарушение.
 Ответь СТРОГО одним словом: BAN (если ему 18-21) или SKIP (если контекст другой)."""
+
+        # 🔥 НОВОЕ: ПРОВЕРКА КОММЕРЦИИ 🔥
+        elif zone == "yellow":
+            prompt = f"""Ты строгий модератор. Прочитай это сообщение из чата: "{text}"
+Определи, нарушает ли автор правила сети (коммерция и эскорт):
+Ищет или предлагает ли автор интим за деньги, материальную помощь (МП), подарки за встречи, спонсорство или платные услуги эскорта?
+ВНИМАНИЕ: Если человек просто говорит про подарки на день рождения, праздники, обычные бытовые ситуации или работу - это БЕЗОПАСНО (SKIP).
+Ответь СТРОГО одним словом: BAN (если это коммерция/эскорт) или SKIP (если контекст безобидный)."""
 
         # Перебираем ключи для обхода лимитов (как у Секретаря)
         for key in GROQ_API_KEYS:
@@ -625,9 +633,12 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             # 1. Сначала фильтруем коммерцию (для всех, даже для VIP/QUEER)
             clean_commerce = re.sub(r'без\s*м\.?п\.?|не\s*коммерция|без\s*мат(\.?|ериальной)\s*помощи', '', text)
             if any(re.search(pattern, clean_commerce) for pattern in live_yellow):
-                bot.delete_message(chat_id, message.message_id)
-                mute_user_everywhere(user_id, reason="Желтая зона: Коммерция", admin_name="Скайнет ⚔️", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
-                return
+                
+                # 🔥 ПОДКЛЮЧАЕМ ИИ-АНАЛИТИКУ ПЕРЕД МУТОМ 🔥
+                if ai_context_checker(raw_text, zone="yellow"):
+                    bot.delete_message(chat_id, message.message_id)
+                    mute_user_everywhere(user_id, reason="Желтая зона: Коммерция", admin_name="Скайнет ⚔️", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
+                    return
 
             # =======================================================
             # 🛡 РАДАР ТВИНКОВ И ТЕКСТОВЫЙ АНТИ-БАЯН
