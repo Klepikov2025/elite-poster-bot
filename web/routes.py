@@ -499,6 +499,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
     def execute_broadcast(txt, tgt, btns_list):
         from telebot import types
         import time
+        from config import all_cities # <-- Достаем список всех городов и чатов
         
         markup = None
         if btns_list:
@@ -510,17 +511,41 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                 markup.add(types.InlineKeyboardButton(**kwargs))
                 
         add_radar_log(f"🚀 Запуск рассылки для: {tgt}")
-        cursor = users_collection.find({}) if tgt == 'all' else users_collection.find({"is_vip": True}) if tgt == 'vip' else users_collection.find({"is_queer": True}) if tgt == 'queer' else None
-        if not cursor: return
         
         count = 0
         dead_count = 0
+
+        # 👇 НОВЫЙ БЛОК: РАССЫЛКА ПО ВСЕМ ГРУППАМ СЕТИ 👇
+        if tgt == 'groups_all':
+            group_ids = set() # Используем set, чтобы исключить дубликаты
+            for city, networks in all_cities.items():
+                for net_key, groups in networks.items():
+                    for group in groups:
+                        group_ids.add(group['chat_id'])
+            
+            for chat_id in group_ids:
+                try:
+                    bot.send_message(chat_id, txt, parse_mode="HTML", disable_web_page_preview=True, reply_markup=markup)
+                    count += 1
+                    time.sleep(0.5) # Пауза для групп чуть больше (0.5 сек), чтобы ТГ не дал Flood Wait
+                except Exception as e:
+                    print(f"Ошибка рассылки в чат {chat_id}: {e}")
+                    
+            add_radar_log(f"✅ Рассылка по группам: Доставлено в {count} чатов.")
+            try: bot.send_message(STAFF_GROUP_ID, f"🚀 **Рассылка по ГРУППАМ завершена!**\n✅ Опубликовано в: {count} чатов.")
+            except: pass
+            return
+        # 👆 ========================================== 👆
+
+        # --- СТАРАЯ ЛОГИКА ДЛЯ ЛС ПОЛЬЗОВАТЕЛЕЙ ---
+        cursor = users_collection.find({}) if tgt == 'all' else users_collection.find({"is_vip": True}) if tgt == 'vip' else users_collection.find({"is_queer": True}) if tgt == 'queer' else None
+        if not cursor: return
         
         for u in cursor:
             try:
                 bot.send_message(u['_id'], txt, parse_mode="HTML", disable_web_page_preview=True, reply_markup=markup)
                 count += 1
-                time.sleep(0.05) # 🔥 Искусственная пауза (~20 сообщений в секунду)
+                time.sleep(0.05) # Искусственная пауза (~20 сообщений в секунду)
                 
             except Exception as e:
                 err_text = str(e).lower()
