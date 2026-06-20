@@ -5,7 +5,16 @@ TOKEN = os.getenv('BOT_TOKEN')
 MONGO_URI = os.getenv('MONGO_URI')
 
 # 🤖 ТОКЕНЫ НЕЙРОСЕТЕЙ (Тянутся из переменных окружения Render)
-GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "дефолтный_ключ")
+
+# 👇 ДОБАВЬ ЭТО 👇
+GROQ_API_KEYS = [
+    GROQ_API_KEY,
+    os.getenv("GROQ_API_KEY_2", ""),
+    os.getenv("GROQ_API_KEY_3", "")
+]
+# Защита: фильтруем пустые значения
+GROQ_API_KEYS = [k for k in GROQ_API_KEYS if k]
 HF_TOKEN = os.getenv('HF_TOKEN')
 OPENROUTER_KEY = os.getenv('OPENROUTER_KEY')
 
