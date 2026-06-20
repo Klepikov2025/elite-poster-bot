@@ -247,7 +247,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         f"♻️ {user_link}, круговорот баянов в природе нужно остановить. Сделай новое фото, прояви уважение к чату! (Страйк {spam_count}/3)",
                         f"📸 {user_link}, у тебя что, память в телефоне закончилась? Хватит слать дубликаты! (Страйк {spam_count}/3)"
                     ]
-                    warn_msg = bot.send_message(chat_id, random.choice(phrases), parse_mode="Markdown")
+                    warn_msg = bot.send_message(chat_id, random.choice(phrases), parse_mode="Markdown", disable_web_page_preview=True)
                     
                     def delete_photo_warn():
                         time.sleep(300)
@@ -764,7 +764,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                                 f"⌨️ {user_link}, нейросети видят 100% плагиат твоего же прошлого сообщения. Мы тут за живое общение! (Страйк {text_spam_count}/3)",
                                 f"🤖 {user_link}, Скайнет против бото-поведения. Хватит слать шаблоны по таймеру, включай мозг. (Страйк {text_spam_count}/3)"
                             ]
-                            warn_msg = bot.send_message(chat_id, random.choice(text_phrases), parse_mode="Markdown")
+                            warn_msg = bot.send_message(chat_id, random.choice(text_phrases), parse_mode="Markdown", disable_web_page_preview=True)
                             
                             def delete_text_warn():
                                 time.sleep(300)
