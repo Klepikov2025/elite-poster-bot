@@ -1018,3 +1018,6 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 # Запускаем в отдельном потоке, чтобы не тормозить Скайнет
                 threading.Thread(target=apply_smart_flood_limit, daemon=True).start()
             # ==========================================================
+
+        except Exception as e:
+            print(f"Критическая ошибка в skynet_core_handler: {e}")
