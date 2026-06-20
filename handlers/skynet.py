@@ -947,22 +947,37 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     users_collection.update_one({"_id": user_id}, {"$set": {"shame_tag": new_tag}}, upsert=True)
                 except: pass
 
-            # === ⏳ УМНЫЙ АНТИФЛУД (6 ЧАСОВ) ДЛЯ НЕВЕРИФИЦИРОВАННЫХ ===
+            # === ⏳ УМНЫЙ АНТИФЛУД ДЛЯ НЕВЕРИФИЦИРОВАННЫХ ===
             # Определяем, какие теги считаются "плохими" (не дают иммунитета)
             bad_tags = ["Not verified", "Параметры FAKE", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска", "чернильница"]
             
-            # Проверяем наличие "хорошего" статуса
+            # Проверяем наличие "хорошего" статуса (они проходят без лимитов)
             has_good_tag = is_vip or is_queer or is_verified or (custom_tag and custom_tag not in bad_tags)
             
             # Применяем ко всем обычным юзерам (кроме ПАРНИ 18+, если там нет лимитов)
             if not has_good_tag and chat_id not in PARNI_CHATS and not is_admin:
                 
+                # 🔥 ОПРЕДЕЛЯЕМ ЖЕСТКИЕ ЧАТЫ 🔥
+                hard_flood_chats = [
+                    chat_ids_mk.get("Фетиши"),
+                    chat_ids_mk.get("Секс Туризм"),
+                    chat_ids_mk.get("Аренда Жилья"),
+                    chat_ids_mk.get("Галерея")
+                ]
+                
+                # Настраиваем таймер и текст в зависимости от группы
+                if chat_id in hard_flood_chats:
+                    flood_duration_sec = 432000 # 5 суток в секундах
+                    flood_time_text = "5 суток"
+                else:
+                    flood_duration_sec = 21600  # 6 часов в секундах
+                    flood_time_text = "6 часов"
+
                 def apply_smart_flood_limit():
                     # 🕒 ПАУЗА 2 СЕКУНДЫ (Чтобы пропустить медиа-альбомы)
                     time.sleep(2) 
                     try:
-                        # 6 часов = 21600 секунд
-                        mute_until = int(time.time()) + 21600 
+                        mute_until = int(time.time()) + flood_duration_sec 
                         bot.restrict_chat_member(
                             chat_id, 
                             user_id, 
@@ -972,12 +987,12 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         
                         # Мотивационная отбивка
                         flood_text = (
-                            f"⏱ {user_link}, ваше объявление опубликовано! Следующее можно отправить **только через 6 часов**.\n\n"
+                            f"⏱ {user_link}, ваше объявление опубликовано! Следующее можно отправить **только через {flood_time_text}**.\n\n"
                             f"🚀 *Хотите публиковать без ограничений и ожиданий?*\n"
                             f"Пройдите бесплатную верификацию или станьте VIP-участником!"
                         )
 
-                        # 👇 ДОБАВЛЯЕМ КНОПКИ 👇
+                        # Кнопки
                         markup = types.InlineKeyboardMarkup(row_width=1)
                         markup.add(
                             types.InlineKeyboardButton("🛠 Пройти верификацию", url="https://t.me/FAQMKBOT"),
