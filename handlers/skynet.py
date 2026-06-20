@@ -15,7 +15,7 @@ from config import (
     all_cities, STAFF_GROUP_ID, SUPPORT_GROUP_ID, JOURNAL_CHAT_ID,
     chat_ids_mk, chat_ids_parni, chat_ids_ns,
     chat_ids_rainbow, chat_ids_gayznak, MAIN_CHANNEL_LINK,
-    GROQ_API_KEY, HF_TOKEN, OPENROUTER_KEY  # <--- Добавили новые токены
+    GROQ_API_KEY, GROQ_API_KEYS, HF_TOKEN, OPENROUTER_KEY  # <--- Добавили новые токены
 )
 from database import users_collection, banned_collection, db, archive_collection
 from utils import escape_md, get_user_name
@@ -258,6 +258,53 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         except Exception as e:
             print(f"Ошибка зрительной памяти: {e}")
     # 👆 ========================================== 👆
+
+    # 👇 УМНАЯ ПРОВЕРКА КОНТЕКСТА ЧЕРЕЗ ИИ 👇
+    def ai_context_checker(text, zone="black"):
+        """Проверяет контекст сообщения через ИИ. Возвращает True (банить) или False (пропустить)"""
+        if not GROQ_API_KEYS:
+            return True # Если ключей нет, баним по старинке
+
+        if zone == "black":
+            prompt = f"""Ты строгий модератор. Прочитай это сообщение из чата: "{text}"
+Определи, нарушает ли автор правила:
+1. Автор признается, что ему СЕЙЧАС меньше 18 лет?
+2. Автор ищет или предлагает интим несовершеннолетним?
+ВНИМАНИЕ: Если автор говорит о прошлом ("в 14 лет я был..."), жалуется на других ("мне пишут 14-летние") или говорит о размерах/предметах - это НЕ нарушение.
+Ответь СТРОГО одним словом: BAN (если нарушение) или SKIP (если безопасно)."""
+
+        elif zone == "orange":
+            prompt = f"""Ты строгий модератор. Прочитай это сообщение из чата: "{text}"
+Признается ли автор, что ему СЕЙЧАС от 18 до 21 года включительно?
+ВНИМАНИЕ: Если он ищет кого-то ("ищу 20 летнего"), говорит о размерах ("20 см") или о прошлом - это НЕ нарушение.
+Ответь СТРОГО одним словом: BAN (если ему 18-21) или SKIP (если контекст другой)."""
+
+        # Перебираем ключи для обхода лимитов (как у Секретаря)
+        for key in GROQ_API_KEYS:
+            try:
+                response = requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                    json={
+                        "model": "llama-3.3-70b-versatile",
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.0,
+                        "max_tokens": 10
+                    },
+                    timeout=5
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()["choices"][0]["message"]["content"].strip().upper()
+                    return "BAN" in result
+                elif response.status_code == 429:
+                    continue # Попали в лимит -> пробуем следующий ключ
+                    
+            except Exception as e:
+                continue # Сетевая ошибка -> пробуем следующий ключ
+                
+        return True # Если все ключи сгорели, перестраховываемся и баним
+    # 👆 ========================================= 👆
 
     # 👇 КОМАНДА-ШПИОН (Обрабатывается самой первой!) 👇
     @bot.message_handler(commands=['ping'])
@@ -565,13 +612,15 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 r'\b(мне|я)\s*18\s*-\s*[1-9]\b',             
                 r'\b(1[0-7]|18\s*-\s*[1-9])\s*(лет|годик)\b',
                 r'\b(1[0-7])\s*[/\\-]\s*1\d{2}\b',           
-                r'\b(200[9]|201[0-9])\s*(г\.р\.?|года?\s*рожд\w*)\b', # <--- ИСПРАВЛЕНО! (Только г.р. или год рождения)
+                r'\b(200[9]|201[0-9])\s*(г\.р\.?|года?\s*рожд\w*)\b',
                 r'\bочень молод(ой|енький)\b'
             ]
             if any(re.search(p, safe_minor) for p in minor_patterns):
-                bot.delete_message(chat_id, message.message_id)
-                ban_user_everywhere(user_id, reason="Черная зона: Несовершеннолетний (<18)", admin_name="Скайнет 🔞", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
-                return
+                # 🔥 ПОДКЛЮЧАЕМ ИИ-АНАЛИТИКУ ПЕРЕД БАНОМ 🔥
+                if ai_context_checker(raw_text, zone="black"):
+                    bot.delete_message(chat_id, message.message_id)
+                    ban_user_everywhere(user_id, reason="Черная зона: Несовершеннолетний (<18)", admin_name="Скайнет 🔞", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
+                    return
 
             # 1. Сначала фильтруем коммерцию (для всех, даже для VIP/QUEER)
             clean_commerce = re.sub(r'без\s*м\.?п\.?|не\s*коммерция|без\s*мат(\.?|ериальной)\s*помощи', '', text)
@@ -592,7 +641,6 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     clean_current = re.sub(r'\s+', '', text)
                     
                     # 1. РАДАР ТВИНКОВ (ПРОКАЧАННЫЙ)
-                    # Увеличили память Скайнета: теперь он помнит 100 последних забаненных текстов
                     recent_bans = list(db['blacklisted_texts'].find().sort("_id", -1).limit(150))
                     
                     for bad in recent_bans:
@@ -600,8 +648,6 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         if not clean_bad: continue
                         similarity = difflib.SequenceMatcher(None, clean_current, clean_bad).ratio()
                         
-                        # 🔥 ДИНАМИЧЕСКАЯ ЧУВСТВИТЕЛЬНОСТЬ 🔥
-                        # Если это карантинник (новорег), Скайнет бьет строже - при совпадении от 75%
                         is_newbie = user_id > 7800000000
                         threshold = 0.75 if is_newbie else 0.85 
                         
@@ -622,7 +668,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             markup.add(types.InlineKeyboardButton("🔨 ЗАБАНИТЬ ВЕЗДЕ", callback_data=f"radar_ban_{user_id}"))
                             try: bot.send_message(STAFF_GROUP_ID, report, parse_mode="Markdown", reply_markup=markup)
                             except: pass
-                            return # Выходим, чтобы текст не пошел дальше по фильтрам
+                            return 
 
                     # 2. ТЕКСТОВЫЙ АНТИ-БАЯН (ПОЧАТОВЫЙ)
                     text_memory_id = f"{user_id}_{chat_id}"
@@ -639,7 +685,6 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     
                     if is_text_duplicate:
                         text_spam_count += 1
-                        # 🔥 ИСПРАВЛЕНО ТУТ: Сохраняем страйк для конкретного чата
                         db['text_memory'].update_one({"_id": text_memory_id}, {"$set": {"spam_count": text_spam_count}}, upsert=True)
                         
                         try: bot.delete_message(chat_id, message.message_id)
@@ -647,10 +692,8 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         
                         if text_spam_count >= 3:
                             mute_time = int(time.time()) + 259200
-                            # Мутим юзера на 3 дня
                             mute_user_everywhere(user_id, reason="Рецидив: Текстовый спам (Анти-Копипаст)", admin_name="Скайнет 📝", mute_time=mute_time)
                             
-                            # 🔥 ГЕНЕРИРУЕМ ЖЕСТКОЕ УНИЖЕНИЕ ЧЕРЕЗ ИИ ДЛЯ КОПИПАСТЕРОВ 🔥
                             if GROQ_API_KEY:
                                 text_insult_styles = [
                                     "Сделай акцент на его сломанных клавишах Ctrl+C и Ctrl+V.",
@@ -717,9 +760,8 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                                 try: bot.delete_message(chat_id, warn_msg.message_id)
                                 except: pass
                             threading.Thread(target=delete_text_warn, daemon=True).start()
-                        return # Прерываем, чтобы дальше по коду не шло
+                        return 
                     else:
-                        # Текст уникальный -> сохраняем в память (запоминаем последние 10)
                         new_texts = [clean_current] + recent_texts[:9]
                         db['text_memory'].update_one(
                             {"_id": text_memory_id}, 
@@ -736,29 +778,17 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 except: pass
                 key = (chat_id, user_id)
                 if key not in warned_users:
-                    # === МАГИЯ ТВОЕГО КОНСТРУКТОРА (С ЦВЕТАМИ И ЭМОДЗИ) ===
                     markup = types.InlineKeyboardMarkup(row_width=1)
-                    
                     db_buttons = db['settings'].find_one({"_id": "skynet_buttons"})
                     
                     if db_buttons and db_buttons.get("buttons"):
                         for btn in db_buttons["buttons"]:
-                            # Базовые параметры (Текст и Ссылка)
                             kwargs = {"text": btn["text"], "url": btn["url"]}
-                            
-                            # Если выбран цвет (и это не дефолт)
-                            if btn.get("style") and btn["style"] != "default":
-                                kwargs["style"] = btn["style"]
-                                
-                            # Если указан ID кастомного эмодзи
-                            if btn.get("emoji_id"):
-                                kwargs["icon_custom_emoji_id"] = btn["emoji_id"]
-                                
+                            if btn.get("style") and btn["style"] != "default": kwargs["style"] = btn["style"]
+                            if btn.get("emoji_id"): kwargs["icon_custom_emoji_id"] = btn["emoji_id"]
                             markup.add(types.InlineKeyboardButton(**kwargs))
                     else:
-                        # Если база пустая (страховка)
                         markup.add(types.InlineKeyboardButton(text="Подписаться на МК", url="https://t.me/clubofrm"))
-                    # ======================================================
 
                     sent = bot.send_message(chat_id, "❗ Внимание, чтобы писать в чате вам необходимо подписаться на наш основной канал.\n\nБез подписки на канал ваши сообщения будут удаляться автоматически. Вступая в чат, я подтверждаю совершеннолетие и обязуюсь соблюдать правила, с которыми ознакомлен и согласен.", reply_markup=markup)
                     warned_users[key] = sent.message_id
@@ -778,16 +808,13 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     users_collection.update_one({"_id": user_id}, {"$set": {"first_seen": first_seen}}, upsert=True)
                 seconds_passed = time.time() - first_seen
                 
-                # Если это новорег и прошло меньше 120 часов (432000 сек)
                 if user_id > 7800000000 and seconds_passed < 432000:
                     try: bot.delete_message(chat_id, message.message_id)
                     except: pass
                     
-                    # 🤐 ФИЗИЧЕСКИЙ МУТ НА ОСТАТОК ВРЕМЕНИ 🤐
                     remaining_time = int(432000 - seconds_passed)
                     if remaining_time > 0:
                         try:
-                            # Физически забираем права писать в этом конкретном чате!
                             bot.restrict_chat_member(
                                 chat_id, 
                                 user_id, 
@@ -796,7 +823,6 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             )
                         except: pass
 
-                    # 📨 ПОПЫТКА ОТПРАВИТЬ ИНСТРУКЦИЮ В ЛС
                     try:
                         bot.send_message(
                             user_id, 
@@ -805,7 +831,6 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             disable_web_page_preview=True
                         )
                     except:
-                        # Если телега запретила писать в ЛС - кидаем "Фантомную" отбивку в чат
                         try:
                             safe_name = escape_md(message.from_user.first_name or "Пользователь")
                             ghost_msg = bot.send_message(
@@ -814,7 +839,6 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                                 parse_mode="Markdown",
                                 disable_web_page_preview=True
                             )
-                            # Удаляем через 15 секунд, чтобы не мусорить
                             def delete_ghost():
                                 time.sleep(15)
                                 try: bot.delete_message(chat_id, ghost_msg.message_id)
@@ -822,7 +846,6 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             threading.Thread(target=delete_ghost, daemon=True).start()
                         except: pass
                     
-                    # Отправляем лог ТОЛЬКО админам
                     try: 
                         bot.send_message(
                             STAFF_GROUP_ID, 
@@ -834,16 +857,14 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         )
                     except: pass
                     
-                    return # Полностью прерываем обработку 
+                    return 
 
             # === 📏 ОПЕРАЦИЯ "1 МАЯ" ===
             if sys_settings.get("may_1_active", True):
-                # СПАСИТЕЛЬНЫЙ ФИЛЬТР: ГДЕ НЕ НУЖНЫ ПАРАМЕТРЫ!
                 EXCLUDED_FROM_PARAMS = set(PARNI_CHATS)
                 EXCLUDED_FROM_PARAMS.update([VIP_CHAT_ID, BEYOND_CHAT_ID])
                 EXCLUDED_FROM_PARAMS.update([chat_ids_mk.get("Фетиши"), chat_ids_mk.get("Мужской Чат"), chat_ids_mk.get("Секс Туризм"), chat_ids_mk.get("Аренда Жилья")])
 
-                # 👇 ДОБАВИЛИ ПРОВЕРКУ: КРУЖКИ НЕ МУТИМ ЗА ОТСУТСТВИЕ ТЕКСТА 👇
                 if chat_id not in EXCLUDED_FROM_PARAMS and message.content_type != 'video_note':
                     strict_match = re.search(r'(?<!\d)[1-9]\d/1\d{2}/\d{2,3}(?:/\d{1,2}(?:[.,*xхX]\d{1,2})?)?(?!\d)', text)
                     if not strict_match:
@@ -854,7 +875,6 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             types.InlineKeyboardButton("🛠 Пройти верификацию", url="https://t.me/MK_MensClubSUPPORT"),
                             types.InlineKeyboardButton("😈 ПАРНИ 18+ (Без ограничений)", url="https://t.me/znakparni/116")
                         )
-                        # 📝 ТЯНЕМ ТЕКСТ "1 МАЯ" ИЗ БАЗЫ
                         db_texts = db['settings'].find_one({"_id": "skynet_texts"}) or {}
                         raw_text_may1 = db_texts.get("may_1_warn", "🚨 {user_link}, **ВНИМАНИЕ!**\n\nС 1 мая введен СТРОГИЙ стандарт оформления анкет для досок объявлений.\nЛюбой текст **БЕЗ ПАРАМЕТРОВ** или с неправильным форматом запрещен!\nПараметры должны быть указаны **ТОЛЬКО через слеш (/) без пробелов и лишних слов**.\n\n✅ *Примеры:* `24/187/72` или `24/187/72/19` (допускается `19.5` или `19*4`)\n\nВаша анкета удалена, а вы временно ограничены в общении во всех группах сети.\n\n💡 *P.S. В нашей сети «ПАРНИ 18+» нет ограничений на формат текста и разрешен любой откровенный контент (включая порно). Переходи туда! 👇*")
 
@@ -870,28 +890,28 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         threading.Thread(target=delete_warning_may, daemon=True).start()
                         return
 
-            # Очищаем от безопасных контекстов (ищу от 18 до 21, 18-25, 18+, и размеры 18-21 см)
+            # Очищаем от безопасных контекстов
             safe_age = re.sub(r'(от|парня|мальчика|мужчину|ищу|для)\s*(?:1[89]|2[0-1])\b|\b(?:1[89]|2[0-1])\s*-\s*\d{2}\b|\b(?:1[89]|2[0-1])\s*\+|\b(?:1[89]|2[0-1])\s*(см|cm)\b', '', text)
             
-            # Ловим, если юзер пишет про свой возраст от 18 до 21 включительно
+            # Ловим Оранжевую зону (18-21)
             if re.search(r'\b(?:1[89]|2[0-1])\s*(лет|год|годик|y\.?o\.?)\b|\b(?:1[89]|2[0-1])\s*[/\\-]\s*1\d{2}\b|\b(мне|я)\s*(?:1[89]|2[0-1])\b', safe_age):
-                bot.delete_message(chat_id, message.message_id)
-                mute_user_everywhere(user_id, reason="Оранжевая зона: Возраст 18-21", admin_name="Скайнет 🔞", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
-                markup = types.InlineKeyboardMarkup()
-                markup.add(types.InlineKeyboardButton("🛠 Пройти верификацию 🔞", url="https://t.me/FAQMKBOT"))
-                
-                # 📝 ТЯНЕМ ТЕКСТ ИЗ БАЗЫ
-                db_texts = db['settings'].find_one({"_id": "skynet_texts"}) or {}
-                # Слегка адаптировал дефолтный текст, чтобы он подходил под новые рамки
-                raw_text_minor = db_texts.get("minor_warn", "🚨 {user_link}, **Внимание!**\nВаша анкета попала под автоматический фильтр безопасности сети. Вашего возрастного диапазона проходят обязательную верификацию 🔞.")
-                
-                warning_msg = bot.send_message(chat_id, raw_text_minor.replace("{user_link}", user_link), reply_markup=markup, parse_mode="Markdown", disable_web_page_preview=True)
-                def delete_warning_18():
-                    time.sleep(300)
-                    try: bot.delete_message(chat_id, warning_msg.message_id)
-                    except: pass
-                threading.Thread(target=delete_warning_18, daemon=True).start()
-                return
+                # 🔥 ПОДКЛЮЧАЕМ ИИ-АНАЛИТИКУ ПЕРЕД БАНОМ 🔥
+                if ai_context_checker(raw_text, zone="orange"):
+                    bot.delete_message(chat_id, message.message_id)
+                    mute_user_everywhere(user_id, reason="Оранжевая зона: Возраст 18-21", admin_name="Скайнет 🔞", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
+                    markup = types.InlineKeyboardMarkup()
+                    markup.add(types.InlineKeyboardButton("🛠 Пройти верификацию 🔞", url="https://t.me/FAQMKBOT"))
+                    
+                    db_texts = db['settings'].find_one({"_id": "skynet_texts"}) or {}
+                    raw_text_minor = db_texts.get("minor_warn", "🚨 {user_link}, **Внимание!**\nВаша анкета попала под автоматический фильтр безопасности сети. Пользователи до 21 года включительно проходят обязательную верификацию 🔞.")
+                    
+                    warning_msg = bot.send_message(chat_id, raw_text_minor.replace("{user_link}", user_link), reply_markup=markup, parse_mode="Markdown", disable_web_page_preview=True)
+                    def delete_warning_18():
+                        time.sleep(300)
+                        try: bot.delete_message(chat_id, warning_msg.message_id)
+                        except: pass
+                    threading.Thread(target=delete_warning_18, daemon=True).start()
+                    return
 
             new_tag = None
             age_match = re.search(r'\b(?:мне|я)\s*([1-9]\d)\b|\b([1-9]\d)\s*(?:лет|год|годик)\b|\b([1-9]\d)\s*[/\\-]\s*1\d{2}\b', text)
