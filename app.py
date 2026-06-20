@@ -1142,7 +1142,7 @@ def skynet_listener():
                         reason=task.get('reason', 'Шпионаж'), 
                         admin_name="Андрюшенька (Спецагент Шпион) 🕵️‍♂️", 
                         trigger_text=task.get('trigger_text', ''), 
-                        origin_chat=escape_md(task.get('origin_chat', '')) # 👈 Экранируем название чата!
+                        origin_chat=escape_md(task.get('origin_chat', ''))
                     )
                     db['skynet_tasks'].update_one({"_id": task['_id']}, {"$set": {"status": "done"}})
                     
