@@ -259,6 +259,177 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             print(f"Ошибка зрительной памяти: {e}")
     # 👆 ========================================== 👆
 
+# ================= OSINT: ДОСЬЕ ДЛЯ ЭЛИТЫ (СТЕЛС-РЕЖИМ) =================
+    @bot.message_handler(commands=['check', 'досье'])
+    @bot.message_handler(func=lambda m: m.text and m.text.lower().startswith(('.check', '!check', 'досье')))
+    def osint_check_handler(message):
+        # 🔥 ПРЕДОХРАНИТЕЛЬ ОТ АНОНИМНЫХ АДМИНОВ 🔥
+        if getattr(message, 'sender_chat', None):
+            try: bot.send_message(message.chat.id, "❌ **Ошибка:** Вы пишете от имени группы (Анонимно). Переключитесь на свой личный профиль, чтобы Скайнет увидел ваш VIP-статус!")
+            except: pass
+            return
+
+        uid = message.from_user.id
+        
+        # 1. Проверяем права
+        user_data = users_collection.find_one({"_id": uid}) or {}
+        is_admin = uid in ADMIN_CHAT_IDS or uid == OWNER_ID
+        is_elite = user_data.get("is_vip") or user_data.get("is_queer") or user_data.get("custom_tag") == "Спонсор_Одобрен"
+        
+        if not (is_admin or is_elite):
+            if message.chat.type == "private":
+                bot.send_message(message.chat.id, "❌ **Отказано в доступе.**\nБаза данных Скайнета засекречена.", parse_mode="Markdown")
+            return
+            
+        target_uid = None
+        display_target = "Неизвестно"
+        target_input = ""
+        clean_name = ""
+        with_at = ""
+        
+        # 🔥 МЕТОД 1: ПРОБИВ ПО РЕПЛАЮ 🔥
+        if message.reply_to_message:
+            if message.reply_to_message.forward_from:
+                target_uid = message.reply_to_message.forward_from.id
+            else:
+                target_uid = message.reply_to_message.from_user.id
+            display_target = str(target_uid)
+            
+        # 🔥 МЕТОД 2: ПОИСК ПО ТЕКСТУ 🔥
+        else:
+            args = message.text.split()
+            if len(args) < 2:
+                error_msg = (
+                    "📋 **Служба Безопасности: Пробив по базе**\n\n"
+                    "Используйте команду: `/check @username` или `/check ID`\n\n"
+                    "💡 *СЕКРЕТНЫЙ ЛАЙФХАК:* Просто **ответьте (reply)** командой `!check` на сообщение подозреваемого в чате! Это работает на 100%."
+                )
+                try:
+                    bot.send_message(uid, error_msg, parse_mode="Markdown")
+                    if message.chat.type != "private":
+                        try: bot.delete_message(message.chat.id, message.message_id)
+                        except: pass
+                except:
+                    bot.send_message(message.chat.id, f"❌ {message.from_user.first_name}, напишите мне в личку /start, чтобы получать досье.")
+                return
+                
+            target_input = args[1].replace("https://", "").replace("http://", "").replace("t.me/", "").replace("@", "").replace("/", "").strip()
+            
+            if target_input.isdigit():
+                target_uid = int(target_input)
+                display_target = str(target_uid)
+            else:
+                clean_name = target_input.lower()
+                with_at = f"@{clean_name}"
+                display_target = with_at
+                
+                try:
+                    chat_info = bot.get_chat(with_at)
+                    target_uid = chat_info.id
+                except Exception:
+                    regex_clean = {"$regex": f"^{clean_name}$", "$options": "i"}
+                    regex_with_at = {"$regex": f"^{with_at}$", "$options": "i"}
+                    
+                    search_query = {"$or": [
+                        {"username": regex_clean},
+                        {"username": regex_with_at}
+                    ]}
+                    
+                    doc = db['support_tickets'].find_one(search_query)
+                    if not doc: doc = db['paid_users'].find_one(search_query)
+                    if not doc: doc = users_collection.find_one(search_query)
+                    if not doc: doc = banned_collection.find_one(search_query)
+                    
+                    if doc: 
+                        target_uid = doc.get("uid") or doc.get("user_id") or doc.get("_id")
+            
+        # 3. Собираем данные со всей базы
+        t_info = users_collection.find_one({"_id": target_uid}) if target_uid else None
+        b_info = banned_collection.find_one({"_id": target_uid}) if target_uid else None
+        
+        # 🔥 СУПЕР-РАДАР ДЛЯ АРХИВА (Игнорируем пустые папки-дубликаты) 🔥
+        archive_query = []
+        if target_uid:
+            archive_query.extend([
+                {"target": str(target_uid)},
+                {"target": target_uid},
+                {"uid": target_uid},
+                {"_id": target_uid}
+            ])
+            
+        if clean_name and with_at:
+            archive_query.extend([
+                {"target": {"$regex": f"^{clean_name}$", "$options": "i"}},
+                {"target": {"$regex": f"^{with_at}$", "$options": "i"}},
+                {"target": {"$regex": f"{clean_name}", "$options": "i"}}
+            ])
+            
+        archive_info = None
+        if archive_query:
+            archive_info = archive_collection.find_one({
+                "$or": archive_query,
+                "history.0": {"$exists": True}
+            })
+            if not archive_info:
+                archive_info = archive_collection.find_one({"$or": archive_query})
+
+        if not t_info and not b_info and not archive_info:
+            empty_report = f"🗄 **База данных Скайнета:**\nПользователь `{display_target}` не найден. История абсолютно чиста."
+            try:
+                bot.send_message(uid, empty_report, parse_mode="Markdown")
+                if message.chat.type != "private":
+                    try: bot.delete_message(message.chat.id, message.message_id)
+                    except: pass
+            except:
+                bot.send_message(message.chat.id, f"❌ {message.from_user.first_name}, напишите мне в личку /start, чтобы получать досье.")
+            return
+                      
+        # 4. Формируем красивое досье
+        status = "🔴 ЗАБАНЕН (ЧС)" if b_info else "🟢 ЧИСТ / АКТИВЕН"
+        city = escape_md(t_info.get("main_city", "Не привязан")) if t_info else "Неизвестно"
+        tag = escape_md(t_info.get("custom_tag", "Отсутствует")) if t_info else "Отсутствует"
+        
+        history_text = "_История нарушений пуста._\n"
+        if archive_info and archive_info.get("history"):
+            history_text = ""
+            for entry in archive_info["history"][-5:]:
+                date = escape_md(entry.get('date', ''))
+                action = escape_md(entry.get('action', ''))
+                reason = escape_md(entry.get('reason', ''))
+                history_text += f"▪️ **{date}** | {action}\n_Причина: {reason}_\n\n"
+                
+        report = (
+            f"📁 **ОФИЦИАЛЬНОЕ ДОСЬЕ**\n\n"
+            f"**Цель:** `{display_target}`\n"
+            f"**Статус в сети:** {status}\n"
+            f"**Город:** {city}\n"
+            f"**Особые отметки:** {tag}\n\n"
+            f"📜 **ВЫПИСКА ИЗ АРХИВА:**\n"
+            f"{history_text}"
+            f"👁‍🗨 _Сгенерировано по запросу VIP-резидента._"
+        )
+        
+        # 5. ОТПРАВЛЯЕМ В ЛИЧКУ И ЗАЧИЩАЕМ ЧАТ
+        try:
+            bot.send_message(uid, report, parse_mode="Markdown")
+            if message.chat.type != "private":
+                try: bot.delete_message(message.chat.id, message.message_id)
+                except: pass
+                notif = bot.send_message(message.chat.id, f"🕵️‍♂️ Секретное досье отправлено вам в личные сообщения.")
+                def delete_notif():
+                    import time
+                    time.sleep(5)
+                    try: bot.delete_message(message.chat.id, notif.message_id)
+                    except: pass
+                import threading
+                threading.Thread(target=delete_notif, daemon=True).start()
+        except Exception as e:
+            bot.send_message(message.chat.id, f"❌ Я не могу отправить досье. Напишите мне в личку /start. Ошибка: {e}")
+        
+        try: add_radar_log(f"🔎 VIP {uid} пробил досье на {display_target}")
+        except: pass
+    # ==========================================================
+
     # 👇 УМНАЯ ПРОВЕРКА КОНТЕКСТА ЧЕРЕЗ ИИ 👇
     def ai_context_checker(text, zone="black"):
         """Проверяет контекст сообщения через ИИ. Возвращает True (банить) или False (пропустить)"""
@@ -318,190 +489,6 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
     @bot.message_handler(commands=['ping'])
     def ping_handler(message):
         bot.reply_to(message, f"👀 Я жив! ID этого чата: {message.chat.id}")
-
-    # ================= OSINT: ДОСЬЕ ДЛЯ ЭЛИТЫ (СТЕЛС-РЕЖИМ) =================
-    @bot.message_handler(commands=['check', 'досье'])
-    @bot.message_handler(func=lambda m: m.text and m.text.lower().startswith(('.check', '!check', 'досье ')))
-    def osint_check_handler(message):
-        uid = message.from_user.id
-        
-        # 1. Проверяем права
-        user_data = users_collection.find_one({"_id": uid}) or {}
-        is_admin = uid in ADMIN_CHAT_IDS or uid == OWNER_ID
-        is_elite = user_data.get("is_vip") or user_data.get("is_queer") or user_data.get("custom_tag") == "Спонсор_Одобрен"
-        
-        if not (is_admin or is_elite):
-            if message.chat.type == "private":
-                bot.send_message(message.chat.id, "❌ **Отказано в доступе.**\nБаза данных Скайнета засекречена.", parse_mode="Markdown")
-            return
-            
-        target_uid = None
-        display_target = "Неизвестно"
-        target_input = ""
-        clean_name = ""
-        with_at = ""
-        
-        # 🔥 МЕТОД 1: ПРОБИВ ПО РЕПЛАЮ
-        if message.reply_to_message:
-            if message.reply_to_message.forward_from:
-                target_uid = message.reply_to_message.forward_from.id
-            else:
-                target_uid = message.reply_to_message.from_user.id
-            display_target = str(target_uid)
-            
-        # МЕТОД 2: Поиск по аргументам
-        else:
-            args = message.text.split()
-            if len(args) != 2:
-                error_msg = (
-                    "📋 **Служба Безопасности: Пробив по базе**\n\n"
-                    "Используйте команду: `/check @username` или `/check ID`\n\n"
-                    "💡 *СЕКРЕТНЫЙ ЛАЙФХАК:* Можете просто **ответить (reply)** командой `/check` на сообщение подозреваемого!"
-                )
-                try:
-                    bot.send_message(uid, error_msg, parse_mode="Markdown")
-                    if message.chat.type != "private":
-                        try: bot.delete_message(message.chat.id, message.message_id)
-                        except: pass
-                except:
-                    bot.send_message(message.chat.id, f"❌ {message.from_user.first_name}, напишите мне в личку /start.")
-                return
-                
-            target_input = args[1].replace("https://", "").replace("http://", "").replace("t.me/", "").replace("@", "").replace("/", "").strip()
-            
-            if target_input.isdigit():
-                target_uid = int(target_input)
-                display_target = str(target_uid)
-            else:
-                clean_name = target_input.lower().strip()
-                with_at = f"@{target_input}"
-                display_target = with_at
-                
-                # === УЛУЧШЕННЫЙ РЕЗОЛВ USERNAME ===
-                try:
-                    chat_info = bot.get_chat(with_at)
-                    target_uid = chat_info.id
-                    display_target = str(target_uid)
-                except Exception:
-                    # Если bot.get_chat не сработал — ищем в базах
-                    search_patterns = [
-                        {"username": {"$regex": f"^{clean_name}$", "$options": "i"}},
-                        {"username": {"$regex": f"^{with_at}$", "$options": "i"}},
-                        {"user_link": {"$regex": clean_name, "$options": "i"}},
-                        {"target": {"$regex": f"^{clean_name}$", "$options": "i"}},
-                        {"target": {"$regex": f"^{with_at}$", "$options": "i"}},
-                        {"target": {"$regex": clean_name, "$options": "i"}}
-                    ]
-                    
-                    collections_to_search = [
-                        db['support_tickets'],
-                        banned_collection,
-                        users_collection,
-                    ]
-                    try:
-                        from database import posts_collection
-                        collections_to_search.append(posts_collection)
-                    except: pass
-                    collections_to_search.append(db['paid_users'])
-                    
-                    for coll in collections_to_search:
-                        for pattern in search_patterns:
-                            doc = coll.find_one(pattern)
-                            if doc:
-                                target_uid = doc.get("uid") or doc.get("user_id") or doc.get("_id")
-                                if target_uid:
-                                    break
-                        if target_uid:
-                            break
-
-        # === ОСНОВНОЙ СБОР ИНФОРМАЦИИ ===
-        t_info = users_collection.find_one({"_id": target_uid}) if target_uid else None
-        b_info = banned_collection.find_one({"_id": target_uid}) if target_uid else None
-        
-        # 🔥 УЛУЧШЕННЫЙ ПОИСК В АРХИВЕ (самое важное)
-        archive_query = []
-        if target_uid:
-            archive_query.extend([
-                {"target": str(target_uid)}, {"target": target_uid},
-                {"uid": target_uid}, {"_id": target_uid}
-            ])
-        if clean_name:
-            archive_query.extend([
-                {"target": {"$regex": f"^{clean_name}$", "$options": "i"}},
-                {"target": {"$regex": f"^{with_at}$", "$options": "i"}},
-                {"target": {"$regex": clean_name, "$options": "i"}}
-            ])
-
-        archive_info = None
-        if archive_query:
-            # Сначала ищем с историей
-            archive_info = archive_collection.find_one({
-                "$or": archive_query,
-                "history.0": {"$exists": True}
-            })
-            if not archive_info:
-                archive_info = archive_collection.find_one({"$or": archive_query})
-
-        # Если ничего не нашли — пробуем поиск только по username в архиве (последний шанс)
-        if not target_uid and not archive_info and clean_name:
-            archive_info = archive_collection.find_one({
-                "$or": [
-                    {"target": {"$regex": clean_name, "$options": "i"}},
-                    {"username": {"$regex": clean_name, "$options": "i"}}
-                ]
-            })
-            if archive_info and archive_info.get("_id"):
-                target_uid = archive_info.get("_id") or archive_info.get("uid") or archive_info.get("target")
-
-        if not t_info and not b_info and not archive_info and not target_uid:
-            empty_report = f"🗄 **База данных Скайнета:**\nПользователь `{display_target}` не найден. История абсолютно чиста."
-            try:
-                bot.send_message(uid, empty_report, parse_mode="Markdown")
-                if message.chat.type != "private":
-                    try: bot.delete_message(message.chat.id, message.message_id)
-                    except: pass
-            except:
-                bot.send_message(message.chat.id, f"❌ {message.from_user.first_name}, напишите мне в личку /start.")
-            return
-                      
-        # Формирование досье (оставил как было, только улучшил fallback)
-        status = "🔴 ЗАБАНЕН (ЧС)" if b_info else "🟢 ЧИСТ / АКТИВЕН"
-        city = escape_md(t_info.get("main_city", "Не привязан")) if t_info else "Неизвестно"
-        tag = escape_md(t_info.get("custom_tag", "Отсутствует")) if t_info else "Отсутствует"
-        
-        history_text = "_История нарушений пуста._\n"
-        if archive_info and archive_info.get("history"):
-            history_text = ""
-            for entry in archive_info["history"][-5:]:
-                date = escape_md(entry.get('date', ''))
-                action = escape_md(entry.get('action', ''))
-                reason = escape_md(entry.get('reason', ''))
-                history_text += f"▪️ **{date}** | {action}\n_Причина: {reason}_\n\n"
-                
-        report = (
-            f"📁 **ОФИЦИАЛЬНОЕ ДОСЬЕ**\n\n"
-            f"**Цель:** `{display_target}`\n"
-            f"**Статус в сети:** {status}\n"
-            f"**Город:** {city}\n"
-            f"**Особые отметки:** {tag}\n\n"
-            f"📜 **ВЫПИСКА ИЗ АРХИВА:**\n"
-            f"{history_text}"
-            f"👁‍🗨 _Сгенерировано по запросу VIP-резидента._"
-        )
-        
-        # Отправка
-        try:
-            bot.send_message(uid, report, parse_mode="Markdown")
-            if message.chat.type != "private":
-                try: bot.delete_message(message.chat.id, message.message_id)
-                except: pass
-                notif = bot.send_message(message.chat.id, f"🕵️‍♂️ {message.from_user.first_name}, секретное досье отправлено вам в ЛС.")
-                threading.Thread(target=lambda: (time.sleep(5), bot.delete_message(message.chat.id, notif.message_id)), daemon=True).start()
-        except Exception as e:
-            bot.send_message(message.chat.id, f"❌ {message.from_user.first_name}, не могу отправить досье в ЛС. Ошибка: {e}")
-        
-        try: add_radar_log(f"🔎 {'ADMIN' if is_admin else 'VIP'} {uid} пробил досье на {display_target}")
-        except: pass
 
     # 👇 🤖 МОДУЛЬ: АВТО-АДМИН ПОДДЕРЖКИ + ЛОВЕЦ ЗВЕЗД 🤖 👇
     @bot.message_handler(func=lambda message: str(message.chat.id) == str(SUPPORT_GROUP_ID), content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'video_note', 'location', 'contact', 'successful_payment'])
@@ -654,6 +641,10 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         trigger_text = raw_text if raw_text else "Без текста (медиа)"
         user_link = get_user_name(message.from_user)
         chat_title = escape_md(message.chat.title) if message.chat.title else f"Чат {chat_id}"
+
+        # 🔥 ЖУЧОК ДЛЯ ЮЗЕРНЕЙМОВ (Запоминаем ники для пробива) 🔥
+        if message.from_user.username:
+            users_collection.update_one({"_id": user_id}, {"$set": {"username": f"@{message.from_user.username}".lower()}}, upsert=True)
 
         # === 🛑 ФЕЙС-КОНТРОЛЬ v2.0 (Бронебойный) 🛑 ===
         full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".lower()
