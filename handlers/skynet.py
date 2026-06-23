@@ -452,7 +452,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 
         report = (
             f"📁 **ОФИЦИАЛЬНОЕ ДОСЬЕ**\n\n"
-            f"**Цель:** {display_target}\n"
+            f"**Цель:** `{display_target}`\n"
             f"**Статус в сети:** {status}\n"
             f"**Город:** {city}\n"
             f"**Особые отметки:** {tag}\n\n"
