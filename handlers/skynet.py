@@ -319,13 +319,13 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
     def ping_handler(message):
         bot.reply_to(message, f"👀 Я жив! ID этого чата: {message.chat.id}")
 
-# ================= OSINT: ДОСЬЕ ДЛЯ ЭЛИТЫ (СТЕЛС-РЕЖИМ) =================
+    # ================= OSINT: ДОСЬЕ ДЛЯ ЭЛИТЫ (СТЕЛС-РЕЖИМ) =================
     @bot.message_handler(commands=['check', 'досье'])
     @bot.message_handler(func=lambda m: m.text and m.text.lower().startswith(('.check', '!check', 'досье ')))
     def osint_check_handler(message):
         uid = message.from_user.id
         
-        # 1. Проверяем права (Доступ только для Элиты и Админов)
+        # 1. Проверяем права
         user_data = users_collection.find_one({"_id": uid}) or {}
         is_admin = uid in ADMIN_CHAT_IDS or uid == OWNER_ID
         is_elite = user_data.get("is_vip") or user_data.get("is_queer") or user_data.get("custom_tag") == "Спонсор_Одобрен"
@@ -341,7 +341,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         clean_name = ""
         with_at = ""
         
-        # 🔥 МЕТОД 1: ПРОБИВ ПО РЕПЛАЮ (Абсолютная 100% точность) 🔥
+        # 🔥 МЕТОД 1: ПРОБИВ ПО РЕПЛАЮ
         if message.reply_to_message:
             if message.reply_to_message.forward_from:
                 target_uid = message.reply_to_message.forward_from.id
@@ -349,14 +349,14 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 target_uid = message.reply_to_message.from_user.id
             display_target = str(target_uid)
             
-        # МЕТОД 2: Поиск по аргументам (@username, ссылка или ID)
+        # МЕТОД 2: Поиск по аргументам
         else:
             args = message.text.split()
             if len(args) != 2:
                 error_msg = (
                     "📋 **Служба Безопасности: Пробив по базе**\n\n"
                     "Используйте команду: `/check @username` или `/check ID`\n\n"
-                    "💡 *СЕКРЕТНЫЙ ЛАЙФХАК:* Можете просто **ответить (reply)** командой `/check` на сообщение подозреваемого в чате! Это работает на 100%, даже если он скрыл профиль или сменил никнейм."
+                    "💡 *СЕКРЕТНЫЙ ЛАЙФХАК:* Можете просто **ответить (reply)** командой `/check` на сообщение подозреваемого!"
                 )
                 try:
                     bot.send_message(uid, error_msg, parse_mode="Markdown")
@@ -364,8 +364,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         try: bot.delete_message(message.chat.id, message.message_id)
                         except: pass
                 except:
-                    # Заменили reply_to на send_message, чтобы не крашилось из-за сторонних ботов
-                    bot.send_message(message.chat.id, f"❌ {message.from_user.first_name}, напишите мне в личку /start, чтобы получать досье.")
+                    bot.send_message(message.chat.id, f"❌ {message.from_user.first_name}, напишите мне в личку /start.")
                 return
                 
             target_input = args[1].replace("https://", "").replace("http://", "").replace("t.me/", "").replace("@", "").replace("/", "").strip()
@@ -374,73 +373,87 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 target_uid = int(target_input)
                 display_target = str(target_uid)
             else:
-                clean_name = target_input
+                clean_name = target_input.lower().strip()
                 with_at = f"@{target_input}"
                 display_target = with_at
                 
+                # === УЛУЧШЕННЫЙ РЕЗОЛВ USERNAME ===
                 try:
                     chat_info = bot.get_chat(with_at)
                     target_uid = chat_info.id
+                    display_target = str(target_uid)
                 except Exception:
-                    regex_clean = {"$regex": f"^{clean_name}$", "$options": "i"}
-                    regex_with_at = {"$regex": f"^{with_at}$", "$options": "i"}
-                    regex_substring = {"$regex": f"{clean_name}", "$options": "i"}
+                    # Если bot.get_chat не сработал — ищем в базах
+                    search_patterns = [
+                        {"username": {"$regex": f"^{clean_name}$", "$options": "i"}},
+                        {"username": {"$regex": f"^{with_at}$", "$options": "i"}},
+                        {"user_link": {"$regex": clean_name, "$options": "i"}},
+                        {"target": {"$regex": f"^{clean_name}$", "$options": "i"}},
+                        {"target": {"$regex": f"^{with_at}$", "$options": "i"}},
+                        {"target": {"$regex": clean_name, "$options": "i"}}
+                    ]
                     
-                    search_query = {"$or": [
-                        {"username": regex_clean},
-                        {"username": regex_with_at},
-                        {"user_link": regex_substring},
-                        {"target": regex_clean},
-                        {"target": regex_with_at}
-                    ]}
+                    collections_to_search = [
+                        db['support_tickets'],
+                        banned_collection,
+                        users_collection,
+                    ]
+                    try:
+                        from database import posts_collection
+                        collections_to_search.append(posts_collection)
+                    except: pass
+                    collections_to_search.append(db['paid_users'])
                     
-                    doc = db['support_tickets'].find_one(search_query)
-                    if not doc: 
-                        try:
-                            from database import posts_collection
-                            doc = posts_collection.find_one(search_query)
-                        except: pass
-                    if not doc: doc = db['paid_users'].find_one(search_query)
-                    if not doc: doc = users_collection.find_one(search_query)
-                    if not doc: doc = banned_collection.find_one(search_query)
-                    
-                    if doc: 
-                        target_uid = doc.get("uid") or doc.get("user_id") or doc.get("_id")
-            
-        # 3. Собираем данные со всей базы
+                    for coll in collections_to_search:
+                        for pattern in search_patterns:
+                            doc = coll.find_one(pattern)
+                            if doc:
+                                target_uid = doc.get("uid") or doc.get("user_id") or doc.get("_id")
+                                if target_uid:
+                                    break
+                        if target_uid:
+                            break
+
+        # === ОСНОВНОЙ СБОР ИНФОРМАЦИИ ===
         t_info = users_collection.find_one({"_id": target_uid}) if target_uid else None
         b_info = banned_collection.find_one({"_id": target_uid}) if target_uid else None
         
-        # 🔥 СУПЕР-РАДАР ДЛЯ АРХИВА (Игнорируем пустые папки-дубликаты) 🔥
+        # 🔥 УЛУЧШЕННЫЙ ПОИСК В АРХИВЕ (самое важное)
         archive_query = []
         if target_uid:
             archive_query.extend([
-                {"target": str(target_uid)},
-                {"target": target_uid},
-                {"uid": target_uid},
-                {"_id": target_uid}
+                {"target": str(target_uid)}, {"target": target_uid},
+                {"uid": target_uid}, {"_id": target_uid}
             ])
-            
-        if clean_name and with_at:
+        if clean_name:
             archive_query.extend([
                 {"target": {"$regex": f"^{clean_name}$", "$options": "i"}},
                 {"target": {"$regex": f"^{with_at}$", "$options": "i"}},
-                {"target": {"$regex": f"{clean_name}", "$options": "i"}}
+                {"target": {"$regex": clean_name, "$options": "i"}}
             ])
-            
+
         archive_info = None
         if archive_query:
-            # ПРИОРИТЕТ 1: Ищем дело, в котором ТОЧНО есть записи о нарушениях (history не пустой)
+            # Сначала ищем с историей
             archive_info = archive_collection.find_one({
                 "$or": archive_query,
-                "history.0": {"$exists": True}  # Магия MongoDB: берет только те доки, где есть хотя бы 1 запись
+                "history.0": {"$exists": True}
             })
-            
-            # ПРИОРИТЕТ 2: Если нарушений нет ни в одном дубликате, берем любую базовую карточку
             if not archive_info:
                 archive_info = archive_collection.find_one({"$or": archive_query})
 
-        if not t_info and not b_info and not archive_info:
+        # Если ничего не нашли — пробуем поиск только по username в архиве (последний шанс)
+        if not target_uid and not archive_info and clean_name:
+            archive_info = archive_collection.find_one({
+                "$or": [
+                    {"target": {"$regex": clean_name, "$options": "i"}},
+                    {"username": {"$regex": clean_name, "$options": "i"}}
+                ]
+            })
+            if archive_info and archive_info.get("_id"):
+                target_uid = archive_info.get("_id") or archive_info.get("uid") or archive_info.get("target")
+
+        if not t_info and not b_info and not archive_info and not target_uid:
             empty_report = f"🗄 **База данных Скайнета:**\nПользователь `{display_target}` не найден. История абсолютно чиста."
             try:
                 bot.send_message(uid, empty_report, parse_mode="Markdown")
@@ -448,10 +461,10 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     try: bot.delete_message(message.chat.id, message.message_id)
                     except: pass
             except:
-                bot.send_message(message.chat.id, f"❌ {message.from_user.first_name}, напишите мне в личку /start, чтобы получать досье.")
+                bot.send_message(message.chat.id, f"❌ {message.from_user.first_name}, напишите мне в личку /start.")
             return
                       
-        # 4. Формируем красивое досье (С БРОНЕБОЙНОЙ ЗАЩИТОЙ MARKDOWN)
+        # Формирование досье (оставил как было, только улучшил fallback)
         status = "🔴 ЗАБАНЕН (ЧС)" if b_info else "🟢 ЧИСТ / АКТИВЕН"
         city = escape_md(t_info.get("main_city", "Не привязан")) if t_info else "Неизвестно"
         tag = escape_md(t_info.get("custom_tag", "Отсутствует")) if t_info else "Отсутствует"
@@ -476,30 +489,19 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             f"👁‍🗨 _Сгенерировано по запросу VIP-резидента._"
         )
         
-        # 5. ОТПРАВЛЯЕМ В ЛИЧКУ И ЗАЧИЩАЕМ ЧАТ
+        # Отправка
         try:
             bot.send_message(uid, report, parse_mode="Markdown")
-            
             if message.chat.type != "private":
                 try: bot.delete_message(message.chat.id, message.message_id)
                 except: pass
-                
-                notif = bot.send_message(message.chat.id, f"🕵️‍♂️ {message.from_user.first_name}, секретное досье отправлено вам в личные сообщения.")
-                def delete_notif():
-                    import time
-                    time.sleep(5)
-                    try: bot.delete_message(message.chat.id, notif.message_id)
-                    except: pass
-                import threading
-                threading.Thread(target=delete_notif, daemon=True).start()
-                
+                notif = bot.send_message(message.chat.id, f"🕵️‍♂️ {message.from_user.first_name}, секретное досье отправлено вам в ЛС.")
+                threading.Thread(target=lambda: (time.sleep(5), bot.delete_message(message.chat.id, notif.message_id)), daemon=True).start()
         except Exception as e:
-            # Больше никаких крашей из-за удаленных сообщений!
-            bot.send_message(message.chat.id, f"❌ {message.from_user.first_name}, я не могу отправить досье. Напишите мне в личку /start. Ошибка: {e}")
+            bot.send_message(message.chat.id, f"❌ {message.from_user.first_name}, не могу отправить досье в ЛС. Ошибка: {e}")
         
-        try: add_radar_log(f"🔎 VIP {uid} пробил досье на {display_target}")
+        try: add_radar_log(f"🔎 {'ADMIN' if is_admin else 'VIP'} {uid} пробил досье на {display_target}")
         except: pass
-    # ==========================================================
 
     # 👇 🤖 МОДУЛЬ: АВТО-АДМИН ПОДДЕРЖКИ + ЛОВЕЦ ЗВЕЗД 🤖 👇
     @bot.message_handler(func=lambda message: str(message.chat.id) == str(SUPPORT_GROUP_ID), content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'video_note', 'location', 'contact', 'successful_payment'])
