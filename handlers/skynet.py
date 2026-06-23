@@ -321,6 +321,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
 
 # ================= OSINT: ДОСЬЕ ДЛЯ ЭЛИТЫ (СТЕЛС-РЕЖИМ) =================
     @bot.message_handler(commands=['check', 'досье'])
+    @bot.message_handler(func=lambda m: m.text and m.text.lower().startswith(('.check', '!check', 'досье ')))
     def osint_check_handler(message):
         uid = message.from_user.id
         
@@ -331,7 +332,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         
         if not (is_admin or is_elite):
             if message.chat.type == "private":
-                bot.reply_to(message, "❌ **Отказано в доступе.**\nБаза данных Скайнета засекречена.", parse_mode="Markdown")
+                bot.send_message(message.chat.id, "❌ **Отказано в доступе.**\nБаза данных Скайнета засекречена.", parse_mode="Markdown")
             return
             
         target_uid = None
@@ -363,10 +364,10 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         try: bot.delete_message(message.chat.id, message.message_id)
                         except: pass
                 except:
-                    bot.reply_to(message, "❌ **Ошибка:** Напишите мне в личку /start, чтобы я мог отправлять вам секретные досье.")
+                    # Заменили reply_to на send_message, чтобы не крашилось из-за сторонних ботов
+                    bot.send_message(message.chat.id, f"❌ {message.from_user.first_name}, напишите мне в личку /start, чтобы получать досье.")
                 return
                 
-            # Жестко вычищаем весь мусор из ссылок (https, t.me, /, @)
             target_input = args[1].replace("https://", "").replace("http://", "").replace("t.me/", "").replace("@", "").replace("/", "").strip()
             
             if target_input.isdigit():
@@ -377,12 +378,10 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 with_at = f"@{target_input}"
                 display_target = with_at
                 
-                # 🌐 Запрос к Telegram API
                 try:
                     chat_info = bot.get_chat(with_at)
                     target_uid = chat_info.id
                 except Exception:
-                    # 🗄 Тотальный поиск по всем базам Скайнета
                     regex_clean = {"$regex": f"^{clean_name}$", "$options": "i"}
                     regex_with_at = {"$regex": f"^{with_at}$", "$options": "i"}
                     regex_substring = {"$regex": f"{clean_name}", "$options": "i"}
@@ -412,18 +411,34 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         t_info = users_collection.find_one({"_id": target_uid}) if target_uid else None
         b_info = banned_collection.find_one({"_id": target_uid}) if target_uid else None
         
-        archive_info = None
-        if target_uid: 
-            archive_info = archive_collection.find_one({"target": str(target_uid)})
+        # 🔥 СУПЕР-РАДАР ДЛЯ АРХИВА (Игнорируем пустые папки-дубликаты) 🔥
+        archive_query = []
+        if target_uid:
+            archive_query.extend([
+                {"target": str(target_uid)},
+                {"target": target_uid},
+                {"uid": target_uid},
+                {"_id": target_uid}
+            ])
             
-        if not archive_info and not target_uid and target_input and not target_input.isdigit(): 
+        if clean_name and with_at:
+            archive_query.extend([
+                {"target": {"$regex": f"^{clean_name}$", "$options": "i"}},
+                {"target": {"$regex": f"^{with_at}$", "$options": "i"}},
+                {"target": {"$regex": f"{clean_name}", "$options": "i"}}
+            ])
+            
+        archive_info = None
+        if archive_query:
+            # ПРИОРИТЕТ 1: Ищем дело, в котором ТОЧНО есть записи о нарушениях (history не пустой)
             archive_info = archive_collection.find_one({
-                "$or": [
-                    {"target": {"$regex": f"^{clean_name}$", "$options": "i"}},
-                    {"target": {"$regex": f"^{with_at}$", "$options": "i"}},
-                    {"target": {"$regex": f"{clean_name}", "$options": "i"}}
-                ]
+                "$or": archive_query,
+                "history.0": {"$exists": True}  # Магия MongoDB: берет только те доки, где есть хотя бы 1 запись
             })
+            
+            # ПРИОРИТЕТ 2: Если нарушений нет ни в одном дубликате, берем любую базовую карточку
+            if not archive_info:
+                archive_info = archive_collection.find_one({"$or": archive_query})
 
         if not t_info and not b_info and not archive_info:
             empty_report = f"🗄 **База данных Скайнета:**\nПользователь `{display_target}` не найден. История абсолютно чиста."
@@ -433,21 +448,21 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     try: bot.delete_message(message.chat.id, message.message_id)
                     except: pass
             except:
-                bot.reply_to(message, "❌ **Ошибка:** Напишите мне в личку /start, чтобы получать досье.")
+                bot.send_message(message.chat.id, f"❌ {message.from_user.first_name}, напишите мне в личку /start, чтобы получать досье.")
             return
                       
-        # 4. Формируем красивое досье
+        # 4. Формируем красивое досье (С БРОНЕБОЙНОЙ ЗАЩИТОЙ MARKDOWN)
         status = "🔴 ЗАБАНЕН (ЧС)" if b_info else "🟢 ЧИСТ / АКТИВЕН"
-        city = t_info.get("main_city", "Не привязан") if t_info else "Неизвестно"
-        tag = t_info.get("custom_tag", "Отсутствует") if t_info else "Отсутствует"
+        city = escape_md(t_info.get("main_city", "Не привязан")) if t_info else "Неизвестно"
+        tag = escape_md(t_info.get("custom_tag", "Отсутствует")) if t_info else "Отсутствует"
         
         history_text = "_История нарушений пуста._\n"
         if archive_info and archive_info.get("history"):
             history_text = ""
             for entry in archive_info["history"][-5:]:
-                date = entry.get('date', '')
-                action = entry.get('action', '')
-                reason = entry.get('reason', '')
+                date = escape_md(entry.get('date', ''))
+                action = escape_md(entry.get('action', ''))
+                reason = escape_md(entry.get('reason', ''))
                 history_text += f"▪️ **{date}** | {action}\n_Причина: {reason}_\n\n"
                 
         report = (
@@ -465,13 +480,10 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         try:
             bot.send_message(uid, report, parse_mode="Markdown")
             
-            # Если пробив был заказан в общей группе
             if message.chat.type != "private":
-                # Удаляем само сообщение с командой /check
                 try: bot.delete_message(message.chat.id, message.message_id)
                 except: pass
                 
-                # Короткая отбивка с автоудалением
                 notif = bot.send_message(message.chat.id, f"🕵️‍♂️ {message.from_user.first_name}, секретное досье отправлено вам в личные сообщения.")
                 def delete_notif():
                     import time
@@ -482,7 +494,8 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 threading.Thread(target=delete_notif, daemon=True).start()
                 
         except Exception as e:
-            bot.reply_to(message, "❌ **Ошибка:** Я не могу написать вам в ЛС. Пожалуйста, напишите мне в личку /start, чтобы я мог отправлять вам досье.")
+            # Больше никаких крашей из-за удаленных сообщений!
+            bot.send_message(message.chat.id, f"❌ {message.from_user.first_name}, я не могу отправить досье. Напишите мне в личку /start. Ошибка: {e}")
         
         try: add_radar_log(f"🔎 VIP {uid} пробил досье на {display_target}")
         except: pass
