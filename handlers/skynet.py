@@ -349,19 +349,38 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             target_uid = int(target_input)
             display_target = str(target_uid)
         else:
-            target_username = f"@{target_input}"
-            display_target = target_username
-            # Пытаемся найти ID по юзернейму в базе тикетов (она общая для всех ботов)
-            ticket = db['support_tickets'].find_one({"username": target_username})
-            if ticket: target_uid = ticket.get("uid")
+            clean_name = target_input
+            with_at = f"@{target_input}"
+            display_target = with_at
+            
+            # Умный поиск ID по ВСЕМ коллекциям (игнорируем регистр и наличие @)
+            regex_clean = {"$regex": f"^{clean_name}$", "$options": "i"}
+            regex_with_at = {"$regex": f"^{with_at}$", "$options": "i"}
+            search_query = {"$or": [{"username": regex_clean}, {"username": regex_with_at}]}
+            
+            # Ищем сначала в тикетах, потом в юзерах, потом в банах
+            doc = db['support_tickets'].find_one(search_query)
+            if not doc: doc = users_collection.find_one(search_query)
+            if not doc: doc = banned_collection.find_one(search_query)
+            
+            if doc: target_uid = doc.get("uid") or doc.get("_id")
             
         # 3. Собираем данные со всей базы
         t_info = users_collection.find_one({"_id": target_uid}) if target_uid else None
         b_info = banned_collection.find_one({"_id": target_uid}) if target_uid else None
         
         archive_info = None
-        if target_uid: archive_info = archive_collection.find_one({"target": str(target_uid)})
-        if not archive_info and target_username: archive_info = archive_collection.find_one({"target": target_username})
+        if target_uid: 
+            archive_info = archive_collection.find_one({"target": str(target_uid)})
+            
+        # Если по ID ничего не нашли (или ID не существует), ищем в архиве напрямую по юзернейму
+        if not archive_info and not target_input.isdigit(): 
+            archive_info = archive_collection.find_one({
+                "$or": [
+                    {"target": {"$regex": f"^{clean_name}$", "$options": "i"}},
+                    {"target": {"$regex": f"^{with_at}$", "$options": "i"}}
+                ]
+            })
             
         if not t_info and not b_info and not archive_info:
             bot.reply_to(message, f"🗄 **База данных Скайнета:**\nПользователь `{display_target}` не найден. История абсолютно чиста.", parse_mode="Markdown")
