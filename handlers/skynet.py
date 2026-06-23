@@ -353,19 +353,31 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             with_at = f"@{target_input}"
             display_target = with_at
             
-            # Умный поиск ID по ВСЕМ коллекциям (игнорируем регистр и наличие @)
-            regex_clean = {"$regex": f"^{clean_name}$", "$options": "i"}
-            regex_with_at = {"$regex": f"^{with_at}$", "$options": "i"}
-            search_query = {"$or": [{"username": regex_clean}, {"username": regex_with_at}]}
+            # 🔥 МЕТОД 1: ЗАПРОС К TELEGRAM API (АБСОЛЮТНАЯ ТОЧНОСТЬ) 🔥
+            try:
+                chat_info = bot.get_chat(with_at)
+                target_uid = chat_info.id
+            except Exception:
+                # 🔥 МЕТОД 2: АГРЕССИВНЫЙ ПОИСК ПО ВСЕМ БАЗАМ СКАЙНЕТА 🔥
+                regex_clean = {"$regex": f"^{clean_name}$", "$options": "i"}
+                regex_with_at = {"$regex": f"^{with_at}$", "$options": "i"}
+                search_query = {"$or": [{"username": regex_clean}, {"username": regex_with_at}]}
+                
+                # Ищем где только можно
+                doc = db['support_tickets'].find_one(search_query)
+                if not doc: 
+                    try:
+                        from database import posts_collection
+                        doc = posts_collection.find_one(search_query)
+                    except: pass
+                if not doc: doc = db['paid_users'].find_one(search_query)
+                if not doc: doc = users_collection.find_one(search_query)
+                if not doc: doc = banned_collection.find_one(search_query)
+                
+                if doc: 
+                    target_uid = doc.get("uid") or doc.get("user_id") or doc.get("_id")
             
-            # Ищем сначала в тикетах, потом в юзерах, потом в банах
-            doc = db['support_tickets'].find_one(search_query)
-            if not doc: doc = users_collection.find_one(search_query)
-            if not doc: doc = banned_collection.find_one(search_query)
-            
-            if doc: target_uid = doc.get("uid") or doc.get("_id")
-            
-        # 3. Собираем данные со всей базы
+        # 3. Собираем данные со всей базы (Ищем СТРОГО по ID!)
         t_info = users_collection.find_one({"_id": target_uid}) if target_uid else None
         b_info = banned_collection.find_one({"_id": target_uid}) if target_uid else None
         
@@ -373,7 +385,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         if target_uid: 
             archive_info = archive_collection.find_one({"target": str(target_uid)})
             
-        # Если по ID ничего не нашли (или ID не существует), ищем в архиве напрямую по юзернейму
+        # Если не нашли по ID, делаем последний слепой выстрел по юзернейму в архив
         if not archive_info and not target_input.isdigit(): 
             archive_info = archive_collection.find_one({
                 "$or": [
@@ -381,7 +393,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     {"target": {"$regex": f"^{with_at}$", "$options": "i"}}
                 ]
             })
-            
+
         if not t_info and not b_info and not archive_info:
             bot.reply_to(message, f"🗄 **База данных Скайнета:**\nПользователь `{display_target}` не найден. История абсолютно чиста.", parse_mode="Markdown")
             
@@ -389,7 +401,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             try: add_radar_log(f"🔎 VIP {uid} пробил {display_target} (ЧИСТ)")
             except: pass
             return
-            
+                      
         # 4. Формируем красивое досье
         status = "🔴 ЗАБАНЕН (ЧС)" if b_info else "🟢 ЧИСТ / АКТИВЕН"
         city = t_info.get("main_city", "Не привязан") if t_info else "Неизвестно"
