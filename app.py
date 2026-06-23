@@ -375,11 +375,37 @@ def start(message):
 
         # --- ЖЕСТКИЙ ФЕЙСКОНТРОЛЬ ---
         if is_banned_in_network(message.from_user.id):
-            bot.send_message(
-                message.chat.id, 
-                "🚫 **Доступ закрыт.**\n\nВы находитесь в черном списке нашей сети и заблокированы в основных чатах.", 
-                parse_mode="Markdown"
-            )
+            try:
+                from config import VIP_PRICE_STARS
+                prices = db['settings'].find_one({"_id": "skynet_pricing"})
+                current_vip_price = prices.get("vip_price", VIP_PRICE_STARS) if prices else VIP_PRICE_STARS
+            except Exception:
+                current_vip_price = 250
+                
+            ban_doc = banned_collection.find_one({"_id": message.from_user.id}) or {}
+            reason = ban_doc.get("reason", "").lower()
+            
+            strict_triggers = ["красн", "желт", "черн", "коммерц", "наркот", "цп", "несовершеннолет", "эскорт", "мп"]
+            is_strict = any(t in reason for t in strict_triggers)
+            
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            markup.add(types.InlineKeyboardButton("🆘 Обратиться в Поддержку", url="https://t.me/FAQMKBOT"))
+            
+            if not is_strict:
+                markup.add(types.InlineKeyboardButton(f"💸 Оплатить штраф ({current_vip_price}⭐️)", callback_data=f"sec_chance_buy_{current_vip_price}"))
+                text = (
+                    "🚫 **Доступ закрыт.**\n"
+                    "Вы находитесь в черном списке нашей сети и заблокированы в основных чатах.\n\n"
+                    "Так как ваше нарушение не относится к категории строгих, вы можете воспользоваться правом на **«Второй шанс»** — оплатить штраф за срыв прошлой верификации или поведение, после чего процесс получения VIP-статуса начнется заново."
+                )
+            else:
+                text = (
+                    "🚫 **Доступ закрыт.**\n"
+                    "Вы находитесь в черном списке нашей сети за грубое нарушение правил.\n"
+                    "Апелляция и снятие ограничений возможны только через Службу Поддержки."
+                )
+
+            bot.send_message(message.chat.id, text, reply_markup=markup, parse_mode="Markdown")
             return # Выбрасываем из функции, меню не покажется!
         # ----------------------------
 

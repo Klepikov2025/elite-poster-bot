@@ -520,6 +520,20 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
         except: pass
         bot.send_invoice(call.message.chat.id, title=f"Пропуск: {city_name} 🏙", description=f"Открывает доступ ко всем чатам нашей сети в городе {city_name} навсегда.", invoice_payload=f"city_access_{city_name}", provider_token="", currency="XTR", prices=[types.LabeledPrice(label=f"Доступ к {city_name}", amount=CITY_PRICE_STARS)])
 
+    @bot.callback_query_handler(func=lambda call: call.data.startswith('sec_chance_buy_'))
+    def handle_sec_chance_buy(call):
+        try: bot.answer_callback_query(call.id)
+        except: pass
+        amount = int(call.data.split('_')[3])
+        bot.send_invoice(
+            call.message.chat.id, 
+            title="Оплата штрафа 💸", 
+            description="Штраф за нарушение правил / срыв верификации. После оплаты запустится процесс проверки.", 
+            invoice_payload=f"second_chance_payment_{amount}", 
+            provider_token="", currency="XTR", 
+            prices=[types.LabeledPrice(label="Штраф", amount=amount)]
+        )
+
     def process_promo_code(message, target_type, original_amount, call_msg):
         try: bot.edit_message_reply_markup(call_msg.chat.id, call_msg.message_id, reply_markup=None)
         except: pass
@@ -558,7 +572,7 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
             msg = bot.send_message(call.message.chat.id, "👇 **Введите ваш промокод ответом на это сообщение:**", parse_mode="Markdown")
             bot.register_next_step_handler(msg, process_promo_code, target_type=target_type, original_amount=original_amount, call_msg=call.message)
 
-    @bot.pre_checkout_query_handler(func=lambda query: query.invoice_payload.startswith("vip_access_payment") or query.invoice_payload.startswith("fine_payment_") or query.invoice_payload.startswith("city_access_"))
+    @bot.pre_checkout_query_handler(func=lambda query: query.invoice_payload.startswith("vip_access_payment") or query.invoice_payload.startswith("fine_payment_") or query.invoice_payload.startswith("city_access_") or query.invoice_payload.startswith("second_chance_payment_"))
     def checkout_process(pre_checkout_query):
         bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
 
@@ -569,6 +583,36 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
         
         # 👇 ДОБАВЬ ВОТ ЭТУ СТРОЧКУ ПРЯМО СЮДА 👇
         amount = message.successful_payment.total_amount
+
+        if payload.startswith("second_chance_payment_"):
+            db['daily_revenue'].insert_one({"type": "fine", "amount": amount, "timestamp": time.time(), "date": datetime.now().strftime("%d.%m.%Y")})
+            
+            # 1. Снимаем бан
+            banned_collection.delete_one({"_id": new_user_id})
+            try: unban_user_everywhere(new_user_id)
+            except: pass
+            users_collection.update_one({"_id": new_user_id}, {"$unset": {"shame_tag": ""}})
+            archive_collection.update_one({"target": str(new_user_id)}, {"$unset": {"banned_in_support": "", "strikes": ""}})
+            
+            # 2. Запускаем верификацию! (Эмитируем нажатие кнопки)
+            db['vip_funnel'].update_one(
+                {"_id": new_user_id},
+                {"$set": {"timestamp": time.time(), "reminded": False}},
+                upsert=True
+            )
+            
+            instruction_text = (
+                f"✅ **Оплата штрафа получена! Блокировка снята.**\n\n"
+                f"Теперь мы можем начать процесс верификации с чистого листа. Запишите видеосообщение (кружок) с лицом и скажите в нем:\n\n"
+                "💬 *«Привет админам вип-чата, сегодня [назовите дату], на часах [назовите время], хочу стать вип-участником»*\n\n"
+                "Просто отправьте кружок сюда и ожидайте ответа."
+            )
+            pending_verification_users[new_user_id] = True
+            bot.send_message(new_user_id, instruction_text, parse_mode="Markdown")
+            
+            try: bot.send_message(STAFF_GROUP_ID, f"🤑 **ОПЛАЧЕН ВТОРОЙ ШАНС (ШТРАФ)!**\nЮзер `{new_user_id}` оплатил {amount}⭐️ за разбан. Бот запросил у него кружок.")
+            except: pass
+            return
         # 👆 ================================= 👆
 
         if payload.startswith("city_access_"):

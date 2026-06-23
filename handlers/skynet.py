@@ -319,6 +319,91 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
     def ping_handler(message):
         bot.reply_to(message, f"👀 Я жив! ID этого чата: {message.chat.id}")
 
+# ================= OSINT: ДОСЬЕ ДЛЯ ЭЛИТЫ =================
+    @bot.message_handler(commands=['check', 'досье'])
+    def osint_check_handler(message):
+        uid = message.from_user.id
+        
+        # 1. Проверяем права (Доступ только для Элиты и Админов)
+        user_data = users_collection.find_one({"_id": uid}) or {}
+        is_admin = uid in ADMIN_CHAT_IDS or uid == OWNER_ID
+        is_elite = user_data.get("is_vip") or user_data.get("is_queer") or user_data.get("custom_tag") == "Спонсор_Одобрен"
+        
+        if not (is_admin or is_elite):
+            # Если пишет в личку - отказываем. В группе - просто молчим, чтобы не спамить.
+            if message.chat.type == "private":
+                bot.reply_to(message, "❌ **Отказано в доступе.**\nБаза данных Скайнета засекречена. Право на пробив имеют только Администрация и элитные резиденты.", parse_mode="Markdown")
+            return
+            
+        args = message.text.split()
+        if len(args) != 2:
+            bot.reply_to(message, "📋 **Служба Безопасности: Пробив по базе**\n\nИспользуйте команду: `/check @username` или `/check ID`\n_Пример:_ `/check @durov`", parse_mode="Markdown")
+            return
+            
+        target_input = args[1].replace("https://t.me/", "").replace("@", "").strip()
+        target_uid = None
+        target_username = None
+        
+        # 2. УМНЫЙ ПАРСЕР (Определяем ID или Username)
+        if target_input.isdigit():
+            target_uid = int(target_input)
+            display_target = str(target_uid)
+        else:
+            target_username = f"@{target_input}"
+            display_target = target_username
+            # Пытаемся найти ID по юзернейму в базе тикетов (она общая для всех ботов)
+            ticket = db['support_tickets'].find_one({"username": target_username})
+            if ticket: target_uid = ticket.get("uid")
+            
+        # 3. Собираем данные со всей базы
+        t_info = users_collection.find_one({"_id": target_uid}) if target_uid else None
+        b_info = banned_collection.find_one({"_id": target_uid}) if target_uid else None
+        
+        archive_info = None
+        if target_uid: archive_info = archive_collection.find_one({"target": str(target_uid)})
+        if not archive_info and target_username: archive_info = archive_collection.find_one({"target": target_username})
+            
+        if not t_info and not b_info and not archive_info:
+            bot.reply_to(message, f"🗄 **База данных Скайнета:**\nПользователь `{display_target}` не найден. История абсолютно чиста.", parse_mode="Markdown")
+            
+            # Сигналим в Радар
+            try: add_radar_log(f"🔎 VIP {uid} пробил {display_target} (ЧИСТ)")
+            except: pass
+            return
+            
+        # 4. Формируем красивое досье
+        status = "🔴 ЗАБАНЕН (ЧС)" if b_info else "🟢 ЧИСТ / АКТИВЕН"
+        city = t_info.get("main_city", "Не привязан") if t_info else "Неизвестно"
+        tag = t_info.get("custom_tag", "Отсутствует") if t_info else "Отсутствует"
+        
+        history_text = "_История нарушений пуста._\n"
+        if archive_info and archive_info.get("history"):
+            history_text = ""
+            # Берем только 5 последних грехов
+            for entry in archive_info["history"][-5:]:
+                date = entry.get('date', '')
+                action = entry.get('action', '')
+                reason = entry.get('reason', '')
+                history_text += f"▪️ **{date}** | {action}\n_Причина: {reason}_\n\n"
+                
+        report = (
+            f"📁 **ОФИЦИАЛЬНОЕ ДОСЬЕ**\n\n"
+            f"**Цель:** {display_target}\n"
+            f"**Статус в сети:** {status}\n"
+            f"**Город:** {city}\n"
+            f"**Особые отметки:** {tag}\n\n"
+            f"📜 **ВЫПИСКА ИЗ АРХИВА:**\n"
+            f"{history_text}"
+            f"👁‍🗨 _Сгенерировано по запросу VIP-резидента._"
+        )
+        
+        bot.reply_to(message, report, parse_mode="Markdown")
+        
+        # 5. Сигналим Главному Админу в веб-панель
+        try: add_radar_log(f"🔎 VIP {uid} пробил досье на {display_target}")
+        except: pass
+    # ==========================================================
+
     # 👇 🤖 МОДУЛЬ: АВТО-АДМИН ПОДДЕРЖКИ + ЛОВЕЦ ЗВЕЗД 🤖 👇
     @bot.message_handler(func=lambda message: str(message.chat.id) == str(SUPPORT_GROUP_ID), content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'video_note', 'location', 'contact', 'successful_payment'])
     def auto_support_handler(message):
