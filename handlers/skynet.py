@@ -830,6 +830,11 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     recent_bans = list(db['blacklisted_texts'].find().sort("_id", -1).limit(150))
                     
                     for bad in recent_bans:
+                        # 👇 ДОБАВЛЯЕМ ПРЕДОХРАНИТЕЛЬ ОТ САМОГО СЕБЯ 👇
+                        if bad.get('uid') == user_id:
+                            continue # Пропускаем свою же старую анкету
+                        # 👆 ========================================== 👆
+
                         clean_bad = bad.get("clean_text", "")
                         if not clean_bad: continue
                         similarity = difflib.SequenceMatcher(None, clean_current, clean_bad).ratio()
