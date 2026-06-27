@@ -2313,7 +2313,12 @@ function loadRootRevenue(pin, period = 'week') {
         const networkNames = { parni: "ПАРНИ 18+", mk: "МК", ns: "НС", rainbow: "Радуга", gayznak: "ГейЗнакомства" };
 
         function loadInfrastructure() {
-            fetch('/glaz/api/infrastructure').then(res => res.json()).then(data => {
+            fetch('/glaz/api/infrastructure')
+            .then(res => {
+                if(!res.ok) throw new Error("Сервер не ответил");
+                return res.json();
+            })
+            .then(data => {
                 if(data) currentInfraData = data;
                 
                 // Предохранители
@@ -2327,6 +2332,9 @@ function loadRootRevenue(pin, period = 'week') {
 
                 renderInfraChats();
                 renderInfraEnemies();
+            })
+            .catch(err => {
+                document.getElementById('infra-chats-tbody').innerHTML = '<tr><td colspan="5" style="text-align: center; color: #cf6679;">⚠️ Ошибка связи с ботом. Возможно, сервер (Render) ещё перезагружается! Подождите пару минут и обновите страницу.</td></tr>';
             });
         }
 
