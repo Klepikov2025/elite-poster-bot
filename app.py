@@ -76,8 +76,12 @@ def add_radar_log(text):
     })
 
 def is_banned_in_network(user_id):
+    # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
+    from config import get_network_data
+    chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+
     """Проверяет статус пользователя в базе Скайнета и в крупных чатах сети"""
-    # 1. СНАЧАЛА ПРОВЕРЯЕМ БАЗУ СКАЙНЕТА (Самое надежное)
+    # 1. СНАЧАЛА ПРОВЕРЯЕМ БАЗУ СКАЙНЕТА...
     if banned_collection.find_one({"_id": user_id}):
         return True
 
@@ -151,6 +155,10 @@ def is_real_vip(user_id: int) -> bool:
 # ==================== МОДУЛЬ 2: УМНАЯ ТАМОЖНЯ + СТАТИСТИКА ====================
 @bot.chat_join_request_handler()
 def handle_join_requests(message: telebot.types.ChatJoinRequest):
+    # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
+    from config import get_network_data
+    chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+
     user_id = message.from_user.id
     chat_id = message.chat.id
     
@@ -452,6 +460,10 @@ def start(message):
             except: pass
 
 def ban_user_everywhere(target_id, reason="Без причины", admin_name="Система", user_link=None, trigger_text=None, origin_chat=None, force=False):
+    # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
+    from config import get_network_data
+    chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+
     # 👇 ТОТАЛЬНАЯ ЗАЩИТА ЭЛИТЫ (ПРЕДОХРАНИТЕЛЬ ЯДРА) 👇
     if not force:
         user_data = users_collection.find_one({"_id": target_id}) or {}
@@ -630,6 +642,10 @@ def process_support_msg(message):
 
 def background_corpse_removal(dead_uid):
     """Медленно и аккуратно выносит труп из всех чатов сети, чтобы не словить Flood Wait"""
+    # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
+    from config import get_network_data
+    chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+
     # Собираем все чаты Империи в один список
     all_empire_chats = []
     if isinstance(PARNI_CHATS, list): all_empire_chats.extend(PARNI_CHATS)
@@ -650,6 +666,9 @@ def background_corpse_removal(dead_uid):
         time.sleep(0.3)  # Пауза, чтобы Телеграм не счел это спамом
 
 def unmute_user_everywhere(target_id):
+    # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
+    from config import get_network_data
+    chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
     """Снимает мут с пользователя абсолютно во всех чатах сети"""
     # 1. Собираем базовые чаты (для всех)
     all_chats = []
@@ -697,6 +716,10 @@ def unmute_user_everywhere(target_id):
     return unmuted_count
 
 def unmute_in_parni_only(target_id):
+    # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
+    from config import get_network_data
+    chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+
     """Снимает мут ТОЛЬКО в чатах сети ПАРНИ 18+"""
     success_count = 0
     for cid in PARNI_CHATS:
@@ -714,6 +737,12 @@ def unmute_in_parni_only(target_id):
     return success_count
 
 def unban_user_everywhere(target_id):
+    # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
+    from config import get_network_data
+    chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+
+    success_count = 0
+    error_count = 0
     """Снимает глобальный бан с пользователя во всех чатах сети"""
     # 1. Удаляем метку бана из памяти Скайнета
     banned_collection.delete_one({"_id": target_id})
@@ -748,7 +777,10 @@ def unban_user_everywhere(target_id):
 
 # --- ФУНКЦИЯ: ГЛОБАЛЬНЫЙ МУТ (ДЛЯ РЕКЛАМЩИКОВ И НАРУШИТЕЛЕЙ) ---
 def mute_user_everywhere(target_id, reason="Без причины", admin_name="Система", user_link=None, trigger_text=None, mute_time=0, origin_chat=None):
-    
+    # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
+    from config import get_network_data
+    chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+
     # 👇 МАГИЯ ЩИТА ИММУНИТЕТА (ЗАЩИТА ОТ АВТО-МУТОВ) 👇
     user_data = users_collection.find_one({"_id": target_id}) or {}
     
@@ -969,6 +1001,10 @@ def catch_bot_block(message):
 # ==================== ПЕРЕХВАТЧИК "МЕРТВЫХ ДУШ" (Защита от старых заявок + Амнистия + Теги) ====================
 @bot.message_handler(content_types=['new_chat_members'])
 def catch_illegal_entry(message):
+    # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
+    from config import get_network_data
+    chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+
     for new_user in message.new_chat_members:
         user_id = new_user.id
         chat_id = message.chat.id

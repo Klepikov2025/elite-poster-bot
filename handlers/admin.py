@@ -152,6 +152,11 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
     @bot.message_handler(commands=['get_report'])
     def get_detailed_report(message):
         if message.from_user.id != OWNER_ID: return
+        
+        # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
+        from config import get_network_data
+        chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+
         stats = db['network_stats'].find_one({"_id": "current_period"})
         if not stats:
             bot.send_message(message.chat.id, "📊 Статистика за этот период пуста.")
@@ -242,6 +247,11 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
     def send_amnesty_button(message):
         if message.chat.id != STAFF_GROUP_ID: return
         bot.send_message(message.chat.id, "🔄 Начинаю рассылку кнопок амнистии по сети ПАРНИ...")
+
+        # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
+        from config import get_network_data
+        chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🕊 Снять мут (Только для 18+)", callback_data="claim_parni_amnesty"))
         text = (
@@ -469,6 +479,11 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
             bot.send_message(message.chat.id, "❌ Ошибка: Телеграм не позволяет делать тег админа длиннее 16 символов. Сократите название.")
             return
         bot.send_message(message.chat.id, f"🔄 Запускаю протокол «Коронация» для `{target_id}`.\nНазначаю права и должность «{custom_title}» по всей сети...", parse_mode="Markdown")
+        
+        # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
+        from config import get_network_data
+        chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+
         all_chats = []
         all_chats.extend(chat_ids_parni.values())
         all_chats.extend(chat_ids_mk.values())
@@ -512,6 +527,12 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
             bot.send_message(message.chat.id, "❌ Ошибка: ID должен состоять только из цифр!")
             return
         bot.send_message(message.chat.id, f"🔄 Запускаю протокол «Разжалование» для `{target_id}`...\nСнимаю права по всей сети...", parse_mode="Markdown")
+        
+        # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
+        from config import get_network_data
+        chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+        # 👆 ==================== 👆
+
         all_chats = []
         all_chats.extend(chat_ids_parni.values())
         all_chats.extend(chat_ids_mk.values())

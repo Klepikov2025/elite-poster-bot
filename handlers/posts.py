@@ -317,6 +317,10 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
         return markup
 
     def select_network(message, text, media_type, file_id):
+        # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
+        from config import get_network_data
+        chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+
         if message.text == "Назад":
             create_new_post(message)
             return
@@ -346,6 +350,10 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
             bot.register_next_step_handler(message, select_network, text, media_type, file_id) # Лучше возвращать на выбор сети!
 
     def select_city_and_publish(message, text, selected_network, media_type, file_id):
+        # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
+        from config import get_network_data
+        chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+
         if message.text == "Назад":
             bot.send_message(message.chat.id, "📋 Выберите сеть для публикации:", reply_markup=get_network_markup())
             bot.register_next_step_handler(message, select_network, text, media_type, file_id)

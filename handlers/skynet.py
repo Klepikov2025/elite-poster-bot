@@ -635,6 +635,11 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
     @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact', 'video_note'], func=lambda message: message.chat.type in ['group', 'supergroup'])
     def skynet_core_handler(message):
         
+        # 👇 НОВЫЕ ДВЕ СТРОЧКИ ДЛЯ ЧТЕНИЯ БАЗЫ НА ЛЕТУ 👇
+        from config import get_network_data
+        chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+        # 👆 ========================================= 👆
+
         if getattr(message, 'sender_chat', None) or message.from_user.id in [777000, 136817688]:
             return
 

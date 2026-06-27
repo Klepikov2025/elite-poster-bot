@@ -708,6 +708,10 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
 
     @bot.message_handler(content_types=['successful_payment'])
     def successful_payment(message):
+        # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
+        from config import get_network_data
+        chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+
         new_user_id = message.from_user.id
         payload = message.successful_payment.invoice_payload
         
