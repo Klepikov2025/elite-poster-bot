@@ -1447,6 +1447,7 @@ function previewBroadcast() {
         }, 5000);
 
        // 👇 СКРИПТ ДЛЯ ЛАМПОЧЕК ОНЛАЙН/ОФФЛАЙН 👇
+        // 👇 ИСПРАВЛЕННЫЙ ПУЛЬС СИСТЕМ 👇
         function checkBotStatuses() {
             fetch('/glaz/api/system_status')
             .then(res => res.json())
@@ -1455,13 +1456,24 @@ function previewBroadcast() {
                 // Бот считается живым, если присылал пульс не позднее 3 минут (180 сек) назад
                 const isAlive = (lastSeen) => lastSeen && (now - lastSeen < 180);
 
-                const ok = '<span style="color:#03dac6;">🟢 Онлайн</span>';
-                const fail = '<span style="color:#cf6679;">🔴 ОФФЛАЙН</span>';
+                const ok = '<span style="color:#03dac6; font-weight:bold;">🟢 ONLINE</span>';
+                const fail = '<span style="color:#cf6679; font-weight:bold;">🔴 OFFLINE</span>';
 
-                document.getElementById('status-skynet').innerHTML = `🤖 Skynet: ${isAlive(data.skynet_last_seen) ? ok : fail}`;
-                document.getElementById('status-spy').innerHTML = `🚜 Bulldozer: ${isAlive(data.spy_last_seen) ? ok : fail}`;
-                document.getElementById('status-ads').innerHTML = `📢 Реклама: ${isAlive(data.ads_last_seen) ? ok : fail}`;
-                document.getElementById('status-sec').innerHTML = `👩‍💼 Секретарь: ${isAlive(data.sec_last_seen) ? ok : fail}`;
+                // Осторожно ищем элементы по правильным ID!
+                const elSkynet = document.getElementById('mod-skynet');
+                if (elSkynet) elSkynet.innerHTML = isAlive(data.skynet_last_seen) ? ok : fail;
+
+                // Бот публикаций (Секретарь)
+                const elPosts = document.getElementById('mod-posts');
+                if (elPosts) elPosts.innerHTML = isAlive(data.sec_last_seen) ? ok : fail;
+
+                // Рекламный бот
+                const elAds = document.getElementById('mod-ads');
+                if (elAds) elAds.innerHTML = isAlive(data.ads_last_seen) ? ok : fail;
+
+                // VIP & Саппорт (Андрюшенька / Бульдозер)
+                const elVip = document.getElementById('mod-vip');
+                if (elVip) elVip.innerHTML = isAlive(data.spy_last_seen) ? ok : fail;
             }).catch(e => console.log("Ожидание статусов..."));
         }
 
