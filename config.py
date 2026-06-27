@@ -2,7 +2,7 @@ import os
 from pymongo import MongoClient
 
 # ==================== СЕКРЕТЫ И НАСТРОЙКИ СЕРВЕРА ====================
-BOT_TOKEN = os.getenv('BOT_TOKEN')
+TOKEN = os.getenv('BOT_TOKEN') # 🔥 ИСПРАВЛЕНО: переименовали BOT_TOKEN обратно в TOKEN
 MONGO_URI = os.getenv('MONGO_URI')
 CRYPTO_TOKEN = os.getenv("CRYPTO_TOKEN")
 APP_URL = os.getenv("APP_URL")
@@ -16,8 +16,8 @@ GROQ_API_KEYS = [key for key in [GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3] i
 HF_TOKEN = os.getenv('HF_TOKEN')
 OPENROUTER_KEY = os.getenv('OPENROUTER_KEY')
 
-if not BOT_TOKEN or not MONGO_URI:
-    raise ValueError("❌ КРИТИЧЕСКАЯ ОШИБКА: BOT_TOKEN или MONGO_URI не найдены в переменных окружения!")
+if not TOKEN or not MONGO_URI: # 🔥 ИСПРАВЛЕНО ЗДЕСЬ ТОЖЕ
+    raise ValueError("❌ КРИТИЧЕСКАЯ ОШИБКА: TOKEN или MONGO_URI не найдены в переменных окружения!")
 
 ADMIN_CHAT_IDS = [479938867, 7235010425]
 OWNER_ID = 479938867
