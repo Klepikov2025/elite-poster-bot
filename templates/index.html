@@ -2335,7 +2335,7 @@ function loadRootRevenue(pin, period = 'week') {
             });
         }
 
-// === ЛОГИКА ИНФРАСТРУКТУРЫ И СЕТЕЙ ===
+// === ЛОГИКА ИНФРАСТРУКТУРЫ И СЕТЕЙ + МОНИТОРИНГ ===
         let currentInfraData = {
             cities: "", global_links: { main_channel: "", faq: "" },
             networks: { parni: [], mk: [], ns: [], rainbow: [], gayznak: [] },
@@ -2343,17 +2343,12 @@ function loadRootRevenue(pin, period = 'week') {
         };
 
         const networkNames = { parni: "ПАРНИ 18+", mk: "МК", ns: "НС", rainbow: "Радуга", gayznak: "ГейЗнакомства" };
+        let pingInterval = null;
 
         function loadInfrastructure() {
-            fetch('/glaz/api/infrastructure')
-            .then(res => {
-                if(!res.ok) throw new Error("Сервер не ответил");
-                return res.json();
-            })
-            .then(data => {
+            fetch('/glaz/api/infrastructure').then(res => res.json()).then(data => {
                 if(data) currentInfraData = data;
                 
-                // Предохранители
                 if(!currentInfraData.networks) currentInfraData.networks = { parni: [], mk: [], ns: [], rainbow: [], gayznak: [] };
                 if(!currentInfraData.competitors) currentInfraData.competitors = [];
                 if(!currentInfraData.global_links) currentInfraData.global_links = { main_channel: "", faq: "" };
@@ -2364,9 +2359,7 @@ function loadRootRevenue(pin, period = 'week') {
 
                 renderInfraChats();
                 renderInfraEnemies();
-            })
-            .catch(err => {
-                document.getElementById('infra-chats-tbody').innerHTML = '<tr><td colspan="5" style="text-align: center; color: #cf6679;">⚠️ Ошибка связи с ботом. Возможно, сервер (Render) ещё перезагружается! Подождите пару минут и обновите страницу.</td></tr>';
+                startAutoPing(); // Запускаем пинг чатов
             });
         }
 
@@ -2378,7 +2371,7 @@ function loadRootRevenue(pin, period = 'week') {
                         <td><strong>${chat.name}</strong></td>
                         <td><code>${chat.id}</code></td>
                         <td><span class="badge yes" style="background: #444; color: #fff;">${networkNames[netKey] || netKey}</span></td>
-                        <td><span id="health-${chat.id}" class="health-status" style="color: #aaa; font-size: 11px;">🟡 Ждет пинга...</span></td>
+                        <td><span id="health-${chat.id}" style="color: #aaa; font-weight: bold; font-size: 12px; padding: 4px 8px; border-radius: 5px; background: #252525;">🟡 Ждем пинга...</span></td>
                         <td><button onclick="removeInfraChat('${netKey}', ${idx})" class="act-btn ban" style="padding: 4px 8px; width: auto; font-size: 10px;">❌</button></td>
                     </tr>`;
                 });
@@ -2387,26 +2380,37 @@ function loadRootRevenue(pin, period = 'week') {
             document.getElementById('infra-chats-tbody').innerHTML = html;
         }
 
-        // 👇 НОВАЯ ФУНКЦИЯ ПИНГА 👇
         function pingNetworks() {
-            showToast("📡 Пингуем сервера Telegram... Ждите.");
-            document.querySelectorAll('.health-status').forEach(el => el.innerHTML = "⏳ Проверка...");
-            
-            fetch('/glaz/api/infrastructure/ping').then(res => res.json()).then(statuses => {
+            document.querySelectorAll('[id^="health-"]').forEach(el => {
+                el.innerHTML = "⏳ Проверка...";
+                el.style.color = "#aaa";
+            });
+
+            fetch('/glaz/api/infrastructure/ping')
+            .then(res => res.json())
+            .then(statuses => {
                 for (const [netKey, chats] of Object.entries(currentInfraData.networks)) {
                     chats.forEach(chat => {
-                        const statusData = statuses[chat.id];
+                        const statusData = statuses[chat.id] || {code: 'error', text: '🔴 Неизвестно'};
                         const el = document.getElementById(`health-${chat.id}`);
-                        if(el && statusData) {
+                        if(el) {
                             let color = statusData.code === 'ok' ? '#03dac6' : statusData.code === 'warn' ? '#ffb74d' : '#cf6679';
-                            el.innerHTML = `<span style="color: ${color}; font-weight: bold; font-size: 12px;">${statusData.text}</span>`;
-                        } else if(el) {
-                            el.innerHTML = `<span style="color: #888; font-size: 12px;">🔴 Неизвестно</span>`;
+                            let bg = statusData.code === 'ok' ? 'rgba(3, 218, 198, 0.1)' : statusData.code === 'warn' ? 'rgba(255, 183, 77, 0.1)' : 'rgba(207, 102, 121, 0.1)';
+                            el.innerHTML = statusData.text;
+                            el.style.color = color;
+                            el.style.background = bg;
                         }
                     });
                 }
-                showToast("✅ Мониторинг завершен!");
             });
+        }
+
+        function startAutoPing() {
+            if(pingInterval) clearInterval(pingInterval);
+            pingNetworks();
+            pingInterval = setInterval(() => {
+                if(document.getElementById('tab-infrastructure').classList.contains('active')) pingNetworks();
+            }, 25000);
         }
 
         function addInfraChat() {
@@ -2414,13 +2418,12 @@ function loadRootRevenue(pin, period = 'week') {
             const id = document.getElementById('new-chat-id').value.trim();
             const net = document.getElementById('new-chat-net').value;
             if(!name || !id) { showToast("⚠️ Введите название и ID чата!"); return; }
-            
             if(!currentInfraData.networks[net]) currentInfraData.networks[net] = [];
             currentInfraData.networks[net].push({ name: name, id: id });
-            
             document.getElementById('new-chat-name').value = '';
             document.getElementById('new-chat-id').value = '';
             renderInfraChats();
+            pingNetworks();
         }
 
         function removeInfraChat(netKey, idx) {
@@ -2428,49 +2431,31 @@ function loadRootRevenue(pin, period = 'week') {
             renderInfraChats();
         }
 
-        // 👇 ПРЯМОЕ УПРАВЛЕНИЕ АНДРЮШЕНЬКОЙ 👇
         function renderInfraEnemies() {
-            fetch('/glaz/api/spy')
-            .then(res => res.json())
-            .then(data => {
-                let html = '';
-                data.forEach(chat => {
-                    html += `
-                    <div style="display: flex; justify-content: space-between; background: #121212; padding: 8px 12px; margin-bottom: 5px; border-radius: 5px; border: 1px solid #333;">
-                        <span style="color: #bb86fc; font-family: monospace;">${chat}</span>
-                        <span style="cursor:pointer; color:#cf6679;" onclick="removeInfraEnemy('${chat}')">✖ Удалить</span>
-                    </div>`;
-                });
-                document.getElementById('infra-enemies-list').innerHTML = html || '<div style="color:#888;">Цели не назначены...</div>';
+            const container = document.getElementById('infra-enemies-list');
+            let html = '';
+            currentInfraData.competitors.forEach((enemy, idx) => {
+                html += `<div style="background: #2d2d2d; border: 1px solid #cf6679; padding: 5px 10px; border-radius: 15px; font-size: 12px; display: flex; align-items: center; gap: 8px;">
+                    🎯 ${enemy} 
+                    <span onclick="removeInfraEnemy(${idx})" style="cursor: pointer; color: #cf6679; font-weight: bold;">✖</span>
+                </div>`;
             });
+            if(html === '') html = '<span style="color: #666; font-size: 12px;">Цели не назначены...</span>';
+            container.innerHTML = html;
         }
 
         function addInfraEnemy() {
             const val = document.getElementById('new-enemy-id').value.trim();
             if(!val) return;
-            
-            fetch('/glaz/api/spy/add', {
-                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({chat: val})
-            }).then(res => res.json()).then(data => {
-                if(data.success) {
-                    document.getElementById('new-enemy-id').value = '';
-                    renderInfraEnemies(); // Обновляем список сразу
-                    showToast("✅ Чат передан Бульдозеру!");
-                }
-            });
+            currentInfraData.competitors.push(val);
+            document.getElementById('new-enemy-id').value = '';
+            renderInfraEnemies();
         }
 
-        function removeInfraEnemy(chatStr) {
-            fetch('/glaz/api/spy/del', {
-                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({chat: chatStr})
-            }).then(res => res.json()).then(data => {
-                if(data.success) {
-                    renderInfraEnemies(); // Обновляем список сразу
-                    showToast("🗑 Чат удален!");
-                }
-            });
+        function removeInfraEnemy(idx) {
+            currentInfraData.competitors.splice(idx, 1);
+            renderInfraEnemies();
         }
-        // 👆 =================================== 👆
 
         function saveInfrastructure() {
             currentInfraData.cities = document.getElementById('infra-cities').value.trim();
@@ -2491,9 +2476,32 @@ function loadRootRevenue(pin, period = 'week') {
             .then(res => res.text())
             .then(text => {
                 showToast(text);
-                setTimeout(() => window.location.reload(), 1500); // Перезагружаем страницу через 1.5 сек
+                setTimeout(() => window.location.reload(), 1500); 
             });
         }
+
+        // 👇 СКРИПТ ДЛЯ ЛАМПОЧЕК ОНЛАЙН/ОФФЛАЙН (ПУЛЬС СИСТЕМ) 👇
+        function checkBotStatuses() {
+            fetch('/glaz/api/system_status')
+            .then(res => res.json())
+            .then(data => {
+                const now = Date.now() / 1000;
+                // Бот считается живым, если присылал пульс не позднее 3 минут (180 сек) назад
+                const isAlive = (lastSeen) => lastSeen && (now - lastSeen < 180);
+
+                const ok = '<span style="color:#03dac6;">🟢 Онлайн</span>';
+                const fail = '<span style="color:#cf6679;">🔴 ОФФЛАЙН</span>';
+
+                document.getElementById('status-skynet').innerHTML = `🤖 Skynet: ${isAlive(data.skynet_last_seen) ? ok : fail}`;
+                document.getElementById('status-spy').innerHTML = `🚜 Bulldozer: ${isAlive(data.spy_last_seen) ? ok : fail}`;
+                document.getElementById('status-ads').innerHTML = `📢 Реклама: ${isAlive(data.ads_last_seen) ? ok : fail}`;
+                document.getElementById('status-sec').innerHTML = `👩‍💼 Секретарь: ${isAlive(data.sec_last_seen) ? ok : fail}`;
+            }).catch(e => console.log("Ожидание статусов..."));
+        }
+
+        // Запускаем проверку пульса
+        checkBotStatuses();
+        setInterval(checkBotStatuses, 30000);
 
     </script>
 </body>
