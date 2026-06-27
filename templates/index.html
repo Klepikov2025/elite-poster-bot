@@ -838,10 +838,10 @@
                 <input type="text" id="new-chat-id" placeholder="ID чата (-100...)" class="form-control" style="flex: 1; background: #111; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 4px;">
                 <select id="new-chat-net" class="form-control" style="background: #111; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 4px;">
                     <option value="parni">ПАРНИ 18+</option>
-                    <option value="mk">Малолетки (МК)</option>
-                    <option value="ns">Неформалы (НС)</option>
+                    <option value="mk">МК</option>
+                    <option value="ns">НС</option>
                     <option value="rainbow">Радуга</option>
-                    <option value="gayznak">ГейЗнакомства</option>
+                    <option value="gayznak">Гей Знакомства</option>
                 </select>
                 <button onclick="addInfraChat()" class="btn" style="background: #03dac6; color: #121212; font-weight: bold; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer;">➕ Добавить</button>
             </div>
@@ -865,6 +865,10 @@
         </div>
 
         <button onclick="saveInfrastructure()" class="form-btn" style="width: 100%; background: #4caf50; color: #fff; font-size: 16px; margin-top: 20px; font-weight: bold; padding: 15px;">💾 ЗАЛИТЬ АРХИТЕКТУРУ В MONGODB</button>
+<div style="display: flex; gap: 15px; margin-top: 20px;">
+            <button onclick="saveInfrastructure()" class="form-btn" style="flex: 2; background: #4caf50; color: #fff; font-size: 16px; font-weight: bold; padding: 15px;">💾 СОХРАНИТЬ ИЗМЕНЕНИЯ В MONGODB</button>
+            <button onclick="runMigration()" class="form-btn" style="flex: 1; background: #ffb74d; color: #121212; font-size: 14px; font-weight: bold; padding: 15px;">🔄 Вытянуть базы из config.py</button>
+        </div>
     </div>
 
 
@@ -2421,7 +2425,16 @@ function loadRootRevenue(pin, period = 'week') {
                 if(data.success) showToast(data.message);
             });
         }
-        // =======================================
+
+        function runMigration() {
+            showToast("⏳ Запускаю перенос данных из конфига...");
+            fetch('/glaz/api/infrastructure/migrate')
+            .then(res => res.text())
+            .then(text => {
+                showToast(text);
+                setTimeout(() => window.location.reload(), 1500); // Перезагружаем страницу через 1.5 сек
+            });
+        }
 
     </script>
 </body>
