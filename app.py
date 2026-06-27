@@ -26,7 +26,7 @@ from config import (
     VIP_CHAT_ID, BEYOND_CHAT_ID, NON_CITIES,
     chat_ids_mk, chat_ids_parni, chat_ids_ns, 
     chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS,
-    all_cities, insert_to_all, GROQ_API_KEYS  # <--- ДОБАВИЛИ СЮДА!
+    all_cities, GROQ_API_KEYS  # <--- ДОБАВИЛИ СЮДА!
 )
 
 from database import (
