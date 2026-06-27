@@ -1,4 +1,5 @@
 import os
+from database import db
 from pymongo import MongoClient
 
 # ==================== СЕКРЕТЫ И НАСТРОЙКИ СЕРВЕРА ====================
@@ -33,7 +34,10 @@ VIP_CHAT_ID = -1002446486648
 BEYOND_CHAT_ID = -1002873115881
 VERIFICATION_LINK = "http://t.me/vip_znakbot"
 
-# 👇 УМНЫЙ ШЛЮЗ ДЛЯ ЧТЕНИЯ MONGODB В РЕАЛЬНОМ ВРЕМЕНИ 👇
+# Вставь вот сюда
+NON_CITIES = ["БЕЗ ПРЕДРАССУДКОВ", "RAINBOW MAN", "Мужской Чат", "Фетиши", "Аренда Жилья", "Секс Туризм", "Галерея", "Тестовая группа 🛠️"]
+
+# Дальше идет функция
 def get_network_data():
     from database import db
     infra = db['settings'].find_one({"_id": "infrastructure"})
