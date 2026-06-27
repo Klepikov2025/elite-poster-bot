@@ -1394,30 +1394,19 @@ def autopilot_daemon():
 threading.Thread(target=autopilot_daemon, daemon=True).start()
 # =======================================
 
-# === 💥 АВТО-МИГРАЦИЯ МАТРИЦЫ ПРИ СТАРТЕ СЕРВЕРА 💥 ===
-try:
+# === ДАТЧИК ПУЛЬСА СКАЙНЕТА ===
+def heartbeat_skynet():
     from database import db
-    from config import all_cities, chat_ids_parni, chat_ids_mk, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, MAIN_CHANNEL_LINK
-    
-    def convert_dict_to_list(chat_dict):
-        return [{"name": name, "id": str(chat_id)} for name, chat_id in chat_dict.items()]
-        
-    migrated_data = {
-        "cities": ", ".join(all_cities),
-        "global_links": {"main_channel": MAIN_CHANNEL_LINK, "faq": ""},
-        "networks": {
-            "parni": convert_dict_to_list(chat_ids_parni),
-            "mk": convert_dict_to_list(chat_ids_mk),
-            "ns": convert_dict_to_list(chat_ids_ns),
-            "rainbow": convert_dict_to_list(chat_ids_rainbow),
-            "gayznak": convert_dict_to_list(chat_ids_gayznak)
-        }
-    }
-    db['settings'].update_one({"_id": "infrastructure"}, {"$set": migrated_data}, upsert=True)
-    print("✅ АВТО-МИГРАЦИЯ МАТРИЦЫ УСПЕШНО ВЫПОЛНЕНА ПРИ СТАРТЕ!")
-except Exception as e:
-    print(f"⚠️ Ошибка авто-миграции: {e}")
-# =======================================================
+    import time
+    while True:
+        try:
+            db['settings'].update_one({"_id": "bot_status"}, {"$set": {"skynet_last_seen": time.time()}}, upsert=True)
+        except: pass
+        time.sleep(60)
+
+import threading
+threading.Thread(target=heartbeat_skynet, daemon=True).start()
+# ==============================
 
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])

@@ -1360,3 +1360,39 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             upsert=True
         )
         return "✅ Миграция успешно завершена! Вернитесь в ЦУП и обновите страницу."
+
+    # === ПРЯМОЕ УПРАВЛЕНИЕ АНДРЮШЕНЬКОЙ (ЦЕЛИ) ===
+    @app.route('/glaz/api/spy', methods=['GET'])
+    def api_get_spy():
+        if not session.get('logged_in'): return jsonify([])
+        doc = db['settings'].find_one({"_id": "spy_settings"}) or {}
+        return jsonify(doc.get("chats", []))
+
+    @app.route('/glaz/api/spy/add', methods=['POST'])
+    def api_add_spy():
+        if not session.get('logged_in'): return jsonify({"success": False})
+        chat = request.json.get('chat')
+        try:
+            if str(chat).lstrip('-').isdigit(): chat = int(chat)
+        except: pass
+        db['settings'].update_one({"_id": "spy_settings"}, {"$addToSet": {"chats": chat}}, upsert=True)
+        add_radar_log(f"🎯 Новая цель для Бульдозера: {chat}")
+        return jsonify({"success": True})
+
+    @app.route('/glaz/api/spy/del', methods=['POST'])
+    def api_del_spy():
+        if not session.get('logged_in'): return jsonify({"success": False})
+        chat = request.json.get('chat')
+        try:
+            if str(chat).lstrip('-').isdigit(): chat = int(chat)
+        except: pass
+        db['settings'].update_one({"_id": "spy_settings"}, {"$pull": {"chats": chat}})
+        return jsonify({"success": True})
+
+    # === ОТДАЕМ ПУЛЬС БОТОВ В ВЕБ-ПАНЕЛЬ ===
+    @app.route('/glaz/api/system_status', methods=['GET'])
+    def api_get_system_status():
+        status_data = db['settings'].find_one({"_id": "bot_status"}) or {}
+        if "_id" in status_data:
+            del status_data["_id"]
+        return jsonify(status_data)

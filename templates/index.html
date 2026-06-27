@@ -2396,31 +2396,49 @@ function loadRootRevenue(pin, period = 'week') {
             renderInfraChats();
         }
 
+        // 👇 ПРЯМОЕ УПРАВЛЕНИЕ АНДРЮШЕНЬКОЙ 👇
         function renderInfraEnemies() {
-            const container = document.getElementById('infra-enemies-list');
-            let html = '';
-            currentInfraData.competitors.forEach((enemy, idx) => {
-                html += `<div style="background: #2d2d2d; border: 1px solid #cf6679; padding: 5px 10px; border-radius: 15px; font-size: 12px; display: flex; align-items: center; gap: 8px;">
-                    🎯 ${enemy} 
-                    <span onclick="removeInfraEnemy(${idx})" style="cursor: pointer; color: #cf6679; font-weight: bold;">✖</span>
-                </div>`;
+            fetch('/glaz/api/spy')
+            .then(res => res.json())
+            .then(data => {
+                let html = '';
+                data.forEach(chat => {
+                    html += `
+                    <div style="display: flex; justify-content: space-between; background: #121212; padding: 8px 12px; margin-bottom: 5px; border-radius: 5px; border: 1px solid #333;">
+                        <span style="color: #bb86fc; font-family: monospace;">${chat}</span>
+                        <span style="cursor:pointer; color:#cf6679;" onclick="removeInfraEnemy('${chat}')">✖ Удалить</span>
+                    </div>`;
+                });
+                document.getElementById('infra-enemies-list').innerHTML = html || '<div style="color:#888;">Цели не назначены...</div>';
             });
-            if(html === '') html = '<span style="color: #666; font-size: 12px;">Цели не назначены...</span>';
-            container.innerHTML = html;
         }
 
         function addInfraEnemy() {
             const val = document.getElementById('new-enemy-id').value.trim();
             if(!val) return;
-            currentInfraData.competitors.push(val);
-            document.getElementById('new-enemy-id').value = '';
-            renderInfraEnemies();
+            
+            fetch('/glaz/api/spy/add', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({chat: val})
+            }).then(res => res.json()).then(data => {
+                if(data.success) {
+                    document.getElementById('new-enemy-id').value = '';
+                    renderInfraEnemies(); // Обновляем список сразу
+                    showToast("✅ Чат передан Бульдозеру!");
+                }
+            });
         }
 
-        function removeInfraEnemy(idx) {
-            currentInfraData.competitors.splice(idx, 1);
-            renderInfraEnemies();
+        function removeInfraEnemy(chatStr) {
+            fetch('/glaz/api/spy/del', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({chat: chatStr})
+            }).then(res => res.json()).then(data => {
+                if(data.success) {
+                    renderInfraEnemies(); // Обновляем список сразу
+                    showToast("🗑 Чат удален!");
+                }
+            });
         }
+        // 👆 =================================== 👆
 
         function saveInfrastructure() {
             currentInfraData.cities = document.getElementById('infra-cities').value.trim();
