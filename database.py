@@ -1,5 +1,11 @@
+import os
 import pymongo
-from config import MONGO_URI
+
+# Рвем связь с config.py, берем ключ напрямую из системы
+MONGO_URI = os.getenv('MONGO_URI')
+
+if not MONGO_URI:
+    raise ValueError("❌ КРИТИЧЕСКАЯ ОШИБКА: MONGO_URI не найден в переменных окружения!")
 
 mongo_client = pymongo.MongoClient(MONGO_URI)
 db = mongo_client['elite_bot_db']
