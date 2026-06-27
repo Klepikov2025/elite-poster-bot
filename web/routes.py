@@ -1258,16 +1258,14 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
 
     # === ИНФРАСТРУКТУРА И СЕТИ (ЭТАП 1) ===
     @app.route('/glaz/api/infrastructure', methods=['GET'])
-    def api_get_infrastructure():
+    def api_get_infra():
         if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+        data = db['settings'].find_one({"_id": "infrastructure"}) or {}
         
-        # Ищем базу, если нет - отдаем пустой скелет
-        data = db['settings'].find_one({"_id": "infrastructure"}) or {
-            "cities": "Москва, Санкт-Петербург, Екатеринбург", 
-            "global_links": {"main_channel": "", "faq": ""},
-            "networks": {"parni": [], "mk": [], "ns": [], "rainbow": [], "gayznak": []},
-            "competitors": []
-        }
+        # 👇 СТРАХОВКА ОТ КРАША JSON 👇
+        if "_id" in data:
+            del data["_id"] 
+            
         return jsonify(data)
 
     @app.route('/glaz/api/infrastructure/save', methods=['POST'])
