@@ -129,6 +129,14 @@
         <a href="/glaz/logout" class="logout-link">🔒 Выйти из Бункера</a>
     </div>
 
+    <div class="header-status" style="display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; background: #1e1e1e; padding: 12px 20px; border-radius: 8px; border: 1px solid #333; max-width: 1060px; margin: 0 auto 25px auto; font-weight: bold; font-size: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+        <div style="color: #bb86fc; text-transform: uppercase; font-size: 12px; display: flex; align-items: center;">📡 Пульс систем:</div>
+        <div id="status-skynet">🤖 Skynet: <span style="color:#aaa;">⏳...</span></div>
+        <div id="status-spy">🚜 Bulldozer: <span style="color:#aaa;">⏳...</span></div>
+        <div id="status-ads">📢 Реклама: <span style="color:#aaa;">⏳...</span></div>
+        <div id="status-sec">👩‍💼 Секретарь: <span style="color:#aaa;">⏳...</span></div>
+    </div>
+
     <div class="tabs-nav">
         <button class="tab-btn active" onclick="openTab('tab-main')">🔍 Обзор и Досье</button>
         <button class="tab-btn" onclick="openTab('tab-radar')">🔴 Радар и Списки</button>
@@ -1437,6 +1445,30 @@ function previewBroadcast() {
                 loadProxyChat(activeProxySession); 
             }
         }, 5000);
+
+       // 👇 СКРИПТ ДЛЯ ЛАМПОЧЕК ОНЛАЙН/ОФФЛАЙН 👇
+        function checkBotStatuses() {
+            fetch('/glaz/api/system_status')
+            .then(res => res.json())
+            .then(data => {
+                const now = Date.now() / 1000;
+                // Бот считается живым, если присылал пульс не позднее 3 минут (180 сек) назад
+                const isAlive = (lastSeen) => lastSeen && (now - lastSeen < 180);
+
+                const ok = '<span style="color:#03dac6;">🟢 Онлайн</span>';
+                const fail = '<span style="color:#cf6679;">🔴 ОФФЛАЙН</span>';
+
+                document.getElementById('status-skynet').innerHTML = `🤖 Skynet: ${isAlive(data.skynet_last_seen) ? ok : fail}`;
+                document.getElementById('status-spy').innerHTML = `🚜 Bulldozer: ${isAlive(data.spy_last_seen) ? ok : fail}`;
+                document.getElementById('status-ads').innerHTML = `📢 Реклама: ${isAlive(data.ads_last_seen) ? ok : fail}`;
+                document.getElementById('status-sec').innerHTML = `👩‍💼 Секретарь: ${isAlive(data.sec_last_seen) ? ok : fail}`;
+            }).catch(e => console.log("Ожидание статусов..."));
+        }
+
+        // Запускаем проверку пульса сразу при загрузке страницы, а затем каждые 30 секунд
+        checkBotStatuses();
+        setInterval(checkBotStatuses, 30000);
+        // 👆 ===================================== 👆
 
         window.onload = function() {
             initCharts();
