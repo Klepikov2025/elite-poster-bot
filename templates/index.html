@@ -904,14 +904,14 @@
             // 5. Загружаем данные для конкретной вкладки
             if(tabId === 'tab-blackbox') loadProxySessions();
             if(tabId === 'tab-quarantine') loadQuarantine();
-            if(tabId === 'tab-infrastructure') loadInfrastructure();
+            if(tabId === 'tab-infrastructure') loadInfrastructure(); // <--- ИМЕННО ЭТА СТРОЧКА ЗАПУСКАЕТ МАТРИЦУ!
             if(tabId === 'ads-tab') loadAds();
             if(tabId === 'tab-system') { 
                 loadDictionary(); loadSystemTexts(); loadSystemSettings(); loadNetworkPrices(); 
                 loadAIPrompt(); loadModSettings(); 
             }
             
-            // 🛡 ИНИЦИАЛИЗАЦИЯ ВИЗУАЛЬНОГО РЕДАКТОРА (ТОЛЬКО КОГДА ВКЛАДКА ВИДИМА!)
+            // 🛡 ИНИЦИАЛИЗАЦИЯ ВИЗУАЛЬНОГО РЕДАКТОРА
             const minimalToolbar = {
                 toolbar: [
                     ['style', ['bold', 'italic', 'underline', 'strikethrough', 'clear']],
@@ -923,7 +923,7 @@
 
             if(tabId === 'tab-broadcast') {
                 loadTemplates();
-                loadBroadcastStats(); // <--- ДОБАВИТЬ ЭТУ СТРОКУ
+                loadBroadcastStats();
                 if (!$('#broadcast-text').hasClass('sn-loaded')) {
                     $('#broadcast-text').summernote({ ...minimalToolbar, height: 250, placeholder: 'Введите текст рассылки...' });
                     $('#broadcast-text').addClass('sn-loaded');
