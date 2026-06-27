@@ -139,6 +139,7 @@
         <button class="tab-btn" onclick="openTab('tab-mass')" style="color: #cf6679;">💥 Репрессии</button>
         <button class="tab-btn" onclick="openTab('tab-system')">⚙️ Система</button>
         <button class="tab-btn" onclick="openTab('ads-tab')">📊 Биржа рекламы</button>
+        <button class="tab-btn" onclick="openTab('tab-infrastructure')" style="color: #4caf50; font-weight: bold;">🗺 Инфраструктура</button>
         <button class="tab-btn" onclick="openTab('tab-withdrawals')">💸 Выводы</button>
         <button class="tab-btn" onclick="openTab('tab-promos')">🎫 Скидки</button>
     </div>
@@ -567,7 +568,69 @@
             
             <div id="toggles-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 16px;">
             </div>
-        </div> <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #333; padding: 20px; border-radius: 10px; max-width: 1000px;">
+        </div>
+        
+        <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #ffb74d; padding: 20px; border-radius: 10px; max-width: 1000px; box-shadow: 0 0 15px rgba(255, 183, 77, 0.05);">
+            <h3 style="color: #ffb74d; margin-bottom: 10px; font-size: 18px;">⚖️ Лимиты модерации и Таймеры</h3>
+            <p style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Настройки радаров и таймеры банов. Изменения применяются без перезагрузки сервера.</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="background: #252525; padding: 15px; border-radius: 8px; border-left: 3px solid #03dac6;">
+                    <h4 style="color: #03dac6; margin-top: 0;">👁 Радар Твинков (Анти-Баян)</h4>
+                    <label style="font-size: 12px; color: #ccc;">Сходство для обычных: <b id="val-sim-norm" style="color:#fff;">85</b>%</label>
+                    <input type="range" id="sim-norm" min="50" max="100" value="85" style="width: 100%; margin-bottom: 15px;" oninput="document.getElementById('val-sim-norm').innerText = this.value">
+                    
+                    <label style="font-size: 12px; color: #ccc;">Сходство для новорегов: <b id="val-sim-new" style="color:#cf6679;">75</b>%</label>
+                    <input type="range" id="sim-new" min="50" max="100" value="75" style="width: 100%; margin-bottom: 10px;" oninput="document.getElementById('val-sim-new').innerText = this.value">
+                </div>
+
+                <div style="background: #252525; padding: 15px; border-radius: 8px; border-left: 3px solid #cf6679;">
+                    <h4 style="color: #cf6679; margin-top: 0;">⏱ Таймеры наказаний (Часы)</h4>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <label style="font-size: 12px; color: #ccc;">Мут за 3 страйка:</label>
+                        <input type="number" id="timer-strike" class="search-input" style="width: 70px; padding: 4px;" value="72">
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <label style="font-size: 12px; color: #ccc;">Антифлуд (Обычный):</label>
+                        <input type="number" id="timer-flood-norm" class="search-input" style="width: 70px; padding: 4px;" value="6">
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <label style="font-size: 12px; color: #ccc;">Антифлуд (Биг-чат):</label>
+                        <input type="number" id="timer-flood-hard" class="search-input" style="width: 70px; padding: 4px;" value="120">
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <label style="font-size: 12px; color: #ccc;">Карантин новорегов:</label>
+                        <input type="number" id="timer-quarantine" class="search-input" style="width: 70px; padding: 4px;" value="120">
+                    </div>
+                </div>
+            </div>
+            <button class="form-btn" style="background: #ffb74d; color: #121212; width: 100%; font-weight: bold; font-size: 15px; margin-top: 15px;" onclick="saveModSettings()">💾 Сохранить таймеры</button>
+        </div>
+<div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #bb86fc; padding: 20px; border-radius: 10px; max-width: 1000px; box-shadow: 0 0 15px rgba(187, 134, 252, 0.05);">
+            <h3 style="color: #bb86fc; margin-bottom: 10px; font-size: 18px;">🤖 Рубильники ИИ-Модерации</h3>
+            <p style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Глобальное отключение модулей (если ИИ сошел с ума или тупит).</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; background: #252525; padding: 12px; border-radius: 8px;">
+                    <span style="color: #fff; font-size: 14px;">📡 <b>Радар твинков</b></span>
+                    <label class="toggle-switch"><input type="checkbox" id="toggle-radar"><span class="slider"></span></label>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; background: #252525; padding: 12px; border-radius: 8px;">
+                    <span style="color: #fff; font-size: 14px;">🖼 <b>Анти-баян (Фото)</b></span>
+                    <label class="toggle-switch"><input type="checkbox" id="toggle-antibayan-photo"><span class="slider"></span></label>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; background: #252525; padding: 12px; border-radius: 8px;">
+                    <span style="color: #fff; font-size: 14px;">📝 <b>Анти-копипаст (Текст)</b></span>
+                    <label class="toggle-switch"><input type="checkbox" id="toggle-antibayan-text"><span class="slider"></span></label>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; background: #252525; padding: 12px; border-radius: 8px;">
+                    <span style="color: #fff; font-size: 14px;">⏳ <b>Умный антифлуд</b></span>
+                    <label class="toggle-switch"><input type="checkbox" id="toggle-antiflood"><span class="slider"></span></label>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #333; padding: 20px; border-radius: 10px; max-width: 1000px;">
             <h3 style="color: #cf6679; margin-bottom: 10px; font-size: 18px;">🤬 Словарь Инквизитора (Живые фильтры)</h3>
             <p style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Добавляйте слова-триггеры. Бот начнет удалять их без перезагрузки сервера.</p>
             
@@ -743,6 +806,68 @@
         </div>
     </div>
 
+<div id="tab-infrastructure" class="tab-content">
+        <div class="panel-block" style="max-width: 1000px; display: flex; gap: 20px; padding: 0; background: transparent; box-shadow: none;">
+            
+            <div style="flex: 1; background: #1a1a1a; padding: 20px; border-radius: 10px; border: 1px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                <h3 style="color: #03dac6; margin-top: 0;">🏙 Список Городов (Анкеты)</h3>
+                <p style="font-size: 11px; color: #aaa;">Вводите через запятую. Этот список пойдет в кнопки бота публикаций.</p>
+                <textarea id="infra-cities" class="form-control" style="width: 100%; height: 120px; background: #222; color: #fff; border: 1px solid #555; padding: 10px; border-radius: 5px; box-sizing: border-box;"></textarea>
+            </div>
+            
+            <div style="flex: 1; background: #1a1a1a; padding: 20px; border-radius: 10px; border: 1px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                <h3 style="color: #bb86fc; margin-top: 0;">🔗 Глобальные ссылки</h3>
+                <label style="font-size: 11px; color: #aaa;">Главный канал сети (MAIN_CHANNEL_LINK):</label>
+                <input type="text" id="infra-link-main" class="form-control" placeholder="https://t.me/..." style="width: 100%; margin-bottom: 15px; background: #222; color: #fff; border: 1px solid #555; padding: 8px; border-radius: 5px; box-sizing: border-box;">
+                
+                <label style="font-size: 11px; color: #aaa;">FAQ / Бот верификации:</label>
+                <input type="text" id="infra-link-faq" class="form-control" placeholder="https://t.me/FAQMKBOT" style="width: 100%; background: #222; color: #fff; border: 1px solid #555; padding: 8px; border-radius: 5px; box-sizing: border-box;">
+            </div>
+
+        </div>
+
+        <div class="panel-block" style="max-width: 1000px; margin-top: 20px; border-left: 4px solid #ffb74d;">
+            <h3 style="color: #ffb74d; margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
+                <span>🌐 Диспетчер Чатов (Сети Империи)</span>
+                <button onclick="pingNetworks()" class="btn" style="background: #3390ec; color: #fff; font-size: 13px; padding: 6px 15px; border: none; border-radius: 5px; cursor: pointer; transition: 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">📡 ПИНГ (Health Check)</button>
+            </h3>
+            <p style="font-size: 12px; color: #aaa;">Добавьте чат сюда, и Скайнет мгновенно возьмет его под охрану.</p>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; background: #252525; padding: 15px; border-radius: 8px; align-items: center;">
+                <input type="text" id="new-chat-name" placeholder="Название (напр. МК Казань)" class="form-control" style="flex: 1; background: #111; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 4px;">
+                <input type="text" id="new-chat-id" placeholder="ID чата (-100...)" class="form-control" style="flex: 1; background: #111; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 4px;">
+                <select id="new-chat-net" class="form-control" style="background: #111; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 4px;">
+                    <option value="parni">ПАРНИ 18+</option>
+                    <option value="mk">Малолетки (МК)</option>
+                    <option value="ns">Неформалы (НС)</option>
+                    <option value="rainbow">Радуга</option>
+                    <option value="gayznak">ГейЗнакомства</option>
+                </select>
+                <button onclick="addInfraChat()" class="btn" style="background: #03dac6; color: #121212; font-weight: bold; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer;">➕ Добавить</button>
+            </div>
+
+            <table class="admin-table">
+                <thead><tr><th>Название</th><th>Telegram ID</th><th>Сеть</th><th>Health Check (Статус)</th><th>Действие</th></tr></thead>
+                <tbody id="infra-chats-tbody">
+                    <tr><td colspan="5" style="text-align: center; color: #888;">Загрузка матрицы...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="panel-block" style="max-width: 1000px; margin-top: 20px; border-left: 4px solid #cf6679; background: rgba(207, 102, 121, 0.05);">
+            <h3 style="color: #cf6679; margin-top: 0;">🎯 Вражеские базы (Цели Андрюшеньки)</h3>
+            <p style="font-size: 12px; color: #aaa;">Добавьте ID чатов или юзернеймы конкурентов. Шпион будет прочесывать их автономно.</p>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <input type="text" id="new-enemy-id" placeholder="@username или -100..." class="form-control" style="flex: 1; background: #111; color: #fff; border: 1px solid #cf6679; padding: 8px; border-radius: 4px;">
+                <button onclick="addInfraEnemy()" class="btn" style="background: #cf6679; color: #fff; font-weight: bold; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer;">➕ Захватить цель</button>
+            </div>
+            <div id="infra-enemies-list" style="display: flex; flex-wrap: wrap; gap: 10px; min-height: 40px;"></div>
+        </div>
+
+        <button onclick="saveInfrastructure()" class="form-btn" style="width: 100%; background: #4caf50; color: #fff; font-size: 16px; margin-top: 20px; font-weight: bold; padding: 15px;">💾 ЗАЛИТЬ АРХИТЕКТУРУ В MONGODB</button>
+    </div>
+
+
     <div class="footer">Skynet Enterprise © 2026 | Высший уровень контроля безопасности</div>
 
     <script>
@@ -778,7 +903,7 @@
             if(tabId === 'ads-tab') loadAds();
             if(tabId === 'tab-system') { 
                 loadDictionary(); loadSystemTexts(); loadSystemSettings(); loadNetworkPrices(); 
-                loadAIPrompt(); // <--- ДОБАВИТЬ ЭТУ СТРОКУ
+                loadAIPrompt(); loadModSettings(); 
             }
             
             // 🛡 ИНИЦИАЛИЗАЦИЯ ВИЗУАЛЬНОГО РЕДАКТОРА (ТОЛЬКО КОГДА ВКЛАДКА ВИДИМА!)
@@ -2126,6 +2251,177 @@ function loadRootRevenue(pin, period = 'week') {
                 if(data.success) showToast("📌 Секретная пометка админа сохранена!");
             });
         }
+
+// === ЛИМИТЫ МОДЕРАЦИИ И ТАЙМЕРЫ ===
+        function loadModSettings() {
+            fetch('/glaz/api/moderation')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('sim-norm').value = data.sim_normal || 85;
+                document.getElementById('val-sim-norm').innerText = data.sim_normal || 85;
+                document.getElementById('sim-new').value = data.sim_newbie || 75;
+                document.getElementById('val-sim-new').innerText = data.sim_newbie || 75;
+                
+                document.getElementById('timer-strike').value = data.strike_hours || 72;
+                document.getElementById('timer-flood-norm').value = data.flood_norm_hours || 6;
+                document.getElementById('timer-flood-hard').value = data.flood_hard_hours || 120;
+                document.getElementById('timer-quarantine').value = data.quaran_hours || 120;
+
+                // 👇 ДОБАВИЛИ ЧТЕНИЕ ТУМБЛЕРОВ ИИ 👇
+                document.getElementById('toggle-radar').checked = data.radar_active !== false;
+                document.getElementById('toggle-antibayan-photo').checked = data.antibayan_photo_active !== false;
+                document.getElementById('toggle-antibayan-text').checked = data.antibayan_text_active !== false;
+                document.getElementById('toggle-antiflood').checked = data.antiflood_active !== false;
+            }).catch(e => console.log('Таймеры еще не настроены'));
+        }
+
+        function saveModSettings() {
+            const payload = {
+                sim_normal: parseInt(document.getElementById('sim-norm').value),
+                sim_newbie: parseInt(document.getElementById('sim-new').value),
+                strike_hours: parseInt(document.getElementById('timer-strike').value),
+                flood_norm_hours: parseInt(document.getElementById('timer-flood-norm').value),
+                flood_hard_hours: parseInt(document.getElementById('timer-flood-hard').value),
+                quaran_hours: parseInt(document.getElementById('timer-quarantine').value),
+
+                // 👇 Просто дописываем сюда сбор данных с новых кнопок ИИ 👇
+                radar_active: document.getElementById('toggle-radar').checked,
+                antibayan_photo_active: document.getElementById('toggle-antibayan-photo').checked,
+                antibayan_text_active: document.getElementById('toggle-antibayan-text').checked,
+                antiflood_active: document.getElementById('toggle-antiflood').checked
+            };
+
+            fetch('/glaz/api/moderation/save', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+            }).then(res => res.json()).then(data => {
+                if(data.success) showToast("✅ Настройки радаров и таймеров обновлены!");
+            });
+        }
+
+// === ЛОГИКА ИНФРАСТРУКТУРЫ И СЕТЕЙ ===
+        let currentInfraData = {
+            cities: "", global_links: { main_channel: "", faq: "" },
+            networks: { parni: [], mk: [], ns: [], rainbow: [], gayznak: [] },
+            competitors: []
+        };
+
+        const networkNames = { parni: "ПАРНИ 18+", mk: "МК", ns: "НС", rainbow: "Радуга", gayznak: "ГейЗнакомства" };
+
+        function loadInfrastructure() {
+            fetch('/glaz/api/infrastructure').then(res => res.json()).then(data => {
+                if(data) currentInfraData = data;
+                
+                // Предохранители
+                if(!currentInfraData.networks) currentInfraData.networks = { parni: [], mk: [], ns: [], rainbow: [], gayznak: [] };
+                if(!currentInfraData.competitors) currentInfraData.competitors = [];
+                if(!currentInfraData.global_links) currentInfraData.global_links = { main_channel: "", faq: "" };
+
+                document.getElementById('infra-cities').value = currentInfraData.cities || "";
+                document.getElementById('infra-link-main').value = currentInfraData.global_links.main_channel || "";
+                document.getElementById('infra-link-faq').value = currentInfraData.global_links.faq || "";
+
+                renderInfraChats();
+                renderInfraEnemies();
+            });
+        }
+
+        function renderInfraChats() {
+            let html = '';
+            for (const [netKey, chats] of Object.entries(currentInfraData.networks)) {
+                chats.forEach((chat, idx) => {
+                    html += `<tr>
+                        <td><strong>${chat.name}</strong></td>
+                        <td><code>${chat.id}</code></td>
+                        <td><span class="badge yes" style="background: #444; color: #fff;">${networkNames[netKey] || netKey}</span></td>
+                        <td><span id="health-${chat.id}" class="health-status" style="color: #aaa; font-size: 11px;">🟡 Ждет пинга...</span></td>
+                        <td><button onclick="removeInfraChat('${netKey}', ${idx})" class="act-btn ban" style="padding: 4px 8px; width: auto; font-size: 10px;">❌</button></td>
+                    </tr>`;
+                });
+            }
+            if(html === '') html = '<tr><td colspan="5" style="text-align: center; color: #888;">Чаты не добавлены</td></tr>';
+            document.getElementById('infra-chats-tbody').innerHTML = html;
+        }
+
+        // 👇 НОВАЯ ФУНКЦИЯ ПИНГА 👇
+        function pingNetworks() {
+            showToast("📡 Пингуем сервера Telegram... Ждите.");
+            document.querySelectorAll('.health-status').forEach(el => el.innerHTML = "⏳ Проверка...");
+            
+            fetch('/glaz/api/infrastructure/ping').then(res => res.json()).then(statuses => {
+                for (const [netKey, chats] of Object.entries(currentInfraData.networks)) {
+                    chats.forEach(chat => {
+                        const statusData = statuses[chat.id];
+                        const el = document.getElementById(`health-${chat.id}`);
+                        if(el && statusData) {
+                            let color = statusData.code === 'ok' ? '#03dac6' : statusData.code === 'warn' ? '#ffb74d' : '#cf6679';
+                            el.innerHTML = `<span style="color: ${color}; font-weight: bold; font-size: 12px;">${statusData.text}</span>`;
+                        } else if(el) {
+                            el.innerHTML = `<span style="color: #888; font-size: 12px;">🔴 Неизвестно</span>`;
+                        }
+                    });
+                }
+                showToast("✅ Мониторинг завершен!");
+            });
+        }
+
+        function addInfraChat() {
+            const name = document.getElementById('new-chat-name').value.trim();
+            const id = document.getElementById('new-chat-id').value.trim();
+            const net = document.getElementById('new-chat-net').value;
+            if(!name || !id) { showToast("⚠️ Введите название и ID чата!"); return; }
+            
+            if(!currentInfraData.networks[net]) currentInfraData.networks[net] = [];
+            currentInfraData.networks[net].push({ name: name, id: id });
+            
+            document.getElementById('new-chat-name').value = '';
+            document.getElementById('new-chat-id').value = '';
+            renderInfraChats();
+        }
+
+        function removeInfraChat(netKey, idx) {
+            currentInfraData.networks[netKey].splice(idx, 1);
+            renderInfraChats();
+        }
+
+        function renderInfraEnemies() {
+            const container = document.getElementById('infra-enemies-list');
+            let html = '';
+            currentInfraData.competitors.forEach((enemy, idx) => {
+                html += `<div style="background: #2d2d2d; border: 1px solid #cf6679; padding: 5px 10px; border-radius: 15px; font-size: 12px; display: flex; align-items: center; gap: 8px;">
+                    🎯 ${enemy} 
+                    <span onclick="removeInfraEnemy(${idx})" style="cursor: pointer; color: #cf6679; font-weight: bold;">✖</span>
+                </div>`;
+            });
+            if(html === '') html = '<span style="color: #666; font-size: 12px;">Цели не назначены...</span>';
+            container.innerHTML = html;
+        }
+
+        function addInfraEnemy() {
+            const val = document.getElementById('new-enemy-id').value.trim();
+            if(!val) return;
+            currentInfraData.competitors.push(val);
+            document.getElementById('new-enemy-id').value = '';
+            renderInfraEnemies();
+        }
+
+        function removeInfraEnemy(idx) {
+            currentInfraData.competitors.splice(idx, 1);
+            renderInfraEnemies();
+        }
+
+        function saveInfrastructure() {
+            currentInfraData.cities = document.getElementById('infra-cities').value.trim();
+            currentInfraData.global_links.main_channel = document.getElementById('infra-link-main').value.trim();
+            currentInfraData.global_links.faq = document.getElementById('infra-link-faq').value.trim();
+
+            fetch('/glaz/api/infrastructure/save', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(currentInfraData)
+            }).then(res => res.json()).then(data => {
+                if(data.success) showToast(data.message);
+            });
+        }
+        // =======================================
 
     </script>
 </body>

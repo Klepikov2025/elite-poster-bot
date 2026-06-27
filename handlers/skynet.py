@@ -115,6 +115,17 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         if not (GROQ_API_KEY or HF_TOKEN or OPENROUTER_KEY): 
             return
 
+        # 🔥 ДОБАВЛЯЕМ ВОТ ЭТОТ БЛОК 🔥
+        mod_limits = db['settings'].find_one({"_id": "moderation_limits"}) or {}
+        
+        # ЕСЛИ ТУМБЛЕР ВЫКЛЮЧЕН - ПРОСТО ВЫХОДИМ
+        if not mod_limits.get("antibayan_photo_active", True):
+            return 
+            
+        sim_normal = mod_limits.get("sim_normal", 85) / 100.0
+        strike_mute_sec = mod_limits.get("strike_hours", 72) * 3600
+        # ===============================
+
         try:
             # 🔥 ИММУНИТЕТ ДЛЯ ЭЛИТЫ И АДМИНОВ 🔥
             user_data = users_collection.find_one({"_id": user_id}) or {}
@@ -157,7 +168,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 if current_hash:
                     for old_hash in recent_hashes:
                         similarity = difflib.SequenceMatcher(None, current_hash, old_hash).ratio()
-                        if similarity > 0.82: # Чуть смягчили порог
+                        if similarity > sim_normal: # Чуть смягчили порог
                             is_duplicate = True
                             break
                     
@@ -182,7 +193,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
 
                 if spam_count >= 3:
                     # 🔥 3 СТРАЙКА = МУТ НА 3 ДНЯ (259200 секунд) 🔥
-                    mute_time = int(time.time()) + 259200
+                    mute_time = int(time.time()) + strike_mute_sec
                     mute_user_everywhere(user_id, reason="Рецидив: Спам старыми фото (Анти-Баян)", admin_name="Скайнет 👁", mute_time=mute_time)
                     
                     # 🔥 ГЕНЕРИРУЕМ ЖЕСТКОЕ УНИЖЕНИЕ ЧЕРЕЗ ИИ (Оставляем на Groq, тут он хорош) 🔥
@@ -629,6 +640,24 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
 
         chat_id = message.chat.id
         user_id = message.from_user.id
+
+        # 1. Тянем актуальные настройки из базы "на лету"
+        mod_limits = db['settings'].find_one({"_id": "moderation_limits"}) or {}
+        
+        # 2. Распаковываем ползунки Радара (делим на 100, чтобы получить 0.85 из 85%)
+        sim_normal = mod_limits.get("sim_normal", 85) / 100.0
+        sim_newbie = mod_limits.get("sim_newbie", 75) / 100.0
+        
+        # 3. Распаковываем таймеры (умножаем часы на 3600, чтобы получить секунды для Телеграма)
+        strike_mute_sec = mod_limits.get("strike_hours", 72) * 3600
+        flood_norm_sec = mod_limits.get("flood_norm_hours", 6) * 3600
+        flood_hard_sec = mod_limits.get("flood_hard_hours", 120) * 3600
+        quarantine_sec = mod_limits.get("quaran_hours", 120) * 3600
+        
+        # 👇 НОВЫЕ ТУМБЛЕРЫ ИЗ ВЕБКИ 👇
+        radar_active = mod_limits.get("radar_active", True)
+        antibayan_text_active = mod_limits.get("antibayan_text_active", True)
+        antiflood_active = mod_limits.get("antiflood_active", True)
            
         raw_text = message.text or message.caption or ""
         
@@ -827,7 +856,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     clean_current = re.sub(r'\s+', '', text)
                     
                     # 1. РАДАР ТВИНКОВ (ПРОКАЧАННЫЙ)
-                    recent_bans = list(db['blacklisted_texts'].find().sort("_id", -1).limit(150))
+                    recent_bans = list(db['blacklisted_texts'].find().sort("_id", -1).limit(150)) if radar_active else []
                     
                     for bad in recent_bans:
                         # 👇 ДОБАВЛЯЕМ ПРЕДОХРАНИТЕЛЬ ОТ САМОГО СЕБЯ 👇
@@ -840,7 +869,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         similarity = difflib.SequenceMatcher(None, clean_current, clean_bad).ratio()
                         
                         is_newbie = user_id > 7800000000
-                        threshold = 0.75 if is_newbie else 0.85 
+                        threshold = sim_newbie if is_newbie else sim_normal 
                         
                         if similarity > threshold: 
                             try: bot.delete_message(chat_id, message.message_id) 
@@ -864,13 +893,13 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     # 2. ТЕКСТОВЫЙ АНТИ-БАЯН (ПОЧАТОВЫЙ)
                     text_memory_id = f"{user_id}_{chat_id}"
                     user_text_memory = db['text_memory'].find_one({"_id": text_memory_id}) or {}
-                    recent_texts = user_text_memory.get("recent_texts", [])
+                    recent_texts = user_text_memory.get("recent_texts", []) if antibayan_text_active else []
                     text_spam_count = user_text_memory.get("spam_count", 0)
                     
                     is_text_duplicate = False
                     for old_text in recent_texts:
                         similarity = difflib.SequenceMatcher(None, clean_current, old_text).ratio()
-                        if similarity > 0.85: 
+                        if similarity > sim_normal: 
                             is_text_duplicate = True
                             break
                     
@@ -882,7 +911,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         except: pass
                         
                         if text_spam_count >= 3:
-                            mute_time = int(time.time()) + 259200
+                            mute_time = int(time.time()) + strike_mute_sec
                             mute_user_everywhere(user_id, reason="Рецидив: Текстовый спам (Анти-Копипаст)", admin_name="Скайнет 📝", mute_time=mute_time)
                             
                             if GROQ_API_KEY:
@@ -953,12 +982,13 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             threading.Thread(target=delete_text_warn, daemon=True).start()
                         return 
                     else:
-                        new_texts = [clean_current] + recent_texts[:9]
-                        db['text_memory'].update_one(
-                            {"_id": text_memory_id}, 
-                            {"$set": {"recent_texts": new_texts, "spam_count": 0}}, 
-                            upsert=True
-                        )
+                        if antibayan_text_active:
+                            new_texts = [clean_current] + recent_texts[:9]
+                            db['text_memory'].update_one(
+                                {"_id": text_memory_id}, 
+                                {"$set": {"recent_texts": new_texts, "spam_count": 0}}, 
+                                upsert=True
+                            )
 
             # 2. А ТОЛЬКО ПОТОМ разрешаем VIP/QUEER писать что угодно (кроме коммерции и копипаста)
             if any([is_vip, is_queer, is_verified, custom_tag]): return 
@@ -999,11 +1029,11 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     users_collection.update_one({"_id": user_id}, {"$set": {"first_seen": first_seen}}, upsert=True)
                 seconds_passed = time.time() - first_seen
                 
-                if user_id > 7800000000 and seconds_passed < 432000:
+                if user_id > 7800000000 and seconds_passed < quarantine_sec:
                     try: bot.delete_message(chat_id, message.message_id)
                     except: pass
                     
-                    remaining_time = int(432000 - seconds_passed)
+                    remaining_time = int(quarantine_sec - seconds_passed)
                     if remaining_time > 0:
                         try:
                             bot.restrict_chat_member(
@@ -1142,7 +1172,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             ]
             
             # Применяем ко всем обычным юзерам (кроме ПАРНИ 18+, свободных чатов и админов)
-            if not has_good_tag and chat_id not in PARNI_CHATS and chat_id not in free_chats and not is_admin:
+            if antiflood_active and not has_good_tag and chat_id not in PARNI_CHATS and chat_id not in free_chats and not is_admin:
                 
                 # 🔥 ОПРЕДЕЛЯЕМ ЖЕСТКИЕ ЧАТЫ 🔥
                 hard_flood_chats = [
@@ -1154,11 +1184,11 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 
                 # Настраиваем таймер и текст в зависимости от группы
                 if chat_id in hard_flood_chats:
-                    flood_duration_sec = 432000 # 5 суток в секундах
-                    flood_time_text = "5 суток"
+                    flood_duration_sec = flood_hard_sec 
+                    flood_time_text = f"{mod_limits.get('flood_hard_hours', 120)} часов"
                 else:
-                    flood_duration_sec = 21600  # 6 часов в секундах
-                    flood_time_text = "6 часов"
+                    flood_duration_sec = flood_norm_sec  
+                    flood_time_text = f"{mod_limits.get('flood_norm_hours', 6)} часов"
 
                 def apply_smart_flood_limit():
                     # 🕒 ПАУЗА 2 СЕКУНДЫ (Чтобы пропустить медиа-альбомы)

@@ -1255,3 +1255,110 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             "stats": stats,
             "bad_list": bad_list
         })
+
+    # === ИНФРАСТРУКТУРА И СЕТИ (ЭТАП 1) ===
+    @app.route('/glaz/api/infrastructure', methods=['GET'])
+    def api_get_infrastructure():
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+        
+        # Ищем базу, если нет - отдаем пустой скелет
+        data = db['settings'].find_one({"_id": "infrastructure"}) or {
+            "cities": "Москва, Санкт-Петербург, Екатеринбург", 
+            "global_links": {"main_channel": "", "faq": ""},
+            "networks": {"parni": [], "mk": [], "ns": [], "rainbow": [], "gayznak": []},
+            "competitors": []
+        }
+        return jsonify(data)
+
+    @app.route('/glaz/api/infrastructure/save', methods=['POST'])
+    def api_save_infrastructure():
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+        
+        data = request.json
+        db['settings'].update_one(
+            {"_id": "infrastructure"},
+            {"$set": data},
+            upsert=True
+        )
+        add_radar_log("🗺 Архитектура сети была изменена в ЦУП!")
+        return jsonify({"success": True, "message": "✅ Инфраструктура сети успешно сохранена в MongoDB!"})
+    # =======================================
+
+    @app.route('/glaz/api/infrastructure/ping', methods=['GET'])
+    def api_ping_infrastructure():
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+        
+        data = db['settings'].find_one({"_id": "infrastructure"}) or {}
+        networks = data.get("networks", {})
+        statuses = {}
+        
+        bot_id = bot.get_me().id # Узнаем ID нашего бота
+        
+        for net_key, chats in networks.items():
+            for chat in chats:
+                cid = chat.get("id")
+                if not cid: continue
+                try:
+                    # Проверяем, какие права у бота в этом чате
+                    bot_member = bot.get_chat_member(cid, bot_id)
+                    if bot_member.status == 'administrator':
+                        statuses[cid] = {"code": "ok", "text": "🟢 Активен (Админ)"}
+                    elif bot_member.status in ['member', 'restricted']:
+                        statuses[cid] = {"code": "warn", "text": "🟡 Нет прав админа!"}
+                    else:
+                        statuses[cid] = {"code": "err", "text": "🔴 Бот кикнут"}
+                except Exception as e:
+                    err_str = str(e).lower()
+                    if "chat not found" in err_str:
+                        statuses[cid] = {"code": "err", "text": "🔴 Чат удален / Не найден"}
+                    else:
+                        statuses[cid] = {"code": "err", "text": "🔴 Ошибка доступа"}
+                        
+        return jsonify(statuses)
+
+    @app.route('/glaz/api/moderation', methods=['GET'])
+    def api_get_mod_settings():
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+        data = db['settings'].find_one({"_id": "moderation_limits"}) or {}
+        return jsonify(data)
+
+    @app.route('/glaz/api/moderation/save', methods=['POST'])
+    def api_save_mod_settings():
+        if not session.get('logged_in'): return jsonify({"success": False}), 401
+        data = request.json
+        db['settings'].update_one({"_id": "moderation_limits"}, {"$set": data}, upsert=True)
+        add_radar_log("⚙️ Таймеры и настройки модерации изменены!")
+        return jsonify({"success": True})
+
+# 👇 МАГИЧЕСКАЯ МИГРАЦИЯ ИЗ CONFIG.PY В MONGODB 👇
+    @app.route('/glaz/api/infrastructure/migrate', methods=['GET'])
+    def api_migrate_infrastructure():
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+        
+        # Загружаем старые данные из конфига
+        from config import all_cities, chat_ids_parni, chat_ids_mk, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, MAIN_CHANNEL_LINK
+        
+        # Умный конвертер словарей в нужный нам формат
+        def convert_dict_to_list(chat_dict):
+            return [{"name": name, "id": str(chat_id)} for name, chat_id in chat_dict.items()]
+
+        migrated_data = {
+            "cities": ", ".join(all_cities),
+            "global_links": {"main_channel": MAIN_CHANNEL_LINK, "faq": ""},
+            "networks": {
+                "parni": convert_dict_to_list(chat_ids_parni),
+                "mk": convert_dict_to_list(chat_ids_mk),
+                "ns": convert_dict_to_list(chat_ids_ns),
+                "rainbow": convert_dict_to_list(chat_ids_rainbow),
+                "gayznak": convert_dict_to_list(chat_ids_gayznak)
+            },
+            "competitors": []
+        }
+        
+        # Записываем в базу
+        db['settings'].update_one(
+            {"_id": "infrastructure"},
+            {"$set": migrated_data},
+            upsert=True
+        )
+        return "✅ Миграция успешно завершена! Вернитесь в ЦУП и обновите страницу."

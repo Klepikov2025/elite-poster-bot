@@ -426,11 +426,33 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
                 markup.add(types.InlineKeyboardButton("🎫 У меня есть промокод", callback_data=f"checkout_promo_vip_{current_vip_price}"))
                 markup.add(types.InlineKeyboardButton(f"⭐️ Оплатить {current_vip_price} Звезд", callback_data=f"checkout_pay_vip_{current_vip_price}"))
                 
-                # Выводим кнопки раздельно — точно так же, как у топ-конкурентов!
+                # Выводим кнопки крипты
                 if url_usdt:
                     markup.add(types.InlineKeyboardButton("🟢 Оплатить через USDT (CryptoBot)", url=url_usdt))
                 if url_ton:
                     markup.add(types.InlineKeyboardButton("💎 Оплатить через TON (CryptoBot)", url=url_ton))
+
+                # 👇 ЭКОСИСТЕМА СЕКРЕТАРЯ: Кэшбэк (₽) и Очки (🎰) 👇
+                paid_user = db['paid_users'].find_one({"uid": user_id})
+                
+                rub_balance = paid_user.get("cashback_balance", 0) if paid_user else 0
+                points_balance = paid_user.get("bounty_points", 0) if paid_user else 0 
+                
+                cost_rub = int(current_vip_price * 1.8) # Курс: 1 звезда = 1.8₽
+                cost_points = current_vip_price * 5    # Курс: 1 звезда = 5 очков
+                
+                # 1. Кнопка оплаты РУБЛЯМИ
+                if rub_balance >= cost_rub:
+                    markup.add(types.InlineKeyboardButton(f"💳 Списать с баланса ({cost_rub}₽)", callback_data=f"vip_eco_rub_{cost_rub}_{current_vip_price}"))
+                elif rub_balance > 0:
+                    markup.add(types.InlineKeyboardButton(f"💳 Баланса не хватает (Твой: {rub_balance}₽)", callback_data="insufficient_funds_vip"))
+
+                # 2. Кнопка оплаты ОЧКАМИ
+                if points_balance >= cost_points:
+                    markup.add(types.InlineKeyboardButton(f"🎰 Оплатить очками ({cost_points} очк.)", callback_data=f"vip_eco_pts_{cost_points}_{current_vip_price}"))
+                elif points_balance > 0:
+                    markup.add(types.InlineKeyboardButton(f"🎰 Очков не хватает (Твои: {points_balance})", callback_data="insufficient_funds_vip"))
+                # 👆 =================================== 👆
 
                 bot.send_message(
                     user_id, 
@@ -555,7 +577,36 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
         db['promocodes'].update_one({"_id": promo_text}, {"$inc": {"used_count": 1}})
         bot.send_message(message.chat.id, f"✅ **Промокод успешно применен!**\nСкидка составила {original_amount - new_amount}⭐️.", parse_mode="Markdown")
         
-        bot.send_invoice(message.chat.id, title=f"VIP Клуб со скидкой 👑", description="Оплата доступа.", invoice_payload="vip_access_payment", provider_token="", currency="XTR", prices=[types.LabeledPrice(label="К оплате", amount=new_amount)])
+        # 👇 НОВОЕ: ГЕНЕРИРУЕМ ПОЛНОЕ МЕНЮ ОПЛАТЫ СО СКИДКОЙ 👇
+        user_id = message.chat.id
+        url_usdt = get_crypto_pay_url(f"vip_{user_id}", new_amount, f"Оплата VIP Клуба ({new_amount}⭐️)", asset="USDT")
+        url_ton = get_crypto_pay_url(f"vip_{user_id}", new_amount, f"Оплата VIP Клуба ({new_amount}⭐️)", asset="TON")
+        
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(types.InlineKeyboardButton(f"⭐️ Оплатить {new_amount} Звезд", callback_data=f"checkout_pay_vip_{new_amount}"))
+        
+        if url_usdt: markup.add(types.InlineKeyboardButton("🟢 Оплатить через USDT (CryptoBot)", url=url_usdt))
+        if url_ton: markup.add(types.InlineKeyboardButton("💎 Оплатить через TON (CryptoBot)", url=url_ton))
+
+        paid_user = db['paid_users'].find_one({"uid": user_id})
+        rub_balance = paid_user.get("cashback_balance", 0) if paid_user else 0
+        points_balance = paid_user.get("bounty_points", 0) if paid_user else 0 
+        
+        cost_rub = int(new_amount * 1.8)
+        cost_points = new_amount * 5
+        
+        if rub_balance >= cost_rub: markup.add(types.InlineKeyboardButton(f"💳 Списать с баланса ({cost_rub}₽)", callback_data=f"vip_eco_rub_{cost_rub}_{new_amount}"))
+        elif rub_balance > 0: markup.add(types.InlineKeyboardButton(f"💳 Баланса не хватает (Твой: {rub_balance}₽)", callback_data="insufficient_funds_vip"))
+
+        if points_balance >= cost_points: markup.add(types.InlineKeyboardButton(f"🎰 Оплатить очками ({cost_points} очк.)", callback_data=f"vip_eco_pts_{cost_points}_{new_amount}"))
+        elif points_balance > 0: markup.add(types.InlineKeyboardButton(f"🎰 Очков не хватает (Твои: {points_balance})", callback_data="insufficient_funds_vip"))
+
+        bot.send_message(
+            user_id, 
+            f"💎 **Оформление VIP-доступа (Со скидкой)**\n\nК оплате: **{new_amount}⭐️**\n\nВыберите удобный способ оплаты ниже 👇", 
+            reply_markup=markup, 
+            parse_mode="Markdown"
+        )
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith('checkout_'))
     def handle_checkout(call):
@@ -571,6 +622,85 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
         elif action == "promo":
             msg = bot.send_message(call.message.chat.id, "👇 **Введите ваш промокод ответом на это сообщение:**", parse_mode="Markdown")
             bot.register_next_step_handler(msg, process_promo_code, target_type=target_type, original_amount=original_amount, call_msg=call.message)
+
+# ==================== ОПЛАТА VIP ИЗ ЭКОСИСТЕМЫ РУЛЕТКИ ====================
+    @bot.callback_query_handler(func=lambda call: call.data.startswith('vip_eco_rub_') or call.data.startswith('vip_eco_pts_'))
+    def handle_vip_ecosystem_payment(call):
+        bot.answer_callback_query(call.id)
+        parts = call.data.split('_')
+        
+        currency_type = parts[2] # 'rub' или 'pts'
+        cost = int(parts[3])
+        stars_amount = int(parts[4])
+        
+        user_id = call.from_user.id
+        paid_user = db['paid_users'].find_one({"uid": user_id})
+        
+        if currency_type == 'pts':
+            current_funds = paid_user.get("bounty_points", 0) if paid_user else 0
+            update_field = "bounty_points"
+            currency_name = "очков"
+            revenue_type = "vip_points"
+        else:
+            current_funds = paid_user.get("cashback_balance", 0) if paid_user else 0
+            update_field = "cashback_balance"
+            currency_name = "₽"
+            revenue_type = "vip_rub_balance"
+            
+        if current_funds < cost:
+            bot.send_message(call.message.chat.id, f"❌ Ошибка транзакции: Недостаточно {currency_name} на счету!")
+            return
+            
+        # 1. Списываем средства
+        db['paid_users'].update_one({"uid": user_id}, {"$inc": {update_field: -cost}})
+        
+        # 2. Пишем в бухгалтерию (в эквиваленте звезд)
+        db['daily_revenue'].insert_one({
+            "type": revenue_type, 
+            "amount": stars_amount, 
+            "timestamp": time.time(), 
+            "date": datetime.now().strftime("%d.%m.%Y")
+        })
+        
+        # 3. Выдача VIP (Идентично покупке за реальные деньги)
+        db['vip_funnel'].delete_one({"_id": user_id})
+        
+        try:
+            users_collection.update_one({"_id": user_id}, {"$set": {"is_vip": True}}, upsert=True)
+            unmute_user_everywhere(user_id)
+            unban_user_everywhere(user_id)
+            users_collection.update_one({"_id": user_id}, {"$unset": {"shame_tag": ""}})
+            archive_collection.update_one({"target": str(user_id)}, {"$unset": {"banned_in_support": "", "strikes": ""}})
+        except Exception as e: print(f"Ошибка при амнистии: {e}")
+            
+        bot.send_message(STAFF_GROUP_ID, f"🤑 **ОПЛАТА VIP (ЭКОСИСТЕМА)!**\nЮзер `{user_id}` оплатил доступ за {cost}{currency_name if currency_name == '₽' else ' ' + currency_name}. Ссылку он получил.")
+        
+        try:
+            invite = bot.create_chat_invite_link(VIP_CHAT_ID, member_limit=1)
+            bot.send_message(user_id, f"🎉 *Оплата получена! Добро пожаловать в элиту.*\n\n👉 [НАЖМИТЕ СЮДА ДЛЯ ВХОДА В VIP-КЛУБ]({invite.invite_link})", parse_mode="Markdown", disable_web_page_preview=True)
+        except Exception as e:
+            bot.send_message(user_id, "Оплата прошла, но возникла ошибка со ссылкой. Напиши админу!")
+            for admin_id in ADMIN_CHAT_IDS: 
+                try: bot.send_message(admin_id, f"🚨 Ошибка создания ссылки: {e}")
+                except: pass
+                
+        # Выдаем бонус рефоводу (если есть)
+        ref_id = get_pending_ref(user_id)
+        if ref_id:
+            update_user_stats(ref_id, invites_add=1)
+            stats = get_user_stats(ref_id)
+            _, bonus_stars = get_referral_bonus(stats['invites'])
+            update_user_stats(ref_id, balance_add=bonus_stars)
+            try: bot.send_message(ref_id, f"🥳 **Твой друг оплатил VIP!**\nТебе начислено: **{bonus_stars} звезд** ⭐️", parse_mode="Markdown")
+            except: pass
+            delete_pending_ref(user_id)
+            
+        try: bot.delete_message(call.message.chat.id, call.message.message_id)
+        except: pass
+
+    @bot.callback_query_handler(func=lambda call: call.data == "insufficient_funds_vip")
+    def handle_insufficient_funds_vip(call):
+        bot.answer_callback_query(call.id, "На вашем счету не хватает средств для оплаты VIP! 😔 Поиграйте еще в рулетку или используйте Telegram-звезды.", show_alert=True)
 
     @bot.pre_checkout_query_handler(func=lambda query: query.invoice_payload.startswith("vip_access_payment") or query.invoice_payload.startswith("fine_payment_") or query.invoice_payload.startswith("city_access_") or query.invoice_payload.startswith("second_chance_payment_"))
     def checkout_process(pre_checkout_query):
