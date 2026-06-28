@@ -118,6 +118,58 @@
         .note-placeholder { color: #888 !important; }
         /* 👆 ========================================= 👆 */
 
+/* === НОВЫЙ ДИЗАЙН ДОСЬЕ (ДАШБОРД) === */
+        .dossier-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .dossier-section {
+            background: #161616;
+            border: 1px solid #282828;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .dossier-section h4 {
+            margin-top: 0;
+            margin-bottom: 12px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px dashed #333;
+            padding-bottom: 6px;
+            color: #fff;
+        }
+
+        .input-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .input-grid label {
+            font-size: 10px;
+            color: #aaa;
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        .full-width-box {
+            background: #161616;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #222;
+            margin-top: 15px;
+        }
+
     </style>
 </head>
 <body>
@@ -193,101 +245,126 @@
             {% if search_error %}<div class="error-msg">⚠️ {{ search_error }}</div>{% endif %}
         </div>
         {% if user_data %}
-            <div class="dossier-card {% if user_data.banned %}banned{% endif %}">
-                <div class="dossier-header {% if user_data.banned %}banned{% endif %}">📁 ЛИЧНОЕ ДЕЛО УЧАСТНИКА [ID: {{ user_data.id }}]</div>
-                <div class="info-row"><span class="info-label">Администратор сети:</span><span>{% if user_data.is_admin %}<span class="badge yes" style="background-color: #bb86fc; color: #121212; font-weight: bold;">⚔️ ДА (РУКОВОДСТВО)</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
-                <div class="info-row"><span class="info-label">Статус в системе:</span><span>{% if user_data.banned %}<span class="badge alert">ЗАБАНЕН ГЛОБАЛЬНО</span>{% else %}<span class="badge yes">АКТИВЕН / ЧИСТ</span>{% endif %}</span></div>
-                <div class="info-row"><span class="info-label">VIP-Доступ:</span><span>{% if user_data.is_vip %}<span class="badge yes">👑 VIP ЕСТЬ</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
-                <div class="info-row"><span class="info-label">Клуб BEYOND:</span><span>{% if user_data.is_queer %}<span class="badge yes" style="background: #f6a5c0; color:#121212;">🏳️‍🌈 QUEER АКТИВЕН</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
-                {% if user_data.is_quarantine %}
-                <div class="info-row" style="background: rgba(255, 183, 77, 0.1); border-left: 4px solid #ffb74d; padding-left: 10px;">
-                    <span class="info-label" style="color: #ffb74d; font-weight: bold;">🥷 СТАТУС КАРАНТИНА:</span>
-                    <span class="badge" style="background: #ffb74d; color: #121212;">АКТИВЕН (<48 часов)</span>
+            <div class="dossier-card {% if user_data.banned %}banned{% endif %}" style="max-width: 1200px; margin: 20px auto;">
+                <div class="dossier-header {% if user_data.banned %}banned{% endif %}">
+                    📁 ТЕРМИНАЛ АНАЛИЗА [УЧАСТНИК ID: {{ user_data.id }}]
                 </div>
-                {% endif %}
-
-                <div class="info-row" style="padding: 12px 0;">
-                    <span class="info-label">Привязанный город:</span>
-                    <div style="display:flex; gap: 5px; flex: 0.7;">
-                        <input type="text" id="input-city-value" class="search-input" style="padding:6px; font-size:14px; color: #bb86fc; font-weight: bold;" placeholder="Город" value="{{ user_data.main_city if user_data.main_city != 'Не привязан' else '' }}">
-                        <button type="button" class="form-btn" style="padding:6px 12px; font-size:14px;" onclick="saveCity({{ user_data.id }})">OK</button>
-                    </div>
-                </div>
-                <div class="info-row"><span class="info-label">Кастомные погоны:</span><span style="color: #03dac6;">{{ user_data.custom_tag }}</span></div>
-                <div class="info-row" style="padding: 12px 0;"><span class="info-label">Изменить тег:</span>
-                    <div style="display:flex; gap: 5px; flex: 0.7;"><input type="text" id="input-tag-value" class="search-input" style="padding:6px; font-size:14px;" placeholder="Новый тег (none для удаления)" value="{{ user_data.custom_tag if user_data.custom_tag != 'Отсутствует' else '' }}"><button type="button" class="form-btn" style="padding:6px 12px; font-size:14px;" onclick="saveCustomTag({{ user_data.id }})">OK</button></div>
-                </div>
-                <div class="info-row"><span class="info-label">Метка Скайнета (Шейм):</span><span style="color: #cf6679;">{{ user_data.shame_tag }}</span></div>
-                <div class="info-row" style="background: #252525; padding: 10px; border-radius: 5px; flex-direction: column; gap: 5px; border:none; margin-top:10px; align-items: flex-start;"><span class="info-label">Текущий вердикт / Последняя улика:</span><span style="color: #ffb74d; font-style: italic;">{{ user_data.ban_reason }}</span></div>
-                {% if user_data.history %}
-                <div style="margin-top: 15px; background: #1a1a1a; padding: 12px; border-radius: 5px; border: 1px solid #333;"><span class="info-label" style="color: #bb86fc; font-weight: bold; font-size: 13px;">📜 ПОЛНАЯ ХРОНОЛОГИЯ:</span><ul style="margin: 8px 0 0 0; padding-left: 20px; color: #ccc; font-size: 13px; line-height: 1.6; text-align: left;">{% for log in user_data.history %}<li>{{ log }}</li>{% endfor %}</ul></div>
-                {% endif %}
-                <div style="margin-top: 20px; background: #1a1a1a; padding: 15px; border-radius: 8px; border: 1px solid #333; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);">
-                    <span class="info-label" style="color: #03dac6; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
-                        👁‍🗨 Голос Саурона (Прямая связь ЛС)
-                    </span>
-                    <textarea id="sauron-msg-text-{{ user_data.id }}" class="form-control" placeholder="Напишите ответ пользователю. Поддерживается Markdown (*жирный*)." style="width: 100%; height: 70px; background: #121212; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 5px; margin-bottom: 10px; resize: vertical; box-sizing: border-box; font-size: 13px;"></textarea>
-                    <button type="button" class="form-btn" style="width: 100%; background: #2d2d2d; border: 1px solid #03dac6; color: #03dac6; padding: 10px; font-size: 14px; font-weight: bold; transition: 0.2s;" onclick="sendSauronMessage({{ user_data.id }})" onmouseover="this.style.background='#03dac6'; this.style.color='#121212';" onmouseout="this.style.background='#2d2d2d'; this.style.color='#03dac6';">
-                        ✉️ Отправить сообщение от имени Бота
-                    </button>
-                </div>
-
-                {% if user_data.verif_seconds_left > 0 %}
-                <div id="live-timer-box" style="margin-top: 15px; background: rgba(255, 235, 59, 0.1); border: 1px solid #ffeb3b; padding: 12px; border-radius: 8px; animation: pulse 2s infinite; text-align: center;">
-                    <span style="color: #ffeb3b; font-weight: bold; font-size: 14px;">⏳ ПРЯМО СЕЙЧАС В ВОРОНКЕ ЗАПИСИ КРУЖКА!</span><br>
-                    <span style="font-size: 13px; color: #eee;">Выдан код: <b style="color: #fff; background: #222; padding: 2px 6px; border-radius: 4px;">{{ user_data.secret_code }}</b> | Осталось времени: <b id="live-sec">{{ user_data.verif_seconds_left }}</b> <b>сек.</b></span>
-                </div>
-                <script>
-                    // Оживляем таймер!
-                    let timeLeft = parseInt(document.getElementById('live-sec').innerText);
-                    let liveTimer = setInterval(function() {
-                        timeLeft--;
-                        if (timeLeft <= 0) {
-                            clearInterval(liveTimer);
-                            document.getElementById('live-timer-box').style.borderColor = '#cf6679';
-                            document.getElementById('live-timer-box').style.background = 'rgba(207, 102, 121, 0.1)';
-                            document.getElementById('live-timer-box').innerHTML = '<span style="color: #cf6679; font-weight: bold; font-size: 14px;">🛑 Время на запись кружка вышло!</span>';
-                        } else {
-                            document.getElementById('live-sec').innerText = timeLeft;
-                        }
-                    }, 1000);
-                </script>
-                {% endif %}
-
-                <div class="info-row" style="margin-top: 15px; background: #252525; padding: 10px 15px; border-radius: 8px;">
-                    <span class="info-label" style="color: #cf6679; font-weight: bold;">⚡ Штрафные страйки спама:</span>
-                    <div style="display: flex; align-items: center; gap: 15px;">
-                        <span style="font-size: 16px; font-weight: bold; color: {% if user_data.strikes >= 3 %}#cf6679{% else %}#ffb74d{% endif %};">{{ user_data.strikes }} / 3 {% if user_data.strikes >= 3 %}[ЗАБЛОКИРОВАН]{% endif %}</span>
-                        <button type="button" class="tab-btn" style="padding: 4px 10px; font-size: 11px; border-color: #03dac6; color: #03dac6; margin: 0;" onclick="resetStrikes({{ user_data.id }})">🔄 Обнулить счетчик</button>
-                    </div>
-                </div>
-
-                <div style="margin-top: 15px; background: #1a1a1a; padding: 15px; border-radius: 8px; border: 1px solid #444;">
-                    <span style="color: #ffb74d; font-weight: bold; font-size: 14px; display: block; margin-bottom: 12px;">💰 Кошелёк и Инвентарь Артефактов</span>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                
+                <div class="dossier-grid">
+                    
+                    <div class="dossier-section" style="border-top: 3px solid #03dac6;">
                         <div>
-                            <label style="font-size: 11px; color: #aaa;">Очки бдительности:</label>
-                            <input type="number" id="inv-points" class="search-input" style="width:100%; padding:6px; margin-top:3px;" value="{{ user_data.points }}">
+                            <h4 style="color: #03dac6;">⚙️ Системный статус</h4>
+                            <div class="info-row"><span class="info-label">Администратор:</span><span>{% if user_data.is_admin %}<span class="badge yes" style="background-color: #bb86fc; color: #121212;">⚔️ ДА</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
+                            <div class="info-row"><span class="info-label">Статус:</span><span>{% if user_data.banned %}<span class="badge alert">ЗАБАНЕН</span>{% else %}<span class="badge yes">ЧИСТ</span>{% endif %}</span></div>
+                            <div class="info-row"><span class="info-label">VIP-Доступ:</span><span>{% if user_data.is_vip %}<span class="badge yes">👑 VIP</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
+                            <div class="info-row"><span class="info-label">Клуб BEYOND:</span><span>{% if user_data.is_queer %}<span class="badge yes" style="background: #f6a5c0; color:#121212;">🏳️‍🌈 QUEER</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
                         </div>
-                        <div>
-                            <label style="font-size: 11px; color: #aaa;">Осколки рулетки:</label>
-                            <input type="number" id="inv-shards" class="search-input" style="width:100%; padding:6px; margin-top:3px;" value="{{ user_data.shards }}">
-                        </div>
-                        <div>
-                            <label style="font-size: 11px; color: #aaa;">Кэшбэк-баланс (руб):</label>
-                            <input type="number" id="inv-cashback" class="search-input" style="width:100%; padding:6px; margin-top:3px;" value="{{ user_data.cashback }}">
-                        </div>
-                        <div>
-                            <label style="font-size: 11px; color: #aaa;">Щиты Иммунитета:</label>
-                            <input type="number" id="inv-immunity" class="search-input" style="width:100%; padding:6px; margin-top:3px;" value="{{ user_data.immunity }}">
+                        <div class="info-row" style="padding-top: 10px; border: none; margin-bottom: 0;">
+                            <span class="info-label">Город:</span>
+                            <div style="display:flex; gap: 5px; flex: 0.7;">
+                                <input type="text" id="input-city-value" class="search-input" style="padding:4px 8px; font-size:13px; color: #03dac6; font-weight: bold;" placeholder="Не указан" value="{{ user_data.main_city if user_data.main_city != 'Не привязан' else '' }}">
+                                <button type="button" class="form-btn" style="padding:4px 10px; font-size:12px;" onclick="saveCity({{ user_data.id }})">OK</button>
+                            </div>
                         </div>
                     </div>
-                    <button type="button" class="form-btn" style="width: 100%; background: #ffb74d; color: #121212; padding: 8px; font-size: 13px; font-weight: bold; margin-top: 12px;" onclick="saveInventory({{ user_data.id }})">💾 Сохранить инвентарь</button>
+
+                    <div class="dossier-section" style="border-top: 3px solid #ffb74d;">
+                        <div>
+                            <h4 style="color: #ffb74d;">💰 Кошелёк и Артефакты</h4>
+                            <div class="input-grid">
+                                <div>
+                                    <label>Очки бдительности:</label>
+                                    <input type="number" id="inv-points" class="search-input" style="width:100%; padding:5px; font-size:13px;" value="{{ user_data.points }}">
+                                </div>
+                                <div>
+                                    <label>Осколки рулетки:</label>
+                                    <input type="number" id="inv-shards" class="search-input" style="width:100%; padding:5px; font-size:13px;" value="{{ user_data.shards }}">
+                                </div>
+                                <div>
+                                    <label>Кэшбэк (руб):</label>
+                                    <input type="number" id="inv-cashback" class="search-input" style="width:100%; padding:5px; font-size:13px;" value="{{ user_data.cashback }}">
+                                </div>
+                                <div>
+                                    <label>Щиты (Иммунитет):</label>
+                                    <input type="number" id="inv-immunity" class="search-input" style="width:100%; padding:5px; font-size:13px;" value="{{ user_data.immunity }}">
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" class="form-btn" style="width: 100%; background: #ffb74d; color: #121212; padding: 6px; font-size: 12px; font-weight: bold;" onclick="saveInventory({{ user_data.id }})">💾 Сохранить инвентарь</button>
+                    </div>
+
+                    <div class="dossier-section" style="border-top: 3px solid #cf6679;">
+                        <div>
+                            <h4 style="color: #cf6679;">🚨 Нарушения и Погоны</h4>
+                            <div class="info-row"><span class="info-label">Текущий тег:</span><span style="color: #03dac6; font-weight: bold;">{{ user_data.custom_tag }}</span></div>
+                            <div class="info-row" style="padding: 6px 0;"><span class="info-label">Сменить:</span>
+                                <div style="display:flex; gap: 5px; flex: 0.7;"><input type="text" id="input-tag-value" class="search-input" style="padding:4px; font-size:12px;" placeholder="none для сброса" value="{{ user_data.custom_tag if user_data.custom_tag != 'Отсутствует' else '' }}"><button type="button" class="form-btn" style="padding:4px 10px; font-size:12px;" onclick="saveCustomTag({{ user_data.id }})">OK</button></div>
+                            </div>
+                            
+                            <div class="info-row" style="margin-top: 8px; background: rgba(207, 102, 121, 0.05); padding: 6px; border-radius: 5px; border: none;">
+                                <span class="info-label" style="color: #cf6679; font-weight: bold;">Штрафные страйки:</span>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-size: 14px; font-weight: bold; color: #ffb74d;">{{ user_data.strikes }} / 3</span>
+                                    <button type="button" class="tab-btn" style="padding: 2px 8px; font-size: 10px; margin:0; border: 1px solid #cf6679; color: #cf6679;" onclick="resetStrikes({{ user_data.id }})">🔄 Обнулить</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="background: #0d0d0d; padding: 6px 10px; border-radius: 4px; font-size: 11px; border: 1px solid #222; text-align: left; margin-top: 5px;">
+                            <span style="color: #888; font-weight: bold;">Улика:</span> <span style="color: #ffb74d; font-style: italic;">{{ user_data.ban_reason }}</span>
+                        </div>
+                    </div>
+
+                    <div class="dossier-section" style="border-top: 3px solid #bb86fc;">
+                        <div>
+                            <h4 style="color: #bb86fc;">🌐 Присутствие в сети</h4>
+                            <div style="max-height: 80px; overflow-y: auto; background: #0d0d0d; border: 1px solid #222; border-radius: 5px; padding: 8px; font-size: 12px; margin-bottom: 5px;">
+                                <ul id="active-chats-list-{{ user_data.id }}" style="margin: 0; padding-left: 5px; color: #ccc; list-style-type: none;">
+                                    {% if user_data.active_chats %}
+                                        {% for chat in user_data.active_chats %}
+                                            <li style="margin-bottom: 3px;">🟢 {{ chat }}</li>
+                                        {% endfor %}
+                                    {% else %}
+                                        <li style="color: #555; font-style: italic; text-align: center;">Нет данных. Нажмите сканировать.</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                            <button type="button" class="form-btn" style="width: 100%; background: #1a1a1a; color: #03dac6; border: 1px dashed #03dac6; padding: 4px; font-size: 10px; margin-bottom: 10px; transition: 0.3s;" onclick="scanNetworks({{ user_data.id }})" onmouseover="this.style.background='#03dac6'; this.style.color='#000';" onmouseout="this.style.background='#1a1a1a'; this.style.color='#03dac6';">
+                                📡 Сканировать сервера Telegram
+                            </button>
+
+                            <h4 style="color: #bb86fc; font-size: 11px; margin-bottom: 5px; border: none;">📂 Пруфы верификации</h4>
+                            <div style="display: flex; justify-content: space-around; text-align: center; background: rgba(187, 134, 252, 0.05); padding: 8px; border-radius: 5px;">
+                                <div style="opacity: 0.5;">
+                                    <span style="font-size: 16px; display: block;">📜</span>
+                                    <span style="font-size: 10px; color: #888;">Фото паспорта</span>
+                                </div>
+                                <div style="opacity: 0.5;">
+                                    <span style="font-size: 16px; display: block;">🎥</span>
+                                    <span style="font-size: 10px; color: #888;">Кружок</span>
+                                </div>
+                            </div>
+                            <div style="text-align: center; margin-top: 5px;">
+                                <span style="font-size: 9px; color: #666;">*Модуль медиа-архива отключен*</span>
+                            </div>
+                        </div>
+                    </div> 
+
+                <div class="full-width-box" style="border-color: #03dac6;">
+                    <span style="color: #03dac6; font-weight: bold; font-size: 13px; display: block; margin-bottom: 8px;">👁‍🗨 Голос Саурона (Прямое ЛС от имени бота)</span>
+                    <textarea id="sauron-msg-text-{{ user_data.id }}" class="form-control" placeholder="Напишите ответ пользователю в ЛС. Поддерживается Markdown (*жирный*)." style="width: 100%; height: 50px; background: #0d0d0d; color: #fff; border: 1px solid #333; padding: 10px; border-radius: 5px; font-size: 13px; resize: vertical; margin-bottom: 8px;"></textarea>
+                    <button type="button" class="form-btn" style="width: 100%; background: #0d0d0d; border: 1px solid #03dac6; color: #03dac6; padding: 8px; font-size: 13px;" onclick="sendSauronMessage({{ user_data.id }})">✉️ Отправить сообщение</button>
                 </div>
 
-                <div style="margin-top: 15px; background: #1a1a1a; padding: 15px; border-radius: 8px; border: 1px solid #bb86fc;">
-                    <span style="color: #bb86fc; font-weight: bold; font-size: 14px; display: block; margin-bottom: 10px;">🧠 Текущий контекст памяти ИИ (Последние реплики)</span>
-                    <div style="max-height: 150px; overflow-y: auto; background: #0d0d0d; padding: 10px; border-radius: 5px; font-size: 12px; font-family: sans-serif; margin-bottom: 10px; border: 1px solid #222;">
+                <div class="full-width-box" style="border-color: #444;">
+                    <span style="color: #aaa; font-weight: bold; font-size: 13px; display: block; margin-bottom: 8px;">📝 Скрытые заметки (Видят только админы)</span>
+                    <textarea id="admin-user-notes" class="form-control" placeholder="Заметки о пользователе, подозрения, пометки..." style="width: 100%; height: 50px; background: #0d0d0d; color: #fff; border: 1px solid #333; padding: 10px; border-radius: 5px; font-size: 13px; resize: vertical; margin-bottom: 8px;">{{ user_data.admin_notes }}</textarea>
+                    <button type="button" class="form-btn" style="width: 100%; background: #333; color: #fff; padding: 8px; font-size: 12px;" onclick="saveAdminNotes({{ user_data.id }})">📌 Сохранить пометку</button>
+                </div>
+
+                <div class="full-width-box" style="border-color: #bb86fc;">
+                    <span style="color: #bb86fc; font-weight: bold; font-size: 13px; display: block; margin-bottom: 8px;">🧠 Текущий контекст памяти ИИ (Последние реплики)</span>
+                    <div style="max-height: 100px; overflow-y: auto; background: #0d0d0d; padding: 8px; border-radius: 5px; font-size: 12px; margin-bottom: 8px; border: 1px solid #222;">
                         {% if user_data.ai_memory %}
                             {% for msg in user_data.ai_memory %}
                                 <div style="margin-bottom: 6px; border-bottom: 1px dashed #222; padding-bottom: 4px;">
@@ -295,26 +372,30 @@
                                 </div>
                             {% endfor %}
                         {% else %}
-                            <span style="color: #666; font-style: italic;">ИИ ничего не помнит об этом пользователе...</span>
+                            <span style="color: #555; font-style: italic;">Нейросеть пуста. Память чиста.</span>
                         {% endif %}
                     </div>
-                    <button type="button" class="form-btn" style="width: 100%; background: #a134eb; color: #fff; padding: 10px; font-size: 13px; font-weight: bold;" onclick="clearAIMemory({{ user_data.id }})">🕶️ Стереть краткосрочную память ИИ</button>
+                    <button type="button" class="form-btn" style="width: 100%; background: #3c1461; color: #fff; padding: 8px; font-size: 12px; font-weight: bold;" onclick="clearAIMemory({{ user_data.id }})">🕶️ Стереть краткосрочную память ИИ</button>
                 </div>
 
-                <div style="margin-top: 15px; background: #1a1a1a; padding: 15px; border-radius: 8px; border: 1px solid #333;">
-                    <span style="color: #aaa; font-weight: bold; font-size: 14px; display: block; margin-bottom: 8px;">📝 Внутренние заметки администрации (Скрытые стикеры)</span>
-                    <textarea id="admin-user-notes" class="form-control" placeholder="Напишите сюда комментарий (например: 'Мутный парень, обещал купить VIP с зарплаты 15 числа'). Пользователь об этом не узнает." style="width: 100%; height: 60px; background: #121212; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 5px; font-size: 13px; box-sizing: border-box; margin-bottom: 8px; resize: vertical;">{{ user_data.admin_notes }}</textarea>
-                    <button type="button" class="form-btn" style="width: 100%; background: #444; color: #fff; padding: 6px; font-size: 12px;" onclick="saveAdminNotes({{ user_data.id }})">📌 Сохранить пометку</button>
+                {% if user_data.history %}
+                <div class="full-width-box">
+                    <span style="color: #bb86fc; font-weight: bold; font-size: 13px; display: block; margin-bottom: 8px;">📜 Хронология нарушений:</span>
+                    <ul style="margin: 0; padding-left: 20px; color: #ccc; font-size: 12px; line-height: 1.6; max-height: 120px; overflow-y: auto;">
+                        {% for log in user_data.history %}<li>{{ log }}</li>{% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <div class="actions-grid" style="margin-top: 20px;">
+                    <button type="button" class="act-btn ban" onclick="fireAction({{ user_data.id }}, 'ban')">🔨 ЗАБАНИТЬ ВЕЗДЕ</button>
+                    <button type="button" class="act-btn unban" onclick="fireAction({{ user_data.id }}, 'unban')">🕊️ АМНИСТИРОВАТЬ</button>
+                    {% if user_data.is_vip %}<button type="button" class="act-btn devip" onclick="fireAction({{ user_data.id }}, 'remove_vip')">❌ СНЯТЬ VIP</button>
+                    {% else %}<button type="button" class="act-btn vip" onclick="fireAction({{ user_data.id }}, 'make_vip')">👑 ВЫДАТЬ VIP</button>{% endif %}
+                    {% if user_data.is_queer %}<button type="button" class="act-btn devip" style="background:#444;" onclick="fireAction({{ user_data.id }}, 'remove_queer')">✖ СНЯТЬ QUEER</button>
+                    {% else %}<button type="button" class="act-btn vip" style="background:#f6a5c0; color:#121212;" onclick="fireAction({{ user_data.id }}, 'make_queer')">🏳️‍🌈 СДЕЛАТЬ QUEER</button>{% endif %}
                 </div>
 
-                <div class="actions-grid">
-                    <button type="button" class="act-btn ban" onclick="fireAction({{ user_data.id }}, 'ban')">🔨 Забанить везде</button>
-                    <button type="button" class="act-btn unban" onclick="fireAction({{ user_data.id }}, 'unban')">🕊️ Амнистировать</button>
-                    {% if user_data.is_vip %}<button type="button" class="act-btn devip" onclick="fireAction({{ user_data.id }}, 'remove_vip')">❌ Снять VIP корону</button>
-                    {% else %}<button type="button" class="act-btn vip" onclick="fireAction({{ user_data.id }}, 'make_vip')">👑 Выдать статус VIP</button>{% endif %}
-                    {% if user_data.is_queer %}<button type="button" class="act-btn devip" style="background:#444;" onclick="fireAction({{ user_data.id }}, 'remove_queer')">✖ Снять QUEER статус</button>
-                    {% else %}<button type="button" class="act-btn vip" style="background:#f6a5c0; color:#121212;" onclick="fireAction({{ user_data.id }}, 'make_queer')">🏳️‍🌈 Сделать QUEER</button>{% endif %}
-                </div>
             </div>
         {% endif %}
     </div>
@@ -2353,6 +2434,37 @@ function loadRootRevenue(pin, period = 'week') {
             .then(res => res.json())
             .then(data => {
                 if(data.success) showToast("📌 Секретная пометка админа сохранена!");
+            });
+        }
+
+function scanNetworks(uid) {
+            const list = document.getElementById(`active-chats-list-${uid}`);
+            
+            // Анимация ожидания прямо в списке
+            list.innerHTML = `
+                <li style="color: #ffb74d; text-align: center; font-style: italic;">
+                    📡 Поиск сигнатур в сети...
+                </li>`;
+
+            fetch(`/glaz/api/scan_networks/${uid}`)
+            .then(res => res.json())
+            .then(data => {
+                if(data.error) {
+                    list.innerHTML = '<li style="color: #cf6679; text-align: center;">Ошибка доступа</li>';
+                    return;
+                }
+                if(data.chats && data.chats.length === 0) {
+                    list.innerHTML = '<li style="color: #aaa; text-align: center;">Не состоит в наших группах</li>';
+                } else if(data.chats) {
+                    let html = '';
+                    data.chats.forEach(chat => {
+                        html += `<li style="margin-bottom: 3px;">🟢 ${chat}</li>`;
+                    });
+                    list.innerHTML = html;
+                }
+            })
+            .catch(e => {
+                list.innerHTML = '<li style="color: #cf6679; text-align: center;">Ошибка соединения</li>';
             });
         }
 
