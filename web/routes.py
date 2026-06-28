@@ -1341,7 +1341,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                         safe_err = str(e).replace('"', "'")[:50] 
                         statuses[cid] = {"code": "err", "text": f"🔴 Ошибка: {safe_err}"}
                         
-                time.sleep(1.5) # Защита от Flood Wait (Телеграм не любит резкие массовые запросы)
+                time.sleep(0.3) # Защита от Flood Wait (Телеграм не любит резкие массовые запросы)
                         
         return jsonify(statuses)
 
