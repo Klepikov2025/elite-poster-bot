@@ -255,18 +255,29 @@
                     <div class="dossier-section" style="border-top: 3px solid #03dac6;">
                         <div>
                             <h4 style="color: #03dac6;">⚙️ Системный статус</h4>
+                            <div class="info-row"><span class="info-label">Дата вербовки:</span><span style="color: #ccc; font-weight: bold;">{{ user_data.first_seen_str }}</span></div>
                             <div class="info-row"><span class="info-label">Администратор:</span><span>{% if user_data.is_admin %}<span class="badge yes" style="background-color: #bb86fc; color: #121212;">⚔️ ДА</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
                             <div class="info-row"><span class="info-label">Статус:</span><span>{% if user_data.banned %}<span class="badge alert">ЗАБАНЕН</span>{% else %}<span class="badge yes">ЧИСТ</span>{% endif %}</span></div>
                             <div class="info-row"><span class="info-label">VIP-Доступ:</span><span>{% if user_data.is_vip %}<span class="badge yes">👑 VIP</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
                             <div class="info-row"><span class="info-label">Клуб BEYOND:</span><span>{% if user_data.is_queer %}<span class="badge yes" style="background: #f6a5c0; color:#121212;">🏳️‍🌈 QUEER</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
                         </div>
                         <div class="info-row" style="padding-top: 10px; border: none; margin-bottom: 0;">
-                            <span class="info-label">Город:</span>
+                            <span class="info-label">Город (Основа):</span>
                             <div style="display:flex; gap: 5px; flex: 0.7;">
                                 <input type="text" id="input-city-value" class="search-input" style="padding:4px 8px; font-size:13px; color: #03dac6; font-weight: bold;" placeholder="Не указан" value="{{ user_data.main_city if user_data.main_city != 'Не привязан' else '' }}">
                                 <button type="button" class="form-btn" style="padding:4px 10px; font-size:12px;" onclick="saveCity({{ user_data.id }})">OK</button>
                             </div>
                         </div>
+                        {% if user_data.purchased_cities %}
+                        <div style="margin-top: 5px; background: rgba(3, 218, 198, 0.05); padding: 8px; border-radius: 5px;">
+                            <span style="font-size: 11px; color: #888; display: block; margin-bottom: 5px;">🎟 Купленные доступы (Крипта):</span>
+                            <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                {% for p_city in user_data.purchased_cities %}
+                                    <span class="badge" style="background: transparent; color: #03dac6; border: 1px solid #03dac6; font-size: 10px;">{{ p_city }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
 
                     <div class="dossier-section" style="border-top: 3px solid #ffb74d;">
@@ -390,10 +401,23 @@
                 <div class="actions-grid" style="margin-top: 20px;">
                     <button type="button" class="act-btn ban" onclick="fireAction({{ user_data.id }}, 'ban')">🔨 ЗАБАНИТЬ ВЕЗДЕ</button>
                     <button type="button" class="act-btn unban" onclick="fireAction({{ user_data.id }}, 'unban')">🕊️ АМНИСТИРОВАТЬ</button>
-                    {% if user_data.is_vip %}<button type="button" class="act-btn devip" onclick="fireAction({{ user_data.id }}, 'remove_vip')">❌ СНЯТЬ VIP</button>
-                    {% else %}<button type="button" class="act-btn vip" onclick="fireAction({{ user_data.id }}, 'make_vip')">👑 ВЫДАТЬ VIP</button>{% endif %}
-                    {% if user_data.is_queer %}<button type="button" class="act-btn devip" style="background:#444;" onclick="fireAction({{ user_data.id }}, 'remove_queer')">✖ СНЯТЬ QUEER</button>
-                    {% else %}<button type="button" class="act-btn vip" style="background:#f6a5c0; color:#121212;" onclick="fireAction({{ user_data.id }}, 'make_queer')">🏳️‍🌈 СДЕЛАТЬ QUEER</button>{% endif %}
+                    
+                    {% if user_data.is_vip %}
+                        <button type="button" class="act-btn devip" onclick="fireAction({{ user_data.id }}, 'remove_vip')">❌ СНЯТЬ VIP</button>
+                    {% else %}
+                        <button type="button" class="act-btn vip" onclick="fireAction({{ user_data.id }}, 'make_vip')">👑 ВЫДАТЬ VIP</button>
+                    {% endif %}
+                    
+                    {% if user_data.is_queer %}
+                        <button type="button" class="act-btn devip" style="background:#444;" onclick="fireAction({{ user_data.id }}, 'remove_queer')">✖ СНЯТЬ QUEER</button>
+                    {% else %}
+                        <button type="button" class="act-btn vip" style="background:#f6a5c0; color:#121212;" onclick="fireAction({{ user_data.id }}, 'make_queer')">🏳️‍🌈 СДЕЛАТЬ QUEER</button>
+                    {% endif %}
+                    
+                    <div style="grid-column: 1 / -1; display: flex; gap: 10px; margin-top: 5px; background: rgba(255, 183, 77, 0.05); padding: 10px; border-radius: 8px; border: 1px solid rgba(255, 183, 77, 0.2);">
+                        <input type="number" id="mute-hours-{{ user_data.id }}" class="search-input" style="width: 80px; padding: 8px; text-align: center; font-weight: bold; color: #ffb74d;" value="24" title="Часы мута">
+                        <button type="button" class="act-btn" style="background: #ffb74d; color: #121212; flex: 1;" onclick="fireMuteAction({{ user_data.id }})">🤐 ВЫДАТЬ ПРОФИЛАКТИЧЕСКИЙ МУТ (ЧАСЫ)</button>
+                    </div>
                 </div>
 
             </div>
@@ -1059,7 +1083,30 @@
             .catch(() => showToast("❌ Критический сбой"));
         }
 
-function saveCity(uid) {
+        function fireMuteAction(uid) {
+            const hours = document.getElementById('mute-hours-' + uid).value;
+            if(!hours || hours <= 0) { showToast("⚠️ Укажите корректное количество часов!"); return; }
+            
+            const formData = new FormData();
+            formData.append('uid', uid); 
+            formData.append('action', 'mute_temp');
+            formData.append('hours', hours);
+            
+            // 👇 ИСПРАВЛЕНА ССЫЛКА ЗДЕСЬ (добавлено /api/) 👇
+            fetch('/glaz/api/user_action', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => { 
+                if(data.success) {
+                    showToast(data.message);
+                    // Опционально: перезагрузить страницу через секунду, чтобы увидеть изменения
+                    setTimeout(() => window.location.reload(), 1500); 
+                }
+                else showToast("❌ Ошибка: " + data.error); 
+            })
+            .catch(() => showToast("❌ Критический сбой"));
+        }
+
+        function saveCity(uid) {
             const cityVal = document.getElementById('input-city-value').value;
             if(!cityVal.trim()) return;
             const formData = new FormData();
