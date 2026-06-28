@@ -2419,12 +2419,12 @@ function loadRootRevenue(pin, period = 'week') {
 
         function startAutoPing() {
             if(pingInterval) clearInterval(pingInterval);
-            pingNetworks();
-            renderInfraEnemies(); // <--- Запускаем сбор инфы о Шпионе
+            pingNetworks(); // <-- При открытии вкладки пингуем 1 раз
+            renderInfraEnemies(); 
             pingInterval = setInterval(() => {
                 if(document.getElementById('tab-infrastructure').classList.contains('active')) {
-                    pingNetworks();
-                    renderInfraEnemies(); // <--- Авто-обновление каждые 25 сек
+                    // pingNetworks(); <--- ЭТУ СТРОЧКУ МЫ УДАЛИЛИ!
+                    renderInfraEnemies(); // А шпион пусть обновляется, он БД не грузит
                 }
             }, 25000);
         }
