@@ -439,11 +439,31 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
     @app.route('/glaz/api/quarantine_list')
     def api_quarantine_list():
         if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+        
+        # 1. Достаем динамический лимит из базы (по умолчанию 120, если вдруг пусто)
+        mod_settings = db['settings'].find_one({"_id": "moderation_limits"}) or {}
+        quaran_hours = int(mod_settings.get("quaran_hours", 120))
+        quaran_seconds = quaran_hours * 3600
+        
         now = time.time()
-        threshold = now - 172800
+        threshold = now - quaran_seconds
+        
         newbies = list(users_collection.find({"_id": {"$gt": 7800000000}, "first_seen": {"$gt": threshold}}))
-        result = [{"id": u["_id"], "hours_left": round((172800 - (now - u['first_seen'])) / 3600, 1)} for u in newbies]
-        return jsonify(result)
+        
+        result = []
+        for u in newbies:
+            sec_left = quaran_seconds - (now - u['first_seen'])
+            if sec_left > 0:
+                result.append({
+                    "id": u["_id"], 
+                    "seconds_left": int(sec_left)
+                })
+                
+        # Возвращаем и список юзеров, и сам лимит для текста на сайте
+        return jsonify({
+            "limit_hours": quaran_hours,
+            "users": result
+        })
 
     @app.route('/glaz/release_quarantine', methods=['POST'])
     def release_quarantine():
