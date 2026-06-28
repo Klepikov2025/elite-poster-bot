@@ -2383,7 +2383,7 @@ function loadRootRevenue(pin, period = 'week') {
                         <td><strong>${chat.name}</strong></td>
                         <td><code>${chat.id}</code></td>
                         <td><span class="badge yes" style="background: #444; color: #fff;">${networkNames[netKey] || netKey}</span></td>
-                        <td><span id="health-${chat.id}" style="color: #aaa; font-weight: bold; font-size: 12px; padding: 4px 8px; border-radius: 5px; background: #252525;">🟡 Ждем пинга...</span></td>
+                        <td><span id="health-${chat.id}" style="color: #aaa; font-weight: bold; font-size: 11px; padding: 6px 10px; border-radius: 5px; background: #252525; display: inline-block; line-height: 1.6; text-align: left; min-width: 100px;">🟡 Ждем пинга...</span></td>
                         <td><button onclick="removeInfraChat('${netKey}', ${idx})" class="act-btn ban" style="padding: 4px 8px; width: auto; font-size: 10px;">❌</button></td>
                     </tr>`;
                 });
