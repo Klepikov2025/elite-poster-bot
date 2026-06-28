@@ -80,6 +80,13 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                         diff = (datetime.now() - v_timer).total_seconds()
                         seconds_left = max(0, int(300 - diff))
 
+                    # 👇 НОВОЕ: ВЫЧИСЛЯЕМ ДАТУ ВЕРБОВКИ 👇
+                    first_seen_ts = u_info.get("first_seen", 0) if u_info else 0
+                    if first_seen_ts > 0:
+                        first_seen_str = datetime.fromtimestamp(first_seen_ts).strftime('%d.%m.%Y')
+                    else:
+                        first_seen_str = "Старожил (До 28.04)"
+
                     user_data = {
                         "id": uid,
                         "is_quarantine": is_quarantine,
@@ -88,20 +95,20 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                         "is_verified": u_info.get("is_verified", False) if u_info else False,
                         "is_admin": is_admin_system,
                         "main_city": u_info.get("main_city", "Не привязан") if u_info else "Не привязан",
+                        "purchased_cities": u_info.get("purchased_cities", []) if u_info else [], # <--- НОВОЕ
+                        "first_seen_str": first_seen_str, # <--- НОВОЕ
                         "custom_tag": u_info.get("custom_tag", "Отсутствует") if u_info else "Отсутствует",
                         "shame_tag": u_info.get("shame_tag", "Отсутствует") if u_info else "Отсутствует",
                         "banned": True if b_info else False,
                         "ban_reason": detected_reason,
                         "history": history_list,
-                        
-                        # Новые поля для админки
                         "points": p_info.get("bounty_points", 0),
                         "shards": p_info.get("jackpot_shards", 0),
                         "cashback": p_info.get("cashback_balance", 0),
                         "immunity": p_info.get("immunity", 0),
                         "strikes": p_info.get("strikes", 0),
                         "admin_notes": p_info.get("admin_notes", ""),
-                        "ai_memory": p_info.get("dialog_history", [])[-6:], # Последние 6 реплик
+                        "ai_memory": p_info.get("dialog_history", [])[-6:], 
                         "secret_code": p_info.get("secret_code", ""),
                         "verif_seconds_left": seconds_left,
                         "active_chats": p_info.get("active_chats", [])
@@ -374,6 +381,12 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             msg = f"📍 Город изменен на: {new_city}"
             add_radar_log(f"📍 ГОРОД [{new_city}]: {uid}")
             staff_msg = f"📍 **ВЕБ-АДМИНКА:** Изменен город для `{uid}` на `{new_city}`"
+        elif action == 'mute_temp':
+            hours = request.form.get('hours', '24')
+            mute_user_everywhere(uid, reason=f"Профилактический Web-мут на {hours} ч.", admin_name="Web-Саурон 👁️")
+            msg = f"🤐 Пользователь {uid} отправлен в мут на {hours} ч."
+            add_radar_log(f"🤐 МУТ [{hours} ч.]: {uid}")
+            staff_msg = f"🤐 **ВЕБ-АДМИНКА: ПРОФИЛАКТИЧЕСКИЙ МУТ**\n\n• **Пользователь:** `{uid}`\n• **Срок:** `{hours} ч.`"
         if log_to_staff and staff_msg:
             try: bot.send_message(STAFF_GROUP_ID, staff_msg, parse_mode="Markdown")
             except: pass
