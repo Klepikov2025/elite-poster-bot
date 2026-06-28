@@ -733,23 +733,26 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             if time.time() - last_check > 600:
                 users_collection.update_one({"_id": user_id}, {"$set": {"last_api_check": time.time()}})
                 
-                try:
-                    m_vip = bot.get_chat_member(VIP_CHAT_ID, user_id)
-                    is_physically_there = getattr(m_vip, 'is_member', False) if m_vip.status == 'restricted' else True
-                    actual_vip = m_vip.status in ['member', 'administrator', 'creator'] or (m_vip.status == 'restricted' and is_physically_there)
-                    if is_vip != actual_vip:
-                        is_vip = actual_vip
-                        users_collection.update_one({"_id": user_id}, {"$set": {"is_vip": is_vip}}, upsert=True)
-                except: pass
+                # 👇 БРОНЯ ИНДУЛЬГЕНЦИИ: Их мы не проверяем на физическое присутствие! 👇
+                if custom_tag != "Индульгенция":
+                    try:
+                        m_vip = bot.get_chat_member(VIP_CHAT_ID, user_id)
+                        is_physically_there = getattr(m_vip, 'is_member', False) if m_vip.status == 'restricted' else True
+                        actual_vip = m_vip.status in ['member', 'administrator', 'creator'] or (m_vip.status == 'restricted' and is_physically_there)
+                        if is_vip != actual_vip:
+                            is_vip = actual_vip
+                            users_collection.update_one({"_id": user_id}, {"$set": {"is_vip": is_vip}}, upsert=True)
+                    except: pass
 
-                try:
-                    m_beyond = bot.get_chat_member(BEYOND_CHAT_ID, user_id)
-                    is_physically_there_q = getattr(m_beyond, 'is_member', False) if m_beyond.status == 'restricted' else True
-                    actual_queer = m_beyond.status in ['member', 'administrator', 'creator'] or (m_beyond.status == 'restricted' and is_physically_there_q)
-                    if is_queer != actual_queer:
-                        is_queer = actual_queer
-                        users_collection.update_one({"_id": user_id}, {"$set": {"is_queer": is_queer}}, upsert=True)
-                except: pass
+                    try:
+                        m_beyond = bot.get_chat_member(BEYOND_CHAT_ID, user_id)
+                        is_physically_there_q = getattr(m_beyond, 'is_member', False) if m_beyond.status == 'restricted' else True
+                        actual_queer = m_beyond.status in ['member', 'administrator', 'creator'] or (m_beyond.status == 'restricted' and is_physically_there_q)
+                        if is_queer != actual_queer:
+                            is_queer = actual_queer
+                            users_collection.update_one({"_id": user_id}, {"$set": {"is_queer": is_queer}}, upsert=True)
+                    except: pass
+                # 👆 ========================================================================= 👆
 
                 try:
                     member = bot.get_chat_member(chat_id, user_id)
