@@ -1482,18 +1482,22 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         networks = infra.get("networks", {})
         
         # Формируем список чатов для сканирования из базы
-        # (Предполагается, что структура в базе примерно такая: 
-        # {"networks": {"МК": {"Нижний Новгород": -10012..., "Москва": -100...}, "ПАРНИ": {...}}})
+        net_prefixes = {"parni": "ПАРНИ 18+", "mk": "МК", "ns": "НС", "rainbow": "Радуга", "gayznak": "Гей Знакомства"}
+        
         for net_name, chats_dict in networks.items():
+            prefix = net_prefixes.get(net_name, net_name.upper())
+            
             # Если chats_dict — это словарь {Город: ID}
             if isinstance(chats_dict, dict):
                 for city, cid in chats_dict.items():
-                    all_chats.append({"name": f"{net_name.upper()} {city}", "id": cid})
+                    all_chats.append({"name": f"{prefix} | {city}", "id": cid})
+                    
             # Если это просто список словарей или ID (на случай другой структуры)
             elif isinstance(chats_dict, list):
                 for item in chats_dict:
                     if isinstance(item, dict) and "id" in item:
-                        all_chats.append({"name": item.get("name", "Неизвестно"), "id": item["id"]})
+                        city_name = item.get("name", "Неизвестно")
+                        all_chats.append({"name": f"{prefix} | {city_name}", "id": item["id"]})
 
         # Сам процесс сканирования (он не меняется)
         active_chats = []
