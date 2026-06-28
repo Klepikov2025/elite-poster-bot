@@ -383,7 +383,7 @@
     <div id="tab-quarantine" class="tab-content">
         <div class="panel-block" style="max-width: 800px;">
             <h3 style="color: #ffb74d;">🥷 Новореги под надзором Скайнета</h3>
-            <p style="color: #aaa; margin-bottom: 15px;">Список свежих аккаунтов, чьи сообщения блокируются в течение первых 48 часов.</p>
+            <p style="color: #aaa; margin-bottom: 15px;">Список свежих аккаунтов, чьи сообщения блокируются в течение первых <b id="q-limit-text" style="color: #ffb74d;">...</b> часов.</p>
             <button class="form-btn" style="margin-bottom: 15px; background: #2d2d2d; color: #fff; border: 1px solid #444;" onclick="loadQuarantine()">🔄 Обновить список</button>
             <table class="admin-table">
                 <thead><tr><th>Telegram ID</th><th>Осталось сидеть</th><th>Амнистия</th></tr></thead>
@@ -1144,17 +1144,72 @@ function toggleSetting(key) {
     .catch(() => showToast("❌ Ошибка связи"));
 }
 
+        // Глобальная переменная для хранения интервала таймера карантина
+        let quarantineTimerInterval = null;
+
         function loadQuarantine() {
             document.getElementById('quarantine-tbody').innerHTML = '<tr><td colspan="3" style="text-align: center;">Загрузка...</td></tr>';
+            
+            // Очищаем старый таймер перед обновлением списка, чтобы не было наслоений
+            if(quarantineTimerInterval) clearInterval(quarantineTimerInterval);
+            
             fetch('/glaz/api/quarantine_list').then(res => res.json()).then(data => {
+                // Обновляем текст в шапке с актуальными часами
+                document.getElementById('q-limit-text').innerText = data.limit_hours;
+                
                 let html = '';
-                data.forEach(item => {
-                    html += `<tr><td><code>${item.id}</code></td><td style="color: #ffb74d;">⏱ ${item.hours_left} ч.</td>
-                        <td><button class="act-btn unban" style="padding: 6px 12px; font-size: 12px; width: auto;" onclick="releaseQuarantine(${item.id})">🔓 Выпустить</button></td></tr>`;
+                data.users.forEach(item => {
+                    html += `<tr>
+                        <td><code>${item.id}</code></td>
+                        <td style="color: #ffb74d; font-family: monospace; font-size: 14px; font-weight: bold;">
+                            ⏱ <span class="q-live-timer" data-sec="${item.seconds_left}">Загрузка...</span>
+                        </td>
+                        <td><button class="act-btn unban" style="padding: 6px 12px; font-size: 12px; width: auto;" onclick="releaseQuarantine(${item.id})">🔓 Выпустить</button></td>
+                    </tr>`;
                 });
-                if(data.length === 0) html = '<tr><td colspan="3" style="text-align: center; color: #888;">Карантин пуст, все чисты.</td></tr>';
+                
+                if(data.users.length === 0) {
+                    html = '<tr><td colspan="3" style="text-align: center; color: #888;">Карантин пуст, все чисты.</td></tr>';
+                }
+                
                 document.getElementById('quarantine-tbody').innerHTML = html;
+                
+                // Запускаем живой счетчик, если есть кого считать
+                if(data.users.length > 0) {
+                    startQuarantineLiveTimers();
+                }
             });
+        }
+
+        function startQuarantineLiveTimers() {
+            const formatTime = (totalSeconds) => {
+                const h = Math.floor(totalSeconds / 3600);
+                const m = Math.floor((totalSeconds % 3600) / 60);
+                const s = Math.floor(totalSeconds % 60);
+                return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            };
+
+            // Сразу приводим таймеры в красивый вид до первого тика
+            document.querySelectorAll('.q-live-timer').forEach(el => {
+                let sec = parseInt(el.getAttribute('data-sec'));
+                el.innerText = formatTime(sec);
+            });
+
+            // Запускаем еженесекундное обновление
+            quarantineTimerInterval = setInterval(() => {
+                document.querySelectorAll('.q-live-timer').forEach(el => {
+                    let sec = parseInt(el.getAttribute('data-sec'));
+                    sec--;
+                    
+                    if(sec <= 0) {
+                        el.innerText = "00:00:00 (Выходит...)";
+                        el.style.color = "#03dac6"; // Делаем зеленым
+                    } else {
+                        el.setAttribute('data-sec', sec);
+                        el.innerText = formatTime(sec);
+                    }
+                });
+            }, 1000);
         }
 
         function releaseQuarantine(uid) {
