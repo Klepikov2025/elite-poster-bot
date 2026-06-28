@@ -1366,7 +1366,22 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
     def api_get_spy():
         if not session.get('logged_in'): return jsonify([])
         doc = db['settings'].find_one({"_id": "spy_settings"}) or {}
-        return jsonify(doc.get("chats", []))
+        chats = doc.get("chats", [])
+        
+        # Подтягиваем здоровье из базы Андрюши
+        health_data = list(db['spy_health'].find({"chat_id": {"$in": [str(c) for c in chats]}}))
+        health_map = {h["chat_id"]: h for h in health_data}
+        
+        result = []
+        for c in chats:
+            c_str = str(c)
+            h = health_map.get(c_str, {})
+            result.append({
+                "id": c_str,
+                "title": h.get("title", c_str),
+                "status": h.get("status", "🟡 Ждем пинга...")
+            })
+        return jsonify(result)
 
     @app.route('/glaz/api/spy/add', methods=['POST'])
     def api_add_spy():
