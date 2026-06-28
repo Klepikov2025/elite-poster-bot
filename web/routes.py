@@ -103,7 +103,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                         "admin_notes": p_info.get("admin_notes", ""),
                         "ai_memory": p_info.get("dialog_history", [])[-6:], # Последние 6 реплик
                         "secret_code": p_info.get("secret_code", ""),
-                        "verif_seconds_left": seconds_left
+                        "verif_seconds_left": seconds_left,
+                        "active_chats": p_info.get("active_chats", [])
                     }
                     add_radar_log(f"🔎 Обыск досье: {uid}")
                 else:
@@ -1456,3 +1457,42 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         if "_id" in status_data:
             del status_data["_id"]
         return jsonify(status_data)
+
+    @app.route('/glaz/api/scan_networks/<int:uid>')
+    def api_scan_networks(uid):
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+
+        all_chats = []
+        
+        # 🚀 Достаем актуальную инфраструктуру сетей прямо из базы!
+        infra = db['settings'].find_one({"_id": "infrastructure"}) or {}
+        networks = infra.get("networks", {})
+        
+        # Формируем список чатов для сканирования из базы
+        # (Предполагается, что структура в базе примерно такая: 
+        # {"networks": {"МК": {"Нижний Новгород": -10012..., "Москва": -100...}, "ПАРНИ": {...}}})
+        for net_name, chats_dict in networks.items():
+            # Если chats_dict — это словарь {Город: ID}
+            if isinstance(chats_dict, dict):
+                for city, cid in chats_dict.items():
+                    all_chats.append({"name": f"{net_name.upper()} {city}", "id": cid})
+            # Если это просто список словарей или ID (на случай другой структуры)
+            elif isinstance(chats_dict, list):
+                for item in chats_dict:
+                    if isinstance(item, dict) and "id" in item:
+                        all_chats.append({"name": item.get("name", "Неизвестно"), "id": item["id"]})
+
+        # Сам процесс сканирования (он не меняется)
+        active_chats = []
+        for chat in all_chats:
+            try:
+                member = bot.get_chat_member(chat['id'], uid)
+                if member.status not in ['left', 'kicked']:
+                    active_chats.append(chat['name'])
+            except Exception:
+                pass # Игнорируем, если бот не в чате или юзера там нет
+
+        # Сохраняем актуальный список в досье пользователя
+        db['paid_users'].update_one({"uid": uid}, {"$set": {"active_chats": active_chats}}, upsert=True)
+        
+        return jsonify({"chats": active_chats})
