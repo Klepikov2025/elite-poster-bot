@@ -992,65 +992,60 @@
         let activeProxySession = null;
 
         // 👇 ПОЛНОСТЬЮ ОБНОВЛЕННАЯ ФУНКЦИЯ ПЕРЕКЛЮЧЕНИЯ ВКЛАДОК 👇
-        function openTab(tabId) {
-            // 1. Скрываем все вкладки и кнопки
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            
-            // 2. Показываем нужную вкладку
-            const el = document.getElementById(tabId);
-            if (!el) return;
-            el.classList.add('active');
-            
-            // 3. Подсвечиваем кнопку безопасно
-            if (typeof event !== 'undefined' && event.currentTarget) {
-                event.currentTarget.classList.add('active');
-            } else {
-                const btn = document.querySelector(`[onclick="openTab('${tabId}')"]`);
-                if(btn) btn.classList.add('active');
-            }
-            
-            // 4. Сохраняем текущую вкладку
-            localStorage.setItem('activeTab', tabId);
+    function openTab(tabId) {
+    // 1. Скрываем все вкладки и кнопки
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    
+    // 2. Показываем нужную вкладку
+    const el = document.getElementById(tabId);
+    if (!el) return;
+    el.classList.add('active');
+    
+    // 3. Подсвечиваем кнопку безопасно (ИСПРАВЛЕНО)
+    const btn = document.querySelector(`[onclick="openTab('${tabId}')"]`);
+    if(btn) btn.classList.add('active');
+    
+    // 4. Сохраняем текущую вкладку
+    localStorage.setItem('activeTab', tabId);
 
-            // 5. Загружаем данные для конкретной вкладки
-            if(tabId === 'tab-blackbox') loadProxySessions();
-            if(tabId === 'tab-quarantine') loadQuarantine();
-            if(tabId === 'tab-infrastructure') loadInfrastructure(); // <--- ИМЕННО ЭТА СТРОЧКА ЗАПУСКАЕТ МАТРИЦУ!
-            if(tabId === 'ads-tab') loadAds();
-            if(tabId === 'tab-system') { 
-                loadDictionary(); loadSystemTexts(); loadSystemSettings(); loadNetworkPrices(); 
-                loadAIPrompt(); loadModSettings(); 
-            }
-            
-            // 🛡 ИНИЦИАЛИЗАЦИЯ ВИЗУАЛЬНОГО РЕДАКТОРА
-            const minimalToolbar = {
-                toolbar: [
-                    ['style', ['bold', 'italic', 'underline', 'strikethrough', 'clear']],
-                    ['insert', ['link']],
-                    ['view', ['codeview']]
-                ],
-                disableDragAndDrop: true, dialogsInBody: true
-            };
+    // 5. Загружаем данные для конкретной вкладки
+    if(tabId === 'tab-blackbox') loadProxySessions();
+    if(tabId === 'tab-quarantine') loadQuarantine();
+    if(tabId === 'tab-infrastructure') loadInfrastructure();
+    if(tabId === 'ads-tab') loadAds();
+    if(tabId === 'tab-system') { 
+        loadDictionary(); loadSystemTexts(); loadSystemSettings(); loadNetworkPrices(); 
+        loadAIPrompt(); loadModSettings(); 
+    }
+    
+    // 🛡 ИНИЦИАЛИЗАЦИЯ ВИЗУАЛЬНОГО РЕДАКТОРА
+    const minimalToolbar = {
+        toolbar: [
+            ['style', ['bold', 'italic', 'underline', 'strikethrough', 'clear']],
+            ['insert', ['link']],
+            ['view', ['codeview']]
+        ],
+        disableDragAndDrop: true, dialogsInBody: true
+    };
 
-            if(tabId === 'tab-broadcast') {
-                loadTemplates();
-                loadBroadcastStats();
-                if (!$('#broadcast-text').hasClass('sn-loaded')) {
-                    $('#broadcast-text').summernote({ ...minimalToolbar, height: 250, placeholder: 'Введите текст рассылки...' });
-                    $('#broadcast-text').addClass('sn-loaded');
-                }
-            }
-
-            if(tabId === 'tab-support') {
-                loadSupportTickets();
-                if (!$('#ticket-reply-text').hasClass('sn-loaded')) {
-                    $('#ticket-reply-text').summernote({ ...minimalToolbar, height: 150, placeholder: 'Напишите ответ пользователю...' });
-                    $('#ticket-reply-text').addClass('sn-loaded');
-                }
-            }
+    if(tabId === 'tab-broadcast') {
+        loadTemplates();
+        loadBroadcastStats();
+        if (!$('#broadcast-text').hasClass('sn-loaded')) {
+            $('#broadcast-text').summernote({ ...minimalToolbar, height: 250, placeholder: 'Введите текст рассылки...' });
+            $('#broadcast-text').addClass('sn-loaded');
         }
-        // 👆 ============================================================== 👆
+    }
+
+    if(tabId === 'tab-support') {
+        loadSupportTickets();
+        if (!$('#ticket-reply-text').hasClass('sn-loaded')) {
+            $('#ticket-reply-text').summernote({ ...minimalToolbar, height: 150, placeholder: 'Напишите ответ пользователю...' });
+            $('#ticket-reply-text').addClass('sn-loaded');
+        }
+    }
+}
 
         function showToast(text) {
             const container = document.getElementById('toast-container');
