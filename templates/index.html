@@ -2420,8 +2420,12 @@ function loadRootRevenue(pin, period = 'week') {
         function startAutoPing() {
             if(pingInterval) clearInterval(pingInterval);
             pingNetworks();
+            renderInfraEnemies(); // <--- Запускаем сбор инфы о Шпионе
             pingInterval = setInterval(() => {
-                if(document.getElementById('tab-infrastructure').classList.contains('active')) pingNetworks();
+                if(document.getElementById('tab-infrastructure').classList.contains('active')) {
+                    pingNetworks();
+                    renderInfraEnemies(); // <--- Авто-обновление каждые 25 сек
+                }
             }, 25000);
         }
 
@@ -2443,7 +2447,7 @@ function loadRootRevenue(pin, period = 'week') {
             renderInfraChats();
         }
 
-        // 👇 ИСПРАВЛЕННАЯ ЛОГИКА АНДРЮШЕНЬКИ (ШПИОНА) 👇
+        // 👇 КРАСИВЫЕ КАРТОЧКИ ЦЕЛЕЙ ШПИОНА 👇
         function renderInfraEnemies() {
             fetch('/glaz/api/spy')
             .then(res => res.json())
@@ -2451,10 +2455,16 @@ function loadRootRevenue(pin, period = 'week') {
                 const container = document.getElementById('infra-enemies-list');
                 let html = '';
                 chats.forEach(chat => {
-                    const chatStr = typeof chat === 'string' ? chat.replace(/'/g, "\\'") : chat;
-                    html += `<div style="background: #2d2d2d; border: 1px solid #cf6679; padding: 5px 10px; border-radius: 15px; font-size: 12px; display: flex; align-items: center; gap: 8px;">
-                        🎯 ${chat} 
-                        <span onclick="removeInfraEnemy('${chatStr}')" style="cursor: pointer; color: #cf6679; font-weight: bold;">✖</span>
+                    const chatStr = typeof chat.id === 'string' ? chat.id.replace(/'/g, "\\'") : chat.id;
+                    let color = chat.status.includes('🟢') ? '#03dac6' : (chat.status.includes('🔴') ? '#cf6679' : '#ffb74d');
+                    
+                    html += `<div style="background: #252525; border: 1px solid ${color}; padding: 10px 15px; border-radius: 8px; font-size: 13px; display: flex; flex-direction: column; gap: 6px; min-width: 220px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <strong style="color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;" title="${chat.title}">🎯 ${chat.title}</strong>
+                            <span onclick="removeInfraEnemy('${chatStr}')" style="cursor: pointer; color: #cf6679; font-weight: bold; font-size: 14px;">✖</span>
+                        </div>
+                        <div style="font-size: 11px; color: #888;">ID: <code>${chat.id}</code></div>
+                        <div style="font-size: 11px; color: ${color}; font-weight: bold;">${chat.status}</div>
                     </div>`;
                 });
                 if(html === '') html = '<span style="color: #666; font-size: 12px;">Цели не назначены...</span>';
