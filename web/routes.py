@@ -1492,22 +1492,38 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                 for city, cid in chats_dict.items():
                     all_chats.append({"name": f"{prefix} | {city}", "id": cid})
                     
-            # Если это просто список словарей или ID (на случай другой структуры)
+            # Если это просто список словарей
             elif isinstance(chats_dict, list):
                 for item in chats_dict:
                     if isinstance(item, dict) and "id" in item:
                         city_name = item.get("name", "Неизвестно")
                         all_chats.append({"name": f"{prefix} | {city_name}", "id": item["id"]})
 
-        # Сам процесс сканирования (он не меняется)
+        # Сам процесс сканирования
         active_chats = []
         for chat in all_chats:
             try:
                 member = bot.get_chat_member(chat['id'], uid)
-                if member.status not in ['left', 'kicked']:
+                
+                # 🛡️ ИСПРАВЛЕННАЯ ЛОГИКА ОПРЕДЕЛЕНИЯ ПРИСУТСТВИЯ 🛡️
+                is_in_chat = False
+                
+                if member.status in ['creator', 'administrator', 'member']:
+                    is_in_chat = True
+                elif member.status == 'restricted':
+                    # Превентивный мут дает статус 'restricted' даже тем, кого нет в чате.
+                    # Поэтому проверяем флаг is_member (появился в новых версиях Telegram API)
+                    if getattr(member, 'is_member', False):
+                        is_in_chat = True
+
+                if is_in_chat:
                     active_chats.append(chat['name'])
+                    
             except Exception:
-                pass # Игнорируем, если бот не в чате или юзера там нет
+                pass # Игнорируем ошибки (бота нет в чате, чат удален и т.д.)
+                
+            # ⏳ Обязательная пауза, чтобы Telegram не выдал FloodWait (ограничение 30 запросов в сек)
+            time.sleep(0.04)
 
         # Сохраняем актуальный список в досье пользователя
         db['paid_users'].update_one({"uid": uid}, {"$set": {"active_chats": active_chats}}, upsert=True)
