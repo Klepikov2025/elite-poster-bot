@@ -1290,27 +1290,53 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         networks = data.get("networks", {})
         statuses = {}
         
-        bot_id = bot.get_me().id # Узнаем ID нашего бота
+        # 👇 ВПИШИТЕ СЮДА ID ВАШИХ 3 БОТОВ (ЦИФРАМИ) 👇
+        # Узнать ID бота можно, переслав любое его сообщение в @getmyid_bot
+        BOTS_TO_CHECK = {
+            "Скайнет": 7674203992,  # Замените на реальный ID Скайнета (Elitepost_bot)
+            "Реклама": 7492221662,  # Замените на реальный ID Рекламного бота (PostGoldBot)
+            "Секретарь": 7229467953  # Замените на реальный ID Секретаря (FAQMKBOT)
+        }
         
         for net_key, chats in networks.items():
             for chat in chats:
                 cid = chat.get("id")
                 if not cid: continue
                 try:
-                    # Проверяем, какие права у бота в этом чате
-                    bot_member = bot.get_chat_member(cid, bot_id)
-                    if bot_member.status == 'administrator':
-                        statuses[cid] = {"code": "ok", "text": "🟢 Активен (Админ)"}
-                    elif bot_member.status in ['member', 'restricted']:
-                        statuses[cid] = {"code": "warn", "text": "🟡 Нет прав админа!"}
+                    # Запрашиваем список всех админов чата (1 запрос на чат)
+                    admins = bot.get_chat_administrators(cid)
+                    admin_ids = [admin.user.id for admin in admins]
+                    
+                    status_lines = []
+                    bots_missing = 0
+                    
+                    # Проверяем наличие каждого бота в списке админов
+                    for bot_name, b_id in BOTS_TO_CHECK.items():
+                        if b_id in admin_ids:
+                            status_lines.append(f"🟢 {bot_name}")
+                        else:
+                            status_lines.append(f"🔴 {bot_name}")
+                            bots_missing += 1
+                            
+                    # Склеиваем статусы через HTML-тег переноса строки
+                    final_text = "<br>".join(status_lines)
+                    
+                    # Выставляем общий цвет фона ячейки
+                    if bots_missing == 0:
+                        statuses[cid] = {"code": "ok", "text": final_text}
+                    elif bots_missing == len(BOTS_TO_CHECK):
+                        statuses[cid] = {"code": "err", "text": final_text}
                     else:
-                        statuses[cid] = {"code": "err", "text": "🔴 Бот кикнут"}
+                        statuses[cid] = {"code": "warn", "text": final_text}
+                        
                 except Exception as e:
                     err_str = str(e).lower()
-                    if "chat not found" in err_str:
-                        statuses[cid] = {"code": "err", "text": "🔴 Чат удален / Не найден"}
+                    if "chat not found" in err_str or "forbidden" in err_str:
+                        statuses[cid] = {"code": "err", "text": "🔴 Скайнет кикнут / Ослеп"}
                     else:
                         statuses[cid] = {"code": "err", "text": "🔴 Ошибка доступа"}
+                        
+                time.sleep(0.2) # Защита от Flood Wait (Телеграм не любит резкие массовые запросы)
                         
         return jsonify(statuses)
 
