@@ -1333,6 +1333,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                     err_str = str(e).lower()
                     if "chat not found" in err_str or "forbidden" in err_str:
                         statuses[cid] = {"code": "err", "text": "🔴 Скайнет кикнут / Ослеп"}
+                    elif "too many requests" in err_str:
+                        statuses[cid] = {"code": "warn", "text": "🟡 ТГ просит подождать (Лимит)"}
                     else:
                         statuses[cid] = {"code": "err", "text": "🔴 Ошибка доступа"}
                         
