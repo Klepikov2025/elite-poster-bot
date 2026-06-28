@@ -1336,9 +1336,12 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                     elif "too many requests" in err_str:
                         statuses[cid] = {"code": "warn", "text": "🟡 ТГ просит подождать (Лимит)"}
                     else:
-                        statuses[cid] = {"code": "err", "text": "🔴 Ошибка доступа"}
+                        # 🔥 ВЫВОДИМ РЕАЛЬНУЮ ОШИБКУ ТЕЛЕГРАМА НА ЭКРАН 🔥
+                        # Обрезаем текст, чтобы не сломать дизайн таблицы
+                        safe_err = str(e).replace('"', "'")[:50] 
+                        statuses[cid] = {"code": "err", "text": f"🔴 Ошибка: {safe_err}"}
                         
-                time.sleep(0.2) # Защита от Flood Wait (Телеграм не любит резкие массовые запросы)
+                time.sleep(1,5) # Защита от Flood Wait (Телеграм не любит резкие массовые запросы)
                         
         return jsonify(statuses)
 
