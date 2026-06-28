@@ -418,12 +418,8 @@
                         <input type="number" id="mute-hours-{{ user_data.id }}" class="search-input" style="width: 80px; padding: 8px; text-align: center; font-weight: bold; color: #ffb74d;" value="24" title="Часы мута">
                         <button type="button" class="act-btn" style="background: #ffb74d; color: #121212; flex: 1;" onclick="fireMuteAction({{ user_data.id }})">🤐 ВЫДАТЬ ПРОФИЛАКТИЧЕСКИЙ МУТ (ЧАСЫ)</button>
                     </div>
-                </div> 
-
-            </div> {% endif %}
-    </div>
-
-    <div id="tab-radar" class="tab-content">
+                </div> </div> </div> {% endif %}
+    </div> <div id="tab-radar" class="tab-content">
         <div class="charts-container" style="align-items: flex-start;">
             <div class="chart-block" style="width: 500px;"><h3 style="color: #03dac6;">🔴 Живой Радар (Web-Логи)</h3><div class="radar-box" id="radar-box"><div style="color: #888;">Загрузка канала связи...</div></div></div>
             <div class="chart-block" style="width: 500px;"><h3 style="color: #bb86fc;">📋 Умные Списки</h3>
@@ -1002,9 +998,12 @@
     if (!el) return;
     el.classList.add('active');
     
-    // 3. Подсвечиваем кнопку безопасно (ИСПРАВЛЕНО)
-    const btn = document.querySelector(`[onclick="openTab('${tabId}')"]`);
-    if(btn) btn.classList.add('active');
+    // 3. Подсвечиваем кнопку безопасно (ПУЛЕНЕПРОБИВАЕМАЯ ВЕРСИЯ)
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                if(btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(tabId)) {
+                    btn.classList.add('active');
+                }
+            });
     
     // 4. Сохраняем текущую вкладку
     localStorage.setItem('activeTab', tabId);
