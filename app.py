@@ -122,6 +122,12 @@ def safe_set_tag(chat_id, user_id, tag):
 
 def is_real_vip(user_id: int) -> bool:
     """Надёжная проверка VIP-статуса по живому состоянию в чате"""
+    # 👇 НОВАЯ ЗАЩИТА ИНДУЛЬГЕНЦИИ (Верим базе на слово) 👇
+    user_data = users_collection.find_one({"_id": user_id}) or {}
+    if user_data.get("custom_tag") == "Индульгенция":
+        return True
+    # 👆 ================================================ 👆
+    
     try:
         member = bot.get_chat_member(VIP_CHAT_ID, user_id)
         
