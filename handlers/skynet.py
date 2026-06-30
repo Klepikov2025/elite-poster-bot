@@ -505,7 +505,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
     @bot.message_handler(func=lambda message: str(message.chat.id) == str(SUPPORT_GROUP_ID), content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'video_note', 'location', 'contact', 'successful_payment'])
     def auto_support_handler(message):
         
-        # 1. ЛОВЕЦ ЗВЕЗД: В этой группе любое сообщение стоит 50 звезд. 
+        # 1. ЛОВЕЦ ЗВЕЗД: В этой группе любое сообщение стоит 60 звезд. 
         # Сбрасываем страйки в базе
         if not message.from_user.is_bot:
             db['paid_users'].update_one(
@@ -546,12 +546,17 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             "Все вопросы по мутам и блокировкам решаем через @FAQMKBOT. Напишите туда."
         ]
 
-        # 4. Логика распознавания
-        if any(word in text for word in ["верификаци", "вериф", "пройти"]):
+        # 4. Логика распознавания (Словарь Дегенерата)
+        if any(word in text for word in [
+            "вериф", "вереф", "вириф", "верификация", "верефекация", "верификиция", 
+            "верфикация", "вирификация", "пройти"
+        ]):
             response = random.choice(phrases_verification)
         elif any(word in text for word in [
-            "забанили", "мут", "не могу писать", "запрет", "ограничени", "блок",
-            "разблок", "снять бан", "получил бан", "бан?", "оплатил", "звезд"
+            "забанили", "забанил", "мут", "не могу писать", "запрет", "ограничени", "блок",
+            "разблок", "снять бан", "получил бан", "бан?", "оплатил", "звезд", "штраф",
+            "теневой", "снять", "снимите", "помогите", "розбан", "разблокировка", "разблокируй",
+            "чс", "уберите", "недоступна", "ограничили", "не приняли"
         ]):
             response = random.choice(phrases_restrictions)
 
