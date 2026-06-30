@@ -1,9 +1,16 @@
 from telebot import types
 from datetime import datetime
 import random
-from config import chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, all_cities
 from database import posts_collection, temp_posts, users_collection
 from utils import format_time, get_user_name, escape_md, clean_user_text, net_key_to_name
+
+def get_live_network_chats(network_key):
+    """Достает самый свежий список городов и ID чатов для конкретной сети прямо из базы данных"""
+    from database import db
+    infra = db['settings'].find_one({"_id": "infrastructure"}) or {}
+    networks = infra.get("networks", {})
+    # Возвращает словарь вида {"Москва": -10012345, "Екатеринбург": -1006789}
+    return networks.get(network_key, {})
 
 def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real_vip):
 
@@ -317,10 +324,6 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
         return markup
 
     def select_network(message, text, media_type, file_id):
-        # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
-        from config import get_network_data
-        chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
-
         if message.text == "Назад":
             create_new_post(message)
             return
@@ -328,18 +331,31 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
         selected_network = message.text
         if selected_network in ["Мужской Клуб", "ПАРНИ 18+", "НС", "Радуга", "Гей Знакомства", "Все сети"]:
             markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True, row_width=2)
+            
+            # 🔥 ЖИВАЯ ЗАГРУЗКА ГОРОДОВ ИЗ БАЗЫ 🔥
+            cities = []
             if selected_network == "Мужской Клуб":
-                cities = list(chat_ids_mk.keys())
+                cities = list(get_live_network_chats("mk").keys())
             elif selected_network == "ПАРНИ 18+":
-                cities = list(chat_ids_parni.keys())
+                cities = list(get_live_network_chats("parni").keys())
             elif selected_network == "НС":
-                cities = list(chat_ids_ns.keys())
+                cities = list(get_live_network_chats("ns").keys())
             elif selected_network == "Радуга":
-                cities = list(chat_ids_rainbow.keys())
+                cities = list(get_live_network_chats("rainbow").keys())
             elif selected_network == "Гей Знакомства":
-                cities = list(chat_ids_gayznak.keys())
+                cities = list(get_live_network_chats("gayznak").keys())
             elif selected_network == "Все сети":
-                cities = [city for city, data in all_cities.items() if len(data.keys()) >= 2]
+                # Динамически собираем города, которые есть минимум в 2 сетях
+                from database import db
+                infra = db['settings'].find_one({"_id": "infrastructure"}) or {}
+                networks = infra.get("networks", {})
+                city_counts = {}
+                for net_key, chats in networks.items():
+                    if isinstance(chats, dict):
+                        for c in chats.keys():
+                            city_counts[c] = city_counts.get(c, 0) + 1
+                cities = [c for c, count in city_counts.items() if count >= 2]
+                
             for city in cities:
                 markup.add(city)
             markup.add("Выбрать другую сеть", "Назад")
@@ -347,13 +363,9 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
             bot.register_next_step_handler(message, select_city_and_publish, text, selected_network, media_type, file_id)
         else:
             bot.send_message(message.chat.id, "❌ Ошибка! Выберите правильную сеть.")
-            bot.register_next_step_handler(message, select_network, text, media_type, file_id) # Лучше возвращать на выбор сети!
+            bot.register_next_step_handler(message, select_network, text, media_type, file_id)
 
     def select_city_and_publish(message, text, selected_network, media_type, file_id):
-        # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
-        from config import get_network_data
-        chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
-
         if message.text == "Назад":
             bot.send_message(message.chat.id, "📋 Выберите сеть для публикации:", reply_markup=get_network_markup())
             bot.register_next_step_handler(message, select_network, text, media_type, file_id)
@@ -370,47 +382,31 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
             is_privileged = is_real_vip(user_id)
 
             if is_privileged:
-                # 1. Защищаем имя юзера от поломки HTML-кода (если у него в имени есть знаки < >)
+                # 1. Защищаем имя юзера
                 safe_name = message.from_user.first_name.replace('<', '').replace('>', '')
                 user_name_html = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
 
-                # 2. ВАЖНО: Телеграм запрещает ставить буквы (V, I, P) внутрь тегов. Там ОБЯЗАНЫ быть смайлики (например 👑)
+                # 2. Смайлики и плашки
                 vip_top_stickers = (
                     '<tg-emoji emoji-id="5467688183229610037">👑</tg-emoji>'
                     '<tg-emoji emoji-id="5467466378233543299">👑</tg-emoji>'
                     '<tg-emoji emoji-id="5467630896955815565">👑</tg-emoji>\n\n'
                 )
 
-                # 3. Анимированный НИЗ (Галочка и Звезды)
                 vip_bottom = (
                     '\n\n<tg-emoji emoji-id="5949582599012750373">✅</tg-emoji> <b>Анкета проверена администрацией сети</b>\n\n'
                     '<tg-emoji emoji-id="6215039782955783886">🌟</tg-emoji> <b>Привилегированный участник</b> <tg-emoji emoji-id="6215039782955783886">🌟</tg-emoji>'
                 )
 
-                # 4. Обновленные заголовки
                 headers = [
                     f"💎 VIP-СООБЩЕНИЕ от {user_name_html}! 💎",
                     f"🚨 🔥 Срочное объявление от {user_name_html}! 🚨",
                     f"👑 {user_name_html} публикует элитное объявление: 👑",
-                    f"🌟 Особое сообщение от привилегированного пользователя {user_name_html}: 🌟",
-                    f"🔒 Только для избранных: сообщение от {user_name_html} 🔒",
-                    f"📣 Важное объявление от {user_name_html}!",
-                    f"🌐 Объявление уровня PREMIUM от {user_name_html}!",
-                    f"📢 Привилегированное сообщение от {user_name_html}:",
-                    f"🛑 Эксклюзив! {user_name_html} пишет:",
-                    f"💼 Серьёзное объявление от проверенного участника {user_name_html}",
-                    f"💠 {user_name_html} публикует объявление с высоким приоритетом",
-                    f"🪙 {user_name_html} использует привилегию VIP для объявления:",
-                    f"⚠️ Срочно на всех экранах: {user_name_html} врывается с объявлением!",
                     f"🔥 {user_name_html} бросает вызов одиночеству!",
                     f"🚀 {user_name_html} не ждёт — он действует! Объявление внутри:",
-                    f"🥵 Горячо! {user_name_html} делится откровенным сообщением:",
-                    f"⚡ Найдено ВИП-сообщение! Проверь, что пишет {user_name_html}",
-                    f"🧿 Внимание! VIP-сообщение от {user_name_html}",
-                    f"🏷️ Объявление с особыми правами: {user_name_html}"
+                    f"🧿 Внимание! VIP-сообщение от {user_name_html}"
                 ]
 
-                # 5. Склеиваем всё вместе и ЗАЩИЩАЕМ текст пользователя, чтобы он не сломал разметку
                 safe_text = clean_user_text(text).replace('<', '&lt;').replace('>', '&gt;')
                 full_text = f"{vip_top_stickers}{random.choice(headers)}\n\n{safe_text}{vip_bottom}"
 
@@ -426,17 +422,21 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
 
                 target_chats = []
 
+                # 🔥 ЖИВАЯ ПРОВЕРКА ID ЧАТОВ ИЗ БАЗЫ 🔥
                 if selected_network == "Все сети":
-                    for net_key, groups in all_cities.get(city, {}).items():
-                        for group in groups:
-                            target_chats.append((group['chat_id'], net_key_to_name(net_key)))
+                    from database import db
+                    infra = db['settings'].find_one({"_id": "infrastructure"}) or {}
+                    networks = infra.get("networks", {})
+                    for net_key, chats in networks.items():
+                        if isinstance(chats, dict) and city in chats:
+                            target_chats.append((chats[city], net_key_to_name(net_key)))
                 else:
                     chat_id = None
-                    if selected_network == "Мужской Клуб": chat_id = chat_ids_mk.get(city)
-                    elif selected_network == "ПАРНИ 18+": chat_id = chat_ids_parni.get(city)
-                    elif selected_network == "НС": chat_id = chat_ids_ns.get(city)
-                    elif selected_network == "Радуга": chat_id = chat_ids_rainbow.get(city)
-                    elif selected_network == "Гей Знакомства": chat_id = chat_ids_gayznak.get(city)
+                    if selected_network == "Мужской Клуб": chat_id = get_live_network_chats("mk").get(city)
+                    elif selected_network == "ПАРНИ 18+": chat_id = get_live_network_chats("parni").get(city)
+                    elif selected_network == "НС": chat_id = get_live_network_chats("ns").get(city)
+                    elif selected_network == "Радуга": chat_id = get_live_network_chats("rainbow").get(city)
+                    elif selected_network == "Гей Знакомства": chat_id = get_live_network_chats("gayznak").get(city)
                     
                     if chat_id:
                         target_chats.append((chat_id, selected_network))
@@ -499,13 +499,12 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
                 bot.send_message(
                     message.chat.id, 
                     "🔓 Вы не являетесь привилегированным участником.\n\n"
-                    "Для публикации элитных объявлений необходимо получить статус VIP. "
-                    "Пройдите быструю верификацию прямо здесь:", 
+                    "Для публикации элитных объявлений необходимо получить статус VIP.", 
                     reply_markup=markup
                 )
 
         except Exception as e:
-            bot.send_message(message.chat.id, f"⚠️ Ошибка при проверке VIP-статуса: {str(e)}")
+            bot.send_message(message.chat.id, f"⚠️ Ошибка при публикации: {str(e)}")
 
     def ask_for_new_post(message):
         bot.send_message(

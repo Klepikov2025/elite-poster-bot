@@ -2647,11 +2647,13 @@ function scanNetworks(uid) {
             document.getElementById('new-chat-id').value = '';
             renderInfraChats();
             pingNetworks();
+            saveInfrastructure(); // 🔥 ДОБАВЛЕНО: АВТОСОХРАНЕНИЕ
         }
 
         function removeInfraChat(netKey, idx) {
             currentInfraData.networks[netKey].splice(idx, 1);
             renderInfraChats();
+            saveInfrastructure(); // 🔥 ДОБАВЛЕНО: АВТОСОХРАНЕНИЕ
         }
 
         // 👇 КРАСИВЫЕ КАРТОЧКИ ЦЕЛЕЙ ШПИОНА 👇
