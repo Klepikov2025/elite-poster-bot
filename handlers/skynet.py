@@ -760,9 +760,16 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     bot_tags = ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "𝐐𝐔𝐄𝐄𝐑 ♛", "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕", "Верифицирован МК", "Not verified", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска", "Параметры FAKE", "Свободен", "Спонсор_Одобрен", "чернильница"]
                     
                     if current_tag:
-                        if current_tag not in bot_tags:
+                        # 🔥 ИСПРАВЛЕНИЕ: Защита Веб-панели и команды /tag 🔥
+                        last_known_tag = user_data.get(f"tag_{chat_id}")
+                        
+                        # Если тег в Телеге НЕ системный, и он ОТЛИЧАЕТСЯ от того, что Скайнет вешал в прошлый раз:
+                        # Значит, админ реально поменял его руками прямо в настройках чата! Синхронизируем в базу.
+                        if current_tag not in bot_tags and current_tag != last_known_tag:
                             users_collection.update_one({"_id": user_id}, {"$set": {"custom_tag": current_tag}}, upsert=True)
                             custom_tag = current_tag
+                            
+                        # Если же это системный тег, просто подтверждаем права
                         elif current_tag == "Верифицирован МК":
                             is_verified = True
                             users_collection.update_one({"_id": user_id}, {"$set": {"is_verified": True}}, upsert=True)
@@ -780,13 +787,18 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             elif is_verified: target_tag = "Верифицирован МК"
             elif shame_tag: target_tag = shame_tag
 
-            # 3. МГНОВЕННАЯ РАЗДАЧА (Только если локальная память говорит, что тег отличается)
-            if user_data.get(f"tag_{chat_id}") != target_tag:
+            # 3. МГНОВЕННАЯ РАЗДАЧА
+            # 🔥 ИСПРАВЛЕНИЕ: Проверяем, не сбился ли реальный тег в чате
+            actual_tag = locals().get('current_tag')
+            
+            # Раздаем, если тег отличается в локальной базе ИЛИ если глубокая проверка выявила рассинхрон
+            if user_data.get(f"tag_{chat_id}") != target_tag or (actual_tag is not None and actual_tag != target_tag):
                 try: 
                     safe_set_tag(chat_id, user_id, target_tag)
+                    # Записываем в базу ТОЛЬКО если не было ошибок (Смотри app.py)
                     users_collection.update_one({"_id": user_id}, {"$set": {f"tag_{chat_id}": target_tag}}, upsert=True)
-                except: pass
-            # 👆 ========================================================================= 👆
+                except Exception as e:
+                    pass # Молча глотаем ошибку API. База не обновится, и Скайнет попробует снова на следующем сообщении!
 
             # 👇 🛡️ ИММУНИТЕТ ДЛЯ АДМИНОВ И СЛУЖЕБНЫХ ЧАТОВ 🛡️ 👇
             # Скайнет не должен модерировать STAFF-чат, Поддержку и Журнал!
