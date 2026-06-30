@@ -1205,7 +1205,7 @@ def skynet_listener():
             # Ищем невыполненные приказы в базе
             tasks = db['skynet_tasks'].find({"status": {"$ne": "done"}})
             for task in tasks:
-                if task['action'] in ["full_unban", "fine_unban"]:
+                if task['action'] in ["full_unban", "fine_unban", "auto_heal"]:
                     target_uid = task['uid']
                     
                     # 1. Снимаем бан и мут везде
@@ -1214,52 +1214,41 @@ def skynet_listener():
                     
                     # 2. ВЫДАЕМ ИММУНИТЕТ ИЛИ ПРОСТО ЧИСТИМ ТЕГ
                     if task['action'] == "full_unban":
-                        # Если это чистая верификация — выдаем официальный статус и тег!
-                        users_collection.update_one(
-                            {"_id": target_uid}, 
-                            {"$set": {"is_verified": True, "custom_tag": "Верифицирован МК"}, "$unset": {"shame_tag": ""}},
-                            upsert=True
-                        )
+                        # 👇 БРОНЯ ОТ СТИРАНИЯ ТЕГОВ 👇
+                        u_info = users_collection.find_one({"_id": target_uid}) or {} 
+                        if not u_info.get("custom_tag"):
+                            users_collection.update_one(
+                                {"_id": target_uid}, 
+                                {"$set": {"is_verified": True, "custom_tag": "Верифицирован МК"}, "$unset": {"shame_tag": ""}},
+                                upsert=True
+                            )
+                        else:
+                            # Если тег уже есть (Элита) - просто подтверждаем вериф без стирания статуса
+                            users_collection.update_one({"_id": target_uid}, {"$set": {"is_verified": True}, "$unset": {"shame_tag": ""}}, upsert=True)
                     
                     elif task['action'] == "fine_unban":
-                        # 🔥 АБСОЛЮТНО БРОНЕБОЙНАЯ ЛОГИКА ШТРАХОВ И ТЕГОВ 🔥
-                        # Пытаемся достать сумму из задачи или ищем последний платеж в fine_payments
                         amount = task.get('amount') or task.get('price')
                         if not amount:
                             last_pay = db['fine_payments'].find_one({"uid": target_uid}, sort=[("timestamp", -1)])
                             amount = last_pay.get('amount', 0) if last_pay else 0
                         
                         if int(amount) == 650:
-                            # Особый случай: покупка свободного тега за 650 звезд
-                            users_collection.update_one(
-                                {"_id": target_uid}, 
-                                {"$set": {"custom_tag": "Свободен"}, "$unset": {"shame_tag": ""}},
-                                upsert=True
-                            )
+                            users_collection.update_one({"_id": target_uid}, {"$set": {"custom_tag": "Свободен"}, "$unset": {"shame_tag": ""}}, upsert=True)
                             add_radar_log(f"🎖️ Юзер {target_uid} оплатил 650⭐️ и получил тег 'Свободен'")
-                            
                         elif int(amount) == 750:
-                            # 🔥 НОВЫЙ КЕЙС: Покупка статуса Спонсора за 750 звезд 🔥
-                            users_collection.update_one(
-                                {"_id": target_uid}, 
-                                {"$set": {"custom_tag": "Спонсор_Одобрен"}, "$unset": {"shame_tag": ""}},
-                                upsert=True
-                            )
+                            users_collection.update_one({"_id": target_uid}, {"$set": {"custom_tag": "Спонсор_Одобрен"}, "$unset": {"shame_tag": ""}}, upsert=True)
                             add_radar_log(f"💎 Юзер {target_uid} оплатил 750⭐️ и получил тег 'Спонсор_Одобрен'")
-                            
                         else:
-                            # Обычный штраф: принудительно выжигаем custom_tag (none) и shame_tag
-                            users_collection.update_one(
-                                {"_id": target_uid}, 
-                                {"$unset": {"shame_tag": "", "custom_tag": ""}}
-                            )
+                            users_collection.update_one({"_id": target_uid}, {"$unset": {"shame_tag": "", "custom_tag": ""}})
                             add_radar_log(f"🧹 Юзер {target_uid} оплатил обычный штраф ({amount}⭐️), теги сброшены")
                     
                     # 3. ОТЧЕТ В ФЛУДИЛКУ АДМИНАМ!
                     if task['action'] == "fine_unban":
                         report_text = f"💸 **Скайнет (Автоматика):**\nЮзер `{target_uid}` оплатил штраф!\nОграничения сняты. Глобально разбанен ({unbanned} чатов) и размучен ({unmuted} чатов)."
+                    elif task['action'] == "auto_heal":
+                        report_text = f"🛡 **Скайнет (Авто-Исцеление):**\nVIP-юзер `{target_uid}` открыл поддержку. Скайнет профилактически снял с него все возможные ограничения!\nГлобально разбанен ({unbanned} чатов) и размучен ({unmuted} чатов)."
                     else:
-                        report_text = f"✅ **Скайнет (Автоматика):**\nЮзер `{target_uid}` прошел ручную верификацию Секретарем!\nГлобально разбанен ({unbanned} чатов) и размучен ({unmuted} чатов)."
+                        report_text = f"✅ **Скайнет (Автоматика):**\nЮзер `{target_uid}` прошел верификацию!\nГлобально разбанен ({unbanned} чатов) и размучен ({unmuted} чатов)."
                     
                     try: bot.send_message(STAFF_GROUP_ID, report_text, parse_mode="Markdown")
                     except: pass
