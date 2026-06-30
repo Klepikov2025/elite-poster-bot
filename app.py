@@ -118,7 +118,12 @@ def safe_set_tag(chat_id, user_id, tag):
     except AttributeError:
         # Если библиотека старая, бьем напрямую в API Телеграма
         url = f"https://api.telegram.org/bot{TOKEN}/setChatMemberTag"
-        requests.post(url, json={"chat_id": chat_id, "user_id": user_id, "tag": tag})
+        response = requests.post(url, json={"chat_id": chat_id, "user_id": user_id, "tag": tag}, timeout=5)
+        
+        # 🔥 ИСПРАВЛЕНИЕ: Вызываем жесткую ошибку, если ТГ отказал (например, лимиты), 
+        # чтобы Скайнет не записал фейковый успех в свою базу!
+        if not response.json().get('ok'):
+            raise Exception(f"Telegram API Error: {response.text}")
 
 def is_real_vip(user_id: int) -> bool:
     """Надёжная проверка VIP-статуса по живому состоянию в чате"""
