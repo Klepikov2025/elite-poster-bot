@@ -374,32 +374,36 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
         if selected_network in ["Мужской Клуб", "ПАРНИ 18+", "НС", "Радуга", "Гей Знакомства", "Все сети"]:
             markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True, row_width=2)
             
-            # 🔥 ЖИВАЯ ЗАГРУЗКА ГОРОДОВ ИЗ БАЗЫ 🔥
-            cities = []
-            if selected_network == "Мужской Клуб":
-                cities = list(get_live_network_chats("mk").keys())
-            elif selected_network == "ПАРНИ 18+":
-                cities = list(get_live_network_chats("parni").keys())
-            elif selected_network == "НС":
-                cities = list(get_live_network_chats("ns").keys())
-            elif selected_network == "Радуга":
-                cities = list(get_live_network_chats("rainbow").keys())
-            elif selected_network == "Гей Знакомства":
-                cities = list(get_live_network_chats("gayznak").keys())
-            elif selected_network == "Все сети":
-                # Динамически собираем города, которые есть минимум в 2 сетях
-                from database import db
-                infra = db['settings'].find_one({"_id": "infrastructure"}) or {}
-                networks = infra.get("networks", {})
+            import re
+            
+            if selected_network == "Все сети":
+                # УМНЫЙ СБОР для всех сетей (без жестких лимитов, срезаем цифры)
                 city_counts = {}
-                for net_key, chats in networks.items():
-                    if isinstance(chats, dict):
-                        for c in chats.keys():
-                            city_counts[c] = city_counts.get(c, 0) + 1
-                cities = [c for c, count in city_counts.items() if count >= 2]
+                non_cities = ["БЕЗ ПРЕДРАССУДКОВ", "RAINBOW MAN", "Мужской Чат", "Фетиши", "Аренда Жилья", "Секс Туризм", "Галерея", "Тестовая группа 🛠️", "Общая группа Юга", "Казахстан", "ХМАО", "ЯМАЛ"]
                 
+                for net_key in ["mk", "parni", "ns", "rainbow", "gayznak"]:
+                    chats = get_live_network_chats(net_key)
+                    for raw_city in chats.keys():
+                        if str(raw_city).startswith("⚠️"): continue
+                        
+                        # Отрезаем цифры (Тюмень 2 -> Тюмень)
+                        clean_city = re.sub(r' \d+$', '', str(raw_city))
+                        if clean_city not in non_cities:
+                            city_counts[clean_city] = city_counts.get(clean_city, 0) + 1
+                
+                # Оставляем только те, что есть минимум в 2 сетях, и сортируем по алфавиту
+                cities = sorted([c for c, count in city_counts.items() if count >= 2])
+                
+            else:
+                # СБОР ДЛЯ КОНКРЕТНОЙ СЕТИ (выводим как есть в базе)
+                net_map = {"Мужской Клуб": "mk", "ПАРНИ 18+": "parni", "НС": "ns", "Радуга": "rainbow", "Гей Знакомства": "gayznak"}
+                net_key = net_map.get(selected_network)
+                raw_chats = get_live_network_chats(net_key)
+                cities = sorted([c for c in raw_chats.keys() if not str(c).startswith("⚠️")])
+
             for city in cities:
                 markup.add(city)
+                
             markup.add("Выбрать другую сеть", "Назад")
             bot.send_message(message.chat.id, "📍 Выберите город для публикации или нажмите 'Выбрать другую сеть':", reply_markup=markup)
             bot.register_next_step_handler(message, select_city_and_publish, text, selected_network, media_type, file_id)
@@ -428,7 +432,6 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
                 safe_name = message.from_user.first_name.replace('<', '').replace('>', '')
                 user_name_html = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
 
-                # 2. Смайлики и плашки
                 vip_top_stickers = (
                     '<tg-emoji emoji-id="5467688183229610037">👑</tg-emoji>'
                     '<tg-emoji emoji-id="5467466378233543299">👑</tg-emoji>'
@@ -462,30 +465,39 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
                     )
                 )
 
+                # 🔥 УНИВЕРСАЛЬНАЯ ПРОВЕРКА ID ЧАТОВ (ДЛЯ КНОПОК И МИНИ-АППА) 🔥
                 target_chats = []
+                import re
+                from utils import net_key_to_name
 
-                # 🔥 ЖИВАЯ ПРОВЕРКА ID ЧАТОВ ИЗ БАЗЫ 🔥
+                def get_clean_match(network_key, target_city):
+                    chats = get_live_network_chats(network_key)
+                    # 1. Если точное совпадение (например, нажали кнопку "Тюмень 2")
+                    if target_city in chats: 
+                        return chats[target_city]
+                    # 2. Поиск по корню (если из Мини-аппа или "Все сети" пришло "Тюмень")
+                    for raw_city, cid in chats.items():
+                        clean_city = re.sub(r' \d+$', '', str(raw_city))
+                        if clean_city == target_city: 
+                            return cid
+                    return None
+
                 if selected_network == "Все сети":
-                    from database import db
-                    infra = db['settings'].find_one({"_id": "infrastructure"}) or {}
-                    networks = infra.get("networks", {})
-                    for net_key, chats in networks.items():
-                        if isinstance(chats, dict) and city in chats:
-                            target_chats.append((chats[city], net_key_to_name(net_key)))
+                    for net_key in ["mk", "parni", "ns", "rainbow", "gayznak"]:
+                        cid = get_clean_match(net_key, city)
+                        if cid:
+                            target_chats.append((cid, net_key_to_name(net_key)))
                 else:
-                    chat_id = None
-                    if selected_network == "Мужской Клуб": chat_id = get_live_network_chats("mk").get(city)
-                    elif selected_network == "ПАРНИ 18+": chat_id = get_live_network_chats("parni").get(city)
-                    elif selected_network == "НС": chat_id = get_live_network_chats("ns").get(city)
-                    elif selected_network == "Радуга": chat_id = get_live_network_chats("rainbow").get(city)
-                    elif selected_network == "Гей Знакомства": chat_id = get_live_network_chats("gayznak").get(city)
-                    
-                    if chat_id:
-                        target_chats.append((chat_id, selected_network))
-                    else:
-                        bot.send_message(message.chat.id, f"❌ Ошибка! Город '{city}' не найден в сети «{selected_network}».")
-                        ask_for_new_post(message)
-                        return
+                    net_map = {"Мужской Клуб": "mk", "ПАРНИ 18+": "parni", "НС": "ns", "Радуга": "rainbow", "Гей Знакомства": "gayznak"}
+                    net_key = net_map.get(selected_network)
+                    if net_key:
+                        cid = get_clean_match(net_key, city)
+                        if cid:
+                            target_chats.append((cid, selected_network))
+                        else:
+                            bot.send_message(message.chat.id, f"❌ Ошибка! Город '{city}' не найден в сети «{selected_network}».")
+                            ask_for_new_post(message)
+                            return
 
                 for chat_id, network_name in target_chats:
                     try:
@@ -527,6 +539,26 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
                         bot.send_message(message.chat.id, f"✅ Ваше объявление опубликовано в сети «{network_name}», городе {city}.")
                     except Exception as e:
                         bot.send_message(message.chat.id, f"❌ Ошибка отправки в {network_name}: {str(e)}")
+
+                ask_for_new_post(message)
+
+            else:
+                markup = types.InlineKeyboardMarkup()
+                verify_button = types.InlineKeyboardButton(
+                    text="🛠️ Пройти верификацию",
+                    callback_data="start_verification", 
+                    style="danger"          
+                )
+                markup.add(verify_button)
+                bot.send_message(
+                    message.chat.id, 
+                    "🔓 Вы не являетесь привилегированным участником.\n\n"
+                    "Для публикации элитных объявлений необходимо получить статус VIP.", 
+                    reply_markup=markup
+                )
+
+        except Exception as e:
+            bot.send_message(message.chat.id, f"⚠️ Ошибка при публикации: {str(e)}")
 
                 ask_for_new_post(message)
 
