@@ -560,26 +560,6 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
         except Exception as e:
             bot.send_message(message.chat.id, f"⚠️ Ошибка при публикации: {str(e)}")
 
-                ask_for_new_post(message)
-
-            else:
-                markup = types.InlineKeyboardMarkup()
-                verify_button = types.InlineKeyboardButton(
-                    text="🛠️ Пройти верификацию",
-                    callback_data="start_verification", 
-                    style="danger"          
-                )
-                markup.add(verify_button)
-                bot.send_message(
-                    message.chat.id, 
-                    "🔓 Вы не являетесь привилегированным участником.\n\n"
-                    "Для публикации элитных объявлений необходимо получить статус VIP.", 
-                    reply_markup=markup
-                )
-
-        except Exception as e:
-            bot.send_message(message.chat.id, f"⚠️ Ошибка при публикации: {str(e)}")
-
     def ask_for_new_post(message):
         bot.send_message(
             message.chat.id, 
