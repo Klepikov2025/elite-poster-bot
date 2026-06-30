@@ -5,12 +5,54 @@ from database import posts_collection, temp_posts, users_collection
 from utils import format_time, get_user_name, escape_md, clean_user_text, net_key_to_name
 
 def get_live_network_chats(network_key):
-    """Достает самый свежий список городов и ID чатов для конкретной сети прямо из базы данных"""
+    """Ультра-бронебойный парсер с выводом ошибок прямо в кнопки Телеграма"""
     from database import db
-    infra = db['settings'].find_one({"_id": "infrastructure"}) or {}
-    networks = infra.get("networks", {})
-    # Возвращает словарь вида {"Москва": -10012345, "Екатеринбург": -1006789}
-    return networks.get(network_key, {})
+    try:
+        # 1. Пытаемся найти документ
+        infra = db['settings'].find_one({"_id": "infrastructure"})
+        if not infra:
+            return {"⚠️ ОШИБКА: База infrastructure не найдена!": 0}
+        
+        # 2. Ищем раздел networks
+        networks = infra.get("networks", {})
+        if not networks:
+            return {"⚠️ ОШИБКА: В базе нет раздела networks!": 0}
+            
+        # 3. Ищем конкретную сеть (mk, parni и т.д.)
+        chats_data = networks.get(network_key)
+        if not chats_data: 
+            return {f"⚠️ ОШИБКА: Сеть {network_key} пуста в БД": 0}
+            
+        result = {}
+        
+        # 4. Всеядный парсинг списка (как у тебя на скриншоте)
+        if isinstance(chats_data, list):
+            for item in chats_data:
+                if isinstance(item, dict):
+                    # Хватаем ключи, даже если они называются чуть иначе
+                    name = item.get("name", item.get("city", "Безымянный Город"))
+                    chat_id = item.get("id", item.get("chat_id", item.get("_id")))
+                    
+                    if chat_id:
+                        result[str(name)] = chat_id
+                        
+        # 5. Парсинг старого формата (если где-то остался словарь)
+        elif isinstance(chats_data, dict):
+            for k, v in chats_data.items():
+                if isinstance(v, dict):
+                    result[str(k)] = v.get("id", 0)
+                else:
+                    result[str(k)] = v
+                    
+        # 6. Если после всего этого результат пустой
+        if not result:
+            return {f"⚠️ ОШИБКА: Не удалось распарсить {network_key}": 0}
+            
+        return result
+        
+    except Exception as e:
+        # Если вылетает критический краш питона — выводим его в кнопку!
+        return {f"⚠️ КРАШ: {str(e)[:30]}": 0}
 
 def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real_vip):
 
