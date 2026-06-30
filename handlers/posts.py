@@ -470,30 +470,31 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
                 import re
                 from utils import net_key_to_name
 
-                def get_clean_match(network_key, target_city):
+                def get_clean_matches(network_key, target_city):
                     chats = get_live_network_chats(network_key)
-                    # 1. Если точное совпадение (например, нажали кнопку "Тюмень 2")
-                    if target_city in chats: 
-                        return chats[target_city]
-                    # 2. Поиск по корню (если из Мини-аппа или "Все сети" пришло "Тюмень")
+                    matched_cids = []
                     for raw_city, cid in chats.items():
+                        # Отрезаем цифры (Челябинск 3 -> Челябинск)
                         clean_city = re.sub(r' \d+$', '', str(raw_city))
-                        if clean_city == target_city: 
-                            return cid
-                    return None
+                        # Если совпадает корень ИЛИ точное название
+                        if clean_city == target_city or str(raw_city) == target_city: 
+                            matched_cids.append(cid)
+                    # Возвращаем список всех найденных чатов
+                    return list(set(matched_cids))
 
                 if selected_network == "Все сети":
                     for net_key in ["mk", "parni", "ns", "rainbow", "gayznak"]:
-                        cid = get_clean_match(net_key, city)
-                        if cid:
+                        cids = get_clean_matches(net_key, city)
+                        for cid in cids:
                             target_chats.append((cid, net_key_to_name(net_key)))
                 else:
                     net_map = {"Мужской Клуб": "mk", "ПАРНИ 18+": "parni", "НС": "ns", "Радуга": "rainbow", "Гей Знакомства": "gayznak"}
                     net_key = net_map.get(selected_network)
                     if net_key:
-                        cid = get_clean_match(net_key, city)
-                        if cid:
-                            target_chats.append((cid, selected_network))
+                        cids = get_clean_matches(net_key, city)
+                        if cids:
+                            for cid in cids:
+                                target_chats.append((cid, selected_network))
                         else:
                             bot.send_message(message.chat.id, f"❌ Ошибка! Город '{city}' не найден в сети «{selected_network}».")
                             ask_for_new_post(message)
