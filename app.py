@@ -76,11 +76,15 @@ def add_radar_log(text):
     })
 
 def is_banned_in_network(user_id):
-    # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
     from config import get_network_data
     chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
 
-    """Проверяет статус пользователя в базе Скайнета и в крупных чатах сети"""
+    # 🔥 ИММУНИТЕТ ДЛЯ ВТОРОГО ШАНСА 🔥
+    # Если юзер оплатил штраф, но еще не прошел верификацию - бот с ним общается!
+    user_data = users_collection.find_one({"_id": user_id}) or {}
+    if user_data.get("fine_paid_pending_vip"):
+        return False
+
     # 1. СНАЧАЛА ПРОВЕРЯЕМ БАЗУ СКАЙНЕТА...
     if banned_collection.find_one({"_id": user_id}):
         return True
@@ -398,26 +402,36 @@ def start(message):
                 current_vip_price = 250
                 
             ban_doc = banned_collection.find_one({"_id": message.from_user.id}) or {}
-            reason = ban_doc.get("reason", "").lower()
+            reason_text = ban_doc.get("reason", "Нарушение правил сети")
+            reason_upper = reason_text.upper()
             
-            strict_triggers = ["красн", "желт", "черн", "коммерц", "наркот", "цп", "несовершеннолет", "эскорт", "мп"]
-            is_strict = any(t in reason for t in strict_triggers)
+            # 🔥 ЕДИНЫЙ СЛОВАРЬ ПРЕМИУМ-ГРЕХОВ (Как в BEYOND) 🔥
+            premium_bot_issues = [
+                "БОТ", "VIP", "ВИП", "БТБ", "БВБ", "ТРАНСБОТ", "V БЛОК", 
+                "ТЯНУЛ ВРЕМЯ", "T БЛОК", "НЕ ОПЛАТИЛ"
+            ]
+            heavy_violations = ["КРАСНАЯ ЗОНА", "НАРКОТ", "ЦП", "МЕФ", "СОЛИ", "<18", "НЕСОВЕРШЕННОЛЕТ", "СПОНСОР", "ЭССКОРТ", "ЖЕЛТАЯ ЗОНА"]
+            
+            is_premium_issue = any(k in reason_upper for k in premium_bot_issues)
+            is_heavy_violation = any(k in reason_upper for k in heavy_violations)
             
             markup = types.InlineKeyboardMarkup(row_width=1)
-            markup.add(types.InlineKeyboardButton("🆘 Обратиться в Поддержку", url="https://t.me/FAQMKBOT"))
             
-            if not is_strict:
+            if is_premium_issue and not is_heavy_violation:
                 markup.add(types.InlineKeyboardButton(f"💸 Оплатить штраф ({current_vip_price}⭐️)", callback_data=f"sec_chance_buy_{current_vip_price}"))
                 text = (
                     "🚫 **Доступ закрыт.**\n"
-                    "Вы находитесь в черном списке нашей сети и заблокированы в основных чатах.\n\n"
-                    "Так как ваше нарушение не относится к категории строгих, вы можете воспользоваться правом на **«Второй шанс»** — оплатить штраф за срыв прошлой верификации или поведение, после чего процесс получения VIP-статуса начнется заново."
+                    "Вы заблокированы в сети за блокировку одного из наших премиум-ботов или затягивание времени.\n"
+                    f"📌 **Причина:** _{reason_text}_\n\n"
+                    "Вы можете воспользоваться правом на **«Второй шанс»** — оплатить штраф, после чего процесс получения VIP-статуса начнется заново."
                 )
             else:
+                markup.add(types.InlineKeyboardButton("🆘 Служба Поддержки", url="https://t.me/FAQMKBOT"))
                 text = (
-                    "🚫 **Доступ закрыт.**\n"
-                    "Вы находитесь в черном списке нашей сети за грубое нарушение правил.\n"
-                    "Апелляция и снятие ограничений возможны только через Службу Поддержки."
+                    "🚫 **ДОСТУП ЗАПРЕЩЕН**\n"
+                    "Вы находитесь в глобальном черном списке нашей сети.\n"
+                    f"📌 **Причина блокировки:** _{reason_text}_\n\n"
+                    "Апелляция и снятие ограничений (в том числе по просроченной верификации) возможны только через Службу Поддержки."
                 )
 
             bot.send_message(message.chat.id, text, reply_markup=markup, parse_mode="Markdown")

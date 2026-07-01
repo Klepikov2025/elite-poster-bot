@@ -129,6 +129,7 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
         if not prices:
             prices = {
                 "vip_price": 250,
+                "beyond_price": 250, # <--- ДОБАВИЛИ ЦЕНУ BEYOND
                 "reg_small_1": 105, "reg_small_7": 490, "reg_small_15": 720, "reg_small_30": 938,
                 "reg_big_1": 105, "reg_big_7": 656, "reg_big_15": 1288, "reg_big_30": 1563,
                 "vip_big_chat_1": 1095, "vip_big_chat_7": 7656
@@ -144,6 +145,7 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             {"_id": "skynet_pricing"},
             {"$set": {
                 "vip_price": int(data.get("vip_price", 250)),
+                "beyond_price": int(data.get("beyond_price", 250)), # <--- ДОБАВИЛИ СОХРАНЕНИЕ
                 "reg_small_1": int(data.get("reg_small_1", 105)),
                 "reg_small_7": int(data.get("reg_small_7", 490)),
                 "reg_small_15": int(data.get("reg_small_15", 720)),
@@ -157,5 +159,5 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             }},
             upsert=True
         )
-        add_radar_log("💰 Сетка тарифов (VIP и Реклама) изменена администратором")
+        add_radar_log("💰 Сетка тарифов (VIP, BEYOND и Реклама) изменена администратором")
         return jsonify({"success": True, "message": "Финансовая матрица успешно обновлена!"})

@@ -645,6 +645,14 @@
                     <label style="font-size: 11px; color: #888;">Цена (звёзды ⭐️):</label>
                     <input type="number" id="price-vip" class="search-input" style="width: 100%; padding: 6px; margin-top: 5px; box-sizing: border-box;">
                 </div>
+                
+                <!-- 👇 НОВЫЙ БЛОК ДЛЯ ЦЕНЫ BEYOND 👇 -->
+                <div style="border: 1px solid #f6a5c0; padding: 12px; border-radius: 8px; background: rgba(246, 165, 192, 0.02);">
+                    <h4 style="color: #f6a5c0; margin-top: 0; margin-bottom: 10px;">🏳️‍🌈 BEYOND-Доступ</h4>
+                    <label style="font-size: 11px; color: #888;">Цена (звёзды ⭐️):</label>
+                    <input type="number" id="price-beyond" class="search-input" style="width: 100%; padding: 6px; margin-top: 5px; box-sizing: border-box;">
+                </div>
+                <!-- 👆 ======================= 👆 -->
                 <div style="border: 1px solid #bb86fc; padding: 12px; border-radius: 8px; background: rgba(187,134,252,0.02);">
                     <h4 style="color: #bb86fc; margin-top: 0; margin-bottom: 10px;">🧩 Чаты &lt; 1000 юзеров</h4>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
@@ -1484,6 +1492,19 @@ function previewBroadcast() {
                     </div>
                     
                     <div style="display: flex; justify-content: space-between; margin-bottom: 5px; background: rgba(255, 235, 59, 0.1); padding: 3px 5px; border-radius: 4px;">
+                        <span>⏳ В воронке VIP:</span> <b style="color:#ffeb3b;">${data.in_verification + data.pending_vip}</b>
+                    </div>
+                    
+                    <!-- 👇 ДОБАВИЛИ ВОРОНКУ BEYOND 👇 -->
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px; background: rgba(246, 165, 192, 0.1); padding: 3px 5px; border-radius: 4px;">
+                        <span>🏳️‍🌈 В воронке BEYOND:</span> <b style="color:#f6a5c0;">${data.beyond_verification}</b>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>🔨 В Черном списке:</span> <b style="color:#cf6679;">${data.banned}</b></div>
+                    
+                    <hr style="border-color: #333; margin: 10px 0;">
+                    
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px; background: rgba(255, 235, 59, 0.1); padding: 3px 5px; border-radius: 4px;">
                         <span>⏳ В воронке верификации:</span> <b style="color:#ffeb3b;">${data.in_verification + data.pending_vip}</b>
                     </div>
                     
@@ -2305,6 +2326,7 @@ function loadRootRevenue(pin, period = 'week') {
             .then(res => res.json())
             .then(data => {
                 document.getElementById('price-vip').value = data.vip_price || 250;
+                document.getElementById('price-beyond').value = data.beyond_price || 250; // <--- ДОБАВЛЕНО
                 document.getElementById('price-sm-1').value = data.reg_small_1 || 105;
                 document.getElementById('price-sm-7').value = data.reg_small_7 || 490;
                 document.getElementById('price-sm-15').value = data.reg_small_15 || 720;
@@ -2323,6 +2345,7 @@ function loadRootRevenue(pin, period = 'week') {
         function saveNetworkPrices() {
             const payload = {
                 vip_price: parseInt(document.getElementById('price-vip').value),
+                beyond_price: parseInt(document.getElementById('price-beyond').value), // <--- ДОБАВЛЕНО
                 reg_small_1: parseInt(document.getElementById('price-sm-1').value),
                 reg_small_7: parseInt(document.getElementById('price-sm-7').value),
                 reg_small_15: parseInt(document.getElementById('price-sm-15').value),

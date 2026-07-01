@@ -1009,6 +1009,26 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                 bot.send_message(uid, f"🎉 **Крипто-оплата успешно получена!**\n👉 [ВХОД В VIP-КЛУБ]({invite.invite_link})", parse_mode="Markdown", disable_web_page_preview=True)
             except: pass
 
+        # 🏳️‍🌈 1.5. ОПЛАТА BEYOND КЛУБА
+        elif payload_str.startswith("beyond_"):
+            uid = int(payload_str.replace("beyond_", ""))
+            db['beyond_funnel'].delete_one({"_id": uid})
+            
+            # Выдаем права
+            users_collection.update_one({"_id": uid}, {"$set": {"is_queer": True, "custom_tag": "𝐐𝐔𝐄𝐄𝐑 ♛"}, "$unset": {"shame_tag": ""}}, upsert=True)
+            
+            # Приказ Скайнету на амнистию
+            import time
+            db['skynet_tasks'].insert_one({"uid": uid, "action": "full_unban", "timestamp": time.time()})
+            
+            try: 
+                bot.send_message(STAFF_GROUP_ID, f"🏳️‍🌈 **ОПЛАТА BEYOND (КРИПТА)!**\nЮзер: `{uid}`\nСумма: {amount_rub} руб.")
+                from config import BEYOND_CHAT_ID # Подтягиваем ID чата
+                invite = bot.create_chat_invite_link(BEYOND_CHAT_ID, member_limit=1)
+                
+                bot.send_message(uid, f"🎉 **Крипто-оплата BEYOND успешно получена!**\n\nСкайнет снимает ограничения.\n👉 [ВХОД В BEYOND]({invite.invite_link})", parse_mode="Markdown", disable_web_page_preview=True)
+            except: pass
+
         # 🚨 2. ОПЛАТА ШТРАФА (АМНИСТИЯ)
         elif payload_str.startswith("fine_"):
             uid = int(payload_str.replace("fine_", ""))

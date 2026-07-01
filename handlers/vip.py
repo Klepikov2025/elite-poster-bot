@@ -485,7 +485,10 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
             bot.send_message(call.message.chat.id, f"❌ Вы отклонили заявку {user_id}.")
             db['vip_funnel'].delete_one({"_id": user_id})
             
-            # 👇 НОВЫЙ ТЕКСТ ОТКАЗА 👇
+            # 🔥 Если юзер был на "втором шансе", возвращаем его в ЧС 🔥
+            users_collection.update_one({"_id": user_id}, {"$unset": {"fine_paid_pending_vip": ""}})
+            banned_collection.update_one({"_id": user_id}, {"$set": {"reason": "Повторный отказ после оплаты штрафа"}}, upsert=True)
+            
             reject_text = (
                 "❌ **К сожалению, ваша заявка отклонена из-за нарушений.**\n\n"
                 "Уточнить причину ограничений можно у операторов в поддержке: @FAQMKBOT"
@@ -721,12 +724,11 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
         if payload.startswith("second_chance_payment_"):
             db['daily_revenue'].insert_one({"type": "fine", "amount": amount, "timestamp": time.time(), "date": datetime.now().strftime("%d.%m.%Y")})
             
-            # 1. Снимаем бан
+            # 1. Снимаем бан ТОЛЬКО В БАЗЕ (Физически в чатах он еще в бане!)
             banned_collection.delete_one({"_id": new_user_id})
-            try: unban_user_everywhere(new_user_id)
-            except: pass
-            users_collection.update_one({"_id": new_user_id}, {"$unset": {"shame_tag": ""}})
-            archive_collection.update_one({"target": str(new_user_id)}, {"$unset": {"banned_in_support": "", "strikes": ""}})
+            
+            # 🔥 ВАЖНО: Даем иммунитет от бота, но не пускаем в чаты! 🔥
+            users_collection.update_one({"_id": new_user_id}, {"$set": {"fine_paid_pending_vip": True}})
             
             # 2. Запускаем верификацию! (Эмитируем нажатие кнопки)
             db['vip_funnel'].update_one(
@@ -736,7 +738,7 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
             )
             
             instruction_text = (
-                f"✅ **Оплата штрафа получена! Блокировка снята.**\n\n"
+                f"✅ **Оплата штрафа получена!**\n\n"
                 f"Теперь мы можем начать процесс верификации с чистого листа. Запишите видеосообщение (кружок) с лицом и скажите в нем:\n\n"
                 "💬 *«Привет админам вип-чата, сегодня [назовите дату], на часах [назовите время], хочу стать вип-участником»*\n\n"
                 "Просто отправьте кружок сюда и ожидайте ответа."
