@@ -154,6 +154,9 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
 
         # === ВОРОНКА ВЕРИФИКАЦИИ ===
         in_verification = db['vip_funnel'].count_documents({})
+        
+        # 👇 ДОБАВЬ ВОТ ЭТУ СТРОЧКУ 👇
+        beyond_verification = db['beyond_funnel'].count_documents({})
 
         # === УМНАЯ КЛАССИФИКАЦИЯ ОБЫЧНЫХ ПОЛЬЗОВАТЕЛЕЙ ===
         # Активные (у кого бот определил город или кто нажимал на кнопки создания рекламы/саппорта)
@@ -211,6 +214,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             "verified": verified_only,
             "banned": banned,
             "in_verification": in_verification,
+            "beyond_verification": beyond_verification, # <--- ДОБАВЬ ЭТО!
             "active_regular": active_regular,
             "just_viewed": just_viewed,
             "ghosts": real_ghosts,
