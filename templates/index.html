@@ -1495,17 +1495,8 @@ function previewBroadcast() {
                         <span>⏳ В воронке VIP:</span> <b style="color:#ffeb3b;">${data.in_verification + data.pending_vip}</b>
                     </div>
                     
-                    <!-- 👇 ДОБАВИЛИ ВОРОНКУ BEYOND 👇 -->
                     <div style="display: flex; justify-content: space-between; margin-bottom: 5px; background: rgba(246, 165, 192, 0.1); padding: 3px 5px; border-radius: 4px;">
-                        <span>🏳️‍🌈 В воронке BEYOND:</span> <b style="color:#f6a5c0;">${data.beyond_verification}</b>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>🔨 В Черном списке:</span> <b style="color:#cf6679;">${data.banned}</b></div>
-                    
-                    <hr style="border-color: #333; margin: 10px 0;">
-                    
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px; background: rgba(255, 235, 59, 0.1); padding: 3px 5px; border-radius: 4px;">
-                        <span>⏳ В воронке верификации:</span> <b style="color:#ffeb3b;">${data.in_verification + data.pending_vip}</b>
+                        <span>🏳️‍🌈 В воронке BEYOND:</span> <b style="color:#f6a5c0;">${data.beyond_verification || 0}</b>
                     </div>
                     
                     <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>🔨 В Черном списке:</span> <b style="color:#cf6679;">${data.banned}</b></div>
