@@ -1273,12 +1273,15 @@ def skynet_listener():
                             is_guilty = ai_context_checker(trigger_text, zone="yellow")
 
                     if is_guilty:
+                        # 👇 БЕРЕМ ИМЯ ИЗ ПРИКАЗА (иначе дефолт шпиона) 👇
+                        task_admin_name = task.get('admin_name', "Андрюшенька (Спецагент Шпион) 🕵️‍♂️")
+                        
                         # ИИ подтвердил вину -> Наказываем!
                         if task['action'] == "global_ban":
                             ban_user_everywhere(
                                 target_id=int(task['uid']), 
                                 reason=reason, 
-                                admin_name="Андрюшенька (Спецагент Шпион) 🕵️‍♂️", 
+                                admin_name=task_admin_name, 
                                 trigger_text=trigger_text, 
                                 origin_chat=escape_md(task.get('origin_chat', ''))
                             )
@@ -1286,7 +1289,7 @@ def skynet_listener():
                             mute_user_everywhere(
                                 target_id=int(task['uid']), 
                                 reason=reason, 
-                                admin_name="Андрюшенька (Спецагент Шпион) 🕵️‍♂️",  
+                                admin_name=task_admin_name,  
                                 trigger_text=trigger_text, 
                                 origin_chat=escape_md(task.get('origin_chat', ''))
                             )
