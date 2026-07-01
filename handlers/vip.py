@@ -451,7 +451,7 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
                 if points_balance >= cost_points:
                     markup.add(types.InlineKeyboardButton(f"🎰 Оплатить очками ({cost_points} очк.)", callback_data=f"vip_eco_pts_{cost_points}_{current_vip_price}"))
                 elif points_balance > 0:
-    markup.add(types.InlineKeyboardButton(f"🎰 Очков не хватает (Твои: {points_balance})", callback_data="btn_game_club"))
+                    markup.add(types.InlineKeyboardButton(f"🎰 Очков не хватает (Твои: {points_balance})", callback_data="btn_game_club"))
                 # 👆 =================================== 👆
 
                 bot.send_message(
