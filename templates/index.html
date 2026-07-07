@@ -979,6 +979,17 @@
             </div>
             <div id="infra-enemies-list" style="display: flex; flex-wrap: wrap; gap: 10px; min-height: 40px;"></div>
         </div>
+<div class="panel-block" style="max-width: 1000px; margin-top: 20px; border-left: 4px solid #ff4d4d; background: rgba(255, 77, 77, 0.05);">
+            <h3 style="color: #ff4d4d; margin-top: 0;">💀 Вражеские чаты РО (Русская Община)</h3>
+            <p style="font-size: 12px; color: #aaa;">Вставьте список ID чатов или юзернеймов конкурентов (в столбик, через запятую или пробел). <b>Можно вставить хоть 500 штук за раз.</b> Андрюшенька будет отправлять в пермач любого, кто там напишет.</p>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <textarea id="new-ro-enemy-id" placeholder="-100123456789&#10;@ro_region&#10;-100987654321" class="form-control" style="flex: 1; height: 60px; background: #111; color: #fff; border: 1px solid #ff4d4d; padding: 8px; border-radius: 4px; resize: vertical;"></textarea>
+                <button onclick="addInfraROEnemy()" class="btn" style="background: #ff4d4d; color: #fff; font-weight: bold; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer;">🔥 Навести ракеты</button>
+            </div>
+            
+            <div id="infra-ro-enemies-list" style="display: flex; flex-wrap: wrap; gap: 10px; min-height: 40px; max-height: 350px; overflow-y: auto; padding-right: 5px;"></div>
+        </div>
 
         
 <div style="display: flex; gap: 15px; margin-top: 20px;">
@@ -2592,6 +2603,7 @@ function scanNetworks(uid) {
 
                 renderInfraChats();
                 renderInfraEnemies();
+                renderInfraROEnemies(); // <--- 🔥 ДОБАВИЛИ СЮДА
                 startAutoPing(); // Запускаем пинг чатов
             });
         }
@@ -2642,10 +2654,12 @@ function scanNetworks(uid) {
             if(pingInterval) clearInterval(pingInterval);
             pingNetworks(); // <-- При открытии вкладки пингуем 1 раз
             renderInfraEnemies(); 
+            renderInfraROEnemies(); // <--- 🔥 ДОБАВИЛИ СЮДА
+            
             pingInterval = setInterval(() => {
                 if(document.getElementById('tab-infrastructure').classList.contains('active')) {
-                    // pingNetworks(); <--- ЭТУ СТРОЧКУ МЫ УДАЛИЛИ!
                     renderInfraEnemies(); // А шпион пусть обновляется, он БД не грузит
+                    renderInfraROEnemies(); // <--- 🔥 И ДОБАВИЛИ СЮДА
                 }
             }, 25000);
         }
@@ -2770,6 +2784,68 @@ function scanNetworks(uid) {
         // Запускаем проверку пульса
         checkBotStatuses();
         setInterval(checkBotStatuses, 30000);
+
+// 👇 КРАСИВЫЕ КАРТОЧКИ ЦЕЛЕЙ РУССКОЙ ОБЩИНЫ (РО) 👇
+        function renderInfraROEnemies() {
+            fetch('/glaz/api/spy_ro')
+            .then(res => res.json())
+            .then(chats => {
+                const container = document.getElementById('infra-ro-enemies-list');
+                let html = '';
+                chats.forEach(chat => {
+                    const chatStr = typeof chat.id === 'string' ? chat.id.replace(/'/g, "\\'") : chat.id;
+                    let color = chat.status.includes('🟢') ? '#03dac6' : (chat.status.includes('🔴') ? '#cf6679' : '#ffb74d');
+                    
+                    html += `<div style="background: #252525; border: 1px solid ${color}; border-top: 3px solid #ff4d4d; padding: 10px 15px; border-radius: 8px; font-size: 13px; display: flex; flex-direction: column; gap: 6px; min-width: 220px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <strong style="color: #ff4d4d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;" title="${chat.title}">💀 ${chat.title}</strong>
+                            <span onclick="removeInfraROEnemy('${chatStr}')" style="cursor: pointer; color: #cf6679; font-weight: bold; font-size: 14px;">✖</span>
+                        </div>
+                        <div style="font-size: 11px; color: #888;">ID: <code>${chat.id}</code></div>
+                        <div style="font-size: 11px; color: ${color}; font-weight: bold;">${chat.status}</div>
+                    </div>`;
+                });
+                if(html === '') html = '<span style="color: #666; font-size: 12px;">База целей РО пуста...</span>';
+                container.innerHTML = html;
+            });
+        }
+
+        // Массовый парсер для загрузки 200+ чатов
+        function addInfraROEnemy() {
+            const val = document.getElementById('new-ro-enemy-id').value.trim();
+            if(!val) return;
+            
+            // Разбиваем текст по запятой, пробелу или переносу строки (очищаем от мусора)
+            const chats = val.split(/[\n, ]+/).map(c => c.trim()).filter(c => c);
+            if(chats.length === 0) return;
+            
+            document.getElementById('new-ro-enemy-id').value = '⏳ Идёт наведение ракет...';
+            
+            fetch('/glaz/api/spy_ro/add_mass', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({chats: chats})
+            }).then(res => res.json()).then(data => {
+                if(data.success) {
+                    document.getElementById('new-ro-enemy-id').value = '';
+                    renderInfraROEnemies(); 
+                    showToast(`💀 База обновлена! Успешно загружено целей: ${data.added}`);
+                }
+            });
+        }
+
+        function removeInfraROEnemy(chatStr) {
+            fetch('/glaz/api/spy_ro/del', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({chat: chatStr})
+            }).then(res => res.json()).then(data => {
+                if(data.success) {
+                    renderInfraROEnemies();
+                    showToast("🗑 Цель РО удалена!");
+                }
+            });
+        }
 
     </script>
 </body>
