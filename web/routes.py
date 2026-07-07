@@ -1553,3 +1553,59 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         db['paid_users'].update_one({"uid": uid}, {"$set": {"active_chats": active_chats}}, upsert=True)
         
         return jsonify({"chats": active_chats})
+
+    # === ПРЯМОЕ УПРАВЛЕНИЕ АНДРЮШЕНЬКОЙ (ЦЕЛИ РО) ===
+    @app.route('/glaz/api/spy_ro', methods=['GET'])
+    def api_get_spy_ro():
+        if not session.get('logged_in'): return jsonify([])
+        doc = db['settings'].find_one({"_id": "spy_settings"}) or {}
+        ro_chats = doc.get("ro_chats", [])
+        
+        # Подтягиваем здоровье из базы Андрюши (как и для обычных)
+        health_data = list(db['spy_health'].find({"chat_id": {"$in": [str(c) for c in ro_chats]}}))
+        health_map = {h["chat_id"]: h for h in health_data}
+        
+        result = []
+        for c in ro_chats:
+            c_str = str(c)
+            h = health_map.get(c_str, {})
+            result.append({
+                "id": c_str,
+                "title": h.get("title", c_str),
+                "status": h.get("status", "🟡 Ждем пинга...")
+            })
+        return jsonify(result)
+
+    @app.route('/glaz/api/spy_ro/add_mass', methods=['POST'])
+    def api_add_spy_ro_mass():
+        if not session.get('logged_in'): return jsonify({"success": False})
+        raw_chats = request.json.get('chats', [])
+        
+        processed_chats = []
+        for chat in raw_chats:
+            try:
+                # Если это чисто цифры или цифры с минусом — сохраняем как число, иначе как текст (юзернейм)
+                if str(chat).lstrip('-').isdigit(): processed_chats.append(int(chat))
+                else: processed_chats.append(str(chat))
+            except: pass
+            
+        if processed_chats:
+            # $addToSet с $each добавляет сразу весь список без дубликатов!
+            db['settings'].update_one(
+                {"_id": "spy_settings"}, 
+                {"$addToSet": {"ro_chats": {"$each": processed_chats}}}, 
+                upsert=True
+            )
+            add_radar_log(f"💀 Массовое добавление целей РО ({len(processed_chats)} шт.)")
+            
+        return jsonify({"success": True, "added": len(processed_chats)})
+
+    @app.route('/glaz/api/spy_ro/del', methods=['POST'])
+    def api_del_spy_ro():
+        if not session.get('logged_in'): return jsonify({"success": False})
+        chat = request.json.get('chat')
+        try:
+            if str(chat).lstrip('-').isdigit(): chat = int(chat)
+        except: pass
+        db['settings'].update_one({"_id": "spy_settings"}, {"$pull": {"ro_chats": chat}})
+        return jsonify({"success": True})
