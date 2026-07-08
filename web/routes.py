@@ -1670,21 +1670,29 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             uid = u.get("uid")
             code = u.get("secret_code", "Нет кода")
             failed = u.get("failed_verification", False)
-            last_activity = u.get("last_activity", now)
+            last_activity = u.get("last_activity") or u.get("verif_timer", now)
             verif_timer = u.get("verif_timer")
             
-            # Если таймер активен (5 минут на видео)
+            # --- 👇 ИСПРАВЛЕННАЯ ЛОГИКА ТАЙМЕРОВ 👇 ---
             if verif_timer and not failed:
                 diff = (now - verif_timer).total_seconds()
-                sec_left = int(300 - diff)
-                phase = "video"
+                sec_left = int(300 - diff) # 300 секунд = 5 минут
+                
+                if sec_left <= 0:
+                    # Магия: 5 минут вышли! Переводим визуально в фазу ликвидации
+                    phase = "death"
+                    # Отсчитываем 24 часа. 86400 (24ч) + 300 (5м) = 86700
+                    sec_left = int(86700 - diff) 
+                else:
+                    phase = "video"
             else:
                 # Если провалил (24 часа до ликвидации Санитаром Архивов)
                 diff = (now - last_activity).total_seconds()
                 sec_left = int(86400 - diff)
                 phase = "death"
                 
-            if sec_left < 0: sec_left = 0
+            if sec_left < 0: 
+                sec_left = 0
             
             result.append({
                 "id": uid,
