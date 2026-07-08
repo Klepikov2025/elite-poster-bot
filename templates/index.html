@@ -858,14 +858,16 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <!-- ЛЕВАЯ КОЛОНКА: ТЕГИ -->
                 <div style="background: #1a1a1a; padding: 20px; border-radius: 10px; border: 1px solid #bb86fc;">
-                    <h3 style="color: #bb86fc; margin-top: 0;">🏷 Заявки на личные теги</h3>
+<h3 style="color: #bb86fc; margin-top: 0;">🏷 Заявки на личные теги</h3>
                     <p style="color: #aaa; font-size: 12px; margin-bottom: 15px;">Одобряйте или отклоняйте статусы. Бот сам уведомит пользователя.</p>
                     
                     <div style="display: flex; flex-direction: column; gap: 10px;">
                         {% for tag in tags %}
                         <div style="background: #252525; padding: 15px; border-radius: 8px; border-left: 4px solid #bb86fc; display: flex; justify-content: space-between; align-items: center;">
                             <div>
-                                <div style="color: #fff; font-weight: bold; font-size: 15px; margin-bottom: 5px;">{{ tag.tag }}</div>
+                                <div style="color: #fff; font-weight: bold; font-size: 15px; margin-bottom: 5px;">
+                                    Желаемый тег: <span style="background: #bb86fc; color: #121212; padding: 2px 6px; border-radius: 4px; font-family: monospace;">{{ tag.tag }}</span>
+                                </div>
                                 <div style="color: #aaa; font-size: 11px;">Юзер: {{ tag.name }} (<code>{{ tag.uid }}</code>)</div>
                             </div>
                             <div style="display: flex; gap: 5px;">
