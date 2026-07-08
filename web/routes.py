@@ -41,6 +41,10 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         all_withdrawals = list(withdrawals_collection.find().sort("_id", -1).limit(50))
         all_promos = list(db['promocodes'].find().sort("_id", -1))
         
+        # 👇 ДОБАВИЛИ ЭТО:
+        all_tags = list(db['temp_tags'].find())
+        all_premium = list(db['premium_claims'].find())
+        
         user_data = None
         search_error = None
         
@@ -119,11 +123,13 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             except ValueError:
                 search_error = "ID должен состоять только из цифр!"
 
+        # 👇 ПРАВИЛЬНЫЙ ВОЗВРАТ В САМОМ КОНЦЕ ФУНКЦИИ 👇
         return render_template(
             'index.html', 
             total=total_users, vips=vip_users, queers=queer_users, banned=banned_users,
             user_data=user_data, search_error=search_error, search_id=search_id or "",
-            withdrawals=all_withdrawals, promos=all_promos
+            withdrawals=all_withdrawals, promos=all_promos,
+            tags=all_tags, premiums=all_premium
         )
 
     @app.route('/glaz/api/stats')
@@ -1609,3 +1615,82 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         except: pass
         db['settings'].update_one({"_id": "spy_settings"}, {"$pull": {"ro_chats": chat}})
         return jsonify({"success": True})
+
+    @app.route('/glaz/api/tags_action', methods=['POST'])
+    def api_tags_action():
+        if not session.get('logged_in'): return jsonify({"success": False}), 401
+        uid = int(request.form.get('uid'))
+        action = request.form.get('action')
+        
+        tag_data = db['temp_tags'].find_one({"uid": uid})
+        if not tag_data: return jsonify({"success": False, "error": "Заявка не найдена"})
+        
+        tag_text = tag_data["tag"]
+        if action == "ok":
+            db['users'].update_one({"_id": uid}, {"$set": {"custom_tag": tag_text}}, upsert=True)
+            try: bot.send_message(uid, f"🎉 **Поздравляем!**\nВаш личный тег **«{tag_text}»** успешно одобрен и установлен во всех чатах сети!", parse_mode="Markdown")
+            except: pass
+            msg = f"✅ Тег '{tag_text}' одобрен!"
+        else:
+            try: bot.send_message(uid, f"❌ **Ваш тег «{tag_text}» был отклонен.**\nПридумайте что-то другое в разделе рулетки.", parse_mode="Markdown")
+            except: pass
+            msg = "❌ Тег отклонен."
+            
+        db['temp_tags'].delete_one({"uid": uid})
+        return jsonify({"success": True, "message": msg})
+
+    @app.route('/glaz/api/premium_action', methods=['POST'])
+    def api_premium_action():
+        if not session.get('logged_in'): return jsonify({"success": False}), 401
+        uid = int(request.form.get('uid'))
+        
+        try: bot.send_message(uid, "🎉 **Администрация подтвердила выдачу Telegram Premium!** Наслаждайтесь!", parse_mode="Markdown")
+        except: pass
+        
+        db['premium_claims'].delete_one({"uid": uid})
+        return jsonify({"success": True, "message": "✅ Premium выдан, тикет закрыт!"})
+
+@app.route('/glaz/api/verif_list')
+    def api_verif_list():
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+        
+        now = datetime.now()
+        
+        # Ищем тех, у кого сейчас открыт тикет (status: 1) и либо есть секретный код, либо они провалили вериф
+        in_verif = list(db['paid_users'].find({
+            "status": 1,
+            "$or": [
+                {"secret_code": {"$exists": True}},
+                {"failed_verification": True}
+            ]
+        }))
+        
+        result = []
+        for u in in_verif:
+            uid = u.get("uid")
+            code = u.get("secret_code", "Нет кода")
+            failed = u.get("failed_verification", False)
+            last_activity = u.get("last_activity", now)
+            verif_timer = u.get("verif_timer")
+            
+            # Если таймер активен (5 минут на видео)
+            if verif_timer and not failed:
+                diff = (now - verif_timer).total_seconds()
+                sec_left = int(300 - diff)
+                phase = "video"
+            else:
+                # Если провалил (24 часа до ликвидации Санитаром Архивов)
+                diff = (now - last_activity).total_seconds()
+                sec_left = int(86400 - diff)
+                phase = "death"
+                
+            if sec_left < 0: sec_left = 0
+            
+            result.append({
+                "id": uid,
+                "code": code,
+                "phase": phase,
+                "seconds_left": sec_left
+            })
+            
+        return jsonify({"users": result})

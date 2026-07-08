@@ -80,7 +80,7 @@
         .radar-box { background-color: #000; border: 1px solid #333; padding: 15px; border-radius: 5px; height: 300px; overflow-y: auto; font-family: monospace; color: #0f0; font-size: 14px; box-shadow: inset 0 0 10px rgba(0,255,0,0.1); }
         .radar-line { margin: 5px 0; border-bottom: 1px dashed #111; padding-bottom: 2px; }
 
-        .chat-app { display: flex; gap: 15px; height: 500px; }
+        .chat-app { display: flex; gap: 15px; height: 750px; }
         .chat-sidebar { width: 300px; background: #1e1e1e; border-radius: 10px; border: 1px solid #333; overflow-y: auto; display: flex; flex-direction: column; }
         .session-item { padding: 15px; border-bottom: 1px solid #333; cursor: pointer; transition: 0.2s; }
         .session-item:hover { background: #2d2d2d; }
@@ -195,12 +195,14 @@
         <button class="tab-btn" onclick="openTab('tab-support')" style="color: #03dac6; border-color: #03dac6; font-weight: bold;">📩 Входящие <span id="ticket-badge" style="display:none; background:#cf6679; color:#fff; border-radius:50%; padding:2px 6px; font-size:10px; margin-left:5px;">0</span></button>
         <button class="tab-btn" onclick="openTab('tab-blackbox')" style="color: #03dac6; border-color: #03dac6;">🕵️‍♂️ Чёрный Ящик</button>
         <button class="tab-btn" onclick="openTab('tab-quarantine')" style="color: #ffb74d;">🥷 Карантин</button>
+        <!-- 👇 НОВАЯ КНОПКА 👇 -->
+        <button class="tab-btn" onclick="openTab('tab-verif')" style="color: #ffeb3b; border-color: #ffeb3b; font-weight: bold;">🎥 Live-Вериф</button>
         <button class="tab-btn" onclick="openTab('tab-broadcast')" style="color: #bb86fc;">🚀 Рассылка</button>
         <button class="tab-btn" onclick="openTab('tab-mass')" style="color: #cf6679;">💥 Репрессии</button>
         <button class="tab-btn" onclick="openTab('tab-system')">⚙️ Система</button>
         <button class="tab-btn" onclick="openTab('ads-tab')">📊 Биржа рекламы</button>
         <button class="tab-btn" onclick="openTab('tab-infrastructure')" style="color: #4caf50; font-weight: bold;">🗺 Инфраструктура</button>
-        <button class="tab-btn" onclick="openTab('tab-withdrawals')">💸 Выводы</button>
+        <button class="tab-btn" onclick="openTab('tab-withdrawals')">🎁 Касса и Награды</button>
         <button class="tab-btn" onclick="openTab('tab-promos')">🎫 Скидки</button>
     </div>
   
@@ -431,7 +433,7 @@
     </div>
 
     <div id="tab-support" class="tab-content">
-        <div class="panel-block" style="max-width: 1000px; padding: 0; background: transparent; box-shadow: none;">
+        <div class="panel-block" style="max-width: 1200px; padding: 0; background: transparent; box-shadow: none;">
             <div class="chat-app">
                 <div class="chat-sidebar" style="width: 350px;">
                     <div style="padding: 15px; background: #252525; border-bottom: 1px solid #333; font-weight: bold; color: #03dac6; text-align: center;">
@@ -451,7 +453,7 @@
                 
                 <div class="chat-main">
                     <div class="chat-header" id="ticket-header">Выберите сообщение из списка слева</div>
-                    <div class="chat-messages" id="ticket-box" style="height: 300px; padding: 20px;">
+                    <div class="chat-messages" id="ticket-box" style="padding: 20px;">
                         <div style="color: #888; text-align: center; margin-top: 40px;">Здесь появится текст вопроса.</div>
                     </div>
                     <div style="padding: 15px; background: #1e1e1e; border-top: 1px solid #333; border-radius: 0 0 10px 10px;">
@@ -491,6 +493,22 @@
             </table>
         </div>
     </div>
+
+<!-- 👇 ОТДЕЛЬНАЯ ВКЛАДКА LIVE-ВЕРИФИКАЦИИ 👇 -->
+    <div id="tab-verif" class="tab-content">
+        <div class="panel-block" style="max-width: 1000px; border-left: 4px solid #ffeb3b; box-shadow: 0 0 15px rgba(255, 235, 59, 0.1);">
+            <h3 style="color: #ffeb3b; margin-top: 0;">🎥 Шоу на выживание (Live Верификация)</h3>
+            <p style="color: #aaa; margin-bottom: 15px;">Кандидаты, которые прямо сейчас записывают кружок (5 мин) или ожидают прихода Санитара Архивов за игнор (24 ч).</p>
+            
+            <button class="form-btn" style="margin-bottom: 15px; background: #2d2d2d; color: #fff; border: 1px solid #444;" onclick="loadVerifList()">🔄 Обновить список</button>
+            
+            <table class="admin-table">
+                <thead><tr><th>Telegram ID</th><th>Секретный Код</th><th>Статус / Таймер</th><th>Действие</th></tr></thead>
+                <tbody id="verif-tbody"><tr><td colspan="4" style="text-align: center; color: #888;">Никто не проходит верификацию...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+    <!-- 👆 =================================== 👆 -->
 
     <div id="tab-broadcast" class="tab-content">
         <div class="panel-block" style="max-width: 1000px;">
@@ -835,20 +853,84 @@
             <button class="form-btn" style="background: #bb86fc; color: #121212; width: 100%; font-weight: bold; font-size: 16px;" onclick="saveSystemTexts()">💾 Сохранить тексты в сеть</button>
         </div>
         </div> <div id="tab-withdrawals" class="tab-content">
-        <div class="panel-block" style="max-width: 900px;">
-            <h3>💸 Очередь финансовых выплат</h3>
-            <table class="admin-table">
-                <thead><tr><th>ID</th><th>User</th><th>Сумма</th><th>Реквизиты</th><th>Статус</th><th>Действие</th></tr></thead>
-                <tbody>
-                    {% for wd in withdrawals %}
-                    <tr>
-                        <td><code>{{ wd._id }}</code></td><td><code>{{ wd.user_id }}</code></td><td>⭐️ {{ wd.amount }}</td><td><code>{{ wd.details }}</code></td>
-                        <td>{% if wd.status == 'pending' %}<span class="status-pending">Ожидает</span>{% elif wd.status == 'paid' %}<span class="status-paid">Выплачено</span>{% else %}<span class="status-rejected">Отклонено</span>{% endif %}</td>
-                        <td>{% if wd.status == 'pending' %}<div style="display:flex; gap:5px;"><form action="/glaz/withdrawal_action" method="POST"><input type="hidden" name="wd_id" value="{{ wd._id }}"><input type="hidden" name="action" value="pay"><button type="submit" class="act-btn unban" style="padding: 5px 10px; font-size:11px;">💵 Да</button></form><form action="/glaz/withdrawal_action" method="POST"><input type="hidden" name="wd_id" value="{{ wd._id }}"><input type="hidden" name="action" value="reject"><button type="submit" class="act-btn ban" style="padding: 5px 10px; font-size:11px;">❌ Нет</button></form></div>{% else %}-{% endif %}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="panel-block" style="max-width: 1200px; background: transparent; padding: 0; box-shadow: none;">
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <!-- ЛЕВАЯ КОЛОНКА: ТЕГИ -->
+                <div style="background: #1a1a1a; padding: 20px; border-radius: 10px; border: 1px solid #bb86fc;">
+                    <h3 style="color: #bb86fc; margin-top: 0;">🏷 Заявки на личные теги</h3>
+                    <p style="color: #aaa; font-size: 12px; margin-bottom: 15px;">Одобряйте или отклоняйте статусы. Бот сам уведомит пользователя.</p>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        {% for tag in tags %}
+                        <div style="background: #252525; padding: 15px; border-radius: 8px; border-left: 4px solid #bb86fc; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="color: #fff; font-weight: bold; font-size: 15px; margin-bottom: 5px;">{{ tag.tag }}</div>
+                                <div style="color: #aaa; font-size: 11px;">Юзер: {{ tag.name }} (<code>{{ tag.uid }}</code>)</div>
+                            </div>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="act-btn unban" style="padding: 6px 12px; width: auto;" onclick="manageTag({{ tag.uid }}, 'ok')">✅</button>
+                                <button class="act-btn ban" style="padding: 6px 12px; width: auto;" onclick="manageTag({{ tag.uid }}, 'rej')">❌</button>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div style="text-align: center; color: #666; padding: 20px;">Новых заявок на теги нет</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- ПРАВАЯ КОЛОНКА: ФИНАНСЫ И ПРЕМИУМ -->
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    
+                    <!-- БЛОК ПРЕМИУМ -->
+                    <div style="background: #1a1a1a; padding: 20px; border-radius: 10px; border: 1px solid #03dac6;">
+                        <h3 style="color: #03dac6; margin-top: 0;">💎 Выдача Telegram Premium</h3>
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            {% for prem in premiums %}
+                            <div style="background: #252525; padding: 15px; border-radius: 8px; border-left: 4px solid #03dac6;">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                                    <span style="color: #fff; font-weight: bold;">{{ prem.name }} {{ prem.username }}</span>
+                                    <button class="act-btn unban" style="padding: 4px 10px; width: auto; font-size: 11px;" onclick="managePremium({{ prem.uid }})">🎁 Выдано</button>
+                                </div>
+                                <div style="color: #03dac6; font-family: monospace; font-size: 13px; background: #111; padding: 8px; border-radius: 5px;">
+                                    Реквизиты: {{ prem.details }}
+                                </div>
+                            </div>
+                            {% else %}
+                            <div style="text-align: center; color: #666; padding: 10px;">Победителей пока нет</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- БЛОК ВЫВОДОВ (СТАРЫЙ) -->
+                    <div style="background: #1a1a1a; padding: 20px; border-radius: 10px; border: 1px solid #4caf50;">
+                        <h3 style="color: #4caf50; margin-top: 0;">💸 Финансовые выплаты</h3>
+                        <table class="admin-table" style="font-size: 12px;">
+                            <thead><tr><th>ID</th><th>Сумма</th><th>Реквизиты</th><th>Действие</th></tr></thead>
+                            <tbody>
+                                {% for wd in withdrawals %}
+                                    {% if wd.status == 'pending' %}
+                                    <tr>
+                                        <td><code>{{ wd.user_id }}</code></td>
+                                        <td><b style="color: #ffb74d;">{{ wd.amount }}⭐️</b></td>
+                                        <td><code>{{ wd.details }}</code></td>
+                                        <td>
+                                            <div style="display:flex; gap:5px;">
+                                                <form action="/glaz/withdrawal_action" method="POST" style="margin:0;"><input type="hidden" name="wd_id" value="{{ wd._id }}"><input type="hidden" name="action" value="pay"><button type="submit" class="act-btn unban" style="padding: 4px 8px; font-size:10px; width: auto;">✅</button></form>
+                                                <form action="/glaz/withdrawal_action" method="POST" style="margin:0;"><input type="hidden" name="wd_id" value="{{ wd._id }}"><input type="hidden" name="action" value="reject"><button type="submit" class="act-btn ban" style="padding: 4px 8px; font-size:10px; width: auto;">❌</button></form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                {% else %}
+                                <tr><td colspan="4" style="text-align: center; color: #666;">Очередь выплат пуста</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1030,6 +1112,7 @@
     // 5. Загружаем данные для конкретной вкладки
     if(tabId === 'tab-blackbox') loadProxySessions();
     if(tabId === 'tab-quarantine') loadQuarantine();
+    if(tabId === 'tab-verif') loadVerifList(); // <--- ДОБАВИТЬ ЭТУ СТРОЧКУ
     if(tabId === 'tab-infrastructure') loadInfrastructure();
     if(tabId === 'ads-tab') loadAds();
     if(tabId === 'tab-system') { 
@@ -1643,7 +1726,11 @@ function previewBroadcast() {
             if(activeProxySession && document.getElementById('tab-blackbox').classList.contains('active')) { 
                 loadProxyChat(activeProxySession); 
             }
-        }, 5000);
+
+            // 👇 ДОБАВЛЯЕМ АВТООБНОВЛЕНИЕ ДЛЯ ШОУ НА ВЫЖИВАНИЕ 👇
+            if(document.getElementById('tab-verif').classList.contains('active')) {
+                loadVerifList();
+            }
 
        // 👇 СКРИПТ ДЛЯ ЛАМПОЧЕК ОНЛАЙН/ОФФЛАЙН 👇
         // 👇 ИСПРАВЛЕННЫЙ ПУЛЬС СИСТЕМ 👇
@@ -2843,6 +2930,93 @@ function scanNetworks(uid) {
                 if(data.success) {
                     renderInfraROEnemies();
                     showToast("🗑 Цель РО удалена!");
+                }
+            });
+        }
+
+function manageTag(uid, action) {
+            const formData = new FormData();
+            formData.append('uid', uid);
+            formData.append('action', action);
+            
+            fetch('/glaz/api/tags_action', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    showToast(data.message);
+                    setTimeout(() => window.location.reload(), 1000);
+                } else showToast("❌ Ошибка: " + data.error);
+            });
+        }
+
+        function managePremium(uid) {
+            if(!confirm("Вы уже подарили Premium этому юзеру в Telegram?")) return;
+            
+            const formData = new FormData();
+            formData.append('uid', uid);
+            
+            fetch('/glaz/api/premium_action', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    showToast(data.message);
+                    setTimeout(() => window.location.reload(), 1000);
+                }
+            });
+        }
+
+function loadVerifList() {
+            // Если таблица пустая, пишем загрузку (но не мерцаем, если уже есть данные)
+            if(document.getElementById('verif-tbody').innerHTML.includes('Никто')) {
+                document.getElementById('verif-tbody').innerHTML = '<tr><td colspan="4" style="text-align: center;">Загрузка...</td></tr>';
+            }
+            
+            fetch('/glaz/api/verif_list').then(res => res.json()).then(data => {
+                let html = '';
+                
+                const formatTime = (totalSeconds) => {
+                    const h = Math.floor(totalSeconds / 3600);
+                    const m = Math.floor((totalSeconds % 3600) / 60);
+                    const s = Math.floor(totalSeconds % 60);
+                    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                };
+                
+                data.users.forEach(item => {
+                    let badge = '';
+                    let color = '';
+                    
+                    if(item.phase === 'video') {
+                        badge = '<span style="background: #03dac6; color: #121212; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-right: 5px;">🎥 ПИШЕТ КРУЖОК</span>';
+                        color = '#03dac6';
+                    } else {
+                        badge = '<span style="background: #cf6679; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-right: 5px;">💀 ЖДЕТ ЛИКВИДАЦИИ</span>';
+                        color = '#cf6679';
+                    }
+                    
+                    let initialTimeStr = formatTime(item.seconds_left);
+                    
+                    html += `<tr>
+                        <td><code>${item.id}</code></td>
+                        <td style="color: #ffeb3b; font-weight: bold; font-size: 14px;">${item.code}</td>
+                        <td style="color: ${color}; font-family: monospace; font-size: 13px; font-weight: bold;">
+                            ${badge} ⏱ <span class="q-live-timer" data-sec="${item.seconds_left}">${initialTimeStr}</span>
+                        </td>
+                        <td>
+                            <button class="act-btn ban" style="padding: 4px 8px; font-size: 11px; width: auto;" onclick="fireAction(${item.id}, 'ban')">СНЕСТИ СЕЙЧАС</button>
+                        </td>
+                    </tr>`;
+                });
+                
+                if(data.users.length === 0) {
+                    html = '<tr><td colspan="4" style="text-align: center; color: #888;">Сейчас никто не проходит верификацию...</td></tr>';
+                }
+                
+                document.getElementById('verif-tbody').innerHTML = html;
+                
+                // Перезапускаем живые таймеры для новой таблицы
+                if(data.users.length > 0) {
+                    if(quarantineTimerInterval) clearInterval(quarantineTimerInterval);
+                    startQuarantineLiveTimers();
                 }
             });
         }
