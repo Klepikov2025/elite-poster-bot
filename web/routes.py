@@ -1650,7 +1650,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         db['premium_claims'].delete_one({"uid": uid})
         return jsonify({"success": True, "message": "✅ Premium выдан, тикет закрыт!"})
 
-@app.route('/glaz/api/verif_list')
+    @app.route('/glaz/api/verif_list')
     def api_verif_list():
         if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
         
