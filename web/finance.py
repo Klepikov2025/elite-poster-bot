@@ -1,6 +1,7 @@
 from flask import request, jsonify, session, redirect, url_for
 from database import db, withdrawals_collection, update_user_stats
 import time
+from bson.objectid import ObjectId
 from datetime import datetime
 
 def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
@@ -10,25 +11,34 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
         if not session.get('logged_in'): return redirect(url_for('login'))
         wd_id = request.form.get('wd_id')
         action = request.form.get('action')
-        wd = withdrawals_collection.find_one({"_id": wd_id})
+        
+        # 👇 ПРЕВРАЩАЕМ ТЕКСТ В ОБЪЕКТ MONGODB 👇
+        try:
+            wd_obj_id = ObjectId(wd_id)
+        except:
+            return redirect(url_for('admin_panel')) # Защита от кривых ID
+            
+        wd = withdrawals_collection.find_one({"_id": wd_obj_id}) # Ищем правильно
+        
         if wd and wd.get('status') == 'pending':
             uid = wd['user_id']
             amount = wd['amount']
             
             if action == 'pay':
-                # ❌ УБРАЛИ двойное списание (деньги уже заморожены ботом)
-                withdrawals_collection.update_one({"_id": wd_id}, {"$set": {"status": "paid"}})
+                # Обновляем правильно
+                withdrawals_collection.update_one({"_id": wd_obj_id}, {"$set": {"status": "paid"}})
                 add_radar_log(f"💸 ОПЛАЧЕНА ЗАЯВКА: {wd_id}")
                 try: bot.send_message(uid, f"✅ Ваш запрос на вывод {amount} руб. одобрен! Деньги отправлены.")
                 except: pass
                 
             elif action == 'reject':
-                # ✅ ДОБАВИЛИ возврат средств на баланс при отказе
+                # Возврат баланса и правильное обновление статуса
                 db['paid'].update_one({"uid": uid}, {"$inc": {"cashback_balance": amount}})
-                withdrawals_collection.update_one({"_id": wd_id}, {"$set": {"status": "rejected"}})
+                withdrawals_collection.update_one({"_id": wd_obj_id}, {"$set": {"status": "rejected"}})
                 add_radar_log(f"🚫 ОТКЛОНЕНА ЗАЯВКА: {wd_id}")
                 try: bot.send_message(uid, "❌ Ваш запрос на вывод средств отклонён.")
                 except: pass
+                
         return redirect(url_for('admin_panel'))
 
     @app.route('/glaz/add_promo', methods=['POST'])
