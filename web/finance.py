@@ -12,32 +12,33 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
         wd_id = request.form.get('wd_id')
         action = request.form.get('action')
         
-        # 👇 ПРЕВРАЩАЕМ ТЕКСТ В ОБЪЕКТ MONGODB 👇
         try:
+            from bson.objectid import ObjectId
             wd_obj_id = ObjectId(wd_id)
-        except:
-            return redirect(url_for('admin_panel')) # Защита от кривых ID
+        except: return redirect(url_for('admin_panel'))
             
-        wd = withdrawals_collection.find_one({"_id": wd_obj_id}) # Ищем правильно
+        wd = withdrawals_collection.find_one({"_id": wd_obj_id})
         
         if wd and wd.get('status') == 'pending':
             uid = wd['user_id']
             amount = wd['amount']
             
             if action == 'pay':
-                # Обновляем правильно
-                withdrawals_collection.update_one({"_id": wd_obj_id}, {"$set": {"status": "paid"}})
+                # 👇 Добавили флажок notify_status: "pay" 👇
+                withdrawals_collection.update_one(
+                    {"_id": wd_obj_id}, 
+                    {"$set": {"status": "paid", "notify_status": "pay"}}
+                )
                 add_radar_log(f"💸 ОПЛАЧЕНА ЗАЯВКА: {wd_id}")
-                try: bot.send_message(uid, f"✅ Ваш запрос на вывод {amount} руб. одобрен! Деньги отправлены.")
-                except: pass
                 
             elif action == 'reject':
-                # Возврат баланса и правильное обновление статуса
                 db['paid'].update_one({"uid": uid}, {"$inc": {"cashback_balance": amount}})
-                withdrawals_collection.update_one({"_id": wd_obj_id}, {"$set": {"status": "rejected"}})
+                # 👇 Добавили флажок notify_status: "reject" 👇
+                withdrawals_collection.update_one(
+                    {"_id": wd_obj_id}, 
+                    {"$set": {"status": "rejected", "notify_status": "reject"}}
+                )
                 add_radar_log(f"🚫 ОТКЛОНЕНА ЗАЯВКА: {wd_id}")
-                try: bot.send_message(uid, "❌ Ваш запрос на вывод средств отклонён.")
-                except: pass
                 
         return redirect(url_for('admin_panel'))
 
