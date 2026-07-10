@@ -14,13 +14,17 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
         if wd and wd.get('status') == 'pending':
             uid = wd['user_id']
             amount = wd['amount']
+            
             if action == 'pay':
-                update_user_stats(uid, balance_add=-amount)
+                # ❌ УБРАЛИ двойное списание (деньги уже заморожены ботом)
                 withdrawals_collection.update_one({"_id": wd_id}, {"$set": {"status": "paid"}})
                 add_radar_log(f"💸 ОПЛАЧЕНА ЗАЯВКА: {wd_id}")
-                try: bot.send_message(uid, f"✅ Ваш запрос на вывод {amount}⭐️ одобрен! Деньги отправлены.")
+                try: bot.send_message(uid, f"✅ Ваш запрос на вывод {amount} руб. одобрен! Деньги отправлены.")
                 except: pass
+                
             elif action == 'reject':
+                # ✅ ДОБАВИЛИ возврат средств на баланс при отказе
+                db['paid'].update_one({"uid": uid}, {"$inc": {"cashback_balance": amount}})
                 withdrawals_collection.update_one({"_id": wd_id}, {"$set": {"status": "rejected"}})
                 add_radar_log(f"🚫 ОТКЛОНЕНА ЗАЯВКА: {wd_id}")
                 try: bot.send_message(uid, "❌ Ваш запрос на вывод средств отклонён.")
