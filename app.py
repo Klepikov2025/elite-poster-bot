@@ -590,7 +590,13 @@ def ban_user_everywhere(target_id, reason="Без причины", admin_name="�
     now_str = datetime.now(pytz.timezone('Asia/Yekaterinburg')).strftime("%d.%m.%Y %H:%M")
     archive_collection.update_one(
         {"target": str(target_id)}, 
-        {"$push": {"history": {"date": now_str, "action": "Глобальный БАН (Скайнет)", "reason": reason}}},
+        {"$push": {"history": {
+            "date": now_str, 
+            "action": "Глобальный МУТ (Скайнет)", 
+            "reason": reason,
+            # 🔥 И СЮДА ДОБАВЛЯЕМ УЛИКУ 🔥
+            "evidence_summary": trigger_text if trigger_text and trigger_text != "Без текста (медиа)" else "Отсутствует"
+        }}},
         upsert=True
     )
     # ===========================================
@@ -929,7 +935,13 @@ def mute_user_everywhere(target_id, reason="Без причины", admin_name="
     now_str = datetime.now(pytz.timezone('Asia/Yekaterinburg')).strftime("%d.%m.%Y %H:%M")
     archive_collection.update_one(
         {"target": str(target_id)}, 
-        {"$push": {"history": {"date": now_str, "action": "Глобальный МУТ (Скайнет)", "reason": reason}}},
+        {"$push": {"history": {
+            "date": now_str, 
+            "action": "Глобальный МУТ (Скайнет)", 
+            "reason": reason,
+            # 🔥 ВОТ ОНА! СОХРАНЯЕМ УЛИКУ В БАЗУ ДЛЯ ИИ 🔥
+            "evidence_summary": trigger_text if trigger_text and trigger_text != "Без текста (медиа)" else "Отсутствует"
+        }}},
         upsert=True
     )
     # ===========================================
