@@ -501,6 +501,7 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
                             return
 
                 for chat_id, network_name in target_chats:
+                    chat_id = int(chat_id) # <--- ДОБАВИТЬ ЭТУ СТРОКУ! Приводим к числу
                     try:
                         ids_to_store = []
                         if media_type == "album":

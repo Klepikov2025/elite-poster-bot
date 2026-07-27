@@ -35,7 +35,11 @@ def register_proxy_handlers(bot, ban_user_everywhere):
         msg_id = call.message.message_id
         user_id = call.from_user.id
         
-        post = posts_collection.find_one({"chat_id": chat_id, "message_ids": msg_id})
+        # 🔥 ИСПРАВЛЕНИЕ: Ищем chat_id в обоих форматах
+        post = posts_collection.find_one({
+            "$or": [{"chat_id": chat_id}, {"chat_id": str(chat_id)}], 
+            "message_ids": msg_id
+        })
         
         if not post:
             bot.answer_callback_query(call.id, "Ошибка: Объявление устарело или было удалено.", show_alert=True)
@@ -231,7 +235,10 @@ def register_proxy_handlers(bot, ban_user_everywhere):
             reporter = call.from_user
             reporter_link = get_user_name(reporter)
 
-            post = posts_collection.find_one({"chat_id": chat_id, "message_id": msg_id})
+            post = posts_collection.find_one({
+                "$or": [{"chat_id": chat_id}, {"chat_id": str(chat_id)}],
+                "message_ids": msg_id
+            })
             found_vip_id = post["user_id"] if post else None
 
             channel_part = str(chat_id)[4:] if str(chat_id).startswith("-100") else str(chat_id)
