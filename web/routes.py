@@ -615,8 +615,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                         
                 # 3. Пользователь просто заблокировал бота в ЛС (он жив, но рассылку не хочет)
                 elif "blocked" in err_text:
-                    users_collection.delete_one({"_id": u['_id']})
-                    dead_count += 1
+                    pass # <--- МЫ ПРОСТО ИГНОРИРУЕМ ОШИБКУ. Из базы он НЕ удаляется!
                     
                 # 4. Ошибка форматирования текста
                 elif "parse entities" in err_text:
