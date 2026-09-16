@@ -698,6 +698,16 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             return # Просто игнорируем это сообщение, Секретарь сам на него ответит!
         # 👆 ======================================================= 👆
 
+        # 🔥 ТРЕКЕР ДЛЯ ДЕРЕВЯННОГО КЕЙСА (АКТИВНОСТЬ В ЧАТАХ) 🔥
+        if raw_text and len(raw_text.split()) >= 3: # Считаем только фразы от 3 слов
+            today_str = datetime.now(pytz.timezone('Asia/Yekaterinburg')).strftime("%Y-%m-%d")
+            db['tasks_progress'].update_one(
+                {"uid": user_id, "date": today_str}, 
+                {"$inc": {"messages": 1}}, 
+                upsert=True
+            )
+        # 👆 ======================================================= 👆
+
         text = raw_text.lower()
         trigger_text = raw_text if raw_text else "Без текста (медиа)"
         user_link = get_user_name(message.from_user)
