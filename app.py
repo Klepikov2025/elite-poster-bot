@@ -1363,19 +1363,19 @@ def cpa_tracker_daemon():
                         # Трафик ВЫЖИЛ! Одобряем и платим Агенту
                         db['cpa_traffic'].update_one({"_id": record['_id']}, {"$set": {"status": "approved"}})
                         
-                        # 1. Начисляем базовые 15 очков + 1 в счетчик рефералов
+                        # 🔥 ИЗМЕНЕНИЕ 1: Выдаем 1 Кейс Агента вместо 15 очков 🔥
                         paid_collection = db['paid_users']
-                        paid_collection.update_one({"uid": agent_id}, {"$inc": {"bounty_points": 15, "cpa_refs": 1}}, upsert=True)
+                        paid_collection.update_one({"uid": agent_id}, {"$inc": {"agent_cases": 1, "cpa_refs": 1}}, upsert=True)
                         
                         agent_data = paid_collection.find_one({"uid": agent_id})
                         total_refs = agent_data.get("cpa_refs", 0)
                         
-                        msg_text = f"🎉 **CPA-Сеть:** Ваш реферал успешно прошел проверку Скайнета (48 часов)!\nВам начислено **+15 Очков Бдительности**! 💰\n_Всего приведено: {total_refs} чел._"
+                        msg_text = f"💼 **CPA-Сеть:** Ваш реферал успешно выжил 48 часов!\n\nВам начислен **1 Кейс Агента**! Зайдите в Игровой Кабинет (вкладка Финансы), чтобы покрутить рулетку и забрать приз!\n_Всего приведено: {total_refs} чел._"
                         
-                        # 2. ПРОВЕРКА НА ЮБИЛЕЙ (Каждый 10-й человек)
+                        # 🔥 ИЗМЕНЕНИЕ 2: За юбилей теперь даем +1 ДОП. КЕЙС вместо 50 очков 🔥
                         if total_refs > 0 and total_refs % 10 == 0:
-                            paid_collection.update_one({"uid": agent_id}, {"$inc": {"bounty_points": 50}})
-                            msg_text += f"\n\n🎊 **ЮБИЛЕЙ!** Вы привели {total_refs} человек! Ловите бонусный куш: **+50 Очков** сверху! 🎰"
+                            paid_collection.update_one({"uid": agent_id}, {"$inc": {"agent_cases": 1}})
+                            msg_text += f"\n\n🎊 **ЮБИЛЕЙ!** Вы привели {total_refs} человек! Ловите еще **+1 Кейс Агента** сверху! 🎰"
                             
                         # Отправляем радостное письмо Агенту
                         try: bot.send_message(agent_id, msg_text, parse_mode="Markdown")
