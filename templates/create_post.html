@@ -1,174 +1,343 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Elite Poster Premium</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        obsidian: '#050505',
+                        graphite: '#111111',
+                        surface: '#1a1a1a',
+                        elite: { light: '#fde047', DEFAULT: '#eab308', dark: '#a16207' }
+                    },
+                    animation: {
+                        'blob': 'blob 10s infinite alternate',
+                        'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'fade-in': 'fadeIn 0.2s ease-out forwards',
+                    },
+                    keyframes: {
+                        blob: { '0%': { transform: 'translate(0px, 0px) scale(1)' }, '100%': { transform: 'translate(20px, -30px) scale(1.1)' } },
+                        slideUp: { '0%': { transform: 'translateY(100%)' }, '100%': { transform: 'translateY(0)' } },
+                        fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--tg-theme-bg-color, #ffffff);
-            color: var(--tg-theme-text-color, #000000);
-            padding: 15px; margin: 0;
+            background-color: theme('colors.obsidian');
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
         
-        /* Стили для вкладок (Табов) */
-        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid var(--tg-theme-hint-color, #ccc); }
-        .tab-btn { 
-            flex: 1; padding: 12px; background: transparent; border: none; 
-            color: var(--tg-theme-hint-color, #888); font-weight: bold; font-size: 15px;
-            cursor: pointer; transition: 0.3s;
-        }
-        .tab-btn.active { 
-            color: var(--tg-theme-button-color, #3390ec); 
-            border-bottom: 3px solid var(--tg-theme-button-color, #3390ec); 
+        /* Плавный скролл без видимых ползунков для карусели */
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .glass-panel {
+            background: rgba(17, 17, 17, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
-        label { display: block; margin-bottom: 5px; font-weight: bold; color: var(--tg-theme-hint-color, #999); font-size: 14px;}
-        input, select, textarea {
-            width: 100%; padding: 12px; margin-bottom: 20px; box-sizing: border-box;
-            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
-            color: var(--tg-theme-text-color, #000);
-            border: 1px solid var(--tg-theme-hint-color, #ccc);
-            border-radius: 10px; font-size: 16px;
-        }
-        button.main-btn {
-            width: 100%; padding: 14px;
-            background-color: var(--tg-theme-button-color, #3390ec);
-            color: var(--tg-theme-button-text-color, #ffffff);
-            border: none; border-radius: 10px; font-size: 16px;
-            font-weight: bold; cursor: pointer;
+        /* Ambient Glow Background */
+        .ambient-glow {
+            position: fixed; top: -10%; left: -10%; width: 120%; height: 120%;
+            background: radial-gradient(circle at 50% 30%, rgba(234, 179, 8, 0.03) 0%, transparent 60%);
+            z-index: -1; pointer-events: none;
         }
 
-        /* Стили для карточек в "Мои анкеты" */
-        .post-card {
-            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
-            padding: 15px; border-radius: 10px; margin-bottom: 15px;
-            border: 1px solid var(--tg-theme-hint-color, #ccc);
+        /* Инпуты-кнопки (фейковые селекты) */
+        .select-trigger {
+            background-color: theme('colors.surface');
+            border: 1px solid rgba(255,255,255,0.08);
+            transition: all 0.2s ease;
         }
-        .post-card h4 { margin: 0 0 5px 0; color: var(--tg-theme-button-color, #3390ec); }
-        .post-card p { font-size: 13px; margin: 0 0 10px 0; color: var(--tg-theme-text-color, #000); }
-        .delete-btn {
-            background: #cf6679; padding: 10px; font-size: 14px; width: 100%;
-            border:none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer;
-        }
+        .select-trigger:active { transform: scale(0.98); border-color: rgba(234,179,8,0.3); }
+
+        textarea { outline: none; resize: none; background: theme('colors.surface'); border: 1px solid rgba(255,255,255,0.08); }
+        textarea:focus { border-color: theme('colors.elite.dark'); box-shadow: 0 0 15px rgba(234,179,8,0.05); }
+
+        #mediaInput { display: none; }
     </style>
 </head>
-<body>
-    <div class="tabs">
-        <button class="tab-btn active" id="tabCreateBtn" onclick="switchTab('create')">📝 Создать</button>
-        <button class="tab-btn" id="tabManageBtn" onclick="switchTab('manage')">📂 Мои анкеты</button>
-    </div>
+<body class="pb-[120px]"> <!-- Отступ под плавающую кнопку -->
 
-    <div id="tabCreate">
-        <label for="network">🌐 Выберите сеть:</label>
-        <select id="network" onchange="updateCities()">
-            <option value="" disabled selected>-- Выберите сеть --</option>
-            <option value="all" style="font-weight: bold;">🌍 Все сети (Рассылка)</option>
-            <option value="mk">Мужской Клуб</option>
-            <option value="parni">ПАРНИ 18+</option>
-            <option value="ns">НС</option>
-            <option value="rainbow">Радуга</option>
-            <option value="gayznak">Гей Знакомства</option>
-        </select>
+    <div class="ambient-glow animate-blob"></div>
 
-        <label for="city">📍 Выберите город:</label>
-        <select id="city" disabled>
-            <option value="">Сначала выберите сеть</option>
-        </select>
-
-        <label for="post_text">💬 Текст анкеты:</label>
-        <textarea id="post_text" rows="5" placeholder="Напишите о себе..."></textarea>
-
-        <label for="mediaInput">📸 Фото/Видео (до 10 файлов):</label>
-        <input type="file" id="mediaInput" accept="image/*,video/*" multiple onchange="previewMedia(event)">
-
-        <div id="previewWrapper" style="display: none; margin-bottom: 20px;">
-            <div id="previewContainer" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;"></div>
-            <button type="button" onclick="clearMedia()" style="background: #cf6679; border:none; padding:8px; border-radius:5px; color:white; width:100%;">🗑 Очистить файлы</button>
+    <div class="px-5 pt-6 pb-2">
+        <!-- HEADER -->
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-2xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-br from-white via-zinc-200 to-zinc-500 uppercase">Elite Poster</h1>
+                <p class="text-[10px] text-elite-DEFAULT font-bold tracking-[0.2em] uppercase">Premium Terminal</p>
+            </div>
+            <div class="w-10 h-10 rounded-full border border-zinc-800 bg-surface flex items-center justify-center shadow-[0_0_15px_rgba(234,179,8,0.15)] text-elite-DEFAULT">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" /></svg>
+            </div>
         </div>
 
-        <button id="mainBtn" class="main-btn" onclick="sendData()">🚀 Опубликовать анкету</button>
+        <!-- TABS -->
+        <div class="flex p-1 bg-surface rounded-[14px] border border-zinc-800/50 mb-6 shadow-inner relative">
+            <div id="tabIndicator" class="absolute left-1 top-1 bottom-1 w-[calc(50%-4px)] bg-graphite border border-zinc-700 rounded-xl shadow-md transition-all duration-300 ease-out z-0"></div>
+            <button id="tabCreateBtn" onclick="switchTab('create')" class="flex-1 py-2.5 text-xs font-bold text-white z-10 transition-colors">Создать</button>
+            <button id="tabManageBtn" onclick="switchTab('manage')" class="flex-1 py-2.5 text-xs font-bold text-zinc-500 z-10 transition-colors">Анкеты</button>
+        </div>
+
+        <!-- TAB 1: СОЗДАНИЕ АНКЕТЫ -->
+        <div id="tabCreate" class="space-y-6 animate-fade-in">
+            
+            <!-- Скрытые реальные значения -->
+            <input type="hidden" id="networkValue" value="">
+            <input type="hidden" id="cityValue" value="">
+
+            <div class="grid grid-cols-2 gap-3">
+                <!-- Фейк Селект Сети -->
+                <div onclick="openSheet('networkSheet')" class="select-trigger rounded-2xl p-4 flex flex-col justify-center cursor-pointer relative overflow-hidden">
+                    <span class="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Сеть</span>
+                    <span id="networkText" class="text-sm font-medium text-white truncate">Выбрать...</span>
+                    <div class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600">▾</div>
+                </div>
+
+                <!-- Фейк Селект Города -->
+                <div onclick="openCitySheet()" class="select-trigger rounded-2xl p-4 flex flex-col justify-center cursor-pointer relative overflow-hidden">
+                    <span class="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Город</span>
+                    <span id="cityText" class="text-sm font-medium text-zinc-600 truncate">Сначала сеть</span>
+                    <div class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600">▾</div>
+                </div>
+            </div>
+
+            <!-- Текст -->
+            <div class="relative">
+                <label class="flex justify-between items-center text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 ml-1">
+                    <span>💬 Описание</span>
+                    <span id="charCount" class="text-zinc-600">0 / 800</span>
+                </label>
+                <textarea id="post_text" oninput="autoResize(this)" rows="4" placeholder="Напишите о себе... Не забудьте параметры (например: 24/180/75)." class="w-full p-4 rounded-2xl text-[15px] leading-relaxed text-zinc-200 hide-scroll"></textarea>
+            </div>
+
+            <!-- Медиа Карусель -->
+            <div>
+                <div class="flex justify-between items-center mb-2 ml-1">
+                    <label class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">📸 Вложения <span id="mediaCounter" class="text-elite-dark ml-1 hidden">(0/10)</span></label>
+                </div>
+                
+                <div class="flex gap-3 overflow-x-auto hide-scroll pb-2 pt-1" id="mediaCarousel">
+                    <!-- Кнопка добавления всегда первая -->
+                    <label for="mediaInput" class="shrink-0 w-24 h-24 rounded-2xl border-2 border-dashed border-zinc-700 bg-surface flex flex-col items-center justify-center text-zinc-500 cursor-pointer hover:border-elite-dark transition-colors active:scale-95">
+                        <span class="text-2xl mb-1">+</span>
+                        <span class="text-[9px] font-bold uppercase tracking-wider">Медиа</span>
+                        <input type="file" id="mediaInput" accept="image/*,video/*" multiple onchange="addMedia(event)">
+                    </label>
+                    <!-- Сюда JS будет добавлять фотки -->
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: МОИ АНКЕТЫ -->
+        <div id="tabManage" class="hidden animate-fade-in">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">Управление</h2>
+                <button onclick="loadMyPosts()" class="w-8 h-8 flex items-center justify-center bg-surface rounded-full border border-zinc-800 text-zinc-400 active:scale-90 transition-transform">↻</button>
+            </div>
+            <div id="myPostsList" class="space-y-3"></div>
+        </div>
     </div>
 
-    <div id="tabManage" style="display: none;">
-        <div id="myPostsList">
-            <p style="text-align: center; color: var(--tg-theme-hint-color, #888);">Загрузка анкет...</p>
+    <!-- ФИКСИРОВАННАЯ КНОПКА ОТПРАВКИ (Glassmorphism) -->
+    <div id="publishBar" class="fixed bottom-0 left-0 right-0 p-5 glass-panel z-40 transition-transform duration-300">
+        <button id="mainBtn" onclick="sendData()" class="w-full py-4 rounded-2xl font-black text-obsidian bg-gradient-to-r from-elite-light via-elite-DEFAULT to-elite-dark shadow-[0_0_20px_rgba(234,179,8,0.25)] active:scale-[0.98] transition-all uppercase tracking-widest text-[13px] flex justify-center items-center gap-2">
+            <span>🚀 Отправить в сеть</span>
+        </button>
+    </div>
+
+    <!-- 🔥 НАИВНЫЕ ШТОРКИ (BOTTOM SHEETS) 🔥 -->
+    
+    <!-- Шторка Сетей -->
+    <div id="networkSheet" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity opacity-0" id="networkBg" onclick="closeSheet('networkSheet')"></div>
+        <div class="absolute bottom-0 left-0 right-0 bg-graphite rounded-t-[30px] border-t border-zinc-800 transform translate-y-full transition-transform duration-300 flex flex-col max-h-[80vh]" id="networkContent">
+            <div class="w-12 h-1.5 bg-zinc-700 rounded-full mx-auto my-3 opacity-50"></div>
+            <div class="px-6 pb-4 border-b border-zinc-800/50">
+                <h3 class="text-lg font-bold text-white">Выбор сети</h3>
+            </div>
+            <div class="overflow-y-auto hide-scroll p-4 space-y-2">
+                <button onclick="selectNetwork('all', '🌍 Все сети (Рассылка)')" class="w-full p-4 rounded-xl text-left font-bold bg-elite-DEFAULT/10 border border-elite-DEFAULT/30 text-elite-light active:scale-[0.98] transition-all">🌍 Все сети (Массовая рассылка)</button>
+                <button onclick="selectNetwork('mk', 'Мужской Клуб')" class="w-full p-4 rounded-xl text-left font-medium bg-surface active:bg-zinc-800 transition-colors text-white">Мужской Клуб</button>
+                <button onclick="selectNetwork('parni', 'ПАРНИ 18+')" class="w-full p-4 rounded-xl text-left font-medium bg-surface active:bg-zinc-800 transition-colors text-white">ПАРНИ 18+</button>
+                <button onclick="selectNetwork('ns', 'НС')" class="w-full p-4 rounded-xl text-left font-medium bg-surface active:bg-zinc-800 transition-colors text-white">НС</button>
+                <button onclick="selectNetwork('rainbow', 'Радуга')" class="w-full p-4 rounded-xl text-left font-medium bg-surface active:bg-zinc-800 transition-colors text-white">Радуга</button>
+                <button onclick="selectNetwork('gayznak', 'Гей Знакомства')" class="w-full p-4 rounded-xl text-left font-medium bg-surface active:bg-zinc-800 transition-colors text-white">Гей Знакомства</button>
+            </div>
+            <div class="p-4 pt-0 mt-auto"><button onclick="closeSheet('networkSheet')" class="w-full py-4 rounded-xl font-bold bg-zinc-800 text-white active:scale-95 transition-all">Закрыть</button></div>
         </div>
+    </div>
+
+    <!-- Шторка Городов -->
+    <div id="citySheet" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity opacity-0" id="cityBg" onclick="closeSheet('citySheet')"></div>
+        <div class="absolute bottom-0 left-0 right-0 bg-graphite rounded-t-[30px] border-t border-zinc-800 transform translate-y-full transition-transform duration-300 flex flex-col max-h-[85vh]" id="cityContent">
+            <div class="w-12 h-1.5 bg-zinc-700 rounded-full mx-auto my-3 opacity-50"></div>
+            <div class="px-6 pb-4 border-b border-zinc-800/50 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-white">Выбор города</h3>
+                <span id="citySheetNetName" class="text-[10px] bg-zinc-800 px-2 py-1 rounded text-zinc-400 font-bold uppercase"></span>
+            </div>
+            <div class="overflow-y-auto hide-scroll p-4 space-y-2" id="cityListContainer">
+                <!-- Города рендерятся сюда -->
+            </div>
+            <div class="p-4 pt-0 mt-auto shadow-[0_-20px_20px_rgba(17,17,17,0.9)] z-10"><button onclick="closeSheet('citySheet')" class="w-full py-4 rounded-xl font-bold bg-zinc-800 text-white active:scale-95 transition-all">Закрыть</button></div>
+        </div>
+    </div>
+
+    <!-- УНИВЕРСАЛЬНЫЙ АЛЕРТ -->
+    <div id="customAlert" class="hidden fixed inset-0 bg-obsidian/80 z-[100] flex items-center justify-center p-5 backdrop-blur-md transition-opacity">
+        <div class="bg-graphite w-full max-w-[320px] rounded-[24px] p-6 border border-zinc-800 text-center relative overflow-hidden shadow-2xl">
+            <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-elite-light to-elite-dark"></div>
+            <div id="alertIcon" class="text-5xl mb-3 drop-shadow-[0_0_15px_rgba(234,179,8,0.3)]">🔔</div>
+            <h3 id="alertTitle" class="font-bold text-xl mb-2 text-white">Уведомление</h3>
+            <p id="alertMsg" class="text-zinc-400 mb-6 text-sm leading-relaxed">Текст</p>
+            <button onclick="document.getElementById('customAlert').classList.add('hidden')" class="w-full bg-surface py-3.5 rounded-xl font-bold text-white border border-zinc-700 active:bg-zinc-800 transition-colors">Понятно</button>
+        </div>
+    </div>
+
+    <!-- УНИВЕРСАЛЬНЫЙ КОНФИРМ -->
+    <div id="customConfirm" class="hidden fixed inset-0 bg-obsidian/80 z-[100] flex items-center justify-center p-5 backdrop-blur-md transition-opacity">
+        <div class="bg-graphite w-full max-w-[320px] rounded-[24px] p-6 border border-red-900/30 text-center relative overflow-hidden shadow-2xl">
+            <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 to-rose-700"></div>
+            <div class="text-5xl mb-3 drop-shadow-[0_0_15px_rgba(239,68,68,0.3)]">⚠️</div>
+            <h3 class="font-bold text-xl mb-2 text-white">Удаление</h3>
+            <p id="confirmMsg" class="text-zinc-400 mb-6 text-sm leading-relaxed">Вы уверены?</p>
+            <div class="flex space-x-3">
+                <button id="confirmYesBtn" class="flex-1 bg-red-600/20 text-red-400 border border-red-500/30 py-3.5 rounded-xl font-bold active:bg-red-600/40 transition-colors">Удалить</button>
+                <button onclick="document.getElementById('customConfirm').classList.add('hidden')" class="flex-1 bg-surface border border-zinc-700 py-3.5 rounded-xl font-bold text-white active:bg-zinc-800 transition-colors">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ОВЕРЛЕЙ ЗАГРУЗКИ -->
+    <div id="loadingOverlay" class="hidden fixed inset-0 bg-obsidian/90 z-[200] flex flex-col items-center justify-center backdrop-blur-md">
+        <div class="relative w-16 h-16 flex items-center justify-center mb-6">
+            <div class="absolute inset-0 rounded-full border-4 border-zinc-800"></div>
+            <div class="absolute inset-0 rounded-full border-4 border-elite-DEFAULT border-t-transparent animate-spin"></div>
+            <div class="text-elite-DEFAULT text-xl">🚀</div>
+        </div>
+        <div class="text-elite-light font-black tracking-widest text-sm uppercase animate-pulse">Передача данных</div>
+        <p class="text-[10px] text-zinc-500 mt-2 font-mono">ШИФРОВАНИЕ И ОТПРАВКА...</p>
     </div>
 
     <script>
         let tg = window.Telegram.WebApp;
         tg.expand(); 
+        tg.setHeaderColor('#050505');
+        tg.setBackgroundColor('#050505');
 
-        // === ЛОГИКА ВКЛАДОК ===
+        // Глобальный объект DataTransfer для хранения файлов (позволяет удалять конкретные файлы)
+        const fileStore = new DataTransfer();
+
+        function safeHaptic(type, style) {
+            try {
+                if(type === 'impact') tg.HapticFeedback.impactOccurred(style);
+                else tg.HapticFeedback.notificationOccurred(style);
+            } catch(e){}
+        }
+
+        function customAlert(msg, title = "Уведомление", icon = "🔔") {
+            document.getElementById('alertIcon').innerText = icon;
+            document.getElementById('alertTitle').innerText = title;
+            document.getElementById('alertMsg').innerText = msg;
+            document.getElementById('customAlert').classList.remove('hidden');
+            safeHaptic('notify', icon === '❌' ? 'error' : 'success');
+        }
+
+        function customConfirm(msg, callback) {
+            document.getElementById('confirmMsg').innerText = msg;
+            const confirmModal = document.getElementById('customConfirm');
+            document.getElementById('confirmYesBtn').onclick = function() {
+                confirmModal.classList.add('hidden');
+                callback(true);
+            };
+            confirmModal.classList.remove('hidden');
+            safeHaptic('impact', 'medium');
+        }
+
+        function toggleLoading(show) {
+            document.getElementById('loadingOverlay').classList.toggle('hidden', !show);
+        }
+
+        // === ВКЛАДКИ И АНИМАЦИИ ===
         function switchTab(tab) {
+            safeHaptic('impact', 'light');
+            const ind = document.getElementById('tabIndicator');
+            const btnC = document.getElementById('tabCreateBtn');
+            const btnM = document.getElementById('tabManageBtn');
+            const pubBar = document.getElementById('publishBar');
+            
             if(tab === 'create') {
                 document.getElementById('tabCreate').style.display = 'block';
                 document.getElementById('tabManage').style.display = 'none';
-                document.getElementById('tabCreateBtn').classList.add('active');
-                document.getElementById('tabManageBtn').classList.remove('active');
+                ind.style.transform = 'translateX(0)';
+                btnC.classList.replace('text-zinc-500', 'text-white');
+                btnM.classList.replace('text-white', 'text-zinc-500');
+                pubBar.style.transform = 'translateY(0)'; // Показываем кнопку
             } else {
                 document.getElementById('tabCreate').style.display = 'none';
                 document.getElementById('tabManage').style.display = 'block';
-                document.getElementById('tabManageBtn').classList.add('active');
-                document.getElementById('tabCreateBtn').classList.remove('active');
-                loadMyPosts(); // Загружаем посты с сервера
+                ind.style.transform = 'translateX(100%)';
+                btnM.classList.replace('text-zinc-500', 'text-white');
+                btnC.classList.replace('text-white', 'text-zinc-500');
+                pubBar.style.transform = 'translateY(150%)'; // Прячем кнопку
+                loadMyPosts();
             }
         }
 
-        // === ЛОГИКА ЗАГРУЗКИ И УДАЛЕНИЯ ПОСТОВ ===
-        function loadMyPosts() {
-            let userId = tg.initDataUnsafe.user?.id || 0;
-            document.getElementById('myPostsList').innerHTML = '<p style="text-align: center;">Загрузка...</p>';
+        // === АВТОРЕСАЙЗ ТЕКСТА И СЧЕТЧИК ===
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = (textarea.scrollHeight < 150 ? textarea.scrollHeight : 150) + 'px';
             
-            fetch('/api/get_user_posts?user_id=' + userId)
-            .then(res => res.json())
-            .then(data => {
-                let list = document.getElementById('myPostsList');
-                if(data.posts.length === 0) {
-                    list.innerHTML = '<p style="text-align: center;">У вас пока нет активных анкет.</p>';
-                    return;
-                }
-                let html = '';
-                data.posts.forEach(p => {
-                    html += `
-                        <div class="post-card">
-                            <h4>${p.network} (${p.city})</h4>
-                            <p style="color: #888;">📅 ${p.time}</p>
-                            <p><em>"${p.text}"</em></p>
-                            <button class="delete-btn" onclick="deletePost('${p.id}')">🗑 Удалить из чата</button>
-                        </div>
-                    `;
-                });
-                list.innerHTML = html;
-            }).catch(e => {
-                document.getElementById('myPostsList').innerHTML = '<p style="text-align: center; color: red;">Ошибка сети.</p>';
-            });
+            const len = textarea.value.length;
+            const counter = document.getElementById('charCount');
+            counter.innerText = `${len} / 800`;
+            if(len > 750) counter.classList.replace('text-zinc-600', 'text-red-500');
+            else counter.classList.replace('text-red-500', 'text-zinc-600');
         }
 
-        function deletePost(postId) {
-            tg.showConfirm("Вы уверены, что хотите безвозвратно удалить эту анкету из чата?", function(confirm) {
-                if(confirm) {
-                    let userId = tg.initDataUnsafe.user?.id || 0;
-                    fetch('/api/delete_post', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ post_id: postId, user_id: userId })
-                    }).then(res => res.json())
-                      .then(data => {
-                          if(data.success) {
-                              tg.showAlert("Анкета успешно удалена из чата!");
-                              loadMyPosts(); // Обновляем список
-                          } else {
-                              tg.showAlert("Ошибка: " + data.message);
-                          }
-                      });
-                }
-            });
+        // === ШТОРКИ (BOTTOM SHEETS) ===
+        function openSheet(id) {
+            safeHaptic('impact', 'light');
+            const sheet = document.getElementById(id);
+            const bg = sheet.querySelector('div[id$="Bg"]');
+            const content = sheet.querySelector('div[id$="Content"]');
+            
+            sheet.classList.remove('hidden');
+            // Маленькая задержка для анимации
+            setTimeout(() => {
+                bg.classList.replace('opacity-0', 'opacity-100');
+                content.classList.replace('translate-y-full', 'translate-y-0');
+            }, 10);
         }
 
-        // === СТАРАЯ ЛОГИКА СОЗДАНИЯ (Города, Медиа, Отправка) ===
+        function closeSheet(id) {
+            const sheet = document.getElementById(id);
+            const bg = sheet.querySelector('div[id$="Bg"]');
+            const content = sheet.querySelector('div[id$="Content"]');
+            
+            bg.classList.replace('opacity-100', 'opacity-0');
+            content.classList.replace('translate-y-0', 'translate-y-full');
+            
+            setTimeout(() => { sheet.classList.add('hidden'); }, 300);
+        }
+
+        // === ЛОГИКА ВЫБОРА ===
         const cityData = {
             "mk": ["Екатеринбург", "Челябинск", "Пермь", "Москва", "Санкт-Петербург", "Тюмень", "Ижевск", "Казань", "Оренбург", "Уфа", "Новосибирск", "Красноярск", "Барнаул", "Омск", "Саратов", "Воронеж", "Самара", "Волгоград", "Нижний Новгород", "Калининград", "Иркутск", "Кемерово", "Общая группа Юга", "ХМАО", "ЯМАЛ", "Казахстан"],
             "parni": ["Екатеринбург", "Тюмень", "Омск", "Челябинск", "Пермь", "Курган", "ХМАО", "Уфа", "Новосибирск", "ЯМАЛ", "Оренбург", "Москва", "Санкт-Петербург", "Красноярск"],
@@ -177,59 +346,137 @@
             "gayznak": ["Красноярск", "Екатеринбург", "Пермь", "Тюмень", "Новосибирск", "Самара", "Казань", "Воронеж", "Кемерово", "Иркутск", "Челябинск", "Орёл", "Саратов", "Архангельск", "Ярославль", "Тверь", "Великий Новгород", "Владимир", "Мурманск", "Рязань", "Смоленск", "Тамбов", "Липецк", "Тула", "Брянск", "Волгоград"]
         };
 
-        let allCitiesSet = new Set();
-        Object.values(cityData).forEach(cities => cities.forEach(c => allCitiesSet.add(c)));
-        cityData["all"] = Array.from(allCitiesSet).sort();
-
-        function updateCities() {
-            const network = document.getElementById("network").value;
-            const citySelect = document.getElementById("city");
-            citySelect.innerHTML = '<option value="" disabled selected>-- Выберите город --</option>';
-            if (cityData[network]) {
-                citySelect.disabled = false;
-                cityData[network].forEach(city => {
-                    let opt = document.createElement('option');
-                    opt.value = city; opt.innerHTML = city;
-                    citySelect.appendChild(opt);
+        function selectNetwork(key, name) {
+            safeHaptic('impact', 'medium');
+            document.getElementById('networkValue').value = key;
+            const netText = document.getElementById('networkText');
+            netText.innerText = name;
+            netText.classList.replace('text-zinc-600', 'text-white');
+            
+            const cityText = document.getElementById('cityText');
+            
+            if (key === 'all') {
+                document.getElementById('cityValue').value = 'all_cities';
+                cityText.innerText = "🌐 Рассылка во все города";
+                cityText.className = "text-sm font-bold text-elite-DEFAULT truncate";
+            } else {
+                document.getElementById('cityValue').value = '';
+                cityText.innerText = "Выбрать город...";
+                cityText.className = "text-sm font-medium text-zinc-400 truncate";
+                document.getElementById('citySheetNetName').innerText = name;
+                
+                // Рендерим города в шторку
+                const container = document.getElementById('cityListContainer');
+                let html = '';
+                cityData[key].sort().forEach(city => {
+                    html += `<button onclick="selectCity('${city}')" class="w-full p-4 rounded-xl text-left font-medium bg-surface active:bg-zinc-800 transition-colors text-white">${city}</button>`;
                 });
-            } else { citySelect.disabled = true; }
+                container.innerHTML = html;
+            }
+            closeSheet('networkSheet');
         }
 
-        function previewMedia(event) {
-            const files = event.target.files;
-            const wrapper = document.getElementById('previewWrapper');
-            const container = document.getElementById('previewContainer');
-            if (files.length > 10) {
-                tg.showAlert("🚫 Можно выбрать максимум 10 файлов!");
-                document.getElementById('mediaInput').value = ''; return;
+        function openCitySheet() {
+            const net = document.getElementById('networkValue').value;
+            if (!net) {
+                customAlert("Сначала выберите сеть публикации!", "Внимание", "⚠️");
+                openSheet('networkSheet');
+                return;
             }
-            container.innerHTML = ''; 
+            if (net === 'all') return; // Если все сети, шторка городов не нужна
+            openSheet('citySheet');
+        }
+
+        function selectCity(name) {
+            safeHaptic('impact', 'light');
+            document.getElementById('cityValue').value = name;
+            const cityText = document.getElementById('cityText');
+            cityText.innerText = name;
+            cityText.classList.replace('text-zinc-400', 'text-white');
+            closeSheet('citySheet');
+        }
+
+        // === ИНТЕЛЛЕКТУАЛЬНАЯ РАБОТА С МЕДИА ===
+        function addMedia(event) {
+            const files = event.target.files;
+            if(!files.length) return;
+
+            const currentCount = fileStore.files.length;
+            const newCount = files.length;
+
+            if (currentCount + newCount > 10) {
+                customAlert("Лимит: 10 файлов на одну анкету.", "Ошибка", "⚠️");
+                return;
+            }
+
+            for (let i = 0; i < files.length; i++) {
+                fileStore.items.add(files[i]);
+            }
+            
+            document.getElementById('mediaInput').value = ''; // Сбрасываем инпут
+            renderMediaCarousel();
+        }
+
+        function removeMedia(index) {
+            safeHaptic('impact', 'light');
+            fileStore.items.remove(index);
+            renderMediaCarousel();
+        }
+
+        function renderMediaCarousel() {
+            const container = document.getElementById('mediaCarousel');
+            const counter = document.getElementById('mediaCounter');
+            const files = fileStore.files;
+
+            // Удаляем все превью (кроме первой кнопки добавления)
+            while (container.children.length > 1) {
+                container.removeChild(container.lastChild);
+            }
+
             if (files.length > 0) {
-                wrapper.style.display = 'block';
+                counter.classList.remove('hidden');
+                counter.innerText = `(${files.length}/10)`;
+                
                 for (let i = 0; i < files.length; i++) {
                     let url = URL.createObjectURL(files[i]);
-                    let elem = document.createElement(files[i].type.startsWith('video/') ? 'video' : 'img');
-                    elem.src = url; elem.style.width = '30%'; elem.style.height = '80px';
-                    elem.style.objectFit = 'cover'; elem.style.borderRadius = '5px';
-                    container.appendChild(elem);
+                    let wrapper = document.createElement('div');
+                    wrapper.className = "shrink-0 w-24 h-24 rounded-2xl overflow-hidden bg-surface border border-zinc-700 relative shadow-md animate-slide-up group";
+                    
+                    let mediaHtml = files[i].type.startsWith('video/') 
+                        ? `<video src="${url}" class="w-full h-full object-cover opacity-70"></video><div class="absolute inset-0 flex items-center justify-center pointer-events-none"><span class="bg-black/50 text-white rounded-full w-6 h-6 flex items-center justify-center text-[10px] backdrop-blur-sm">▶️</span></div>`
+                        : `<img src="${url}" class="w-full h-full object-cover">`;
+
+                    wrapper.innerHTML = `
+                        ${mediaHtml}
+                        <button onclick="removeMedia(${i})" class="absolute top-1 right-1 w-6 h-6 bg-black/60 backdrop-blur-md rounded-full text-white text-[10px] font-bold flex items-center justify-center border border-white/10 active:scale-90 transition-transform">✕</button>
+                    `;
+                    container.appendChild(wrapper);
                 }
-            } else { wrapper.style.display = 'none'; }
+                
+                // Прокручиваем карусель вправо
+                container.scrollLeft = container.scrollWidth;
+            } else {
+                counter.classList.add('hidden');
+            }
         }
 
-        function clearMedia() {
-            document.getElementById('mediaInput').value = '';
-            document.getElementById('previewWrapper').style.display = 'none';
-            document.getElementById('previewContainer').innerHTML = '';
-        }
-
+        // === ОТПРАВКА ДАННЫХ ===
         function sendData() {
             let text = document.getElementById("post_text").value.trim();
-            let networkKey = document.getElementById("network").value; // Получаем "rainbow"
-            let city = document.getElementById("city").value;
+            let networkKey = document.getElementById("networkValue").value; 
+            let city = document.getElementById("cityValue").value;
 
-            if (!text || !city || !networkKey) { tg.showAlert("Пожалуйста, заполните текст и выберите сеть/город!"); return; }
+            if (networkKey === 'all') city = "Массовая рассылка";
 
-            // 🔥 МАГИЯ ПЕРЕВОДА ДЛЯ ПИТОНА 🔥
+            if (!text || !city || !networkKey) { 
+                customAlert("Заполните текст анкеты и выберите сеть/город!", "Внимание", "⚠️"); 
+                return; 
+            }
+            if (text.length > 800) {
+                customAlert("Текст слишком длинный! Максимум 800 символов.", "Внимание", "⚠️"); 
+                return;
+            }
+
             const networkMap = {
                 "all": "Все сети",
                 "mk": "Мужской Клуб",
@@ -238,43 +485,108 @@
                 "rainbow": "Радуга",
                 "gayznak": "Гей Знакомства"
             };
-            let network = networkMap[networkKey]; // Превращаем "rainbow" в "Радуга"
+            let network = networkMap[networkKey]; 
 
-            document.getElementById("mainBtn").innerText = "⏳ Отправка в сеть...";
-            document.getElementById("mainBtn").disabled = true;
+            toggleLoading(true);
 
             let formData = new FormData();
             formData.append('user_id', tg.initDataUnsafe.user?.id || 0);
             formData.append('text', text);
-            formData.append('network', network); // <-- Теперь сюда пойдет правильное русское название!
+            formData.append('network', network); 
             formData.append('city', city);
 
-            const fileInput = document.getElementById('mediaInput');
-            for (let i = 0; i < fileInput.files.length; i++) {
-                formData.append('media', fileInput.files[i]);
+            // Передаем файлы из нашего умного хранилища
+            for (let i = 0; i < fileStore.files.length; i++) {
+                formData.append('media', fileStore.files[i]);
             }
 
             fetch('/api/submit_mini_app', { method: 'POST', body: formData })
             .then(response => response.json())
             .then(data => {
+                  toggleLoading(false);
                   if(data.status === "ok") { 
-                      tg.showAlert("✅ Опубликовано!");
-                      switchTab('manage'); // Перекидываем юзера во вкладку "Мои анкеты"
+                      safeHaptic('notify', 'success');
+                      customAlert("Анкета передана агентам Скайнета. Публикация запущена!", "Отправлено", "✅");
                       
-                      // Очищаем форму создания
+                      // Очистка формы
                       document.getElementById("post_text").value = "";
-                      clearMedia();
-                      document.getElementById("mainBtn").innerText = "🚀 Опубликовать анкету";
-                      document.getElementById("mainBtn").disabled = false;
+                      fileStore.items.clear();
+                      renderMediaCarousel();
+                      autoResize(document.getElementById("post_text"));
+                      
+                      switchTab('manage'); 
                   } else {
-                      tg.showAlert("Ошибка: " + data.message);
-                      document.getElementById("mainBtn").innerText = "🚀 Опубликовать анкету";
-                      document.getElementById("mainBtn").disabled = false;
+                      customAlert(data.message, "Ошибка отправки", "❌");
                   }
             }).catch(err => {
-                tg.showAlert("Ошибка связи с сервером!");
-                document.getElementById("mainBtn").innerText = "🚀 Опубликовать анкету";
-                document.getElementById("mainBtn").disabled = false;
+                toggleLoading(false);
+                customAlert("Сбой связи с сервером терминала!", "Ошибка сети", "🔌");
+            });
+        }
+
+        // === УПРАВЛЕНИЕ АНКЕТАМИ ===
+        function loadMyPosts() {
+            let userId = tg.initDataUnsafe.user?.id || 0;
+            const list = document.getElementById('myPostsList');
+            
+            list.innerHTML = `
+                <div class="animate-pulse bg-graphite p-5 rounded-[20px] border border-zinc-800/50">
+                    <div class="h-3 bg-zinc-800 rounded w-1/3 mb-4"></div>
+                    <div class="space-y-2"><div class="h-2 bg-zinc-800 rounded w-full"></div><div class="h-2 bg-zinc-800 rounded w-5/6"></div></div>
+                </div>`;
+            
+            fetch('/api/get_user_posts?user_id=' + userId)
+            .then(res => res.json())
+            .then(data => {
+                if(data.posts.length === 0) {
+                    list.innerHTML = `
+                    <div class="bg-graphite p-8 rounded-[24px] border border-zinc-800/50 text-center opacity-80 mt-10">
+                        <div class="text-5xl mb-3 drop-shadow-lg">🪹</div>
+                        <p class="text-sm font-bold text-zinc-300">У вас нет активных анкет</p>
+                        <p class="text-[10px] text-zinc-500 mt-1">Создайте новую на соседней вкладке</p>
+                    </div>`;
+                    return;
+                }
+                let html = '';
+                data.posts.forEach(p => {
+                    html += `
+                        <div class="bg-graphite p-5 rounded-[20px] mb-4 border border-zinc-800/50 relative shadow-lg">
+                            <div class="absolute top-0 right-0 bg-zinc-800 text-elite-DEFAULT text-[9px] font-bold px-3 py-1.5 rounded-bl-xl">${p.network}</div>
+                            <h4 class="font-bold text-white mb-1 text-sm">📍 ${p.city}</h4>
+                            <p class="text-[9px] text-zinc-500 mb-3 uppercase tracking-wider">${p.time}</p>
+                            <p class="text-xs text-zinc-300 mb-4 bg-surface p-3 rounded-xl border border-zinc-800 line-clamp-3 leading-relaxed">"${p.text}"</p>
+                            <button onclick="deletePost('${p.id}')" class="w-full bg-red-500/10 py-2.5 rounded-xl text-xs font-bold text-red-400 border border-red-500/20 active:bg-red-500/20 transition-colors">
+                                🗑 Изъять из сети
+                            </button>
+                        </div>
+                    `;
+                });
+                list.innerHTML = html;
+            }).catch(e => {
+                list.innerHTML = '<p class="text-center text-red-500 text-sm mt-10">Ошибка связи с сервером.</p>';
+            });
+        }
+
+        function deletePost(postId) {
+            customConfirm("Анкета будет безвозвратно удалена из чата. Подтверждаете?", function(confirm) {
+                if(confirm) {
+                    toggleLoading(true);
+                    let userId = tg.initDataUnsafe.user?.id || 0;
+                    fetch('/api/delete_post', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ post_id: postId, user_id: userId })
+                    }).then(res => res.json())
+                      .then(data => {
+                          toggleLoading(false);
+                          if(data.success) {
+                              customAlert("Анкета уничтожена!", "Выполнено", "✅");
+                              loadMyPosts(); 
+                          } else {
+                              customAlert(data.message, "Ошибка", "❌");
+                          }
+                      });
+                }
             });
         }
     </script>
