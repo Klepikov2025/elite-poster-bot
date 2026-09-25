@@ -64,8 +64,27 @@
         }
         .select-trigger:active { transform: scale(0.98); border-color: rgba(234,179,8,0.3); }
 
-        textarea { outline: none; resize: none; background: theme('colors.surface'); border: 1px solid rgba(255,255,255,0.08); }
-        textarea:focus { border-color: theme('colors.elite.dark'); box-shadow: 0 0 15px rgba(234,179,8,0.05); }
+        /* Обновленное поле для текста */
+        textarea { 
+            outline: none; 
+            resize: none; 
+            /* Темный полупрозрачный фон для создания эффекта глубины */
+            background: rgba(0, 0, 0, 0.4); 
+            /* Более четкая рамка (15% прозрачности вместо 8%) */
+            border: 1px solid rgba(255, 255, 255, 0.15); 
+            /* Внутренняя тень, чтобы поле казалось вдавленным в экран */
+            box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.6); 
+            transition: all 0.3s ease;
+        }
+        
+        /* Эффект при клике (когда пользователь печатает) */
+        textarea:focus { 
+            background: rgba(0, 0, 0, 0.6);
+            /* Рамка загорается фирменным золотым цветом */
+            border-color: theme('colors.elite.DEFAULT'); 
+            /* Сохраняем внутреннюю тень и добавляем внешнее золотое свечение */
+            box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.6), 0 0 20px rgba(234, 179, 8, 0.15); 
+        }
 
         #mediaInput { display: none; }
     </style>
@@ -411,7 +430,6 @@
                 openSheet('networkSheet');
                 return;
             }
-            if (net === 'all') return; // Если все сети, шторка городов не нужна
             openSheet('citySheet');
         }
 

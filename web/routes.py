@@ -925,10 +925,29 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             vip_bot = '\n\n<tg-emoji emoji-id="5949582599012750373">✅</tg-emoji> <b>Анкета проверена администрацией сети</b>\n\n<tg-emoji emoji-id="6215039782955783886">🌟</tg-emoji> <b>Привилегированный участник</b> <tg-emoji emoji-id="6215039782955783886">🌟</tg-emoji>'
             
             headers = [
-                f"💎 VIP-СООБЩЕНИЕ от {user_name_html}! 💎",
-                f"🚨 🔥 Срочное объявление от {user_name_html}! 🚨",
-                f"👑 {user_name_html} публикует элитное объявление: 👑",
-            ]
+                    # 💎 Статус и Эксклюзив (Премиум)
+                    f"💎 VIP-РЕЗИДЕНТ на связи: {user_name_html} 💎",
+                    f"👑 {user_name_html} заходит с козырей! Элитная анкета: 👑",
+                    f"🏆 Эксклюзивный доступ: сообщение от {user_name_html}",
+                    f"🎩 {user_name_html} знает себе цену. Читать внимательно:",
+
+                    # 🔥 Дерзость и Уверенность (Агрессивный маркетинг)
+                    f"🔥 {user_name_html} забирает всё внимание чата на себя! 🔥",
+                    f"⚡️ {user_name_html} не любит ждать. Читай и действуй:",
+                    f"💥 Меньше слов, больше дела. Анкета от {user_name_html}:",
+                    f"🚀 {user_name_html} нажал на газ! Кто составит компанию?",
+
+                    # 🧿 Интрига и Внимание (Кликбейт)
+                    f"🧿 У вас одно непрочитанное VIP-сообщение от {user_name_html}",
+                    f"🤫 Только для своих: {user_name_html} ищет компанию.",
+                    f"🎯 Внимание на экран! {user_name_html} в активном поиске:",
+                    f"🚨 Срочный перехват эфира от {user_name_html}! 🚨",
+
+                    # ✨ Классика (Обновленные старые варианты)
+                    f"✨ {user_name_html} бросает вызов одиночеству!",
+                    f"⚡️ Молния! {user_name_html} только что опубликовал анкету:",
+                    f"🌟 Привилегированный участник {user_name_html} на радаре:"
+                ]
             
             safe_text = str(txt).replace('<', '&lt;').replace('>', '&gt;')
             full_text = f"{vip_top}{random.choice(headers)}\n\n{safe_text}{vip_bot}"
