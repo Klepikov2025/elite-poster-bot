@@ -882,13 +882,13 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             })
 
         # Асинхронная фоновая отправка в Telegram
+        # Асинхронная фоновая отправка в Telegram
         def background_upload(uid, txt, net, cty, f_list):
-            from database import temp_posts
-            from telebot import types
+            from database import temp_posts, users_collection
             import io
             
             if f_list:
-                try: bot.send_message(uid, f"⏳ Получено {len(f_list)} файлов из Мини-аппа. Начинаю загрузку в Telegram...")
+                try: bot.send_message(uid, f"⏳ Загружаю {len(f_list)} медиафайлов на сервера Telegram...")
                 except: pass
             
             media_items = []
@@ -906,31 +906,61 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                 except Exception as e:
                     print(f"Ошибка фоновой загрузки медиа: {e}")
             
-            # Сохраняем готовый черновик в базу данных
+            # Сохраняем в базу на всякий случай
             temp_posts.update_one(
                 {"_id": uid},
                 {"$set": {
-                    "text": txt,
-                    "network": net,
-                    "city": cty,
-                    "media": media_items,
-                    "status": "ready_to_publish" # Меняем статус на "готов к публикации"
+                    "text": txt, "network": net, "city": cty, 
+                    "media": media_items, "status": "published"
                 }},
                 upsert=True
             )
+
+            # 🔥 БЕСШОВНАЯ ПУБЛИКАЦИЯ 🔥
+            # Собираем данные так, как этого ждет старая функция публикации
+            media_count = len(media_items)
+            if media_count == 0:
+                media_type = None
+                file_id = None
+            elif media_count == 1:
+                media_type = media_items[0]['type']
+                file_id = media_items[0]['id']
+            else:
+                media_type = "album"
+                file_id = uid
+
+            # Делаем фейковый объект Message, чтобы обмануть функцию из posts.py
+            class FakeUser:
+                def __init__(self, uid):
+                    self.id = uid
+                    # Вытаскиваем реальное имя юзера из базы
+                    user_doc = users_collection.find_one({"_id": uid})
+                    self.first_name = user_doc.get("first_name", "VIP") if user_doc else "VIP"
+
+            class FakeChat:
+                def __init__(self, uid):
+                    self.id = uid
+                    self.type = "private"
+
+            class FakeMessage:
+                def __init__(self, uid, text):
+                    self.from_user = FakeUser(uid)
+                    self.chat = FakeChat(uid)
+                    self.text = text # Для функции нужен ГОРОД в виде текста сообщения!
+
+            # Создаем фейк-сообщение (вместо текста передаем ГОРОД, т.к. старая логика ждет город именно там)
+            fake_msg = FakeMessage(uid, cty)
             
-            # Предлагаем кнопку финальной публикации в чате бота
-            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-            markup.add("🚀 Опубликовать анкету")
-            markup.add("Назад")
             try:
-                bot.send_message(
-                    uid, 
-                    "✅ **Все медиафайлы успешно загружены через Мини-апп!**\n\nНажмите на кнопку ниже, чтобы запустить публикацию анкеты:", 
-                    reply_markup=markup, 
-                    parse_mode="Markdown"
-                )
-            except: pass
+                # Импортируем саму функцию публикации напрямую
+                from handlers.posts import select_city_and_publish
+                
+                # И вызываем её в тихом режиме!
+                select_city_and_publish(fake_msg, txt, net, media_type, file_id)
+                
+            except Exception as e:
+                try: bot.send_message(uid, f"❌ Произошла ошибка при публикации анкеты: {e}")
+                except: pass
 
         # Запускаем поток и мгновенно отвечаем фронтенду "ok", чтобы закрыть/переключить окно
         threading.Thread(target=background_upload, args=(user_id, text, network, city, files_to_process), daemon=True).start()
