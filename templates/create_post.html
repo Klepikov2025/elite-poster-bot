@@ -240,6 +240,17 @@
         tg.setHeaderColor('#050505');
         tg.setBackgroundColor('#050505');
 
+        // ДОБАВИТЬ ЭТУ ФУНКЦИЮ:
+        function safeHaptic(type, style) {
+            if (tg.HapticFeedback) {
+                if (type === 'impact') {
+                    tg.HapticFeedback.impactOccurred(style);
+                } else if (type === 'notify') {
+                    tg.HapticFeedback.notificationOccurred(style);
+                }
+            }
+        }
+
         const fileStore = new DataTransfer();
         let cityData = {}; // Глобальная переменная для городов
 
