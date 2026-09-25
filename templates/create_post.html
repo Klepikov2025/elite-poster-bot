@@ -240,15 +240,15 @@
         tg.setHeaderColor('#050505');
         tg.setBackgroundColor('#050505');
 
-        // Глобальный объект DataTransfer для хранения файлов (позволяет удалять конкретные файлы)
         const fileStore = new DataTransfer();
+        let cityData = {}; // Глобальная переменная для городов
 
-        function safeHaptic(type, style) {
-            try {
-                if(type === 'impact') tg.HapticFeedback.impactOccurred(style);
-                else tg.HapticFeedback.notificationOccurred(style);
-            } catch(e){}
-        }
+        // Загружаем матрицу городов при открытии аппки
+        fetch('/api/get_cities_matrix')
+            .then(res => res.json())
+            .then(data => {
+                cityData = data;
+            }).catch(e => console.log("Ошибка загрузки городов:", e));
 
         function customAlert(msg, title = "Уведомление", icon = "🔔") {
             document.getElementById('alertIcon').innerText = icon;
@@ -337,15 +337,7 @@
             setTimeout(() => { sheet.classList.add('hidden'); }, 300);
         }
 
-        // === ЛОГИКА ВЫБОРА ===
-        const cityData = {
-            "mk": ["Екатеринбург", "Челябинск", "Пермь", "Москва", "Санкт-Петербург", "Тюмень", "Ижевск", "Казань", "Оренбург", "Уфа", "Новосибирск", "Красноярск", "Барнаул", "Омск", "Саратов", "Воронеж", "Самара", "Волгоград", "Нижний Новгород", "Калининград", "Иркутск", "Кемерово", "Общая группа Юга", "ХМАО", "ЯМАЛ", "Казахстан"],
-            "parni": ["Екатеринбург", "Тюмень", "Омск", "Челябинск", "Пермь", "Курган", "ХМАО", "Уфа", "Новосибирск", "ЯМАЛ", "Оренбург", "Москва", "Санкт-Петербург", "Красноярск"],
-            "ns": ["Новосибирск", "Челябинск", "Пермь", "Уфа", "ЯМАЛ", "Москва", "ХМАО", "Екатеринбург", "Тюмень", "Санкт-Петербург"],
-            "rainbow": ["Екатеринбург"],
-            "gayznak": ["Красноярск", "Екатеринбург", "Пермь", "Тюмень", "Новосибирск", "Самара", "Казань", "Воронеж", "Кемерово", "Иркутск", "Челябинск", "Орёл", "Саратов", "Архангельск", "Ярославль", "Тверь", "Великий Новгород", "Владимир", "Мурманск", "Рязань", "Смоленск", "Тамбов", "Липецк", "Тула", "Брянск", "Волгоград"]
-        };
-
+        // === ЛОГИКА ВЫБОРА ГОРОДОВ ИЗ БАЗЫ ===
         function selectNetwork(key, name) {
             safeHaptic('impact', 'medium');
             document.getElementById('networkValue').value = key;
@@ -358,22 +350,46 @@
             document.getElementById('cityValue').value = '';
             cityText.innerText = "Выбрать город...";
             
+            const container = document.getElementById('cityListContainer');
+            let html = '';
+
             if (key === 'all') {
                 cityText.className = "text-sm font-bold text-elite-DEFAULT truncate";
-                document.getElementById('citySheetNetName').innerText = "Все сети (Рассылка)";
+                document.getElementById('citySheetNetName').innerText = "Все сети (От 2 совпадений)";
+                
+                let counts = {};
+                let nonCities = ["БЕЗ ПРЕДРАССУДКОВ", "RAINBOW MAN", "Мужской Чат", "Фетиши", "Аренда Жилья", "Секс Туризм", "Галерея", "Тестовая группа 🛠️", "Общая группа Юга", "Казахстан", "ХМАО", "ЯМАЛ"];
+                
+                // Считаем общие города
+                ['mk', 'parni', 'ns', 'rainbow', 'gayznak'].forEach(net => {
+                    if(cityData[net]) {
+                        cityData[net].forEach(c => {
+                            if (!nonCities.includes(c)) {
+                                counts[c] = (counts[c] || 0) + 1;
+                            }
+                        });
+                    }
+                });
+                
+                // Оставляем только те, что есть минимум в 2 базах
+                let commonCities = Object.keys(counts).filter(c => counts[c] >= 2).sort();
+                
+                commonCities.forEach(city => {
+                    html += `<button onclick="selectCity('${city}')" class="w-full p-4 rounded-xl text-left font-medium bg-surface active:bg-zinc-800 transition-colors text-white">${city}</button>`;
+                });
+
             } else {
                 cityText.className = "text-sm font-medium text-zinc-400 truncate";
                 document.getElementById('citySheetNetName').innerText = name;
+                
+                if (cityData[key]) {
+                    cityData[key].sort().forEach(city => {
+                        html += `<button onclick="selectCity('${city}')" class="w-full p-4 rounded-xl text-left font-medium bg-surface active:bg-zinc-800 transition-colors text-white">${city}</button>`;
+                    });
+                }
             }
             
-            // Рендерим города в шторку (cityData['all'] содержит все уникальные города без дублей)
-            const container = document.getElementById('cityListContainer');
-            let html = '';
-            cityData[key].sort().forEach(city => {
-                html += `<button onclick="selectCity('${city}')" class="w-full p-4 rounded-xl text-left font-medium bg-surface active:bg-zinc-800 transition-colors text-white">${city}</button>`;
-            });
             container.innerHTML = html;
-            
             closeSheet('networkSheet');
         }
 
