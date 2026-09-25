@@ -850,45 +850,55 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         )
         return jsonify({"status": "ok"})
 
-    # === РОУТЫ ДЛЯ МИНИ-АППКИ VIP ===
-    # 1. Отдаем саму страничку Мини-аппа
+    # 1. Отдаем чистую страничку Мини-аппа
     @app.route('/mini_app_post')
     def mini_app_post():
         return render_template('create_post.html')
 
-    # 2. Принимаем хардкорную FormData с текстом и файлами
+    # 1.5. API для загрузки городов без глюков HTML
+    @app.route('/api/get_cities_matrix', methods=['GET'])
+    def api_get_cities_matrix():
+        infra = db['settings'].find_one({"_id": "infrastructure"}) or {}
+        networks = infra.get("networks", {})
+        city_data = {}
+        import re
+        for net_key in ["mk", "parni", "ns", "rainbow", "gayznak"]:
+            city_data[net_key] = []
+            for item in networks.get(net_key, []):
+                raw_name = item.get("name", "")
+                clean_name = re.sub(r'\s*\d+$', '', raw_name).strip()
+                if clean_name and clean_name not in city_data[net_key]:
+                    city_data[net_key].append(clean_name)
+        return jsonify(city_data)
+
+    # 2. Прием файлов и АВТОНОМНАЯ публикация
     @app.route('/api/submit_mini_app', methods=['POST'])
     def submit_mini_app():
         import io
+        import re
+        import random
+        import time
+        from datetime import datetime
+        from telebot import types
+        
         user_id = request.form.get('user_id')
         text = request.form.get('text')
         network = request.form.get('network')
         city = request.form.get('city')
         uploaded_files = request.files.getlist('media')
 
-        if not user_id:
-            return jsonify({"status": "error", "message": "No user_id"}), 400
-
+        if not user_id: return jsonify({"status": "error", "message": "No user_id"}), 400
         user_id = int(user_id)
 
-        # Вытаскиваем байты файлов из памяти сразу, пока запрос активен
         files_to_process = []
-        for file in uploaded_files[:10]: # Ограничение Телеграма — до 10 файлов
+        for file in uploaded_files[:10]:
             filename = file.filename.lower()
             is_video = filename.endswith(('.mp4', '.mov', '.avi', '.mkv', '.webm'))
-            files_to_process.append({
-                "bytes": file.read(),
-                "is_video": is_video
-            })
+            files_to_process.append({"bytes": file.read(), "is_video": is_video})
 
-        # Асинхронная фоновая отправка в Telegram
-        # Асинхронная фоновая отправка в Telegram
         def background_upload(uid, txt, net, cty, f_list):
-            from database import temp_posts, users_collection
-            import io
-            
             if f_list:
-                try: bot.send_message(uid, f"⏳ Загружаю {len(f_list)} медиафайлов на сервера Telegram...")
+                try: bot.send_message(uid, f"⏳ Выгружаю {len(f_list)} файлов на сервера Telegram...")
                 except: pass
             
             media_items = []
@@ -904,65 +914,98 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                         msg = bot.send_photo(uid, bio)
                         media_items.append({"type": "photo", "id": msg.photo[-1].file_id})
                 except Exception as e:
-                    print(f"Ошибка фоновой загрузки медиа: {e}")
-            
-            # Сохраняем в базу на всякий случай
-            temp_posts.update_one(
-                {"_id": uid},
-                {"$set": {
-                    "text": txt, "network": net, "city": cty, 
-                    "media": media_items, "status": "published"
-                }},
-                upsert=True
-            )
+                    print(f"Ошибка фоновой загрузки: {e}")
 
-            # 🔥 БЕСШОВНАЯ ПУБЛИКАЦИЯ 🔥
-            # Собираем данные так, как этого ждет старая функция публикации
-            media_count = len(media_items)
-            if media_count == 0:
-                media_type = None
-                file_id = None
-            elif media_count == 1:
-                media_type = media_items[0]['type']
-                file_id = media_items[0]['id']
+            # Собираем красивую анкету
+            user_doc = users_collection.find_one({"_id": uid}) or {}
+            safe_name = user_doc.get("first_name", "VIP").replace('<', '').replace('>', '')
+            user_name_html = f'<a href="tg://user?id={uid}">{safe_name}</a>'
+            
+            vip_top = '<tg-emoji emoji-id="5467688183229610037">👑</tg-emoji><tg-emoji emoji-id="5467466378233543299">👑</tg-emoji><tg-emoji emoji-id="5467630896955815565">👑</tg-emoji>\n\n'
+            vip_bot = '\n\n<tg-emoji emoji-id="5949582599012750373">✅</tg-emoji> <b>Анкета проверена администрацией сети</b>\n\n<tg-emoji emoji-id="6215039782955783886">🌟</tg-emoji> <b>Привилегированный участник</b> <tg-emoji emoji-id="6215039782955783886">🌟</tg-emoji>'
+            
+            headers = [
+                f"💎 VIP-СООБЩЕНИЕ от {user_name_html}! 💎",
+                f"🚨 🔥 Срочное объявление от {user_name_html}! 🚨",
+                f"👑 {user_name_html} публикует элитное объявление: 👑",
+            ]
+            
+            safe_text = str(txt).replace('<', '&lt;').replace('>', '&gt;')
+            full_text = f"{vip_top}{random.choice(headers)}\n\n{safe_text}{vip_bot}"
+            
+            markup = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton(text="Откликнуться ♥", callback_data="respond"))
+
+            # Достаем чаты
+            infra = db['settings'].find_one({"_id": "infrastructure"}) or {}
+            networks_db = infra.get("networks", {})
+            target_chats = []
+
+            def get_matches(nk, target_city):
+                matched = []
+                for item in networks_db.get(nk, []):
+                    raw_city = item.get("name", "")
+                    cid = item.get("id")
+                    if not cid: continue
+                    clean_city = re.sub(r'\s*\d+$', '', str(raw_city)).strip()
+                    if clean_city == target_city or str(raw_city) == target_city:
+                        matched.append((int(cid), nk))
+                return matched
+
+            if net == "Все сети":
+                for nk in ["mk", "parni", "ns", "rainbow", "gayznak"]:
+                    target_chats.extend(get_matches(nk, cty))
             else:
-                media_type = "album"
-                file_id = uid
+                net_map = {"Мужской Клуб": "mk", "ПАРНИ 18+": "parni", "НС": "ns", "Радуга": "rainbow", "Гей Знакомства": "gayznak"}
+                nk = net_map.get(net)
+                if nk: target_chats.extend(get_matches(nk, cty))
 
-            # Делаем фейковый объект Message, чтобы обмануть функцию из posts.py
-            class FakeUser:
-                def __init__(self, uid):
-                    self.id = uid
-                    # Вытаскиваем реальное имя юзера из базы
-                    user_doc = users_collection.find_one({"_id": uid})
-                    self.first_name = user_doc.get("first_name", "VIP") if user_doc else "VIP"
+            unique_targets = {cid: n_key for cid, n_key in target_chats}
 
-            class FakeChat:
-                def __init__(self, uid):
-                    self.id = uid
-                    self.type = "private"
-
-            class FakeMessage:
-                def __init__(self, uid, text):
-                    self.from_user = FakeUser(uid)
-                    self.chat = FakeChat(uid)
-                    self.text = text # Для функции нужен ГОРОД в виде текста сообщения!
-
-            # Создаем фейк-сообщение (вместо текста передаем ГОРОД, т.к. старая логика ждет город именно там)
-            fake_msg = FakeMessage(uid, cty)
-            
-            try:
-                # Импортируем саму функцию публикации напрямую
-                from handlers.posts import select_city_and_publish
-                
-                # И вызываем её в тихом режиме!
-                select_city_and_publish(fake_msg, txt, net, media_type, file_id)
-                
-            except Exception as e:
-                try: bot.send_message(uid, f"❌ Произошла ошибка при публикации анкеты: {e}")
+            if not unique_targets:
+                try: bot.send_message(uid, f"❌ Город '{cty}' не найден в базе!")
                 except: pass
+                return
 
-        # Запускаем поток и мгновенно отвечаем фронтенду "ok", чтобы закрыть/переключить окно
+            # 🔥 РАССЫЛКА И СОХРАНЕНИЕ ДЛЯ УДАЛЕНИЯ 🔥
+            success_chats = 0
+            for chat_id, network_name in unique_targets.items():
+                ids_to_store = []
+                try:
+                    if len(media_items) > 1:
+                        media_list = []
+                        for m in media_items:
+                            if m['type'] == 'photo': media_list.append(types.InputMediaPhoto(m['id']))
+                            else: media_list.append(types.InputMediaVideo(m['id']))
+                        
+                        sent_album = bot.send_media_group(chat_id, media_list)
+                        for m_msg in sent_album: ids_to_store.append(m_msg.message_id)
+                        
+                        sent_text = bot.send_message(chat_id, full_text, parse_mode="HTML", reply_markup=markup)
+                        ids_to_store.append(sent_text.message_id)
+                        
+                    elif len(media_items) == 1:
+                        m = media_items[0]
+                        if m['type'] == 'photo': sent_msg = bot.send_photo(chat_id, m['id'], caption=full_text, parse_mode="HTML", reply_markup=markup)
+                        else: sent_msg = bot.send_video(chat_id, m['id'], caption=full_text, parse_mode="HTML", reply_markup=markup)
+                        ids_to_store.append(sent_msg.message_id)
+                        
+                    else:
+                        sent_msg = bot.send_message(chat_id, full_text, parse_mode="HTML", reply_markup=markup)
+                        ids_to_store.append(sent_msg.message_id)
+
+                    # Записываем в базу, чтобы потом можно было удалить!
+                    db['posts'].insert_one({
+                        "user_id": uid, "message_ids": ids_to_store, "chat_id": chat_id,
+                        "time": datetime.now(), "city": cty, "network": network_name
+                    })
+                    success_chats += 1
+                except Exception as e:
+                    print(f"Ошибка в чат {chat_id}: {e}")
+                time.sleep(0.3)
+
+            try: bot.send_message(uid, f"✅ Успех! Анкета опубликована в городе {cty} ({success_chats} групп)!")
+            except: pass
+
         threading.Thread(target=background_upload, args=(user_id, text, network, city, files_to_process), daemon=True).start()
         return jsonify({"status": "ok"})
 
