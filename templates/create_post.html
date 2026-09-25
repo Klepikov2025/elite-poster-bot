@@ -569,6 +569,8 @@
             });
         }
 
+        let myPostsCache = []; // Глобальный кэш для функции "Повторить"
+
         // === УПРАВЛЕНИЕ АНКЕТАМИ ===
         function loadMyPosts() {
             let userId = tg.initDataUnsafe.user?.id || 0;
@@ -592,17 +594,28 @@
                     </div>`;
                     return;
                 }
+                
+                myPostsCache = data.posts; // Сохраняем анкеты в память телефона
                 let html = '';
+                
                 data.posts.forEach(p => {
+                    // line-clamp-3 заменен на блок с мягким скроллом для длинных текстов
                     html += `
                         <div class="bg-graphite p-5 rounded-[20px] mb-4 border border-zinc-800/50 relative shadow-lg">
                             <div class="absolute top-0 right-0 bg-zinc-800 text-elite-DEFAULT text-[9px] font-bold px-3 py-1.5 rounded-bl-xl">${p.network}</div>
                             <h4 class="font-bold text-white mb-1 text-sm">📍 ${p.city}</h4>
                             <p class="text-[9px] text-zinc-500 mb-3 uppercase tracking-wider">${p.time}</p>
-                            <p class="text-xs text-zinc-300 mb-4 bg-surface p-3 rounded-xl border border-zinc-800 line-clamp-3 leading-relaxed">"${p.text}"</p>
-                            <button onclick="deletePost('${p.id}')" class="w-full bg-red-500/10 py-2.5 rounded-xl text-xs font-bold text-red-400 border border-red-500/20 active:bg-red-500/20 transition-colors">
-                                🗑 Изъять из сети
-                            </button>
+                            
+                            <div class="text-xs text-zinc-300 mb-4 bg-surface p-3 rounded-xl border border-zinc-800 leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto hide-scroll">"${p.text}"</div>
+                            
+                            <div class="flex gap-2">
+                                <button onclick="reusePost('${p.id}')" class="flex-1 bg-elite-DEFAULT/10 py-2.5 rounded-xl text-xs font-bold text-elite-DEFAULT border border-elite-DEFAULT/20 active:bg-elite-DEFAULT/20 transition-colors">
+                                    ♻️ Повторить
+                                </button>
+                                <button onclick="deletePost('${p.id}')" class="flex-1 bg-red-500/10 py-2.5 rounded-xl text-xs font-bold text-red-400 border border-red-500/20 active:bg-red-500/20 transition-colors">
+                                    🗑 Изъять
+                                </button>
+                            </div>
                         </div>
                     `;
                 });
@@ -610,6 +623,50 @@
             }).catch(e => {
                 list.innerHTML = '<p class="text-center text-red-500 text-sm mt-10">Ошибка связи с сервером.</p>';
             });
+        }
+
+        // НОВАЯ ФУНКЦИЯ: Загрузка старой анкеты в редактор
+        function reusePost(postId) {
+            safeHaptic('impact', 'medium');
+            const post = myPostsCache.find(p => p.id === postId);
+            if(!post) return;
+
+            // 1. Заливаем текст
+            const textArea = document.getElementById('post_text');
+            textArea.value = post.text;
+            autoResize(textArea); // Подгоняем размер рамки под текст
+
+            // 2. Обратный перевод названия сети в системный ключ
+            const networkMapReverse = {
+                "Все сети": "all",
+                "Мужской Клуб": "mk",
+                "ПАРНИ 18+": "parni",
+                "НС": "ns",
+                "Радуга": "rainbow",
+                "Гей Знакомства": "gayznak"
+            };
+            
+            const netKey = networkMapReverse[post.network] || "";
+            if (netKey) {
+                document.getElementById('networkValue').value = netKey;
+                const netText = document.getElementById('networkText');
+                netText.innerText = post.network;
+                netText.classList.replace('text-zinc-600', 'text-white');
+            }
+
+            // 3. Подставляем город
+            if (post.city) {
+                document.getElementById('cityValue').value = post.city;
+                const cityText = document.getElementById('cityText');
+                cityText.innerText = post.city;
+                cityText.classList.replace('text-zinc-400', 'text-white');
+            }
+
+            // 4. Перекидываем пользователя на первую вкладку
+            switchTab('create');
+            
+            // Легкое уведомление, что магия сработала
+            customAlert("Анкета загружена в редактор! Вы можете изменить её или отправить заново.", "Режим редактирования", "✍️");
         }
 
         function deletePost(postId) {
