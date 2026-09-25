@@ -166,11 +166,15 @@
         <div id="tabManage" class="hidden animate-fade-in">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">Управление</h2>
-                <button onclick="loadMyPosts()" class="w-8 h-8 flex items-center justify-center bg-surface rounded-full border border-zinc-800 text-zinc-400 active:scale-90 transition-transform">↻</button>
+                <div class="flex gap-2">
+                    <button onclick="deleteAllPosts()" class="px-3 h-8 flex items-center justify-center bg-red-500/10 rounded-full border border-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-wider active:scale-90 transition-transform">
+                        🗑 Удалить всё
+                    </button>
+                    <button onclick="loadMyPosts()" class="w-8 h-8 flex items-center justify-center bg-surface rounded-full border border-zinc-800 text-zinc-400 active:scale-90 transition-transform">↻</button>
+                </div>
             </div>
             <div id="myPostsList" class="space-y-3"></div>
         </div>
-    </div>
 
     <!-- ФИКСИРОВАННАЯ КНОПКА ОТПРАВКИ (Glassmorphism) -->
     <div id="publishBar" class="fixed bottom-0 left-0 right-0 p-5 glass-panel z-40 transition-transform duration-300">
@@ -613,7 +617,7 @@
                                     ♻️ Повторить
                                 </button>
                                 <button onclick="deletePost('${p.id}')" class="flex-1 bg-red-500/10 py-2.5 rounded-xl text-xs font-bold text-red-400 border border-red-500/20 active:bg-red-500/20 transition-colors">
-                                    🗑 Изъять
+                                    🗑 Удалить
                                 </button>
                             </div>
                         </div>
@@ -687,6 +691,38 @@
                           } else {
                               customAlert(data.message, "Ошибка", "❌");
                           }
+                      });
+                }
+            });
+        }
+
+function deleteAllPosts() {
+            if (myPostsCache.length === 0) {
+                customAlert("У вас нет активных анкет для удаления.", "Внимание", "⚠️");
+                return;
+            }
+            
+            customConfirm("Вы уверены, что хотите удалить ВСЕ свои анкеты из ВСЕХ чатов? Это действие необратимо.", function(confirm) {
+                if(confirm) {
+                    toggleLoading(true);
+                    let userId = tg.initDataUnsafe.user?.id || 0;
+                    
+                    fetch('/api/delete_all_posts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ user_id: userId })
+                    }).then(res => res.json())
+                      .then(data => {
+                          toggleLoading(false);
+                          if(data.success) {
+                              customAlert(`Все анкеты (${data.count} шт.) успешно уничтожены!`, "Выполнено", "✅");
+                              loadMyPosts(); // Обновляем список, чтобы показать пустую страницу
+                          } else {
+                              customAlert(data.message, "Ошибка", "❌");
+                          }
+                      }).catch(e => {
+                          toggleLoading(false);
+                          customAlert("Сбой связи с сервером!", "Ошибка сети", "🔌");
                       });
                 }
             });
