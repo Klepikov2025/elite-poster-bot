@@ -1014,8 +1014,13 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
 
                     # Записываем в базу, чтобы потом можно было удалить!
                     db['posts'].insert_one({
-                        "user_id": uid, "message_ids": ids_to_store, "chat_id": chat_id,
-                        "time": datetime.now(), "city": cty, "network": network_name
+                        "user_id": uid, 
+                        "message_ids": ids_to_store, 
+                        "chat_id": chat_id,
+                        "time": datetime.now(), 
+                        "city": cty, 
+                        "network": network_name,
+                        "text": txt  # <---- ДОБАВИТЬ ВОТ ЭТУ СТРОЧКУ!
                     })
                     success_chats += 1
                 except Exception as e:
@@ -1077,6 +1082,38 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                     
         db['posts'].delete_one({"_id": ObjectId(post_id)})
         return jsonify({"success": True})
+
+    @app.route('/api/delete_all_posts', methods=['POST'])
+    def api_delete_all_posts():
+        data = request.json
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return jsonify({"success": False, "message": "Нет user_id"})
+            
+        # Ищем все анкеты пользователя
+        posts = list(db['posts'].find({"user_id": int(user_id)}))
+        
+        if not posts:
+            return jsonify({"success": False, "message": "Нет анкет для удаления"})
+            
+        deleted_count = 0
+        for post in posts:
+            chat_id = post.get("chat_id")
+            msg_ids = post.get("message_ids", [post.get("message_id")])
+            
+            if chat_id:
+                for m_id in msg_ids:
+                    if m_id:
+                        try: 
+                            bot.delete_message(chat_id, m_id)
+                        except: 
+                            pass
+            deleted_count += 1
+            
+        # Стираем все записи из базы
+        db['posts'].delete_many({"user_id": int(user_id)})
+        return jsonify({"success": True, "count": deleted_count})
 
 # 👇 УНИВЕРСАЛЬНЫЙ КРИПТО-КАССИР ДЛЯ VIP, ШТРАФОВ И ГОРОДОВ 👇
     @app.route('/glaz/api/cryptobot_webhook', methods=['POST'])
