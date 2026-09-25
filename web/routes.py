@@ -1042,14 +1042,14 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         result = []
         for p in posts:
             time_str = format_time(p["time"]) if "time" in p else "Неизвестно"
-            text_preview = p.get("text", "")[:40] + "..." # Обрезаем длинный текст для превью
-            
+            text_full = p.get("text", "") 
+        
             result.append({
                 "id": str(p["_id"]),
-                "network": p.get("network", "Неизвестно"),
-                "city": p.get("city", "Неизвестно"),
-                "time": time_str,
-                "text": text_preview
+                 "network": p.get("network", "Неизвестно"),
+                 "city": p.get("city", "Неизвестно"),
+                 "time": time_str,
+                 "text": text_full # <-- Здесь теперь передаем полный текст
             })
         return jsonify({"success": True, "posts": result})
 
