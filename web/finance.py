@@ -34,6 +34,15 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             elif action == 'reject':
                 # Правильный возврат денег на баланс!
                 db['paid_users'].update_one({"uid": uid}, {"$inc": {"cashback_balance": amount}})
+                
+                # 👇 ФИКС: Записываем возврат в лог, чтобы он отображался в выписке
+                db['ruble_ledger'].insert_one({
+                    "uid": uid,
+                    "amount": amount,
+                    "reason": "Возврат средств (Отмена вывода админом)",
+                    "timestamp": time.time()
+                })
+                
                 db['withdrawals'].update_one(
                     {"_id": wd_obj_id}, 
                     {"$set": {"status": "rejected", "notify_status": "reject"}}

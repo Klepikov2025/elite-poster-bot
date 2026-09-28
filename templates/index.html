@@ -304,6 +304,18 @@
                                 </div>
                             </div>
                         </div>
+
+                        {% if user_data.fin_history %}
+                        <div style="margin-bottom: 10px; background: rgba(3, 218, 198, 0.05); padding: 8px; border-radius: 5px; border: 1px solid rgba(3, 218, 198, 0.2);">
+                            <span style="font-size: 11px; color: #03dac6; display: block; margin-bottom: 5px; font-weight: bold;">💸 Выписки и Выводы (Последние 15):</span>
+                            <ul style="margin: 0; padding-left: 15px; color: #ccc; font-size: 11px; line-height: 1.5; max-height: 120px; overflow-y: auto;">
+                                {% for log in user_data.fin_history %}
+                                    <li style="margin-bottom: 3px;">{{ log }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
                         <button type="button" class="form-btn" style="width: 100%; background: #ffb74d; color: #121212; padding: 6px; font-size: 12px; font-weight: bold;" onclick="saveInventory({{ user_data.id }})">💾 Сохранить инвентарь</button>
                     </div>
 

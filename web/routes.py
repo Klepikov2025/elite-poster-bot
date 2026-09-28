@@ -38,7 +38,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         queer_users = users_collection.count_documents({"is_queer": True})
         banned_users = banned_collection.count_documents({})
         
-        all_withdrawals = list(db['withdrawals'].find().sort("timestamp", -1).limit(50))
+        # Тянем ТОЛЬКО активные заявки, чтобы они не терялись за старыми
+        all_withdrawals = list(db['withdrawals'].find({"status": "pending"}).sort("timestamp", -1))
         all_promos = list(db['promocodes'].find().sort("_id", -1))
         
         # 👇 ДОБАВИЛИ ЭТО:
@@ -91,6 +92,22 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                     else:
                         first_seen_str = "Старожил (До 28.04)"
 
+                    # 👇 ВЫТАСКИВАЕМ ФИНАНСОВУЮ ИСТОРИЮ ЮЗЕРА 👇
+                    ledger_logs = list(db['ruble_ledger'].find({"uid": uid}).sort("timestamp", -1).limit(10))
+                    fin_history = []
+                    for log in ledger_logs:
+                        dt = datetime.fromtimestamp(log['timestamp']).strftime('%d.%m %H:%M')
+                        sign = "+" if log['amount'] > 0 else ""
+                        fin_history.append(f"[{dt}] {sign}{log['amount']}₽ — {log.get('reason', '')}")
+                        
+                    wd_logs = list(db['withdrawals'].find({"user_id": uid}).sort("timestamp", -1).limit(5))
+                    for wd in wd_logs:
+                        dt = datetime.fromtimestamp(wd['timestamp']).strftime('%d.%m %H:%M')
+                        status_map = {"pending": "⏳ В обработке", "paid": "✅ Выплачено", "rejected": "❌ Отклонено"}
+                        status_ru = status_map.get(wd.get('status'), wd.get('status'))
+                        method_str = wd.get('method', 'Неизвестно')
+                        fin_history.append(f"[{dt}] ВЫВОД {wd['amount']}₽ ({method_str}) — {status_ru}")
+
                     user_data = {
                         "id": uid,
                         "is_quarantine": is_quarantine,
@@ -99,8 +116,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                         "is_verified": u_info.get("is_verified", False) if u_info else False,
                         "is_admin": is_admin_system,
                         "main_city": u_info.get("main_city", "Не привязан") if u_info else "Не привязан",
-                        "purchased_cities": u_info.get("purchased_cities", []) if u_info else [], # <--- НОВОЕ
-                        "first_seen_str": first_seen_str, # <--- НОВОЕ
+                        "purchased_cities": u_info.get("purchased_cities", []) if u_info else [],
+                        "first_seen_str": first_seen_str,
                         "custom_tag": u_info.get("custom_tag", "Отсутствует") if u_info else "Отсутствует",
                         "shame_tag": u_info.get("shame_tag", "Отсутствует") if u_info else "Отсутствует",
                         "banned": True if b_info else False,
@@ -115,7 +132,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                         "ai_memory": p_info.get("dialog_history", [])[-6:], 
                         "secret_code": p_info.get("secret_code", ""),
                         "verif_seconds_left": seconds_left,
-                        "active_chats": p_info.get("active_chats", [])
+                        "active_chats": p_info.get("active_chats", []),
+                        "fin_history": fin_history # <--- ВОТ ТУТ ДОБАВЛЕНА ВЫПИСКА
                     }
                     add_radar_log(f"🔎 Обыск досье: {uid}")
                 else:
