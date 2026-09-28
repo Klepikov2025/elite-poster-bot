@@ -17,24 +17,24 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             wd_obj_id = ObjectId(wd_id)
         except: return redirect(url_for('admin_panel'))
             
-        wd = withdrawals_collection.find_one({"_id": wd_obj_id})
+        # Читаем из правильной таблицы!
+        wd = db['withdrawals'].find_one({"_id": wd_obj_id})
         
         if wd and wd.get('status') == 'pending':
             uid = wd['user_id']
             amount = wd['amount']
             
             if action == 'pay':
-                # 👇 Добавили флажок notify_status: "pay" 👇
-                withdrawals_collection.update_one(
+                db['withdrawals'].update_one(
                     {"_id": wd_obj_id}, 
                     {"$set": {"status": "paid", "notify_status": "pay"}}
                 )
                 add_radar_log(f"💸 ОПЛАЧЕНА ЗАЯВКА: {wd_id}")
                 
             elif action == 'reject':
-                db['paid'].update_one({"uid": uid}, {"$inc": {"cashback_balance": amount}})
-                # 👇 Добавили флажок notify_status: "reject" 👇
-                withdrawals_collection.update_one(
+                # Правильный возврат денег на баланс!
+                db['paid_users'].update_one({"uid": uid}, {"$inc": {"cashback_balance": amount}})
+                db['withdrawals'].update_one(
                     {"_id": wd_obj_id}, 
                     {"$set": {"status": "rejected", "notify_status": "reject"}}
                 )

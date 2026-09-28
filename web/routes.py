@@ -38,7 +38,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         queer_users = users_collection.count_documents({"is_queer": True})
         banned_users = banned_collection.count_documents({})
         
-        all_withdrawals = list(withdrawals_collection.find().sort("_id", -1).limit(50))
+        all_withdrawals = list(db['withdrawals'].find().sort("timestamp", -1).limit(50))
         all_promos = list(db['promocodes'].find().sort("_id", -1))
         
         # 👇 ДОБАВИЛИ ЭТО:
