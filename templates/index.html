@@ -202,7 +202,7 @@
         <button class="tab-btn" onclick="openTab('tab-system')">⚙️ Система</button>
         <button class="tab-btn" onclick="openTab('ads-tab')">📊 Биржа рекламы</button>
         <button class="tab-btn" onclick="openTab('tab-infrastructure')" style="color: #4caf50; font-weight: bold;">🗺 Инфраструктура</button>
-        <button class="tab-btn" onclick="openTab('tab-live-finance')" style="color: #00e676; border-color: #00e676; font-weight: bold;">💰 Live-Финансы</button>
+        <button id="btn-secret-finance" class="tab-btn" onclick="openTab('tab-live-finance')" style="display: none; color: #00e676; border-color: #00e676; font-weight: bold;">💰 Live-Финансы</button>
         <button class="tab-btn" onclick="openTab('tab-withdrawals')">🎁 Касса и Награды</button>
         <button class="tab-btn" onclick="openTab('tab-promos')">🎫 Скидки</button>
     </div>
@@ -1875,13 +1875,17 @@ function unlockRoot() {
         document.getElementById('root-panel').style.display = 'block'; 
         document.getElementById('buttons-container').innerHTML = ''; 
         
+        // 👇 ДОБАВЛЯЕМ ЭТУ СТРОЧКУ ДЛЯ ПОЯВЛЕНИЯ КНОПКИ ФИНАНСОВ 👇
+        document.getElementById('btn-secret-finance').style.display = 'inline-block';
+        showToast("🔓 Секретный раздел Live-Финансов разблокирован!");
+        
         // Подтягиваем цвета и эмодзи из базы
         data.buttons.forEach(b => addButtonRow(b.text, b.url, b.style || 'default', b.emoji_id || ''));
         if(data.buttons.length === 0) addButtonRow('', '', 'default', '');
 
         // 👇 ВЫЗЫВАЕМ ЗАГРУЗКУ КАССЫ И ГРАФИКА 👇
         loadRootFinance(pin);
-        loadRootRevenue(pin); // <--- ВОТ ЭТУ НОВУЮ СТРОЧКУ ДОБАВИТЬ
+        loadRootRevenue(pin); 
     })
     .catch(err => alert("⛔️ " + err.message));
 }
