@@ -4,7 +4,9 @@ import time
 from bson.objectid import ObjectId
 from datetime import datetime
 
-# ================= 📡 LIVE ФИНАНСОВЫЙ ЦЕНТР СЕТИ =================
+def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
+
+    # ================= 📡 LIVE ФИНАНСОВЫЙ ЦЕНТР СЕТИ =================
     @app.route('/glaz/api/live_finance', methods=['GET'])
     def api_live_finance():
         if not session.get('logged_in'): 
@@ -146,8 +148,6 @@ from datetime import datetime
             "total_items": total_items
         })
 
-def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
-
     @app.route('/glaz/withdrawal_action', methods=['POST'])
     def glaz_withdrawal_action():
         if not session.get('logged_in'): return redirect(url_for('login'))
@@ -178,6 +178,7 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
                 db['paid_users'].update_one({"uid": uid}, {"$inc": {"cashback_balance": amount}})
                 
                 # 👇 ФИКС: Записываем возврат в лог, чтобы он отображался в выписке
+                import time
                 db['ruble_ledger'].insert_one({
                     "uid": uid,
                     "amount": amount,
@@ -236,6 +237,7 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
         # Оставляем детальный список логов для авторазбанов внизу блока
         today_payments = list(db['fine_payments'].find({"date": today_str}))
         formatted_list = []
+        import time
         for p in today_payments:
             formatted_list.append({
                 "uid": p["uid"],
@@ -295,7 +297,7 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
         if not prices:
             prices = {
                 "vip_price": 250,
-                "beyond_price": 250, # <--- ДОБАВИЛИ ЦЕНУ BEYOND
+                "beyond_price": 250,
                 "reg_small_1": 105, "reg_small_7": 490, "reg_small_15": 720, "reg_small_30": 938,
                 "reg_big_1": 105, "reg_big_7": 656, "reg_big_15": 1288, "reg_big_30": 1563,
                 "vip_big_chat_1": 1095, "vip_big_chat_7": 7656
@@ -311,7 +313,7 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             {"_id": "skynet_pricing"},
             {"$set": {
                 "vip_price": int(data.get("vip_price", 250)),
-                "beyond_price": int(data.get("beyond_price", 250)), # <--- ДОБАВИЛИ СОХРАНЕНИЕ
+                "beyond_price": int(data.get("beyond_price", 250)),
                 "reg_small_1": int(data.get("reg_small_1", 105)),
                 "reg_small_7": int(data.get("reg_small_7", 490)),
                 "reg_small_15": int(data.get("reg_small_15", 720)),
