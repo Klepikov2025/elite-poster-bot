@@ -1336,60 +1336,160 @@ threading.Thread(target=vip_funnel_sniper, daemon=True).start()
 threading.Thread(target=skynet_listener, daemon=True).start()
 # ============================================================================
 
-# ==================== ДЕМОН CPA-СЕТИ (БУХГАЛТЕР) ====================
+# ==================== ДЕМОН CPA-СЕТИ (БУХГАЛТЕР 2.0) ====================
 def cpa_tracker_daemon():
     while True:
         try:
             now = time.time()
-            # 172800 секунд = 48 часов. 
-            # (💡 Для тестов можешь поставить 60 секунд, чтобы проверить сразу)
-            HOLD_TIME = 172800 
+            # 🔥 НОВЫЙ ХОЛД: 14 дней (1 209 600 секунд) 🔥
+            HOLD_TIME = 1209600 
             
-            # Ищем всех, кто висит в заморозке
             pending_traffic = db['cpa_traffic'].find({"status": "hold"})
             
             for record in pending_traffic:
                 if now - record['join_time'] > HOLD_TIME:
                     new_user_id = record['new_user_id']
                     agent_id = record['agent_id']
+                    target_chat_id = record.get('chat_id')
                     
-                    # Проверяем, не убил ли Скайнет этого новичка за спам?
                     is_banned = banned_collection.find_one({"_id": new_user_id})
                     
+                    is_physically_present = False
+                    if target_chat_id and not is_banned:
+                        try:
+                            member = bot.get_chat_member(target_chat_id, new_user_id)
+                            # Мут (restricted) тоже считается присутствием!
+                            if member.status in ['member', 'administrator', 'creator'] or (member.status == 'restricted' and getattr(member, 'is_member', False)):
+                                is_physically_present = True
+                        except: pass 
+
                     if is_banned:
-                        # Трафик оказался спамером. Забраковано!
-                        db['cpa_traffic'].update_one({"_id": record['_id']}, {"$set": {"status": "fraud"}})
+                        db['cpa_traffic'].update_one({"_id": record['_id']}, {"$set": {"status": "fraud_banned"}})
+                    elif not is_physically_present:
+                        db['cpa_traffic'].update_one({"_id": record['_id']}, {"$set": {"status": "fraud_left"}})
                     else:
-                        # Трафик ВЫЖИЛ! Одобряем и платим Агенту
-                        db['cpa_traffic'].update_one({"_id": record['_id']}, {"$set": {"status": "approved"}})
+                        # 🔥 ТРАФИК ОДОБРЕН! Присваиваем ему метку ТЕКУЩЕГО МЕСЯЦА для конкурса 🔥
+                        import datetime
+                        current_month = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5))).strftime("%Y-%m")
+                        db['cpa_traffic'].update_one({"_id": record['_id']}, {"$set": {"status": "approved", "approved_month": current_month}})
                         
-                        # 🔥 ИЗМЕНЕНИЕ 1: Выдаем 1 Кейс Агента вместо 15 очков 🔥
                         paid_collection = db['paid_users']
                         paid_collection.update_one({"uid": agent_id}, {"$inc": {"agent_cases": 1, "cpa_refs": 1}}, upsert=True)
                         
                         agent_data = paid_collection.find_one({"uid": agent_id})
                         total_refs = agent_data.get("cpa_refs", 0)
                         
-                        msg_text = f"💼 **CPA-Сеть:** Ваш реферал успешно выжил 48 часов!\n\nВам начислен **1 Кейс Агента**! Зайдите в Игровой Кабинет (вкладка Финансы), чтобы покрутить рулетку и забрать приз!\n_Всего приведено: {total_refs} чел._"
+                        msg_text = f"💼 **CPA-Сеть:** Ваш реферал успешно выжил 14 дней в группе!\n\nВам начислен **1 Кейс Агента**! Зайдите в Игровой Кабинет (вкладка Финансы), чтобы забрать приз!\n_Всего приведено: {total_refs} чел._"
                         
-                        # 🔥 ИЗМЕНЕНИЕ 2: За юбилей теперь даем +1 ДОП. КЕЙС вместо 50 очков 🔥
                         if total_refs > 0 and total_refs % 10 == 0:
                             paid_collection.update_one({"uid": agent_id}, {"$inc": {"agent_cases": 1}})
                             msg_text += f"\n\n🎊 **ЮБИЛЕЙ!** Вы привели {total_refs} человек! Ловите еще **+1 Кейс Агента** сверху! 🎰"
                             
-                        # Отправляем радостное письмо Агенту
                         try: bot.send_message(agent_id, msg_text, parse_mode="Markdown")
                         except: pass
                         
         except Exception as e:
-            print(f"Ошибка CPA Tracker: {e}")
+            logger.error(f"Ошибка CPA Tracker: {e}")
         
-        # Демон спит 1 час, потом снова проверяет базу
-        time.sleep(3600)
+        time.sleep(21600) # Спит 6 часов
 
-# Запускаем Демона CPA при старте сервера
+# ==================== АВТО-КОНКУРС АГЕНТОВ (КАЖДОЕ 1 ЧИСЛО) ====================
+def cpa_monthly_daemon():
+    while True:
+        try:
+            import datetime
+            # Берем время по Екб (+5)
+            now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5)))
+            
+            # Если сегодня 1-е число месяца
+            if now.day == 1:
+                # Находим строку ПРОШЛОГО месяца (например, "2026-09" если сейчас октябрь)
+                prev_month_date = now.replace(day=1) - datetime.timedelta(days=1)
+                prev_month_str = prev_month_date.strftime("%Y-%m")
+                
+                # 🔥 ПРЕДОХРАНИТЕЛЬ: Конкурс официально стартует с Октября (2026-10) 🔥
+                # Если прошлый месяц был сентябрь 2026 или раньше — игнорируем!
+                if prev_month_str < "2026-10":
+                    # Ставим заглушку в базу, чтобы бот даже не пытался ничего считать
+                    db['settings'].update_one({"_id": f"cpa_contest_resolved_{prev_month_str}"}, {"$set": {"done": True, "skipped": "before_launch"}}, upsert=True)
+                
+                # Проверяем, не выдавали ли мы уже призы за этот месяц
+                elif not db['settings'].find_one({"_id": f"cpa_contest_resolved_{prev_month_str}"}):
+                    logger.info(f"🏆 СКАЙНЕТ НАЧИНАЕТ ПОДВЕДЕНИЕ ИТОГОВ КОНКУРСА АГЕНТОВ ЗА {prev_month_str}...")
+                    
+                    # 1. Выгружаем ТОП агентов с лидами >= 50 за ПРОШЛЫЙ месяц
+                    pipeline = [
+                        {"$match": {"status": "approved", "approved_month": prev_month_str}},
+                        {"$group": {"_id": "$agent_id", "count": {"$sum": 1}}},
+                        {"$match": {"count": {"$gte": 50}}}, # 🔥 ЖЕСТКИЙ ПОРОГ В 50 ЛИДОВ 🔥
+                        {"$sort": {"count": -1}},
+                        {"$limit": 5}
+                    ]
+                    top_agents = list(db['cpa_traffic'].aggregate(pipeline))
+                    
+                    if top_agents:
+                        from config import STAFF_GROUP_ID, PRIZES_THREAD_ID
+                        from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+                        
+                        report_to_admins = f"🏆 **ИТОГИ CPA-КОНКУРСА ({prev_month_str})** 🏆\n\n_Порог в 50 лидов прошли {len(top_agents)} агентов!_\n\n"
+                        
+                        for idx, agent in enumerate(top_agents):
+                            place = idx + 1
+                            agent_id = agent["_id"]
+                            leads = agent["count"]
+                            
+                            u_info = db['users'].find_one({"_id": agent_id}) or {}
+                            agent_name = u_info.get("first_name", f"ID {agent_id}")
+                            username_str = f"@{u_info.get('username')}" if u_info.get('username') else f"ID {agent_id}"
+                            
+                            if place == 1:
+                                prize_str = "Сертификат 2000₽"
+                                db['premium_claims'].insert_one({"uid": agent_id, "username": username_str, "details": "CPA 1 МЕСТО (Серт. 2000₽)", "timestamp": time.time(), "status": "pending"})
+                            elif place == 2:
+                                prize_str = "Сертификат 1500₽"
+                                db['premium_claims'].insert_one({"uid": agent_id, "username": username_str, "details": "CPA 2 МЕСТО (Серт. 1500₽)", "timestamp": time.time(), "status": "pending"})
+                            elif place == 3:
+                                prize_str = "Сертификат 1000₽"
+                                db['premium_claims'].insert_one({"uid": agent_id, "username": username_str, "details": "CPA 3 МЕСТО (Серт. 1000₽)", "timestamp": time.time(), "status": "pending"})
+                            elif place == 4:
+                                prize_str = "3000 Очков 💎"
+                                db['paid_users'].update_one({"uid": agent_id}, {"$inc": {"bounty_points": 3000}}, upsert=True)
+                            elif place == 5:
+                                prize_str = "1500 Очков 💎"
+                                db['paid_users'].update_one({"uid": agent_id}, {"$inc": {"bounty_points": 1500}}, upsert=True)
+                                
+                            report_to_admins += f"**{place} МЕСТО:** {agent_name} ({leads} лидов)\n🎁 Приз: {prize_str}\n\n"
+                            
+                            # Пишем агенту в ЛС
+                            try:
+                                bot.send_message(
+                                    agent_id, 
+                                    f"🏆 **ПОЗДРАВЛЯЕМ! ВЫ В ТОП-5 АГЕНТОВ СЕТИ!** 🏆\n\n"
+                                    f"За прошлый месяц вы привели **{leads}** активных участников и заняли **{place} место**!\n\n"
+                                    f"Ваш приз: **{prize_str}**.\n"
+                                    f"_(Если вы выиграли Сертификат, заявка отправлена администрации. Если Очки — они уже на балансе!)_",
+                                    parse_mode="Markdown"
+                                )
+                            except: pass
+
+                        markup = InlineKeyboardMarkup().add(InlineKeyboardButton("✅ Обработать призы в ЦУП", url="https://elite-poster-bot.onrender.com/glaz"))
+                        try: bot.send_message(STAFF_GROUP_ID, report_to_admins, parse_mode="Markdown", reply_markup=markup, message_thread_id=PRIZES_THREAD_ID)
+                        except: pass
+                    else:
+                        try: bot.send_message(STAFF_GROUP_ID, f"📉 Итоги CPA ({prev_month_str}): Ни один агент не смог преодолеть порог в 50 лидов.")
+                        except: pass
+
+                    # Записываем флаг, что месяц обработан
+                    db['settings'].update_one({"_id": f"cpa_contest_resolved_{prev_month_str}"}, {"$set": {"done": True}}, upsert=True)
+                    
+        except Exception as e:
+            logger.error(f"Ошибка CPA Конкурса: {e}")
+            
+        time.sleep(3600) # Проверяем дату каждый час
+
+# Запускаем демонов CPA
 threading.Thread(target=cpa_tracker_daemon, daemon=True).start()
-# =====================================================================
+threading.Thread(target=cpa_monthly_daemon, daemon=True).start()
 
 # 🤖 ФОНОВЫЙ ДЕМОН АВТОПИЛОТА
 def autopilot_daemon():

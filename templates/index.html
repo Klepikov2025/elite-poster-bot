@@ -202,6 +202,7 @@
         <button class="tab-btn" onclick="openTab('tab-system')">⚙️ Система</button>
         <button class="tab-btn" onclick="openTab('ads-tab')">📊 Биржа рекламы</button>
         <button class="tab-btn" onclick="openTab('tab-infrastructure')" style="color: #4caf50; font-weight: bold;">🗺 Инфраструктура</button>
+        <button class="tab-btn" onclick="openTab('tab-live-finance')" style="color: #00e676; border-color: #00e676; font-weight: bold;">💰 Live-Финансы</button>
         <button class="tab-btn" onclick="openTab('tab-withdrawals')">🎁 Касса и Награды</button>
         <button class="tab-btn" onclick="openTab('tab-promos')">🎫 Скидки</button>
     </div>
@@ -864,6 +865,67 @@
 
             <button class="form-btn" style="background: #bb86fc; color: #121212; width: 100%; font-weight: bold; font-size: 16px;" onclick="saveSystemTexts()">💾 Сохранить тексты в сеть</button>
         </div>
+<!-- ================= ВКЛАДКА: LIVE ФИНАНСОВЫЙ ЦЕНТР ================= -->
+    <div id="tab-live-finance" class="tab-content">
+        <div class="panel-block" style="max-width: 1200px; margin-top: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 12px;">
+                <div>
+                    <h3 style="color: #00e676; margin: 0; font-size: 20px; display: flex; align-items: center; gap: 8px;">
+                        <span>🔴</span> Прямой Эфир Транзакций
+                    </h3>
+                    <p style="color: #888; font-size: 12px; margin: 4px 0 0 0;">Все финансовые потоки сети (штрафы, квесты, рынок, сейфы, выводы) в реальном времени</p>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <label style="font-size: 12px; color: #aaa; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <input type="checkbox" id="live-finance-auto-refresh" checked> Автообновление (5с)
+                    </label>
+                    <button onclick="loadLiveFinance(currentFinancePage)" class="form-btn" style="padding: 6px 14px; font-size: 13px; background: #2d2d2d; color: #fff; border: 1px solid #444;">🔄 Обновить</button>
+                </div>
+            </div>
+
+            <!-- ПАНЕЛЬ ФИЛЬТРОВ И ПОИСКА -->
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; background: #161616; padding: 12px; border-radius: 8px; border: 1px solid #282828;">
+                <select id="live-finance-filter" class="form-input" style="flex: 1; min-width: 180px; padding: 8px; font-size: 13px;" onchange="loadLiveFinance(1)">
+                    <option value="all">🌐 Все валюты и потоки</option>
+                    <option value="rub">💸 Только Рубли (₽) и Баланс</option>
+                    <option value="stars">⭐️ Только Telegram Stars</option>
+                    <option value="payout">📤 Только Выводы средств</option>
+                </select>
+                <input type="text" id="live-finance-search-uid" placeholder="Поиск по Telegram ID..." class="form-input" style="flex: 1; min-width: 180px; padding: 8px; font-size: 13px;">
+                <button onclick="loadLiveFinance(1)" class="form-btn" style="background: #00e676; color: #121212; font-weight: bold; padding: 8px 18px; font-size: 13px;">Найти</button>
+                <button onclick="document.getElementById('live-finance-search-uid').value=''; loadLiveFinance(1);" class="form-btn" style="background: #333; color: #aaa; padding: 8px 12px; font-size: 13px;">Сброс</button>
+            </div>
+
+            <!-- ТАБЛИЦА ТРАНЗАКЦИЙ -->
+            <div style="overflow-x: auto; background: #121212; border-radius: 8px; border: 1px solid #282828;">
+                <table class="admin-table" style="margin: 0; font-size: 13px;">
+                    <thead>
+                        <tr>
+                            <th style="width: 140px;">Время (Екб)</th>
+                            <th style="width: 130px;">Пользователь</th>
+                            <th style="width: 170px;">Категория</th>
+                            <th style="width: 120px;">Сумма</th>
+                            <th>Описание / Назначение</th>
+                            <th style="width: 130px; text-align: center;">Статус</th>
+                        </tr>
+                    </thead>
+                    <tbody id="live-finance-tbody">
+                        <tr><td colspan="6" style="text-align: center; color: #888; padding: 25px;">Загрузка финансового монитора...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ПАНЕЛЬ ПАГИНАЦИИ -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 5px 0;">
+                <span id="live-finance-counter" style="font-size: 12px; color: #888;">Показано: 0 из 0</span>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button id="live-finance-prev-btn" onclick="changeFinancePage(-1)" class="tab-btn" style="padding: 6px 14px; font-size: 12px;">◀ Назад</button>
+                    <span id="live-finance-page-info" style="font-size: 13px; font-weight: bold; color: #fff;">1 / 1</span>
+                    <button id="live-finance-next-btn" onclick="changeFinancePage(1)" class="tab-btn" style="padding: 6px 14px; font-size: 12px;">Вперед ▶</button>
+                </div>
+            </div>
+        </div>
+    </div>
         </div> <div id="tab-withdrawals" class="tab-content">
         <div class="panel-block" style="max-width: 1200px; background: transparent; padding: 0; box-shadow: none;">
             
@@ -1129,6 +1191,7 @@
     if(tabId === 'tab-verif') loadVerifList(); // <--- ДОБАВИТЬ ЭТУ СТРОЧКУ
     if(tabId === 'tab-infrastructure') loadInfrastructure();
     if(tabId === 'ads-tab') loadAds();
+    if(tabId === 'tab-live-finance') loadLiveFinance(1);
     if(tabId === 'tab-system') { 
         loadDictionary(); loadSystemTexts(); loadSystemSettings(); loadNetworkPrices(); 
         loadAIPrompt(); loadModSettings(); 
@@ -1744,6 +1807,13 @@ function previewBroadcast() {
             // 👇 ДОБАВЛЯЕМ АВТООБНОВЛЕНИЕ ДЛЯ ШОУ НА ВЫЖИВАНИЕ 👇
             if(document.getElementById('tab-verif').classList.contains('active')) {
                 loadVerifList();
+            }
+            // 👇 АВТООБНОВЛЕНИЕ ДЛЯ LIVE-ФИНАНСОВ 👇
+            if(document.getElementById('tab-live-finance').classList.contains('active')) {
+                const autoRefresh = document.getElementById('live-finance-auto-refresh');
+                if(autoRefresh && autoRefresh.checked && currentFinancePage === 1) {
+                    loadLiveFinance(1);
+                }
             }
         }, 5000);
 
@@ -3034,6 +3104,95 @@ function loadVerifList() {
                     startQuarantineLiveTimers();
                 }
             });
+        }
+// ================= 💰 LIVE ФИНАНСОВЫЙ ЦЕНТР =================
+        let currentFinancePage = 1;
+        let totalFinancePages = 1;
+
+        function loadLiveFinance(page = 1) {
+            currentFinancePage = page;
+            const currency = document.getElementById('live-finance-filter').value;
+            const uid = document.getElementById('live-finance-search-uid').value.trim();
+
+            fetch(`/glaz/api/live_finance?page=${page}&limit=25&currency=${currency}&uid=${uid}`)
+            .then(res => res.json())
+            .then(data => {
+                if(data.error) return;
+
+                totalFinancePages = data.total_pages;
+                document.getElementById('live-finance-page-info').innerText = `${data.page} / ${data.total_pages}`;
+                document.getElementById('live-finance-counter').innerText = `Всего записей: ${data.total_items}`;
+
+                document.getElementById('live-finance-prev-btn').disabled = (data.page <= 1);
+                document.getElementById('live-finance-next-btn').disabled = (data.page >= data.total_pages);
+
+                const tbody = document.getElementById('live-finance-tbody');
+                if(!data.items || data.items.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #666; padding: 25px;">Транзакций не найдено 🪹</td></tr>';
+                    return;
+                }
+
+                let html = '';
+                data.items.forEach(it => {
+                    // Цвета сумм
+                    const amountColor = it.currency === '⭐️' ? '#ffeb3b' : (it.is_positive ? '#00e676' : '#ff5252');
+                    
+                    // Цвета статуса
+                    let badgeBg = 'rgba(255,255,255,0.08)';
+                    let badgeColor = '#aaa';
+                    if(it.badge === 'green') { badgeBg = 'rgba(0,230,118,0.15)'; badgeColor = '#00e676'; }
+                    else if(it.badge === 'red') { badgeBg = 'rgba(255,82,82,0.15)'; badgeColor = '#ff5252'; }
+                    else if(it.badge === 'yellow') { badgeBg = 'rgba(255,235,59,0.15)'; badgeColor = '#ffeb3b'; }
+                    else if(it.badge === 'purple') { badgeBg = 'rgba(187,134,252,0.15)'; badgeColor = '#bb86fc'; }
+                    else if(it.badge === 'blue') { badgeBg = 'rgba(43,107,243,0.15)'; badgeColor = '#64b5f6'; }
+
+                    const safeReason = (it.reason || '').replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+                    html += `
+                    <tr>
+                        <td style="color: #777; font-family: monospace; font-size: 11px;">${it.date_str}</td>
+                        <td>
+                            <span onclick="openDossierFromFinance(${it.uid})" style="cursor: pointer; color: #64b5f6; font-weight: bold; text-decoration: underline;" title="Открыть досье">
+                                ${it.uid || 'Система'}
+                            </span>
+                        </td>
+                        <td style="color: #ccc;">${it.type}</td>
+                        <td style="color: ${amountColor}; font-weight: bold; font-family: monospace; font-size: 14px;">
+                            ${it.amount_str}
+                        </td>
+                        <td style="color: #aaa; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${safeReason}">
+                            ${safeReason}
+                        </td>
+                        <td style="text-align: center;">
+                            <span style="background: ${badgeBg}; color: ${badgeColor}; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; border: 1px solid ${badgeColor}33;">
+                                ${it.status}
+                            </span>
+                        </td>
+                    </tr>`;
+                });
+
+                tbody.innerHTML = html;
+            })
+            .catch(() => {
+                document.getElementById('live-finance-tbody').innerHTML = '<tr><td colspan="6" style="text-align: center; color: #cf6679; padding: 25px;">Ошибка связи с сервером</td></tr>';
+            });
+        }
+
+        function changeFinancePage(delta) {
+            const newPage = currentFinancePage + delta;
+            if(newPage >= 1 && newPage <= totalFinancePages) {
+                loadLiveFinance(newPage);
+            }
+        }
+
+        function openDossierFromFinance(uid) {
+            if(!uid) return;
+            const searchInput = document.querySelector('input[name="search_id"]');
+            if(searchInput) {
+                searchInput.value = uid;
+                openTab('tab-main');
+                searchInput.closest('form').submit();
+            }
         }
 
     </script>

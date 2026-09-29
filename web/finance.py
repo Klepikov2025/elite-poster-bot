@@ -4,6 +4,148 @@ import time
 from bson.objectid import ObjectId
 from datetime import datetime
 
+# ================= 📡 LIVE ФИНАНСОВЫЙ ЦЕНТР СЕТИ =================
+    @app.route('/glaz/api/live_finance', methods=['GET'])
+    def api_live_finance():
+        if not session.get('logged_in'): 
+            return jsonify({"error": "Unauthorized"}), 401
+        
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 25))
+        currency_filter = request.args.get('currency', 'all')
+        search_uid = request.args.get('uid', '').strip()
+        
+        rub_query = {}
+        wd_query = {}
+        fine_query = {}
+        star_query = {}
+        
+        if search_uid and search_uid.isdigit():
+            u_int = int(search_uid)
+            rub_query["uid"] = u_int
+            wd_query["user_id"] = u_int
+            fine_query["uid"] = u_int
+            star_query["uid"] = u_int
+            
+        items = []
+        
+        # 1. Рублевый леджер (Кэшбэк, Квесты, Ферма, Рынок, Сейфы)
+        if currency_filter in ['all', 'rub']:
+            rub_records = list(db['ruble_ledger'].find(rub_query).sort("timestamp", -1).limit(500))
+            for r in rub_records:
+                amt = r.get("amount", 0)
+                is_plus = amt > 0
+                items.append({
+                    "id": str(r.get("_id")),
+                    "timestamp": r.get("timestamp", 0),
+                    "uid": r.get("uid"),
+                    "currency": "₽",
+                    "amount": amt,
+                    "amount_str": f"{'+' if is_plus else ''}{amt} ₽",
+                    "is_positive": is_plus,
+                    "type": "Кэшбэк / Баланс",
+                    "reason": r.get("reason", "Операция баланса"),
+                    "badge": "green" if is_plus else "red",
+                    "status": "Выполнено"
+                })
+                
+        # 2. Выводы средств (Ожидающие, выплаченные, отклоненные)
+        if currency_filter in ['all', 'rub', 'payout']:
+            wd_records = list(db['withdrawals'].find(wd_query).sort("timestamp", -1).limit(300))
+            for w in wd_records:
+                st = w.get("status", "pending")
+                st_map = {
+                    "pending": ("Ожидает выплаты", "yellow"),
+                    "paid": ("Выплачено", "green"),
+                    "rejected": ("Отклонено", "red")
+                }
+                status_label, badge_color = st_map.get(st, (st, "gray"))
+                items.append({
+                    "id": str(w.get("_id")),
+                    "timestamp": w.get("timestamp", 0),
+                    "uid": w.get("user_id"),
+                    "currency": "₽",
+                    "amount": -w.get("amount", 0),
+                    "amount_str": f"-{w.get('amount', 0)} ₽",
+                    "is_positive": False,
+                    "type": f"Вывод ({w.get('method', 'Реквизиты')})",
+                    "reason": f"Реквизиты: {w.get('details', '')}",
+                    "badge": badge_color,
+                    "status": status_label
+                })
+                
+        # 3. Звезды Telegram Stars (Штрафы, Разбаны, Донаты)
+        if currency_filter in ['all', 'stars']:
+            fine_records = list(db['fine_payments'].find(fine_query).sort("timestamp", -1).limit(300))
+            for f in fine_records:
+                amt = f.get("amount", 0)
+                items.append({
+                    "id": str(f.get("_id")),
+                    "timestamp": f.get("timestamp", 0),
+                    "uid": f.get("uid"),
+                    "currency": "⭐️",
+                    "amount": amt,
+                    "amount_str": f"+{amt} ⭐️",
+                    "is_positive": True,
+                    "type": "Штраф / Разбан",
+                    "reason": f"Оплата штрафа ({f.get('date', '')})",
+                    "badge": "purple",
+                    "status": "Оплачено"
+                })
+                
+            star_records = list(db['star_transactions'].find(star_query).sort("timestamp", -1).limit(300))
+            fine_ts = {f.get("timestamp") for f in fine_records}
+            for s in star_records:
+                if s.get("timestamp") not in fine_ts:
+                    amt = s.get("amount", 0)
+                    items.append({
+                        "id": str(s.get("_id")),
+                        "timestamp": s.get("timestamp", 0),
+                        "uid": s.get("uid"),
+                        "currency": "⭐️",
+                        "amount": amt,
+                        "amount_str": f"+{amt} ⭐️",
+                        "is_positive": True,
+                        "type": "Покупка Stars",
+                        "reason": f"Чек: {str(s.get('charge_id', ''))[:16]}...",
+                        "badge": "blue",
+                        "status": s.get("status", "paid")
+                    })
+
+        # Мгновенная сортировка общего пула по времени (свежие — сверху)
+        items.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+        
+        total_items = len(items)
+        total_pages = max(1, (total_items + limit - 1) // limit)
+        if page < 1: page = 1
+        if page > total_pages: page = total_pages
+        
+        start_idx = (page - 1) * limit
+        end_idx = start_idx + limit
+        paginated_items = items[start_idx:end_idx]
+        
+        import pytz
+        from datetime import datetime
+        tz_ekb = pytz.timezone('Asia/Yekaterinburg')
+        
+        for item in paginated_items:
+            ts = item.get("timestamp", 0)
+            if ts:
+                try:
+                    dt = datetime.fromtimestamp(ts, tz_ekb)
+                    item["date_str"] = dt.strftime("%d.%m %H:%M:%S")
+                except:
+                    item["date_str"] = "---"
+            else:
+                item["date_str"] = "---"
+
+        return jsonify({
+            "items": paginated_items,
+            "page": page,
+            "total_pages": total_pages,
+            "total_items": total_items
+        })
+
 def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
 
     @app.route('/glaz/withdrawal_action', methods=['POST'])
