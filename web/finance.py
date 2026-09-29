@@ -38,7 +38,7 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             
         # 1. Рублевый леджер (Кэшбэк, Квесты, Ферма, Рынок, Сейфы)
         if currency_filter in ['all', 'rub']:
-            rub_records = list(target_db['ruble_ledger'].find(rub_query).sort("timestamp", -1).limit(500))
+            rub_records = list(target_db['ruble_ledger'].find(rub_query).sort("timestamp", -1).limit(300))
             for r in rub_records:
                 amt = r.get("amount", 0)
                 is_plus = amt > 0
@@ -58,7 +58,7 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
                 
         # 2. Выводы средств (Ожидающие, выплаченные, отклоненные)
         if currency_filter in ['all', 'rub', 'payout']:
-            wd_records = list(target_db['withdrawals'].find(wd_query).sort("timestamp", -1).limit(300))
+            wd_records = list(target_db['withdrawals'].find(wd_query).sort("timestamp", -1).limit(200))
             for w in wd_records:
                 st = w.get("status", "pending")
                 st_map = {
@@ -83,7 +83,7 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
                 
         # 3. Звезды Telegram Stars (Штрафы, Разбаны, Донаты)
         if currency_filter in ['all', 'stars']:
-            fine_records = list(target_db['fine_payments'].find(fine_query).sort("timestamp", -1).limit(300))
+            fine_records = list(target_db['fine_payments'].find(fine_query).sort("timestamp", -1).limit(200))
             for f in fine_records:
                 amt = f.get("amount", 0)
                 items.append({
@@ -100,7 +100,7 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
                     "status": "Оплачено"
                 })
                 
-            star_records = list(target_db['star_transactions'].find(star_query).sort("timestamp", -1).limit(300))
+            star_records = list(target_db['star_transactions'].find(star_query).sort("timestamp", -1).limit(200))
             fine_ts = {f.get("timestamp") for f in fine_records}
             for s in star_records:
                 if s.get("timestamp") not in fine_ts:
@@ -117,6 +117,34 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
                         "reason": f"Чек: {str(s.get('charge_id', ''))[:16]}...",
                         "badge": "blue",
                         "status": s.get("status", "paid")
+                    })
+
+        # 4. 🔥 КРИПТО-КАССА (Реклама, VIP, BEYOND) 🔥
+        if currency_filter in ['all', 'rub'] and not search_uid:
+            rev_records = list(target_db['daily_revenue'].find().sort("timestamp", -1).limit(200))
+            for rev in rev_records:
+                r_type = rev.get("type", "")
+                if r_type in ["ads", "vip", "beyond", "city", "donation"]:
+                    # Переводим технические названия в красивые для панели
+                    type_ru = "Донат / Чаевые"
+                    if r_type == 'ads': type_ru = "Покупка Рекламы"
+                    elif r_type == 'vip': type_ru = "Покупка VIP"
+                    elif r_type == 'beyond': type_ru = "Клуб BEYOND"
+                    elif r_type == 'city': type_ru = "Доступ к городу"
+                    
+                    amt = rev.get("amount", 0)
+                    items.append({
+                        "id": str(rev.get("_id")),
+                        "timestamp": rev.get("timestamp", 0),
+                        "uid": "Крипто-Шлюз", # У крипты не всегда пишется UID в revenue
+                        "currency": "₽",
+                        "amount": amt,
+                        "amount_str": f"+{amt} ₽",
+                        "is_positive": True,
+                        "type": type_ru,
+                        "reason": "Прямое пополнение (CryptoBot)",
+                        "badge": "purple",
+                        "status": "Успешно"
                     })
 
         # Мгновенная сортировка общего пула по времени (свежие — сверху)
