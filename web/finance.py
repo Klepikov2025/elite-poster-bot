@@ -31,9 +31,14 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             
         items = []
         
+        try:
+            target_db = db.client['elite_bot_db']
+        except:
+            target_db = db
+            
         # 1. Рублевый леджер (Кэшбэк, Квесты, Ферма, Рынок, Сейфы)
         if currency_filter in ['all', 'rub']:
-            rub_records = list(db['ruble_ledger'].find(rub_query).sort("timestamp", -1).limit(500))
+            rub_records = list(target_db['ruble_ledger'].find(rub_query).sort("timestamp", -1).limit(500))
             for r in rub_records:
                 amt = r.get("amount", 0)
                 is_plus = amt > 0
@@ -53,7 +58,7 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
                 
         # 2. Выводы средств (Ожидающие, выплаченные, отклоненные)
         if currency_filter in ['all', 'rub', 'payout']:
-            wd_records = list(db['withdrawals'].find(wd_query).sort("timestamp", -1).limit(300))
+            wd_records = list(target_db['withdrawals'].find(wd_query).sort("timestamp", -1).limit(300))
             for w in wd_records:
                 st = w.get("status", "pending")
                 st_map = {
@@ -78,7 +83,7 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
                 
         # 3. Звезды Telegram Stars (Штрафы, Разбаны, Донаты)
         if currency_filter in ['all', 'stars']:
-            fine_records = list(db['fine_payments'].find(fine_query).sort("timestamp", -1).limit(300))
+            fine_records = list(target_db['fine_payments'].find(fine_query).sort("timestamp", -1).limit(300))
             for f in fine_records:
                 amt = f.get("amount", 0)
                 items.append({
@@ -95,7 +100,7 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
                     "status": "Оплачено"
                 })
                 
-            star_records = list(db['star_transactions'].find(star_query).sort("timestamp", -1).limit(300))
+            star_records = list(target_db['star_transactions'].find(star_query).sort("timestamp", -1).limit(300))
             fine_ts = {f.get("timestamp") for f in fine_records}
             for s in star_records:
                 if s.get("timestamp") not in fine_ts:
@@ -159,34 +164,44 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             wd_obj_id = ObjectId(wd_id)
         except: return redirect(url_for('admin_panel'))
             
-        # Читаем из правильной таблицы!
-        wd = db['withdrawals'].find_one({"_id": wd_obj_id})
+        try:
+            target_db = db.client['elite_bot_db']
+            collection = target_db['withdrawals']
+        except:
+            collection = db['withdrawals']
+            
+        wd = collection.find_one({"_id": wd_obj_id})
         
         if wd and wd.get('status') == 'pending':
             uid = wd['user_id']
             amount = wd['amount']
             
             if action == 'pay':
-                db['withdrawals'].update_one(
+                collection.update_one(
                     {"_id": wd_obj_id}, 
                     {"$set": {"status": "paid", "notify_status": "pay"}}
                 )
                 add_radar_log(f"💸 ОПЛАЧЕНА ЗАЯВКА: {wd_id}")
                 
             elif action == 'reject':
-                # Правильный возврат денег на баланс!
-                db['paid_users'].update_one({"uid": uid}, {"$inc": {"cashback_balance": amount}})
+                try:
+                    paid_coll = target_db['paid_users']
+                    rub_ledger = target_db['ruble_ledger']
+                except:
+                    paid_coll = db['paid_users']
+                    rub_ledger = db['ruble_ledger']
+                    
+                paid_coll.update_one({"uid": uid}, {"$inc": {"cashback_balance": amount}})
                 
-                # 👇 ФИКС: Записываем возврат в лог, чтобы он отображался в выписке
                 import time
-                db['ruble_ledger'].insert_one({
+                rub_ledger.insert_one({
                     "uid": uid,
                     "amount": amount,
                     "reason": "Возврат средств (Отмена вывода админом)",
                     "timestamp": time.time()
                 })
                 
-                db['withdrawals'].update_one(
+                collection.update_one(
                     {"_id": wd_obj_id}, 
                     {"$set": {"status": "rejected", "notify_status": "reject"}}
                 )
