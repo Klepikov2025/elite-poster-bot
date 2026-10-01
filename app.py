@@ -194,18 +194,50 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
                 "chat_id": chat_id
             })
             
-            # Радуем Агента быстрым дофамином
-        try:
-            bot.send_message(
-                agent_id, 
-                "👀 **У вас новый реферал!**\nПользователь подал заявку по вашей ссылке.\n\n⏳ _Скайнет поместил его в холд на 14 дней. Если он не сбежит и не получит бан за спам, вы получите_ 💼 **Кейс Агента** _(и +1 лид в зачет Конкурса Месяца)!_",
-                parse_mode="Markdown"
-            )
-        except: pass
-    else:
-        # ❌ ЮЗЕР УЖЕ ЕСТЬ В СЕТИ (Или зашел по ссылке другого агента ранее)
-        # Просто тихо плюсуем счетчик "Дубликаты", чтобы агент видел клики, но не получал спам в ЛС
-        db['paid_users'].update_one({"uid": agent_id}, {"$inc": {"cpa_duplicates": 1}}, upsert=True)
+            # 1. Радуем Агента быстрым дофамином
+            try:
+                bot.send_message(
+                    agent_id, 
+                    "👀 **У вас новый реферал!**\nПользователь подал заявку по вашей ссылке.\n\n⏳ _Скайнет поместил его в холд на 14 дней. Если он не сбежит и не получит бан за спам, вы получите_ 💼 **Кейс Агента** _(и +1 лид в зачет Конкурса Месяца)!_",
+                    parse_mode="Markdown"
+                )
+            except: pass
+            
+            # 2. 🔥 ВЫДАЕМ WELCOME-BOX НОВИЧКУ 🔥
+            try:
+                # Начисляем стартовый капитал
+                db['paid_users'].update_one(
+                    {"uid": user_id}, 
+                    {"$inc": {"bounty_points": 50, "immunity": 1}}, 
+                    upsert=True
+                )
+                
+                # Достаем имя агента для красивого приветствия
+                agent_info = db['users'].find_one({"_id": agent_id}) or {}
+                agent_name = agent_info.get("first_name", f"Агентом ID {agent_id}")
+                
+                from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+                # ВАЖНО: Замени FAQMKBOT на реальный юзернейм твоего бота-Секретаря, если он другой
+                markup = InlineKeyboardMarkup().add(
+                    InlineKeyboardButton("🎮 Открыть Игровой Кабинет", url="https://t.me/FAQMKBOT?start=app_profile")
+                )
+                
+                welcome_text = (
+                    f"🎁 **СТАРТОВЫЙ НАБОР ВЫЖИВАНИЯ!**\n\n"
+                    f"Вы были завербованы в сеть {agent_name}!\n"
+                    f"Вам передан секретный кейс новичка:\n"
+                    f"💎 **50 Очков Бдительности**\n"
+                    f"🛡 **1 Щит Иммунитета** (спасет от мута или вредителя на ферме)\n\n"
+                    f"Запускайте Игровой Кабинет, чтобы бесплатно испытать удачу в Гача-Рулетке! Добро пожаловать в Империю. 😎"
+                )
+                bot.send_message(user_id, welcome_text, parse_mode="Markdown", reply_markup=markup)
+            except Exception as e: 
+                pass # Если у юзера закрыта личка, просто игнорим
+
+        else:
+            # ❌ ЮЗЕР УЖЕ ЕСТЬ В СЕТИ (Или зашел по ссылке другого агента ранее)
+            # Просто тихо плюсуем счетчик "Дубликаты"
+            db['paid_users'].update_one({"uid": agent_id}, {"$inc": {"cpa_duplicates": 1}}, upsert=True)
     # 👆 ============================================================= 👆
     
     # 1. ФИКСИРУЕМ ЗАЯВКУ В СТАТИСТИКЕ (Строго 1 раз за весь период!)
