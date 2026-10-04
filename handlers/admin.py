@@ -557,3 +557,63 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
             f"✅ **Разжалование завершено!** 📉\n\nПользователь `{target_id}` лишен прав модератора в **{success_count}** чатах.\n\n⚠️ *Ошибок/Пропусков: {error_count} (юзер уже не админ или его нет в чате).* \n\n**Важно:** Кастомный тег должности удаляется автоматически при снятии прав.",
             parse_mode="Markdown"
         )
+
+    @bot.message_handler(commands=['updatebot'])
+    def update_service_bot_perms(message):
+        try:
+            staff_member = bot.get_chat_member(STAFF_GROUP_ID, message.from_user.id)
+            if staff_member.status not in ['administrator', 'creator']:
+                return
+        except Exception: return 
+        
+        args = message.text.split()
+        if len(args) < 2:
+            bot.send_message(message.chat.id, "❌ Формат: `/updatebot [ID_БОТА]`\nПример: `/updatebot 123456789`", parse_mode="Markdown")
+            return
+            
+        try: target_bot_id = int(args[1])
+        except ValueError:
+            return bot.send_message(message.chat.id, "❌ Ошибка: ID должен состоять только из цифр!")
+
+        bot.send_message(message.chat.id, f"🔄 Обновление прав для бота `{target_bot_id}`...\nПрименяю конфигурацию матричной маски по всей сети.", parse_mode="Markdown")
+        
+        from config import get_network_data
+        chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+
+        all_chats = []
+        all_chats.extend(chat_ids_parni.values())
+        all_chats.extend(chat_ids_mk.values())
+        all_chats.extend(chat_ids_ns.values())
+        all_chats.extend(chat_ids_rainbow.values())
+        all_chats.extend(chat_ids_gayznak.values())
+        unique_chats = set(all_chats)
+        
+        success_count = 0
+        error_count = 0
+        
+        for cid in unique_chats:
+            try:
+                # ВАЖНО: Выставляем права 1 в 1 как на скриншоте + Анонимность
+                bot.promote_chat_member(
+                    chat_id=cid, 
+                    user_id=target_bot_id, 
+                    can_manage_chat=True, 
+                    can_change_info=False,         # Изменение профиля ❌
+                    can_delete_messages=True,      # Удаление сообщений ✅
+                    can_restrict_members=True,     # Блокировка пользователей ✅
+                    can_invite_users=True,         # Добавление участников ✅
+                    can_pin_messages=False,        # Закрепление сообщений ❌
+                    can_manage_video_chats=False,  # Управление видеочатами ❌
+                    is_anonymous=True,             # Анонимность ✅ (Писать от имени группы)
+                    can_promote_members=True       # Добавление администраторов ✅
+                )
+                success_count += 1
+            except Exception as e:
+                error_count += 1
+            time.sleep(1) # Защита от лимитов Телеграма
+            
+        bot.send_message(
+            message.chat.id, 
+            f"✅ **Синхронизация прав завершена!** 🤖\n\nБоту `{target_bot_id}` обновлены галочки в **{success_count}** чатах.\n\n⚠️ *Ошибок: {error_count}.*",
+            parse_mode="Markdown"
+        )
