@@ -1612,6 +1612,34 @@ def autopilot_daemon():
 threading.Thread(target=autopilot_daemon, daemon=True).start()
 # =======================================
 
+# ==================== 🧹 ДЕМОН-УБОРЩИК (СКАЙНЕТ) ====================
+def garbage_collector_daemon():
+    """Фоновый уборщик: Скайнет удаляет чужой мусор по наводке Андрюшеньки"""
+    while True:
+        try:
+            now = time.time()
+            # Ищем сообщения, у которых время удаления (delete_at) уже наступило
+            tasks = list(db['cleanup_tasks'].find({"delete_at": {"$lte": now}}))
+            
+            for task in tasks:
+                try:
+                    # Скайнет использует свои админские права для удаления
+                    bot.delete_message(task['chat_id'], task['msg_id'])
+                except Exception as e:
+                    pass # Если сообщение уже удалили руками или нет прав - просто глотаем ошибку
+                
+                # Стираем выполненную задачу из базы
+                db['cleanup_tasks'].delete_one({"_id": task['_id']})
+                
+        except Exception as e:
+            print(f"Ошибка Уборщика Скайнета: {e}")
+            
+        time.sleep(30) # Проверяем базу каждые полминуты
+
+# Запускаем уборщика вместе с остальными демонами Скайнета
+threading.Thread(target=garbage_collector_daemon, daemon=True).start()
+# ====================================================================
+
 # === ДАТЧИК ПУЛЬСА СКАЙНЕТА ===
 def heartbeat_skynet():
     from database import db
