@@ -1622,66 +1622,6 @@ def autopilot_daemon():
 threading.Thread(target=autopilot_daemon, daemon=True).start()
 # =======================================
 
-_diag_done = set()
-
-def garbage_collector_daemon():
-    print("🧹 Уборщик Скайнета запущен", flush=True)
-    while True:
-        try:
-            now = time.time()
-            tasks = list(db['cleanup_tasks'].find({"delete_at": {"$lte": now}}))
-            for task in tasks:
-
-                chat_id = int(float(task['chat_id']))
-                msg_id = int(float(task['msg_id']))
-
-                try:
-                    bot.delete_message(chat_id, msg_id)
-                    db['cleanup_tasks'].delete_one({"_id": task['_id']})
-                    print(f"✅ Скайнет удалил {chat_id}/{msg_id}", flush=True)
-                except Exception as e:
-                    err = str(e).lower()
-                    tries = task.get("tries", 0) + 1
-                    print(f"❌ Скайнет не смог удалить {chat_id}/{msg_id}, попытка {tries}: {e}", flush=True)
-
-                    if chat_id not in _diag_done:   # диагностика один раз на чат
-                        _diag_done.add(chat_id)
-                        try:
-                            me = bot.get_me()
-                            m = bot.get_chat_member(chat_id, me.id)
-                            print(f"🔎 Я @{me.username}, статус в чате: {m.status}, "
-                                  f"can_delete_messages={getattr(m, 'can_delete_messages', None)}", flush=True)
-                        except Exception as e2:
-                            print(f"🔎 get_chat_member упал: {e2}", flush=True)
-
-                    if "forbidden" in err:
-                        # нет прав — повторять бессмысленно
-                        db['cleanup_tasks'].delete_one({"_id": task['_id']})
-                    elif "not found" in err:
-                        # сообщение могло ещё не дойти до Bot API или уже удалено — пробуем ещё
-                        if tries >= 4:
-                            db['cleanup_tasks'].delete_one({"_id": task['_id']})
-                        else:
-                            db['cleanup_tasks'].update_one(
-                                {"_id": task['_id']},
-                                {"$set": {"tries": tries, "delete_at": time.time() + 15}}
-                            )
-                    elif tries >= 3:
-                        db['cleanup_tasks'].delete_one({"_id": task['_id']})
-                    else:
-                        db['cleanup_tasks'].update_one(
-                            {"_id": task['_id']},
-                            {"$set": {"tries": tries, "delete_at": time.time() + 120}}
-                        )
-        except Exception as e:
-            print(f"Ошибка Уборщика Скайнета: {e}", flush=True)
-
-        time.sleep(3)
-# ====================================================================
-# Запускаем уборщика вместе с остальными демонами Скайнета
-threading.Thread(target=garbage_collector_daemon, daemon=True).start()
-# ====================================================================
-
 # === ДАТЧИК ПУЛЬСА СКАЙНЕТА ===
 def heartbeat_skynet():
     from database import db
