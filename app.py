@@ -1631,12 +1631,10 @@ def garbage_collector_daemon():
             now = time.time()
             tasks = list(db['cleanup_tasks'].find({"delete_at": {"$lte": now}}))
             for task in tasks:
-                
-                # 🔥 ВОТ ОНА, РАЗГАДКА: ЖЕСТКОЕ ПРИВЕДЕНИЕ ТИПОВ К INT 🔥
-                # float() нужен на случай, если база вернула число как строку '347285.0'
+
                 chat_id = int(float(task['chat_id']))
                 msg_id = int(float(task['msg_id']))
-                
+
                 try:
                     bot.delete_message(chat_id, msg_id)
                     db['cleanup_tasks'].delete_one({"_id": task['_id']})
@@ -1656,8 +1654,19 @@ def garbage_collector_daemon():
                         except Exception as e2:
                             print(f"🔎 get_chat_member упал: {e2}", flush=True)
 
-                    # Добавил 'not found', чтобы он не мучил удаленные задачи по 3 раза
-                    if "forbidden" in err or "not found" in err or tries >= 3:
+                    if "forbidden" in err:
+                        # нет прав — повторять бессмысленно
+                        db['cleanup_tasks'].delete_one({"_id": task['_id']})
+                    elif "not found" in err:
+                        # сообщение могло ещё не дойти до Bot API или уже удалено — пробуем ещё
+                        if tries >= 4:
+                            db['cleanup_tasks'].delete_one({"_id": task['_id']})
+                        else:
+                            db['cleanup_tasks'].update_one(
+                                {"_id": task['_id']},
+                                {"$set": {"tries": tries, "delete_at": time.time() + 15}}
+                            )
+                    elif tries >= 3:
                         db['cleanup_tasks'].delete_one({"_id": task['_id']})
                     else:
                         db['cleanup_tasks'].update_one(
@@ -1666,8 +1675,8 @@ def garbage_collector_daemon():
                         )
         except Exception as e:
             print(f"Ошибка Уборщика Скайнета: {e}", flush=True)
-        
-        time.sleep(3) # 🔥 Теперь Скайнет проверяет корзину каждые 3 секунды
+
+        time.sleep(3)
 # ====================================================================
 # Запускаем уборщика вместе с остальными демонами Скайнета
 threading.Thread(target=garbage_collector_daemon, daemon=True).start()
