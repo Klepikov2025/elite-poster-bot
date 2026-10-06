@@ -1666,7 +1666,8 @@ def garbage_collector_daemon():
                         )
         except Exception as e:
             print(f"Ошибка Уборщика Скайнета: {e}", flush=True)
-        time.sleep(30)
+        
+        time.sleep(3) # 🔥 Теперь Скайнет проверяет корзину каждые 3 секунды
 # ====================================================================
 # Запускаем уборщика вместе с остальными демонами Скайнета
 threading.Thread(target=garbage_collector_daemon, daemon=True).start()
