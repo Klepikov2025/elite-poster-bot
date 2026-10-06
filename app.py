@@ -1618,24 +1618,29 @@ def garbage_collector_daemon():
     while True:
         try:
             now = time.time()
-            # Ищем сообщения, у которых время удаления (delete_at) уже наступило
             tasks = list(db['cleanup_tasks'].find({"delete_at": {"$lte": now}}))
             
             for task in tasks:
                 try:
                     # Скайнет использует свои админские права для удаления
                     bot.delete_message(task['chat_id'], task['msg_id'])
+                    # УДАЛЯЕМ ИЗ БАЗЫ ТОЛЬКО ЕСЛИ УСПЕШНО УДАЛИЛИ В ТГ!
+                    db['cleanup_tasks'].delete_one({"_id": task['_id']})
+                    print(f"✅ Скайнет успешно удалил мусор: {task['chat_id']}/{task['msg_id']}")
                 except Exception as e:
-                    pass # Если сообщение уже удалили руками или нет прав - просто глотаем ошибку
-                
-                # Стираем выполненную задачу из базы
-                db['cleanup_tasks'].delete_one({"_id": task['_id']})
+                    error_msg = str(e).lower()
+                    print(f"❌ Скайнет не смог удалить мусор ({task['chat_id']}/{task['msg_id']}): {e}")
+                    
+                    # Если сообщения уже нет (удалили руками) или бота выгнали из чата — стираем задачу, она безнадежна
+                    if "not found" in error_msg or "message to delete not found" in error_msg or "forbidden" in error_msg:
+                        db['cleanup_tasks'].delete_one({"_id": task['_id']})
+                    # Иначе (временные сбои сети 429) — оставляем в базе, бот попробует еще раз через 30 секунд!
                 
         except Exception as e:
             print(f"Ошибка Уборщика Скайнета: {e}")
             
         time.sleep(30) # Проверяем базу каждые полминуты
-
+# ====================================================================
 # Запускаем уборщика вместе с остальными демонами Скайнета
 threading.Thread(target=garbage_collector_daemon, daemon=True).start()
 # ====================================================================
