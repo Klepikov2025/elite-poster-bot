@@ -1088,6 +1088,16 @@ def catch_bot_block(message):
                 # Это обычный обыватель. Просто заблокировал бота. Пусть живет мирно 🕊
                 pass
 
+@bot.message_handler(commands=['удали'])
+def test_kill_cookie(message):
+    if message.reply_to_message:
+        target_id = message.reply_to_message.message_id
+        try:
+            bot.delete_message(message.chat.id, target_id)
+            bot.reply_to(message, f"✅ Скайнет смог! Я удалил ID {target_id} напрямую!")
+        except Exception as e:
+            bot.reply_to(message, f"❌ Скайнет смотрит в упор, но Телеграм не дает: {e}")
+
 # ==================== ПЕРЕХВАТЧИК "МЕРТВЫХ ДУШ" (Защита от старых заявок + Амнистия + Теги) ====================
 @bot.message_handler(content_types=['new_chat_members'])
 def catch_illegal_entry(message):
@@ -1612,34 +1622,45 @@ def autopilot_daemon():
 threading.Thread(target=autopilot_daemon, daemon=True).start()
 # =======================================
 
-# ==================== 🧹 ДЕМОН-УБОРЩИК (СКАЙНЕТ) ====================
+_diag_done = set()
+
 def garbage_collector_daemon():
-    """Фоновый уборщик: Скайнет удаляет чужой мусор по наводке Андрюшеньки"""
+    print("🧹 Уборщик Скайнета запущен", flush=True)
     while True:
         try:
             now = time.time()
             tasks = list(db['cleanup_tasks'].find({"delete_at": {"$lte": now}}))
-            
             for task in tasks:
+                chat_id, msg_id = task['chat_id'], task['msg_id']
                 try:
-                    # Скайнет использует свои админские права для удаления
-                    bot.delete_message(task['chat_id'], task['msg_id'])
-                    # УДАЛЯЕМ ИЗ БАЗЫ ТОЛЬКО ЕСЛИ УСПЕШНО УДАЛИЛИ В ТГ!
+                    bot.delete_message(chat_id, msg_id)
                     db['cleanup_tasks'].delete_one({"_id": task['_id']})
-                    print(f"✅ Скайнет успешно удалил мусор: {task['chat_id']}/{task['msg_id']}")
+                    print(f"✅ Скайнет удалил {chat_id}/{msg_id}", flush=True)
                 except Exception as e:
-                    error_msg = str(e).lower()
-                    print(f"❌ Скайнет не смог удалить мусор ({task['chat_id']}/{task['msg_id']}): {e}")
-                    
-                    # Если сообщения уже нет (удалили руками) или бота выгнали из чата — стираем задачу, она безнадежна
-                    if "not found" in error_msg or "message to delete not found" in error_msg or "forbidden" in error_msg:
+                    err = str(e).lower()
+                    tries = task.get("tries", 0) + 1
+                    print(f"❌ Скайнет не смог удалить {chat_id}/{msg_id}, попытка {tries}: {e}", flush=True)
+
+                    if chat_id not in _diag_done:   # диагностика один раз на чат
+                        _diag_done.add(chat_id)
+                        try:
+                            me = bot.get_me()
+                            m = bot.get_chat_member(chat_id, me.id)
+                            print(f"🔎 Я @{me.username}, статус в чате: {m.status}, "
+                                  f"can_delete_messages={getattr(m, 'can_delete_messages', None)}", flush=True)
+                        except Exception as e2:
+                            print(f"🔎 get_chat_member упал: {e2}", flush=True)
+
+                    if "forbidden" in err or tries >= 3:
                         db['cleanup_tasks'].delete_one({"_id": task['_id']})
-                    # Иначе (временные сбои сети 429) — оставляем в базе, бот попробует еще раз через 30 секунд!
-                
+                    else:
+                        db['cleanup_tasks'].update_one(
+                            {"_id": task['_id']},
+                            {"$set": {"tries": tries, "delete_at": time.time() + 120}}
+                        )
         except Exception as e:
-            print(f"Ошибка Уборщика Скайнета: {e}")
-            
-        time.sleep(30) # Проверяем базу каждые полминуты
+            print(f"Ошибка Уборщика Скайнета: {e}", flush=True)
+        time.sleep(30)
 # ====================================================================
 # Запускаем уборщика вместе с остальными демонами Скайнета
 threading.Thread(target=garbage_collector_daemon, daemon=True).start()
