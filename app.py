@@ -1631,7 +1631,12 @@ def garbage_collector_daemon():
             now = time.time()
             tasks = list(db['cleanup_tasks'].find({"delete_at": {"$lte": now}}))
             for task in tasks:
-                chat_id, msg_id = task['chat_id'], task['msg_id']
+                
+                # 🔥 ВОТ ОНА, РАЗГАДКА: ЖЕСТКОЕ ПРИВЕДЕНИЕ ТИПОВ К INT 🔥
+                # float() нужен на случай, если база вернула число как строку '347285.0'
+                chat_id = int(float(task['chat_id']))
+                msg_id = int(float(task['msg_id']))
+                
                 try:
                     bot.delete_message(chat_id, msg_id)
                     db['cleanup_tasks'].delete_one({"_id": task['_id']})
@@ -1651,7 +1656,8 @@ def garbage_collector_daemon():
                         except Exception as e2:
                             print(f"🔎 get_chat_member упал: {e2}", flush=True)
 
-                    if "forbidden" in err or tries >= 3:
+                    # Добавил 'not found', чтобы он не мучил удаленные задачи по 3 раза
+                    if "forbidden" in err or "not found" in err or tries >= 3:
                         db['cleanup_tasks'].delete_one({"_id": task['_id']})
                     else:
                         db['cleanup_tasks'].update_one(
