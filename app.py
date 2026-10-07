@@ -860,7 +860,7 @@ def unban_user_everywhere(target_id):
     return unbanned_count
 
 # --- ФУНКЦИЯ: ГЛОБАЛЬНЫЙ МУТ (ДЛЯ РЕКЛАМЩИКОВ И НАРУШИТЕЛЕЙ) ---
-def mute_user_everywhere(target_id, reason="Без причины", admin_name="Система", user_link=None, trigger_text=None, mute_time=0, origin_chat=None):
+def mute_user_everywhere(target_id, reason="Без причины", admin_name="Система", user_link=None, trigger_text=None, mute_time=0, origin_chat=None, ignore_shield=False):
     # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
     from config import get_network_data
     chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
@@ -884,7 +884,7 @@ def mute_user_everywhere(target_id, reason="Без причины", admin_name="
     # Достаем данные юзера из базы для проверки одноразовых щитов
     user_paid_data = db['paid_users'].find_one({"uid": target_id}) or {}
     
-    if user_paid_data.get("immunity", 0) > 0:
+    if not ignore_shield and user_paid_data.get("immunity", 0) > 0:
         # 1. Списываем один щит
         db['paid_users'].update_one({"uid": target_id}, {"$inc": {"immunity": -1}})
         
@@ -1279,7 +1279,7 @@ def skynet_listener():
                     # 1. Снимаем бан и мут везде
                     unbanned = unban_user_everywhere(target_uid)
                     unmuted = unmute_user_everywhere(target_uid)
-                    
+
                     # 2. ВЫДАЕМ ИММУНИТЕТ ИЛИ ПРОСТО ЧИСТИМ ТЕГ
                     if task['action'] == "full_unban":
                         # 👇 БРОНЯ ОТ СТИРАНИЯ ТЕГОВ 👇
@@ -1323,6 +1323,10 @@ def skynet_listener():
                     
                     # 4. Закрываем задачу
                     db['skynet_tasks'].update_one({"_id": task['_id']}, {"$set": {"status": "done"}})
+
+                elif task['action'] == "global_unmute":
+                    unmute_user_everywhere(int(task['uid']))
+                    db['skynet_tasks'].update_one({"_id": task['_id']}, {"$set": {"status": "done"}})
                 
                 # 👇 ИСПОЛНЕНИЕ ПРИКАЗОВ ОТ ШПИОНА (С ДВОЙНОЙ ПРОВЕРКОЙ ИИ) 👇
                 elif task['action'] in ["global_ban", "global_mute"]:
@@ -1354,12 +1358,15 @@ def skynet_listener():
                                 origin_chat=escape_md(task.get('origin_chat', ''))
                             )
                         else:
+                            _dur = int(task.get('duration') or 0)
                             mute_user_everywhere(
-                                target_id=int(task['uid']), 
-                                reason=reason, 
-                                admin_name=task_admin_name,  
-                                trigger_text=trigger_text, 
-                                origin_chat=escape_md(task.get('origin_chat', ''))
+                                target_id=int(task['uid']),
+                                reason=reason,
+                                admin_name=task_admin_name,
+                                trigger_text=trigger_text,
+                                mute_time=int(time.time() + _dur) if _dur else 0,
+                                origin_chat=escape_md(task.get('origin_chat', '')),
+                                ignore_shield=bool(task.get('ignore_shield'))
                             )
                     else:
                         # 🛡 ИИ ОПРАВДАЛ ЮЗЕРА! Ордер аннулирован.
