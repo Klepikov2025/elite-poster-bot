@@ -10,6 +10,7 @@ import pymongo
 from pymongo import MongoClient
 import pytz
 import random
+from web_auth import init_web_auth, verify_telegram_webhook_secret
 import uuid
 import json
 import re
@@ -51,13 +52,14 @@ from handlers.skynet import register_skynet_handlers
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
-app.secret_key = "skynet_secret_eye_2026"
-# Секретные данные для входа на твой сайт (можешь поменять на свои!)
-WEB_USER = "admin"
-WEB_PASS = "mkadmin"
+# 🔐 Секреты теперь берутся из переменных окружения (не из кода!)
+WEB_USER = os.getenv("WEB_USER")
+WEB_PASS = None  # пароль больше не хранится в коде, проверка идёт по хешу в web_auth.py
 
-# === 👑 ROOT: КОНСТРУКТОР КНОПОК ===
-ROOT_PIN = "6996"  # ⚠️ ПОМЕНЯЙ ЭТОТ ПАРОЛЬ НА СВОЙ СЕКРЕТНЫЙ ПИН-КОД!
+# === 👑 ROOT PIN ===
+ROOT_PIN = os.getenv("ROOT_PIN")
+if not ROOT_PIN or len(ROOT_PIN) < 8:
+    raise RuntimeError("Задай ROOT_PIN (минимум 8 символов) в переменных окружения!")
 
 # Глобальные переменные
 ns_city_substitution = {}
@@ -74,6 +76,9 @@ def add_radar_log(text):
         "text": f"[{now}] {text}",
         "ts": time.time()
     })
+
+# 🔐 Включаем защиту веб-панели: логин + 2FA в Telegram + охранник на /glaz/*
+init_web_auth(app, bot, add_radar_log, OWNER_ID)
 
 def is_banned_in_network(user_id):
     from config import get_network_data
@@ -1646,6 +1651,8 @@ threading.Thread(target=heartbeat_skynet, daemon=True).start()
 # ==================== WEBHOOK ====================
 @app.route('/webhook', methods=['POST'])
 def webhook():
+    if not verify_telegram_webhook_secret():
+        return 'forbidden', 403
     update = telebot.types.Update.de_json(request.stream.read().decode('utf-8'))
     bot.process_new_updates([update])
     return 'ok', 200

@@ -11,23 +11,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                          unban_user_everywhere, unmute_user_everywhere, background_corpse_removal,
                          WEB_USER, WEB_PASS, OWNER_ID, ADMIN_CHAT_IDS, ROOT_PIN, STAFF_GROUP_ID):
 
-    @app.route('/glaz/login', methods=['GET', 'POST'])
-    def login():
-        error = None
-        if request.method == 'POST':
-            if request.form['username'] == WEB_USER and request.form['password'] == WEB_PASS:
-                session['logged_in'] = True
-                add_radar_log("🔐 Успешный вход в систему: Web-Саурон")
-                return redirect(url_for('admin_panel'))
-            else:
-                error = 'ОТКАЗАНО: Неверный маркер доступа!'
-                add_radar_log(f"⚠️ Неудачная попытка входа! Логин: {request.form.get('username')}")
-        return render_template('login.html', error=error)
-
-    @app.route('/glaz/logout')
-    def logout():
-        session.pop('logged_in', None)
-        return redirect(url_for('login'))
+    # login / 2fa / logout теперь живут в web_auth.py
 
     @app.route('/glaz', methods=['GET', 'POST'])
     def admin_panel():
@@ -1139,7 +1123,11 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         import random
         from config import VIP_CHAT_ID # Подтягиваем настройки
         
-        data = request.json
+        from web_auth import verify_cryptobot_signature
+        raw = request.get_data()
+        if not verify_cryptobot_signature(raw, request.headers.get("crypto-pay-api-signature", "")):
+            return jsonify({"status": "forbidden"}), 403
+        data = json.loads(raw)
         if not data or data.get("update_type") != "invoice_paid":
             return jsonify({"status": "ignored"}), 200
             
