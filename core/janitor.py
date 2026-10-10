@@ -65,6 +65,7 @@ _RETENTION = [
     ("skynet_errors", "ts", 30 * 86400),
     ("admin_audit", "ts", 180 * 86400),
     ("post_replies", "ts", 60 * 86400),
+    ("ai_reviews", "ts", 14 * 86400),
 ]
 
 

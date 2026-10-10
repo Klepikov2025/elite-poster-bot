@@ -22,6 +22,7 @@ from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 from core.guards import is_staff, is_staff_admin, deny_callback, acquire_lease, safe_delete
 from core.cfg import cfg as _cfg  # настройки из панели «🎛 Управление»
+from core.diag import log_error
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("skynet")  # раньше logger не был объявлен: демоны CPA падали на первой же записи в лог
@@ -1298,6 +1299,49 @@ def radar_confirm_ban(call):
     count = ban_user_everywhere(target_id, reason="Радар Твинков (Клон забаненной анкеты)", admin_name=admin_info)
     bot.send_message(call.message.chat.id, f"✅ Твинк уничтожен в {count} чатах.")
 
+@bot.callback_query_handler(func=lambda call: call.data.startswith("aire_"))
+def ai_review_decision(call):
+    """Решение админа по делу, которое ИИ не смог проверить (core/ai_review.py)."""
+    if not is_staff_admin(bot, call.from_user.id):
+        return deny_callback(bot, call)
+    try:
+        _, code, rid = call.data.split("_", 2)
+    except ValueError:
+        return
+    decision = {"b": "ban", "m": "mute", "x": "dismissed"}.get(code)
+    if not decision:
+        return
+    from core.ai_review import claim_review
+    admin_info = get_user_name(call.from_user)
+    case = claim_review(rid, decision, admin_info)
+    if not case:
+        try: bot.answer_callback_query(call.id, "Это дело уже решено.", show_alert=True)
+        except Exception: pass
+        try: bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+        except Exception: pass
+        return
+    try: bot.answer_callback_query(call.id)
+    except Exception: pass
+    uid, reason = int(case["uid"]), case.get("reason") or "Решение администратора"
+    verdict = {"ban": f"🔨 ЗАБАНЕН: {admin_info}", "mute": f"🔇 ЗАМУЧЕН: {admin_info}", "dismissed": f"✅ НЕ НАРУШЕНИЕ: {admin_info}"}[decision]
+    # Без parse_mode: раньше в тексте оставались сырые звёздочки **
+    try: bot.edit_message_text(f"{call.message.text}\n\n{verdict}", call.message.chat.id, call.message.message_id)
+    except Exception: pass
+    try:
+        if decision == "ban":
+            ban_user_everywhere(uid, reason=reason, admin_name=admin_info, user_link=case.get("user_link"),
+                                trigger_text=case.get("trigger_text"), origin_chat=escape_md(case.get("origin_chat", "")))
+        elif decision == "mute":
+            dur = int(case.get("duration") or 0)
+            mute_user_everywhere(uid, reason=reason, admin_name=admin_info, user_link=case.get("user_link"),
+                                 trigger_text=case.get("trigger_text"), mute_time=int(time.time() + dur) if dur else 0,
+                                 origin_chat=escape_md(case.get("origin_chat", "")))
+        add_radar_log(f"🤖→👤 Ручное решение ({reason}) для {uid}: {verdict}")
+    except Exception as e:
+        log_error("Ручное решение по ИИ", e, uid)
+        try: bot.send_message(call.message.chat.id, f"⚠️ Не удалось выполнить: {e}")
+        except Exception: pass
+
 # ==================== VIP СНАЙПЕР (Фоновая задача) ====================
 def vip_funnel_sniper():
     while True:
@@ -1439,9 +1483,13 @@ def _execute_skynet_task(task):
             from core.diag import log_error
             log_error("Приказ Шпиона", f"ИИ недоступен, {task['action']} для {task['uid']} не исполнен", task.get('uid'))
             try:
-                mk = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("🔨 ЗАБАНИТЬ ВЕЗДЕ", callback_data=f"radar_ban_{int(task['uid'])}"))
+                from core.ai_review import create_review
+                mk = create_review(int(task['uid']), "ban" if task['action'] == 'global_ban' else "mute", reason,
+                                   trigger_text=trigger_text, origin_chat=task.get('origin_chat', ''),
+                                   duration=int(task.get('duration') or 0), source="Шпион")
                 bot.send_message(STAFF_GROUP_ID, f"🤖 ИИ-проверка недоступна. Шпион просит {'бан' if task['action'] == 'global_ban' else 'мут'} для {task['uid']}\nПричина: {reason}\nУлика: {str(trigger_text)[:300]}\nРешите вручную.", reply_markup=mk)
-            except Exception: pass
+            except Exception as e:
+                log_error("Приказ Шпиона: алерт", e, task.get('uid'))
         elif is_guilty:
             # 👇 БЕРЕМ ИМЯ ИЗ ПРИКАЗА (иначе дефолт шпиона) 👇
             task_admin_name = task.get('admin_name', "Андрюшенька (Спецагент Шпион) 🕵️‍♂️")

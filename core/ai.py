@@ -30,20 +30,29 @@ def groq_chat(prompt, max_tokens=400, temperature=0.0, timeout=12, where="ИИ")
     from core.diag import log_error
     if not GROQ_API_KEYS:
         return None
+    model = groq_model()
+    body = {"model": model, "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature, "max_tokens": max_tokens}
+    if "gpt-oss" in model:
+        # gpt-oss сначала «думает», и эти мысли съедают лимит токенов: при 400 токенах ответ
+        # приходил пустым («пустой ответ» в Диагностике). Думать мало, мысли не присылать, запас токенов.
+        body.update({"reasoning_effort": "low", "include_reasoning": False, "max_tokens": max_tokens + 1200})
     for i, key in enumerate(GROQ_API_KEYS, 1):
+        kname = f"GROQ_API_KEY{'' if i == 1 else '_' + str(i)}"
         try:
             r = requests.post(GROQ_URL, headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                              json={"model": groq_model(), "messages": [{"role": "user", "content": prompt}],
-                                    "temperature": temperature, "max_tokens": max_tokens}, timeout=timeout)
+                              json=body, timeout=timeout)
             if r.status_code == 200:
-                text = (r.json()["choices"][0]["message"].get("content") or "").strip()
+                choice = r.json()["choices"][0]
+                text = (choice["message"].get("content") or "").strip()
                 if text:
                     return text
-                log_error("Groq", f"{where}: пустой ответ (ключ GROQ_API_KEY{'' if i == 1 else '_' + str(i)})")
+                why = "модель не успела ответить, кончился лимит токенов" if choice.get("finish_reason") == "length" else "пустой ответ"
+                log_error("Groq", f"{where}: {why} ({model}, ключ {kname})")
                 continue
-            log_error("Groq", f"{where}: HTTP {r.status_code}, ключ GROQ_API_KEY{'' if i == 1 else '_' + str(i)}: {r.text[:160]}")
+            log_error("Groq", f"{where}: HTTP {r.status_code}, ключ {kname}: {r.text[:160]}")
         except Exception as e:
-            log_error("Groq", f"{where}: ключ GROQ_API_KEY{'' if i == 1 else '_' + str(i)}: {e}")
+            log_error("Groq", f"{where}: ключ {kname}: {e}")
     return None
 
 

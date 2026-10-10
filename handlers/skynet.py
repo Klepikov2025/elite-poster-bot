@@ -402,13 +402,19 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         from core.ai import ai_verdict
         return ai_verdict(text, zone)
 
-    def ai_down_alert(user_link, user_id, chat_title, text, zone_name):
-        """ИИ не ответил: не наказываем вслепую, а зовём админов с кнопкой бана."""
-        mk = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("🔨 ЗАБАНИТЬ ВЕЗДЕ", callback_data=f"radar_ban_{user_id}"))
+    def ai_down_alert(user_link, user_id, chat_title, text, zone_name, zone="black"):
+        """ИИ не ответил: не наказываем вслепую, а зовём админов. Кнопки — с настоящей причиной зоны
+        (раньше была одна кнопка бана с причиной «Клон забаненной анкеты»)."""
+        from core.ai_review import create_review, ZONE_REASONS
+        action, reason = ZONE_REASONS.get(zone, ("ban", zone_name))
         try:
-            bot.send_message(STAFF_GROUP_ID, f"🤖 **ИИ-проверка недоступна** ({zone_name})\n{user_link} (`{user_id}`) · {chat_title}\n_{escape_md(str(text)[:300])}_\nАвтоматика ничего не сделала — решите вручную.", parse_mode="Markdown", reply_markup=mk)
-        except Exception:
-            pass
+            mk = create_review(user_id, action, reason, trigger_text=text, origin_chat=chat_title, user_link=user_link)
+            bot.send_message(STAFF_GROUP_ID, f"🤖 **ИИ-проверка недоступна** ({zone_name})\n{user_link} (`{user_id}`) · {escape_md(str(chat_title))}\n"
+                             f"Положено: {'бан' if action == 'ban' else 'мут'} — {escape_md(reason)}\n_{escape_md(str(text)[:300])}_\n"
+                             f"Автоматика ничего не сделала — решите вручную.", parse_mode="Markdown", reply_markup=mk)
+        except Exception as e:
+            from core.diag import log_error
+            log_error("ИИ-недоступен: алерт", e, user_id)
     # 👆 ========================================= 👆
 
     # 👇 КОМАНДА-ШПИОН (Обрабатывается самой первой!) 👇
@@ -792,7 +798,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 verdict_black = ai_context_checker(raw_text, zone="black")
                 if verdict_black is None:
                     safe_delete(bot, chat_id, message.message_id)  # прячем сообщение, но не баним без проверки
-                    ai_down_alert(user_link, user_id, chat_title, raw_text, "чёрная зона <18")
+                    ai_down_alert(user_link, user_id, chat_title, raw_text, "чёрная зона <18", zone="black")
                     return
                 if verdict_black:
                     safe_delete(bot, chat_id, message.message_id)
@@ -806,7 +812,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 # 🔥 ПОДКЛЮЧАЕМ ИИ-АНАЛИТИКУ ПЕРЕД МУТОМ 🔥
                 verdict_yellow = ai_context_checker(raw_text, zone="yellow")
                 if verdict_yellow is None:
-                    ai_down_alert(user_link, user_id, chat_title, raw_text, "жёлтая зона")
+                    ai_down_alert(user_link, user_id, chat_title, raw_text, "жёлтая зона", zone="yellow")
                 if verdict_yellow:
                     safe_delete(bot, chat_id, message.message_id)
                     mute_user_everywhere(user_id, reason="Желтая зона: Коммерция", admin_name="Скайнет ⚔️", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
@@ -1057,7 +1063,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 # 🔥 ПОДКЛЮЧАЕМ ИИ-АНАЛИТИКУ ПЕРЕД БАНОМ 🔥
                 verdict_orange = ai_context_checker(raw_text, zone="orange")
                 if verdict_orange is None:
-                    ai_down_alert(user_link, user_id, chat_title, raw_text, "оранжевая зона 18–21")
+                    ai_down_alert(user_link, user_id, chat_title, raw_text, "оранжевая зона 18–21", zone="orange")
                 if verdict_orange:
                     safe_delete(bot, chat_id, message.message_id)
                     mute_user_everywhere(user_id, reason="Оранжевая зона: Возраст 18-21", admin_name="Скайнет 🔞", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
