@@ -86,6 +86,20 @@ def _clear_fails(ip):
     db["login_attempts"].delete_one({"_id": ip})
 
 
+# ---------- ВЛАДЕЛЕЦ ----------
+OWNER_ONLY_PATHS = (
+    "/glaz/api/live_finance", "/glaz/api/root/finance", "/glaz/api/analytics/revenue",
+    "/glaz/api/diag/revenue_month",
+)
+
+
+def is_owner():
+    """Вошёл именно владелец (логин WEB_USER), а не дополнительный админ."""
+    login = session.get("login") or ""
+    owner = os.getenv("WEB_USER", "")
+    return bool(login and owner) and _eq(login, owner)
+
+
 # ---------- ПОДПИСИ ВНЕШНИХ ВЕБХУКОВ ----------
 def verify_cryptobot_signature(raw_body: bytes, header_sig: str) -> bool:
     token = os.getenv("CRYPTO_TOKEN", "")
@@ -180,6 +194,13 @@ def init_web_auth(app, bot, add_radar_log, owner_id):
                 if p.startswith("/glaz/api"):
                     return jsonify({"error": "Unauthorized"}), 401
                 return redirect(url_for("login"))
+            # Доходы видит только владелец: остальным админам эти разделы не отдаются вовсе
+            if p.startswith(OWNER_ONLY_PATHS) and not is_owner():
+                return jsonify({"error": "Access Denied"}), 403
+
+    @app.context_processor
+    def inject_owner_flag():
+        return {"is_owner": is_owner()}
 
     @app.after_request
     def sec_headers(resp):

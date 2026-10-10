@@ -9,7 +9,8 @@ TYPE_NAMES = {
     "ads": "Реклама", "donation": "Донаты", "beyond": "BEYOND", "indulgence": "Индульгенции",
     "support": "Платная поддержка", "points_shop": "Магазин очков", "fine_partial": "Штрафы (смешанная оплата)",
     "vip_points": "VIP за очки", "vip_rub_balance": "VIP за кэшбэк", "beyond_rub": "BEYOND за кэшбэк",
-    "beyond_pts": "BEYOND за очки", "market": "Чёрный рынок",
+    "beyond_pts": "BEYOND за очки", "market": "Чёрный рынок", "market_fee": "Комиссия рынка",
+    "ads_points": "Реклама за очки", "ads_rub_balance": "Реклама за кэшбэк", "ads_crypto": "Реклама (крипта)",
 }
 
 

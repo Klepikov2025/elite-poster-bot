@@ -75,15 +75,28 @@ def register_proxy_handlers(bot, ban_user_everywhere):
             "👉 _Жду ваше сообщение:_ ",
             parse_mode="Markdown"
         )
-        bot.register_next_step_handler(msg, process_proxy_first_message, vip_id)
+        bot.register_next_step_handler(msg, process_proxy_first_message, vip_id, post.get("_id"))
 
-    def process_proxy_first_message(message, vip_id):
+    def process_proxy_first_message(message, vip_id, post_oid=None):
         if not message.text and not message.photo and not message.video and not message.voice:
             bot.send_message(message.chat.id, "❌ Ошибка: Поддерживается только текст, photo, video или голос.")
             return
 
         guest_id = message.from_user.id
         session_id = f"proxy_{vip_id}_{guest_id}"
+
+        # 📊 Счётчик откликов для статистики мини-приложения (один гость = один отклик на анкету)
+        if post_oid is not None:
+            try:
+                import time as _t
+                p = posts_collection.find_one({"_id": post_oid}) or {}
+                pub_id = p.get("pub_id") or str(post_oid)
+                from database import db as _db
+                _db['post_replies'].insert_one({"_id": f"{pub_id}:{guest_id}", "pub_id": pub_id, "owner": vip_id,
+                                                "chat_id": p.get("chat_id"), "uid": guest_id, "ts": _t.time()})
+                posts_collection.update_one({"_id": post_oid}, {"$inc": {"replies": 1}})
+            except Exception:
+                pass  # повторный отклик того же гостя на ту же анкету не считаем
         
         proxy_sessions.update_one(
             {"_id": session_id},

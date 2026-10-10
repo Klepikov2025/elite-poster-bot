@@ -4,13 +4,14 @@ import time
 from bson.objectid import ObjectId
 from datetime import datetime
 
-INTERNAL_REVENUE_TYPES = {"vip_points", "vip_rub_balance", "beyond_rub", "beyond_pts"}  # оплата очками/кэшбэком — не живые деньги
+INTERNAL_REVENUE_TYPES = {"vip_points", "vip_rub_balance", "beyond_rub", "beyond_pts", "ads_points", "ads_rub_balance"}
+RUB_REVENUE_TYPES = {"ads_crypto"}  # бот МП пишет крипто-рекламу в рублях без пометки валюты  # оплата очками/кэшбэком — не живые деньги
 
 def _rev_kind(r):
     """stars | rub | internal. Новые крипто-записи помечены currency=RUB."""
     if r.get("type") in INTERNAL_REVENUE_TYPES:
         return "internal"
-    if r.get("currency") == "RUB":
+    if r.get("currency") == "RUB" or r.get("type") in RUB_REVENUE_TYPES:
         return "rub"
     return "stars"
 

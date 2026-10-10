@@ -64,6 +64,7 @@ _RETENTION = [
     ("blacklisted_texts", "timestamp", 180 * 86400),
     ("skynet_errors", "ts", 30 * 86400),
     ("admin_audit", "ts", 180 * 86400),
+    ("post_replies", "ts", 60 * 86400),
 ]
 
 

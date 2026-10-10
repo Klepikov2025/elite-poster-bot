@@ -203,7 +203,7 @@
         <button class="tab-btn" onclick="openTab('tab-diag')" style="color: #03dac6;">🩺 Диагностика</button>
         <button class="tab-btn" onclick="openTab('ads-tab')">📊 Биржа рекламы</button>
         <button class="tab-btn" onclick="openTab('tab-infrastructure')" style="color: #4caf50; font-weight: bold;">🗺 Инфраструктура</button>
-        <button id="btn-secret-finance" class="tab-btn" onclick="openTab('tab-live-finance')" style="display: none; color: #00e676; border-color: #00e676; font-weight: bold;">💰 Live-Финансы</button>
+        {% if is_owner %}<button id="btn-secret-finance" class="tab-btn" onclick="openTab('tab-live-finance')" style="display: none; color: #00e676; border-color: #00e676; font-weight: bold;">💰 Live-Финансы</button>{% endif %}
         <button class="tab-btn" onclick="openTab('tab-withdrawals')">🎁 Касса и Награды</button>
         <button class="tab-btn" onclick="openTab('tab-promos')">🎫 Скидки</button>
     </div>
@@ -634,7 +634,7 @@
                 <button onclick="saveRootButtons()" class="btn btn-sm btn-danger mt-3" style="float: right;">💾 Сохранить в сеть</button>
                 <div style="clear: both;"></div>
 
-                <div style="background: rgba(3, 218, 198, 0.05); border: 1px solid #03dac6; padding: 20px; border-radius: 8px; margin-top: 20px; text-align: center;">
+                {% if is_owner %}<div style="background: rgba(3, 218, 198, 0.05); border: 1px solid #03dac6; padding: 20px; border-radius: 8px; margin-top: 20px; text-align: center;">
                     <h5 style="margin: 0 0 10px 0; color: #03dac6; text-transform: uppercase; font-size: 14px; letter-spacing: 1px; font-weight: bold;">
                         💰 ОБЩАЯ КАССА ИМПЕРИИ (ЗА СЕГОДНЯ)
                     </h5>
@@ -663,7 +663,7 @@
                     </div>
                     
                     <canvas id="revenueChart" width="600" height="250" style="margin: 0 auto; display: block;"></canvas>
-                </div>
+                </div>{% endif %}
 
             </div>
 
@@ -882,14 +882,14 @@
                 <tbody id="diag-errors"><tr><td colspan="4" style="color:#888;">Загрузка...</td></tr></tbody>
             </table>
         </div>
-        <div class="panel-block" style="margin-top:20px;">
+        {% if is_owner %}<div class="panel-block" style="margin-top:20px;">
             <h3 style="color:#00e676; margin-top:0;">💰 Выручка по источникам (30 дней)</h3>
             <div id="diag-rev-totals" style="margin-bottom:10px; color:#ccc;"></div>
             <table class="admin-table" style="font-size:12px;">
                 <thead><tr><th>Источник</th><th>Валюта</th><th>Сумма</th><th>Оплат</th></tr></thead>
                 <tbody id="diag-revenue"></tbody>
             </table>
-        </div>
+        </div>{% endif %}
         <div class="panel-block" style="margin-top:20px;">
             <h3 style="color:#bb86fc; margin-top:0;">🧾 Журнал действий админов</h3>
             <table class="admin-table" style="font-size:12px;">
@@ -1216,7 +1216,7 @@
             const rows = (d.errors || []).map(e => `<tr><td>${_esc(e.time)}</td><td>${_esc(e.kind)}</td><td><code>${_esc(e.uid || '')}</code></td><td>${_esc(e.text)}</td></tr>`).join('');
             document.getElementById('diag-errors').innerHTML = rows || '<tr><td colspan="4" style="color:#4caf50;">✅ Ошибок нет</td></tr>';
         });
-        fetch('/glaz/api/diag/revenue_month').then(r => r.json()).then(d => {
+        if (document.getElementById('diag-revenue')) fetch('/glaz/api/diag/revenue_month').then(r => r.json()).then(d => {
             const cur = {stars: '⭐️ звёзды', rub: '₽ крипта', internal: '🎰 внутренняя (очки/кэшбэк)'};
             document.getElementById('diag-rev-totals').innerHTML =
                 `⭐️ <b>${d.totals.stars.toLocaleString('ru-RU')}</b> &nbsp;|&nbsp; ₽ <b>${d.totals.rub.toLocaleString('ru-RU')}</b> &nbsp;|&nbsp; <span style="color:#888;">внутренние оплаты (не деньги): ${d.totals.internal.toLocaleString('ru-RU')}</span>`;
@@ -1949,8 +1949,8 @@ function unlockRoot() {
         document.getElementById('buttons-container').innerHTML = ''; 
         
         // 👇 ДОБАВЛЯЕМ ЭТУ СТРОЧКУ ДЛЯ ПОЯВЛЕНИЯ КНОПКИ ФИНАНСОВ 👇
-        document.getElementById('btn-secret-finance').style.display = 'inline-block';
-        showToast("🔓 Секретный раздел Live-Финансов разблокирован!");
+        const _fb = document.getElementById('btn-secret-finance');
+        if (_fb) { _fb.style.display = 'inline-block'; showToast("🔓 Секретный раздел Live-Финансов разблокирован!"); }
         
         // Подтягиваем цвета и эмодзи из базы
         data.buttons.forEach(b => addButtonRow(b.text, b.url, b.style || 'default', b.emoji_id || ''));
@@ -1965,6 +1965,7 @@ function unlockRoot() {
 
 // 1.5. Секретная функция загрузки Кассы
 function loadRootFinance(pin) {
+    if (!document.getElementById('root-finance-total')) return;  // не владелец
     fetch('/glaz/api/root/finance', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -2518,6 +2519,7 @@ let revenueChartInstance = null;
 
 // Теперь функция принимает второй параметр - период (по умолчанию 'week')
 function loadRootRevenue(pin, period = 'week') {
+    if (!document.getElementById('revenueChart')) return;  // не владелец
     
     // Переключаем активную кнопку (подсветка фиолетовым)
     document.querySelectorAll('[id^="btn-period-"]').forEach(btn => btn.classList.remove('active'));

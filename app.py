@@ -1856,6 +1856,8 @@ register_main_routes(
 register_ads_routes(app, bot, add_radar_log)
 from web.diag import register_diag_routes
 register_diag_routes(app, bot)
+from web.poster import register_poster_routes
+register_poster_routes(app, bot)
 
 if __name__ == '__main__':
     print("Бот запущен — мягкая версия с приветствием и удалением сообщений (кроме сети ПАРНИ)")
