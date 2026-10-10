@@ -1551,7 +1551,8 @@ def _execute_skynet_task(task):
                 )
         else:
             # 🛡 ИИ ОПРАВДАЛ ЮЗЕРА! Ордер аннулирован.
-            print(f"🛡 СКАЙНЕТ ОТМЕНИЛ АРЕСТ! Андрюшенька ошибся. Улика: {trigger_text}")
+            print(f"🛡 СКАЙНЕТ ОТМЕНИЛ АРЕСТ ({reason}) для {task.get('uid')}. Улика: {trigger_text}")
+            add_radar_log(f"🛡 ИИ оправдал {task.get('uid')}: {reason} · {str(trigger_text)[:120]}")
 
 
 def skynet_listener():
