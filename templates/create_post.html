@@ -443,6 +443,7 @@ async function openDetail(p) {
     chats.appendChild(el('div', {cls: 'inforow'}, [el('span', {text: c.name, style: 'color:var(--text);font-weight:600'}), v]));
   });
   const ta = document.getElementById('dtText'); ta.value = p.text || ''; ta.disabled = !p.can_edit;
+  ta.placeholder = p.text ? '' : 'Текст этой старой анкеты не сохранился. Впишите новый — он заменит старый во всех чатах.';
   document.getElementById('dtSave').disabled = !p.can_edit;
   document.getElementById('dtSave').textContent = p.can_edit ? 'Сохранить во всех чатах' : 'Старую анкету править нельзя';
   const bb = document.getElementById('dtBump'); bb.disabled = !p.can_bump; bb.textContent = p.can_bump ? 'Поднять наверх' : (p.has_text ? 'Поднять через ' + p.bump_in_hours + ' ч' : 'Поднять нельзя');

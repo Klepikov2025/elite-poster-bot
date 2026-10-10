@@ -55,21 +55,8 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         name, url = (m.group(1).replace("\\", ""), m.group(2)) if m else ("Пользователь", "")
         mention = f'<a href="{_html.escape(url)}">{_html.escape(name)}</a>' if url else _html.escape(name)
         prompt = prompt_text.replace(user_link, "{USER}")
-        text = None
-        for key in (GROQ_API_KEYS or ([GROQ_API_KEY] if GROQ_API_KEY else [])):
-            try:
-                r = requests.post("https://api.groq.com/openai/v1/chat/completions",
-                                  headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                                  json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}],
-                                        "temperature": 0.8, "max_tokens": 150}, timeout=10)
-                if r.status_code == 200:
-                    text = r.json()["choices"][0]["message"]["content"].strip()
-                    break
-                add_radar_log(f"🤖 Прожарка: Groq ответил {r.status_code}")
-                from core.diag import log_error; log_error("Groq", f"прожарка: HTTP {r.status_code} {r.text[:150]}")
-            except Exception as e:
-                add_radar_log(f"🤖 Прожарка: ошибка связи с Groq ({str(e)[:60]})")
-                from core.diag import log_error; log_error("Groq", f"прожарка: {e}")
+        from core.ai import groq_chat
+        text = groq_chat(prompt, max_tokens=700, temperature=0.8, where="прожарка")
         if text and any(w in text.lower() for w in ["извините", "не могу", "как ии", "языковая модель", "запрограммирован", "оскорбительн", "токсичн", "цензур"]):
             text = None
         if text:
@@ -409,57 +396,18 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
 
     # 👇 УМНАЯ ПРОВЕРКА КОНТЕКСТА ЧЕРЕЗ ИИ 👇
     def ai_context_checker(text, zone="black"):
-        """Проверяет контекст сообщения через ИИ. Возвращает True (банить) или False (пропустить)"""
-        if not GROQ_API_KEYS:
-            return True 
+        """True — нарушение, False — безопасно, None — ИИ недоступен.
+        Раньше при сбое ИИ функция возвращала True, и все, кого задел фильтр, наказывались без проверки."""
+        from core.ai import ai_verdict
+        return ai_verdict(text, zone)
 
-        if zone == "black":
-            prompt = f"""Ты строгий модератор. Прочитай это сообщение из чата: "{text}"
-Определи, нарушает ли автор правила:
-1. Автор признается, что ему СЕЙЧАС меньше 18 лет?
-2. Автор ищет или предлагает интим несовершеннолетним?
-ВНИМАНИЕ: Если автор говорит о прошлом ("в 14 лет я был..."), жалуется на других ("мне пишут 14-летние") или говорит о размерах/предметах - это НЕ нарушение.
-Ответь СТРОГО одним словом: BAN (если нарушение) или SKIP (если безопасно)."""
-
-        elif zone == "orange":
-            prompt = f"""Ты строгий модератор. Прочитай это сообщение из чата: "{text}"
-Признается ли автор, что ему СЕЙЧАС от 18 до 21 года включительно?
-ВНИМАНИЕ: Если он ищет кого-то ("ищу 20 летнего"), говорит о размерах ("20 см") или о прошлом - это НЕ нарушение.
-Ответь СТРОГО одним словом: BAN (если ему 18-21) или SKIP (если контекст другой)."""
-
-        # 🔥 НОВОЕ: ПРОВЕРКА КОММЕРЦИИ 🔥
-        elif zone == "yellow":
-            prompt = f"""Ты строгий модератор. Прочитай это сообщение из чата: "{text}"
-Определи, нарушает ли автор правила сети (коммерция и эскорт):
-Ищет или предлагает ли автор интим за деньги, материальную помощь (МП), подарки за встречи, спонсорство или платные услуги эскорта?
-ВНИМАНИЕ: Если человек просто говорит про подарки на день рождения, праздники, обычные бытовые ситуации или работу - это БЕЗОПАСНО (SKIP).
-Ответь СТРОГО одним словом: BAN (если это коммерция/эскорт) или SKIP (если контекст безобидный)."""
-
-        # Перебираем ключи для обхода лимитов (как у Секретаря)
-        for key in GROQ_API_KEYS:
-            try:
-                response = requests.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                    json={
-                        "model": "llama-3.3-70b-versatile",
-                        "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.0,
-                        "max_tokens": 10
-                    },
-                    timeout=5
-                )
-                
-                if response.status_code == 200:
-                    result = response.json()["choices"][0]["message"]["content"].strip().upper()
-                    return "BAN" in result
-                elif response.status_code == 429:
-                    continue # Попали в лимит -> пробуем следующий ключ
-                    
-            except Exception as e:
-                continue # Сетевая ошибка -> пробуем следующий ключ
-                
-        return True # Если все ключи сгорели, перестраховываемся и баним
+    def ai_down_alert(user_link, user_id, chat_title, text, zone_name):
+        """ИИ не ответил: не наказываем вслепую, а зовём админов с кнопкой бана."""
+        mk = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("🔨 ЗАБАНИТЬ ВЕЗДЕ", callback_data=f"radar_ban_{user_id}"))
+        try:
+            bot.send_message(STAFF_GROUP_ID, f"🤖 **ИИ-проверка недоступна** ({zone_name})\n{user_link} (`{user_id}`) · {chat_title}\n_{escape_md(str(text)[:300])}_\nАвтоматика ничего не сделала — решите вручную.", parse_mode="Markdown", reply_markup=mk)
+        except Exception:
+            pass
     # 👆 ========================================= 👆
 
     # 👇 КОМАНДА-ШПИОН (Обрабатывается самой первой!) 👇
@@ -839,7 +787,12 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             ]
             if any(re.search(p, safe_minor) for p in minor_patterns):
                 # 🔥 ПОДКЛЮЧАЕМ ИИ-АНАЛИТИКУ ПЕРЕД БАНОМ 🔥
-                if ai_context_checker(raw_text, zone="black"):
+                verdict_black = ai_context_checker(raw_text, zone="black")
+                if verdict_black is None:
+                    safe_delete(bot, chat_id, message.message_id)  # прячем сообщение, но не баним без проверки
+                    ai_down_alert(user_link, user_id, chat_title, raw_text, "чёрная зона <18")
+                    return
+                if verdict_black:
                     safe_delete(bot, chat_id, message.message_id)
                     ban_user_everywhere(user_id, reason="Черная зона: Несовершеннолетний (<18)", admin_name="Скайнет 🔞", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
                     return
@@ -849,7 +802,10 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             if sk.get("yellow_commerce", True) and any(re.search(pattern, clean_commerce) for pattern in live_yellow):
                 
                 # 🔥 ПОДКЛЮЧАЕМ ИИ-АНАЛИТИКУ ПЕРЕД МУТОМ 🔥
-                if ai_context_checker(raw_text, zone="yellow"):
+                verdict_yellow = ai_context_checker(raw_text, zone="yellow")
+                if verdict_yellow is None:
+                    ai_down_alert(user_link, user_id, chat_title, raw_text, "жёлтая зона")
+                if verdict_yellow:
                     safe_delete(bot, chat_id, message.message_id)
                     mute_user_everywhere(user_id, reason="Желтая зона: Коммерция", admin_name="Скайнет ⚔️", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
                     return
@@ -1097,7 +1053,10 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             # Ловим Оранжевую зону (18-21)
             if re.search(r'\b(?:1[89]|2[0-1])\s*(лет|год|годик|y\.?o\.?)\b|\b(?:1[89]|2[0-1])\s*[/\\-]\s*1\d{2}\b|\b(мне|я)\s*(?:1[89]|2[0-1])\b', safe_age):
                 # 🔥 ПОДКЛЮЧАЕМ ИИ-АНАЛИТИКУ ПЕРЕД БАНОМ 🔥
-                if ai_context_checker(raw_text, zone="orange"):
+                verdict_orange = ai_context_checker(raw_text, zone="orange")
+                if verdict_orange is None:
+                    ai_down_alert(user_link, user_id, chat_title, raw_text, "оранжевая зона 18–21")
+                if verdict_orange:
                     safe_delete(bot, chat_id, message.message_id)
                     mute_user_everywhere(user_id, reason="Оранжевая зона: Возраст 18-21", admin_name="Скайнет 🔞", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
                     markup = types.InlineKeyboardMarkup()

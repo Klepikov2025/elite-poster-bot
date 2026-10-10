@@ -275,7 +275,8 @@ def register_poster_routes(app, bot):
             g = groups.setdefault(key, {"id": key, "city": p.get("city"), "network": p.get("pub_network") or p.get("network"),
                                         "text": p.get("text", ""), "time": p.get("time"), "chats": [], "replies": 0,
                                         "bumped_at": p.get("bumped_at"), "bump_count": p.get("bump_count", 0),
-                                        "can_edit": bool(p.get("text_msg_id")), "has_text": bool(p.get("text"))})
+                                        # старые анкеты тоже можно поднять (копированием) и править
+                                        "can_edit": bool(p.get("text_msg_id") or p.get("message_ids")), "has_text": True})
             g["replies"] += int(p.get("replies", 0))
             g["chats"].append({"name": f"{p.get('network')} · {p.get('city')}", "replies": int(p.get("replies", 0)),
                                "status": p.get("status", "live")})
@@ -317,8 +318,6 @@ def register_poster_routes(app, bot):
         docs = pub_docs(uid, pub_id)
         if not docs:
             return deny("Анкета не найдена.", 404)
-        if not docs[0].get("text"):
-            return deny("Старую анкету (созданную до обновления) поднять нельзя — опубликуйте её заново.", 400)
         cooldown = bump_hours() * 3600
         def _last(d):
             if d.get("bumped_at") is not None:
@@ -335,8 +334,34 @@ def register_poster_routes(app, bot):
             return deny("Уже поднимается.", 409)
         name = u.get("first_name", "VIP")
 
+        def legacy_bump(d):
+            """Анкета до обновления: ни текста, ни медиа в базе нет. Telegram умеет копировать
+            сообщения бота — копируем пост как есть (альбом + текст) и удаляем старый."""
+            chat, ids = d["chat_id"], [m for m in d.get("message_ids", []) if m]
+            if not ids:
+                raise ValueError("нет сообщений")
+            new_ids = []
+            if len(ids) > 1:
+                new_ids += [m.message_id for m in bot.copy_messages(chat, chat, ids[:-1])]
+            last = bot.copy_message(chat, chat, ids[-1], reply_markup=respond_markup())
+            new_ids.append(last.message_id)
+            for mid in ids:
+                try: bot.delete_message(chat, mid)
+                except Exception: pass
+            db['posts'].update_one({"_id": d["_id"]}, {"$set": {"message_ids": new_ids, "text_msg_id": last.message_id, "status": "live"},
+                                                       "$inc": {"bump_count": 1}})
+
         def work():
             for d in docs:
+                if not d.get("text") or "media" not in d:
+                    try:
+                        legacy_bump(d)
+                    except Exception as e:
+                        es = str(e).lower()
+                        db['posts'].update_one({"_id": d["_id"]}, {"$set": {"status": "gone" if "not found" in es else "error"}})
+                        print(f"legacy bump {d['chat_id']}: {e}")
+                    time.sleep(0.3)
+                    continue
                 for mid in d.get("message_ids", []):
                     try: bot.delete_message(d["chat_id"], mid)
                     except Exception: pass
@@ -368,15 +393,29 @@ def register_poster_routes(app, bot):
         name = u.get("first_name", "VIP")
         done, gone = 0, 0
         for d in docs:
-            if not d.get("text_msg_id"):
+            # у старых анкет текст — последнее сообщение публикации (подпись к фото или отдельный текст)
+            mid = d.get("text_msg_id") or ([m for m in d.get("message_ids", []) if m] or [None])[-1]
+            if not mid:
                 continue
-            full = build_full_text(uid, name, text, d.get("header_idx", 0))
+            idx = d.get("header_idx", random.randrange(len(HEADERS)))
+            full = build_full_text(uid, name, text, idx)
             try:
-                if d.get("text_is_caption"):
-                    bot.edit_message_caption(full, d["chat_id"], d["text_msg_id"], parse_mode="HTML", reply_markup=respond_markup())
+                is_cap = d.get("text_is_caption")
+                if is_cap is None:
+                    try:
+                        bot.edit_message_text(full, d["chat_id"], mid, parse_mode="HTML", reply_markup=respond_markup())
+                        is_cap = False
+                    except Exception as e1:
+                        if "no text" not in str(e1).lower() and "text is empty" not in str(e1).lower():
+                            raise
+                        bot.edit_message_caption(full, d["chat_id"], mid, parse_mode="HTML", reply_markup=respond_markup())
+                        is_cap = True
+                elif is_cap:
+                    bot.edit_message_caption(full, d["chat_id"], mid, parse_mode="HTML", reply_markup=respond_markup())
                 else:
-                    bot.edit_message_text(full, d["chat_id"], d["text_msg_id"], parse_mode="HTML", reply_markup=respond_markup())
-                db['posts'].update_one({"_id": d["_id"]}, {"$set": {"text": text, "status": "live"}})
+                    bot.edit_message_text(full, d["chat_id"], mid, parse_mode="HTML", reply_markup=respond_markup())
+                db['posts'].update_one({"_id": d["_id"]}, {"$set": {"text": text, "status": "live", "text_msg_id": mid,
+                                                                    "text_is_caption": is_cap, "header_idx": idx}})
                 done += 1
             except Exception as e:
                 es = str(e).lower()

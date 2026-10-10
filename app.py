@@ -1354,40 +1354,9 @@ def vip_funnel_sniper():
 
 # 👇 УМНАЯ ПРОВЕРКА КОНТЕКСТА ЧЕРЕЗ ИИ 👇
 def ai_context_checker(text, zone="black"):
-    if not GROQ_API_KEYS or not text:
-        return True # Если нет ключей или текста, верим Андрюшеньке на слово
-
-    if zone == "black":
-        prompt = f"""Ты модератор. Сообщение: "{text}"
-1. Автор СЕЙЧАС младше 18 лет?
-2. Ищет интим с несовершеннолетними?
-(Жалобы, прошлое или размеры - НЕ нарушение). Ответь СТРОГО: BAN или SKIP."""
-    elif zone == "orange":
-        prompt = f"""Ты модератор. Сообщение: "{text}"
-Автору СЕЙЧАС от 18 до 21 года?
-(Размеры "20 см" или поиск "ищу 20 летнего" - НЕ нарушение). Ответь СТРОГО: BAN или SKIP."""
-    elif zone == "yellow":
-        prompt = f"""Ты строгий модератор. Прочитай это сообщение из чата: "{text}"
-Определи, нарушает ли автор правила сети (коммерция и эскорт):
-Ищет или предлагает ли автор интим за деньги, материальную помощь (МП), подарки за встречи, спонсорство или платные услуги эскорта?
-ВНИМАНИЕ: Если человек просто говорит про подарки на день рождения, праздники, обычные бытовые ситуации, работу, ИЛИ просто ищет/предлагает МАССАЖ без упоминания денег и цен — это БЕЗОПАСНО (SKIP). Наказывай ТОЛЬКО если есть явный финансовый подтекст (цена, прайс, покупка, продажа, МП).
-Ответь СТРОГО: BAN или SKIP."""
-    else:
-        return True
-
-    import requests
-    for key in GROQ_API_KEYS:
-        try:
-            resp = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}], "temperature": 0.0, "max_tokens": 10},
-                timeout=5
-            )
-            if resp.status_code == 200:
-                return "BAN" in resp.json()["choices"][0]["message"]["content"].strip().upper()
-        except: continue
-    return True
+    """True — нарушение, False — оправдан, None — ИИ недоступен (см. core/ai.py)."""
+    from core.ai import ai_verdict
+    return ai_verdict(text, zone)
 # 👆 ===================================== 👆
 
 # ==================== СЛУШАТЕЛЬ СЕКРЕТАРЯ (РАЗБАН ПО КНОПКЕ) ====================
@@ -1462,7 +1431,15 @@ def _execute_skynet_task(task):
             elif "желтая зона" in reason_lower:
                 is_guilty = ai_context_checker(trigger_text, zone="yellow")
 
-        if is_guilty:
+        if is_guilty is None:
+            # ИИ недоступен: раньше в этом случае наказывали вслепую. Теперь решает человек.
+            from core.diag import log_error
+            log_error("Приказ Шпиона", f"ИИ недоступен, {task['action']} для {task['uid']} не исполнен", task.get('uid'))
+            try:
+                mk = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("🔨 ЗАБАНИТЬ ВЕЗДЕ", callback_data=f"radar_ban_{int(task['uid'])}"))
+                bot.send_message(STAFF_GROUP_ID, f"🤖 ИИ-проверка недоступна. Шпион просит {'бан' if task['action'] == 'global_ban' else 'мут'} для {task['uid']}\nПричина: {reason}\nУлика: {str(trigger_text)[:300]}\nРешите вручную.", reply_markup=mk)
+            except Exception: pass
+        elif is_guilty:
             # 👇 БЕРЕМ ИМЯ ИЗ ПРИКАЗА (иначе дефолт шпиона) 👇
             task_admin_name = task.get('admin_name', "Андрюшенька (Спецагент Шпион) 🕵️‍♂️")
             
