@@ -200,6 +200,7 @@
         <button class="tab-btn" onclick="openTab('tab-broadcast')" style="color: #bb86fc;">🚀 Рассылка</button>
         <button class="tab-btn" onclick="openTab('tab-mass')" style="color: #cf6679;">💥 Репрессии</button>
         <button class="tab-btn" onclick="openTab('tab-system')">⚙️ Система</button>
+        <button class="tab-btn" onclick="openTab('tab-control')" style="color: #ffb74d; font-weight: bold;">🎛 Управление</button>
         <button class="tab-btn" onclick="openTab('tab-diag')" style="color: #03dac6;">🩺 Диагностика</button>
         <button class="tab-btn" onclick="openTab('ads-tab')">📊 Биржа рекламы</button>
         <button class="tab-btn" onclick="openTab('tab-infrastructure')" style="color: #4caf50; font-weight: bold;">🗺 Инфраструктура</button>
@@ -899,6 +900,20 @@
         </div>
     </div>
 
+    <!-- 🎛 УПРАВЛЕНИЕ: настройки ботов без деплоя -->
+    <div id="tab-control" class="tab-content">
+        <div class="panel-block">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div>
+                    <h3 style="color:#ffb74d; margin:0;">🎛 Управление ботами</h3>
+                    <div style="color:#aaa; font-size:13px; margin-top:6px;">Изменения доходят до ботов примерно за 20 секунд, деплой не нужен. Изменённые значения подсвечены, пустое поле — вернуть как было.</div>
+                </div>
+                <button class="form-btn" style="width:auto;" onclick="saveControl()">💾 Сохранить изменения</button>
+            </div>
+            <div id="control-groups" style="margin-top:18px; display:flex; flex-direction:column; gap:18px;">Загрузка...</div>
+        </div>
+    </div>
+
     <div id="tab-withdrawals" class="tab-content">
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1200px; margin: 0 auto;">
             
@@ -1194,6 +1209,53 @@
         let activeProxySession = null;
 
 
+
+    // ===== 🎛 УПРАВЛЕНИЕ =====
+    let controlDirty = {};
+    let controlLabels = {};
+    function loadControl() {
+        controlDirty = {};
+        fetch('/glaz/api/config').then(r => r.json()).then(groups => {
+            const box = document.getElementById('control-groups');
+            box.innerHTML = '';
+            groups.forEach(g => {
+                const sec = document.createElement('div');
+                sec.style.cssText = 'background:#1a1a1a; border:1px solid #2a2a2a; border-radius:10px; padding:16px;';
+                const h = document.createElement('h4'); h.textContent = g.group; h.style.cssText = 'margin:0 0 12px 0; color:#fff;'; sec.appendChild(h);
+                g.items.forEach(it => {
+                    controlLabels[it.key] = it.label;
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; padding:10px 0; border-top:1px solid #252525;';
+                    const left = document.createElement('div'); left.style.cssText = 'flex:1 1 280px; min-width:0;';
+                    const lab = document.createElement('label'); lab.htmlFor = 'cfg-' + it.key; lab.textContent = it.label; lab.style.cssText = 'display:block; color:#fff; font-size:14px;';
+                    const meta = document.createElement('div'); meta.style.cssText = 'color:#888; font-size:12px; margin-top:3px;';
+                    meta.textContent = (it.help ? it.help + ' ' : '') + '· ' + it.bots + ' · по умолчанию: ' + it.default;
+                    left.appendChild(lab); left.appendChild(meta);
+                    const inp = document.createElement('input');
+                    inp.id = 'cfg-' + it.key; inp.className = 'search-input';
+                    inp.type = (it.type === 'int' || it.type === 'float') ? 'number' : 'text';
+                    if (it.type === 'float') inp.step = '0.01';
+                    if (it.min !== null && it.min !== undefined) inp.min = it.min;
+                    if (it.max !== null && it.max !== undefined) inp.max = it.max;
+                    inp.value = it.value;
+                    inp.style.cssText = 'flex:0 1 260px; min-width:120px; padding:8px; box-sizing:border-box;' + (it.changed ? 'border-color:#ffb74d;' : '');
+                    inp.addEventListener('input', () => { controlDirty[it.key] = inp.value; inp.style.borderColor = '#03dac6'; });
+                    row.appendChild(left); row.appendChild(inp); sec.appendChild(row);
+                });
+                box.appendChild(sec);
+            });
+        });
+    }
+    function saveControl() {
+        const keys = Object.keys(controlDirty);
+        if (!keys.length) { showToast('Нечего сохранять'); return; }
+        fetch('/glaz/api/config/save', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({values: controlDirty})})
+            .then(r => r.json()).then(d => {
+                if (d.success) { showToast('✅ Сохранено настроек: ' + d.saved); loadControl(); }
+                else { const e = d.errors || {}; showToast('❌ ' + Object.keys(e).map(k => (controlLabels[k] || k) + ': ' + e[k]).join('; ')); }
+            });
+    }
+
     // ===== 🩺 ДИАГНОСТИКА =====
     function _esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
     function _card(label, value, bad) {
@@ -1250,6 +1312,7 @@
     // 4. Сохраняем текущую вкладку
     localStorage.setItem('activeTab', tabId);
     if (tabId === 'tab-diag') loadDiag();
+    if (tabId === 'tab-control') loadControl();
 
     // 5. Загружаем данные для конкретной вкладки
     if(tabId === 'tab-blackbox') loadProxySessions();

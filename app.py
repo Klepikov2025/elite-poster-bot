@@ -21,6 +21,7 @@ import logging
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 from core.guards import is_staff, is_staff_admin, deny_callback, acquire_lease, safe_delete
+from core.cfg import cfg as _cfg  # настройки из панели «🎛 Управление»
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("skynet")  # раньше logger не был объявлен: демоны CPA падали на первой же записи в лог
@@ -283,15 +284,17 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
             
             # 2. 🔥 ВЫДАЕМ WELCOME-BOX НОВИЧКУ 🔥
             try:
-                # Начисляем стартовый капитал
+                # Начисляем стартовый капитал (размер — в панели «Управление»)
+                from core.cfg import cfg
+                _wb_pts, _wb_sh = cfg("cpa_welcome_points"), cfg("cpa_welcome_shields")
                 db['paid_users'].update_one(
                     {"uid": user_id}, 
-                    {"$inc": {"bounty_points": 50, "immunity": 1}}, 
+                    {"$inc": {"bounty_points": _wb_pts, "immunity": _wb_sh}}, 
                     upsert=True
                 )
                 from core.janitor import log_points
-                log_points(user_id, "bounty_points", 50, reason="cpa_welcome_box")
-                log_points(user_id, "immunity", 1, reason="cpa_welcome_box")
+                log_points(user_id, "bounty_points", _wb_pts, reason="cpa_welcome_box")
+                log_points(user_id, "immunity", _wb_sh, reason="cpa_welcome_box")
                 
                 # Достаем имя агента для красивого приветствия
                 agent_info = db['users'].find_one({"_id": agent_id}) or {}
@@ -300,15 +303,15 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
                 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
                 # ВАЖНО: Замени FAQMKBOT на реальный юзернейм твоего бота-Секретаря, если он другой
                 markup = InlineKeyboardMarkup().add(
-                    InlineKeyboardButton("🎮 Открыть Игровой Кабинет", url="https://t.me/FAQMKBOT?start=app_profile")
+                    InlineKeyboardButton("🎮 Открыть Игровой Кабинет", url=f"https://t.me/{cfg('support_bot')}?start=app_profile")
                 )
                 
                 welcome_text = (
                     f"🎁 **СТАРТОВЫЙ НАБОР ВЫЖИВАНИЯ!**\n\n"
                     f"Вы были завербованы в сеть {agent_name}!\n"
                     f"Вам передан секретный кейс новичка:\n"
-                    f"💎 **50 Очков Бдительности**\n"
-                    f"🛡 **1 Щит Иммунитета** (спасет от мута или вредителя на ферме)\n\n"
+                    f"💎 **{_wb_pts} Очков Бдительности**\n"
+                    f"🛡 **{_wb_sh} Щит Иммунитета** (спасет от мута или вредителя на ферме)\n\n"
                     f"Запускайте Игровой Кабинет, чтобы бесплатно испытать удачу в Гача-Рулетке! Добро пожаловать в Империю. 😎"
                 )
                 bot.send_message(user_id, welcome_text, parse_mode="Markdown", reply_markup=markup)
@@ -477,7 +480,7 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
                     
                     markup = types.InlineKeyboardMarkup(row_width=1)
                     markup.add(
-                        types.InlineKeyboardButton(f"🎟 Купить пропуск в г. {primary_target_city} (250⭐️)", callback_data=f"buy_city_{primary_target_city}"),
+                        types.InlineKeyboardButton(f"🎟 Купить пропуск в г. {primary_target_city} ({_cfg('city_pass_price')}⭐️)", callback_data=f"buy_city_{primary_target_city}"),
                         types.InlineKeyboardButton("👑 Купить VIP (Все города)", callback_data="start_verification")
                     )
                     try:
@@ -547,7 +550,7 @@ def start(message):
                     "Вы можете воспользоваться правом на **«Второй шанс»** — оплатить штраф, после чего процесс получения VIP-статуса начнется заново."
                 )
             else:
-                markup.add(types.InlineKeyboardButton("🆘 Служба Поддержки", url="https://t.me/FAQMKBOT"))
+                markup.add(types.InlineKeyboardButton("🆘 Служба Поддержки", url=f"https://t.me/{_cfg('support_bot')}"))
                 text = (
                     "🚫 **ДОСТУП ЗАПРЕЩЕН**\n"
                     "Вы находитесь в глобальном черном списке нашей сети.\n"
@@ -1325,7 +1328,7 @@ def vip_funnel_sniper():
                     reminded = doc.get('reminded', False)
                     
                     # 1. Напоминание через неделю
-                    if not reminded and (now - timestamp > 604800):
+                    if not reminded and (now - timestamp > _cfg("vip_remind_days") * 86400):
                         reminder_text = (
                             "⚠️ **Системное уведомление!**\n\n"
                             "Вы начали процесс вступления в VIP, но остановились. "
@@ -1343,7 +1346,7 @@ def vip_funnel_sniper():
                         )
                     
                     # 2. Бан через 3 дня после напоминания
-                    elif reminded and (now - timestamp > 259200):
+                    elif reminded and (now - timestamp > _cfg("vip_ban_days") * 86400):
                         ban_user_everywhere(user_id, reason="Не оплатил ВИП, тянул время", admin_name="Скайнет ⏱")
                         db['vip_funnel'].delete_one({"_id": user_id})
                         
@@ -1390,12 +1393,12 @@ def _execute_skynet_task(task):
                 last_pay = db['fine_payments'].find_one({"uid": target_uid}, sort=[("timestamp", -1)])
                 amount = last_pay.get('amount', 0) if last_pay else 0
             
-            if int(amount) == 650:
+            if int(amount) == _cfg("fine_tag_free"):
                 users_collection.update_one({"_id": target_uid}, {"$set": {"custom_tag": "Свободен"}, "$unset": {"shame_tag": ""}}, upsert=True)
-                add_radar_log(f"🎖️ Юзер {target_uid} оплатил 650⭐️ и получил тег 'Свободен'")
-            elif int(amount) == 750:
+                add_radar_log(f"🎖️ Юзер {target_uid} оплатил {amount}⭐️ и получил тег 'Свободен'")
+            elif int(amount) == _cfg("fine_tag_sponsor"):
                 users_collection.update_one({"_id": target_uid}, {"$set": {"custom_tag": "Спонсор_Одобрен"}, "$unset": {"shame_tag": ""}}, upsert=True)
-                add_radar_log(f"💎 Юзер {target_uid} оплатил 750⭐️ и получил тег 'Спонсор_Одобрен'")
+                add_radar_log(f"💎 Юзер {target_uid} оплатил {amount}⭐️ и получил тег 'Спонсор_Одобрен'")
             else:
                 users_collection.update_one({"_id": target_uid}, {"$unset": {"shame_tag": "", "custom_tag": ""}})
                 add_radar_log(f"🧹 Юзер {target_uid} оплатил обычный штраф ({amount}⭐️), теги сброшены")
@@ -1521,7 +1524,7 @@ def cpa_tracker_daemon():
                 continue
             now = time.time()
             # 🔥 НОВЫЙ ХОЛД: 14 дней (1 209 600 секунд) 🔥
-            HOLD_TIME = 1209600 
+            HOLD_TIME = _cfg("cpa_hold_days") * 86400
             
             pending_traffic = list(db['cpa_traffic'].find({"status": "hold", "join_time": {"$lt": now - HOLD_TIME}}))
             
@@ -1571,7 +1574,7 @@ def cpa_tracker_daemon():
                         agent_data = paid_collection.find_one({"uid": agent_id})
                         total_refs = agent_data.get("cpa_refs", 0)
                         
-                        msg_text = f"💼 **CPA-Сеть:** Ваш реферал успешно выжил 14 дней в группе!\n\nВам начислен **1 Кейс Агента**! Зайдите в Игровой Кабинет (вкладка Финансы), чтобы забрать приз!\n_Всего приведено: {total_refs} чел._"
+                        msg_text = f"💼 **CPA-Сеть:** Ваш реферал успешно выжил {_cfg('cpa_hold_days')} дней в группе!\n\nВам начислен **1 Кейс Агента**! Зайдите в Игровой Кабинет (вкладка Финансы), чтобы забрать приз!\n_Всего приведено: {total_refs} чел._"
                         
                         if total_refs > 0 and total_refs % 10 == 0:
                             paid_collection.update_one({"uid": agent_id}, {"$inc": {"agent_cases": 1}})
@@ -1623,7 +1626,7 @@ def cpa_monthly_daemon():
                     pipeline = [
                         {"$match": {"status": "approved", "approved_month": prev_month_str}},
                         {"$group": {"_id": "$agent_id", "count": {"$sum": 1}}},
-                        {"$match": {"count": {"$gte": 50}}}, # 🔥 ЖЕСТКИЙ ПОРОГ В 50 ЛИДОВ 🔥
+                        {"$match": {"count": {"$gte": _cfg("cpa_contest_min")}}}, # 🔥 ЖЕСТКИЙ ПОРОГ В 50 ЛИДОВ 🔥
                         {"$sort": {"count": -1}},
                         {"$limit": 5}
                     ]
@@ -1633,7 +1636,7 @@ def cpa_monthly_daemon():
                         from config import STAFF_GROUP_ID, PRIZES_THREAD_ID  # раньше PRIZES_THREAD_ID не существовал → ImportError 1-го числа
                         from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
                         
-                        report_to_admins = f"🏆 **ИТОГИ CPA-КОНКУРСА ({prev_month_str})** 🏆\n\n_Порог в 50 лидов прошли {len(top_agents)} агентов!_\n\n"
+                        report_to_admins = f"🏆 **ИТОГИ CPA-КОНКУРСА ({prev_month_str})** 🏆\n\n_Порог в {_cfg('cpa_contest_min')} лидов прошли {len(top_agents)} агентов!_\n\n"
                         
                         for idx, agent in enumerate(top_agents):
                             place = idx + 1
@@ -1654,13 +1657,13 @@ def cpa_monthly_daemon():
                                 prize_str = "Сертификат 1000₽"
                                 db['premium_claims'].insert_one({"uid": agent_id, "username": username_str, "details": "CPA 3 МЕСТО (Серт. 1000₽)", "timestamp": time.time(), "status": "pending"})
                             elif place == 4:
-                                prize_str = "3000 Очков 💎"
-                                db['paid_users'].update_one({"uid": agent_id}, {"$inc": {"bounty_points": 3000}}, upsert=True)
-                                from core.janitor import log_points; log_points(agent_id, "bounty_points", 3000, reason="cpa_contest")
+                                _p = _cfg("cpa_prize_4"); prize_str = f"{_p} Очков 💎"
+                                db['paid_users'].update_one({"uid": agent_id}, {"$inc": {"bounty_points": _p}}, upsert=True)
+                                from core.janitor import log_points; log_points(agent_id, "bounty_points", _p, reason="cpa_contest")
                             elif place == 5:
-                                prize_str = "1500 Очков 💎"
-                                db['paid_users'].update_one({"uid": agent_id}, {"$inc": {"bounty_points": 1500}}, upsert=True)
-                                from core.janitor import log_points; log_points(agent_id, "bounty_points", 1500, reason="cpa_contest")
+                                _p = _cfg("cpa_prize_5"); prize_str = f"{_p} Очков 💎"
+                                db['paid_users'].update_one({"uid": agent_id}, {"$inc": {"bounty_points": _p}}, upsert=True)
+                                from core.janitor import log_points; log_points(agent_id, "bounty_points", _p, reason="cpa_contest")
                                 
                             report_to_admins += f"**{place} МЕСТО:** {agent_name} ({leads} лидов)\n🎁 Приз: {prize_str}\n\n"
                             
@@ -1680,7 +1683,7 @@ def cpa_monthly_daemon():
                         try: bot.send_message(STAFF_GROUP_ID, report_to_admins, parse_mode="Markdown", reply_markup=markup, message_thread_id=PRIZES_THREAD_ID)
                         except: pass
                     else:
-                        try: bot.send_message(STAFF_GROUP_ID, f"📉 Итоги CPA ({prev_month_str}): Ни один агент не смог преодолеть порог в 50 лидов.")
+                        try: bot.send_message(STAFF_GROUP_ID, f"📉 Итоги CPA ({prev_month_str}): Ни один агент не смог преодолеть порог в {_cfg('cpa_contest_min')} лидов.")
                         except: pass
 
                     # Записываем флаг, что месяц обработан
@@ -1738,9 +1741,10 @@ def autopilot_daemon():
                         add_radar_log(f"🤖 АВТОПИЛОТ: Запуск по расписанию '{t['name']}'")
                         
                         # 👇 🥷 СТЕЛС-МОДУЛЬ 2.0 (ПЕРСОНАЛЬНАЯ ИЛЛЮЗИЯ) 🥷 👇
-                        enemy_ref = "ref_EQHH7XHV" # Чужая ссылка
-                        boss_ref = "ref_2BBPF35H"  # Твоя ссылка
-                        admin_ids = [7235010425] # УКАЖИ ТУТ ID АДМИНОВ (через запятую)
+                        # Ссылки и исключения настраиваются в панели: «Управление» → «Автопилот»
+                        enemy_ref = _cfg("stealth_enemy_ref")
+                        boss_ref = _cfg("stealth_boss_ref")
+                        admin_ids = [int(x) for x in re.findall(r"-?\d+", str(_cfg("stealth_exempt_ids")))]
 
                         for u in cursor:
                             uid = u['_id']
@@ -1835,6 +1839,8 @@ from web.diag import register_diag_routes
 register_diag_routes(app, bot)
 from web.poster import register_poster_routes
 register_poster_routes(app, bot)
+from web.control import register_control_routes
+register_control_routes(app, add_radar_log)
 
 if __name__ == '__main__':
     print("Бот запущен — мягкая версия с приветствием и удалением сообщений (кроме сети ПАРНИ)")

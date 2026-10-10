@@ -7,12 +7,13 @@ import threading
 import os
 import random
 import requests # <--- Добавить, если еще нет
+from core.cfg import cfg  # курсы и цены из панели «🎛 Управление»
 
 def get_crypto_pay_url(custom_payload, amount_stars, description, asset=None):
     import os
     import requests
     
-    amount_rub = int(amount_stars * 1.8)
+    amount_rub = int(amount_stars * cfg("rub_per_star"))
     API_TOKEN = os.getenv("CRYPTO_TOKEN")
     
     if not API_TOKEN:
@@ -156,7 +157,8 @@ import re as _re
 
 vip_offers = db['vip_offers']
 star_payments = db['skynet_star_payments']   # защита от повторной обработки одного платежа
-CITY_PRICE_STARS = 250
+def city_price():
+    return cfg("city_pass_price")
 
 _HEAVY_BAN_RE = _re.compile(
     r"КРАСН\w* ЗОН|ЧЕРН\w* ЗОН|ЖЕЛТ\w* ЗОН|НАРКОТ|\bЦП\b|\bМЕФ|\bСОЛИ\b|<18|НЕСОВЕРШЕННОЛЕТ|"
@@ -263,8 +265,8 @@ def build_vip_payment_markup(uid, price):
     paid_user = db['paid_users'].find_one({"uid": uid}) or {}
     rub_balance = paid_user.get("cashback_balance", 0)
     points_balance = paid_user.get("bounty_points", 0)
-    cost_rub = int(price * 1.8)  # Курс: 1 звезда = 1.8₽
-    cost_points = price * 5      # Курс: 1 звезда = 5 очков
+    cost_rub = int(price * cfg("rub_per_star"))  # курс ₽ за звезду — в панели
+    cost_points = price * cfg("points_per_star")  # курс очков за звезду — в панели
 
     if rub_balance >= cost_rub:
         markup.add(types.InlineKeyboardButton(f"💳 Списать с баланса ({cost_rub}₽)", callback_data="vip_eco_rub"))
@@ -576,15 +578,16 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
                 "Перед оплатой рекомендуем приобрести звёзды через проверенный сервис. "
                 "Это выйдет значительно выгоднее, чем покупать их напрямую через Telegram.\n\n"
                 "**Инструкция:**\n"
-                "1️⃣ Перейдите по ссылке: https://t.me/Avrrorkastarbot?start=7924963993\n"
+                f"1️⃣ Перейдите по ссылке: {cfg('cheap_stars_url')}\n"
                 "2️⃣ Нажмите кнопку «⭐️ Купить звезды»\n"
                 "3️⃣ Выберите пункт «👤 Себе»\n"
                 f"4️⃣ Выберите пакет «⭐️ {current_vip_price} звезд»\n"
                 "5️⃣ Оплатите удобным способом\n\n"
                 "После покупки возвращайтесь сюда и оплачивайте VIP-доступ счетом ниже! 👇"
             )
-            try: bot.send_message(user_id, cheap_stars_text, parse_mode="Markdown", disable_web_page_preview=True)
-            except: pass
+            if cfg("cheap_stars_url"):
+                try: bot.send_message(user_id, cheap_stars_text, parse_mode="Markdown", disable_web_page_preview=True)
+                except: pass
 
             try:
                 markup = build_vip_payment_markup(user_id, current_vip_price)
@@ -693,7 +696,7 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
             return
         try: bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
         except: pass
-        bot.send_invoice(call.message.chat.id, title=f"Пропуск: {city_name} 🏙", description=f"Открывает доступ ко всем чатам нашей сети в городе {city_name} навсегда.", invoice_payload=f"city_access_{city_name}", provider_token="", currency="XTR", prices=[types.LabeledPrice(label=f"Доступ к {city_name}", amount=CITY_PRICE_STARS)])
+        bot.send_invoice(call.message.chat.id, title=f"Пропуск: {city_name} 🏙", description=f"Открывает доступ ко всем чатам нашей сети в городе {city_name} навсегда.", invoice_payload=f"city_access_{city_name}", provider_token="", currency="XTR", prices=[types.LabeledPrice(label=f"Доступ к {city_name}", amount=city_price())])
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith('sec_chance_buy_'))
     def handle_sec_chance_buy(call):
@@ -799,12 +802,12 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
         stars_amount = int(offer["price"])
 
         if currency_type == 'pts':
-            cost = stars_amount * 5
+            cost = stars_amount * cfg("points_per_star")
             update_field = "bounty_points"
             currency_name = "очков"
             revenue_type = "vip_points"
         else:
-            cost = int(stars_amount * 1.8)
+            cost = int(stars_amount * cfg("rub_per_star"))
             update_field = "cashback_balance"
             currency_name = "₽"
             revenue_type = "vip_rub_balance"
@@ -865,7 +868,7 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
             elif q.total_amount < get_vip_price():
                 ok, err = False, "Сумма штрафа изменилась. Нажмите /start."
         elif payload.startswith("city_access_"):
-            if q.total_amount < CITY_PRICE_STARS:
+            if q.total_amount < city_price():
                 ok, err = False, "Неверная сумма."
         bot.answer_pre_checkout_query(q.id, ok=ok, error_message=err)
 

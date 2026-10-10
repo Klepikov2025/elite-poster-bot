@@ -3,6 +3,7 @@ from datetime import datetime
 import random
 from database import posts_collection, temp_posts, users_collection
 from utils import format_time, get_user_name, escape_md, clean_user_text, net_key_to_name
+from core.cfg import cfg  # ссылка на поддержку — в панели
 
 def get_live_network_chats(network_key):
     """Ультра-бронебойный парсер с выводом ошибок прямо в кнопки Телеграма"""
@@ -84,7 +85,7 @@ def register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real
             is_strict = any(t in reason for t in strict_triggers)
             
             markup = types.InlineKeyboardMarkup(row_width=1)
-            markup.add(types.InlineKeyboardButton("🆘 Обратиться в Поддержку", url="https://t.me/FAQMKBOT"))
+            markup.add(types.InlineKeyboardButton("🆘 Обратиться в Поддержку", url="https://t.me/" + cfg("support_bot")))
             
             if not is_strict:
                 markup.add(types.InlineKeyboardButton(f"💸 Оплатить штраф ({current_vip_price}⭐️)", callback_data=f"sec_chance_buy_{current_vip_price}"))

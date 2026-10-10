@@ -5,6 +5,7 @@ import threading
 from datetime import datetime
 from flask import request, render_template, session, redirect, url_for, jsonify
 from core.settings import SkynetSettings
+from core.cfg import cfg
 from database import db, users_collection, banned_collection, withdrawals_collection, proxy_sessions, archive_collection
 
 def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user_everywhere,
@@ -920,8 +921,11 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         return jsonify({"status": "ok"}), 200
 
     def _rub_ok(amount_rub, price_stars):
-        """Крипто-счёт выставляется в рублях: звёзды × 1.8. Допуск 1₽ на округление."""
-        return amount_rub + 1 >= int(price_stars * 1.8)
+        """Крипто-счёт выставляется в рублях: звёзды × курс из панели. Допуск 1₽ на округление."""
+        return amount_rub + 1 >= int(price_stars * cfg("rub_per_star"))
+
+    def _rub(price_stars):
+        return int(price_stars * cfg("rub_per_star"))
 
     def _staff(text):
         if text.startswith("⚠️") or text.startswith("🚨"):
@@ -946,7 +950,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             expected = expected_vip_price(uid)
             if not _rub_ok(amount_rub, expected):
                 # Цена в кнопках раньше подделывалась — сверяем с серверной ценой заявки
-                _staff(f"⚠️ **Крипто-оплата VIP меньше цены!**\nЮзер `{uid}` заплатил {amount_rub}₽, ожидалось {int(expected * 1.8)}₽. Доступ НЕ выдан, решите вручную.")
+                _staff(f"⚠️ **Крипто-оплата VIP меньше цены!**\nЮзер `{uid}` заплатил {amount_rub}₽, ожидалось {_rub(expected)}₽. Доступ НЕ выдан, решите вручную.")
                 try: bot.send_message(uid, "⚠️ Сумма оплаты не совпала с ценой VIP. Администрация свяжется с вами.")
                 except Exception: pass
                 return
@@ -960,7 +964,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             price = int(pricing.get("beyond_price", 250))
             ban = banned_collection.find_one({"_id": uid})
             if not _rub_ok(amount_rub, price):
-                _staff(f"⚠️ **Штраф BEYOND (крипта) меньше цены!** Юзер `{uid}`: {amount_rub}₽ вместо {int(price * 1.8)}₽. Бан НЕ снят.")
+                _staff(f"⚠️ **Штраф BEYOND (крипта) меньше цены!** Юзер `{uid}`: {amount_rub}₽ вместо {_rub(price)}₽. Бан НЕ снят.")
                 return
             if not ban or not is_fine_eligible(ban.get("reason")):
                 _staff(f"⚠️ **Штраф BEYOND оплачен криптой ({amount_rub}₽)**, но у `{uid}` " + ("нет бана" if not ban else "тяжёлый бан") + ". Ничего не снято — решите вручную.")
@@ -984,7 +988,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             step = funnel.get("step")
             problem = None
             if not _rub_ok(amount_rub, price):
-                problem = f"сумма {amount_rub}₽ меньше цены {int(price * 1.8)}₽"
+                problem = f"сумма {amount_rub}₽ меньше цены {_rub(price)}₽"
             elif banned_collection.find_one({"_id": uid}):
                 problem = "активный бан в сети"   # как в BEYOND-боте: оплата больше не снимает любой бан
             elif not funnel or (step is not None and step not in ("waiting_payment", "paying", "decided")):
@@ -1016,7 +1020,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             # Секретарь теперь запоминает сумму выставленного штрафа (pay_offers). Сверяем.
             offer = db['pay_offers'].find_one({"_id": f"{uid}:fine"})
             if offer and not _rub_ok(amount_rub, int(offer.get("amount", 0))):
-                _staff(f"⚠️ **Штраф криптой меньше выставленного!** `{uid}`: {amount_rub}₽ вместо {int(offer['amount'] * 1.8)}₽. Разбан НЕ выполнен.")
+                _staff(f"⚠️ **Штраф криптой меньше выставленного!** `{uid}`: {amount_rub}₽ вместо {_rub(offer['amount'])}₽. Разбан НЕ выполнен.")
                 return
             db['pay_offers'].delete_one({"_id": f"{uid}:fine"})
             db['daily_revenue'].insert_one({"type": "fine", "amount": amount_rub, "currency": "RUB", "uid": uid, "timestamp": time.time(), "date": datetime.now().strftime("%d.%m.%Y")})
@@ -1024,7 +1028,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             ticket_num = now.strftime("%d%m%Y%H%M%S") + f"-{random.randint(100, 999)}"
             # Сумму передаём в звёздах: по ней Скайнет выдаёт теги «Свободен» (650⭐️) / «Спонсор» (750⭐️).
             # Раньше её не было, и тег брался по последнему ЗВЁЗДНОМУ платежу юзера.
-            stars_equiv = int(round(amount_rub / 1.8))
+            # Если Секретарь запомнил сумму штрафа в звёздах — берём её (он считает рубли по своему курсу).
+            stars_equiv = int(offer["amount"]) if offer and offer.get("amount") else int(round(amount_rub / cfg("rub_per_star")))
             db['skynet_tasks'].insert_one({"uid": uid, "action": "fine_unban", "amount": stars_equiv, "timestamp": now})
             archive_collection.update_one({"target": str(uid)}, {"$push": {"history": {"date": now.strftime("%d.%m.%Y %H:%M"), "action": "Разблокировка (Крипта)", "reason": "Штраф оплачен"}}}, upsert=True)
 
@@ -1048,7 +1053,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             offer = db['pay_offers'].find_one({"_id": f"{uid}:indulgence"})
             price = int(offer.get("amount", 2000)) if offer else 2000
             if not _rub_ok(amount_rub, price):
-                _staff(f"⚠️ **Индульгенция криптой меньше цены!** `{uid}`: {amount_rub}₽ вместо {int(price * 1.8)}₽. Не выдана.")
+                _staff(f"⚠️ **Индульгенция криптой меньше цены!** `{uid}`: {amount_rub}₽ вместо {_rub(price)}₽. Не выдана.")
                 return
             db['pay_offers'].delete_one({"_id": f"{uid}:indulgence"})
             db['daily_revenue'].insert_one({"type": "indulgence", "amount": amount_rub, "currency": "RUB", "uid": uid, "timestamp": time.time(), "date": datetime.now().strftime("%d.%m.%Y")})
@@ -1070,6 +1075,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             parts = payload_str.split("_", 2)
             uid = int(parts[1])
             purchased_city = parts[2]
+            if not _rub_ok(amount_rub, cfg("city_pass_price")):
+                _staff(f"⚠️ **Пропуск в город криптой меньше цены!** `{uid}`: {amount_rub}₽ вместо {_rub(cfg('city_pass_price'))}₽. Доступ выдан, проверьте вручную.")
             users_collection.update_one({"_id": uid}, {"$addToSet": {"purchased_cities": purchased_city}}, upsert=True)
             db['daily_revenue'].insert_one({"type": "city", "amount": amount_rub, "currency": "RUB", "uid": uid, "timestamp": time.time(), "date": datetime.now().strftime("%d.%m.%Y")})
             try:

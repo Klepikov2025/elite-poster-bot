@@ -12,6 +12,7 @@ import pytz
 import random
 from telebot import types
 import telebot
+from core.cfg import cfg  # пороги и ссылки — в панели «🎛 Управление»
 
 from config import (
     OWNER_ID, ADMIN_CHAT_IDS, VIP_CHAT_ID, BEYOND_CHAT_ID, PARNI_CHATS,
@@ -138,7 +139,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             # Математика: находим разницу между двумя картинками (Hamming distance)
                             # Разница 0 - идеальная копия. До 8 - слегка обрезанная или сжатая копия.
                             diff = imagehash.hex_to_hash(current_hash) - imagehash.hex_to_hash(old_hash)
-                            if diff <= 8: 
+                            if diff <= cfg("photo_similarity"): 
                                 is_duplicate = True
                                 break
                         except:
@@ -165,7 +166,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 try: bot.delete_message(chat_id, message_id)
                 except: pass
 
-                if spam_count >= 3:
+                if spam_count >= cfg("repost_strikes"):
                     # 🔥 3 СТРАЙКА = МУТ НА 3 ДНЯ (259200 секунд) 🔥
                     mute_time = int(time.time()) + strike_mute_sec
                     muted = mute_user_everywhere(user_id, reason="Рецидив: Спам старыми фото (Анти-Баян)", admin_name="Скайнет 👁", mute_time=mute_time)
@@ -204,16 +205,16 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 else:
                     # Предупреждение (1 или 2 раз) со случайными фразами и автоудалением через 5 минут
                     phrases = [
-                        f"🥱 {user_link}, моя зрительная память подсказывает, что это ебучее фото мы уже видели. Смени ракурс! (Страйк {spam_count}/3)",
-                        f"📸 {user_link}, Скайнет всё видит. Загрузка старых баянов запрещена, прояви фантазию! (Страйк {spam_count}/3)",
-                        f"🤖 {user_link}, обнаружен дубликат изображения. Пиксель в пиксель. Сделай новое фото. (Страйк {spam_count}/3)",
-                        f"👁 {user_link}, мои нейроны перегреваются от этих баянов. Кидай свежие кадры, а не из архива 2010 года! (Страйк {spam_count}/3)",
-                        f"🖼 {user_link}, я сличил хеши. Эту картинку ты уже постил. У нас тут чат, а не музей антиквариата! (Страйк {spam_count}/3)",
-                        f"🚨 {user_link}, моя база данных говорит, что этот ракурс уже заезжен до дыр. Жду новый контент. (Страйк {spam_count}/3)",
-                        f"🥱 {user_link}, дежавю... Или ты опять скинул ту же самую фотку? Давай что-то свежее. (Страйк {spam_count}/3)",
-                        f"🔎 {user_link}, алгоритмы распознавания образов не обманешь. За спам старыми фотками у нас наказывают. (Страйк {spam_count}/3)",
-                        f"♻️ {user_link}, круговорот баянов в природе нужно остановить. Сделай новое фото, прояви уважение к чату! (Страйк {spam_count}/3)",
-                        f"📸 {user_link}, у тебя что, память в телефоне закончилась? Хватит слать дубликаты! (Страйк {spam_count}/3)"
+                        f"🥱 {user_link}, моя зрительная память подсказывает, что это ебучее фото мы уже видели. Смени ракурс! (Страйк {spam_count}/{cfg('repost_strikes')})",
+                        f"📸 {user_link}, Скайнет всё видит. Загрузка старых баянов запрещена, прояви фантазию! (Страйк {spam_count}/{cfg('repost_strikes')})",
+                        f"🤖 {user_link}, обнаружен дубликат изображения. Пиксель в пиксель. Сделай новое фото. (Страйк {spam_count}/{cfg('repost_strikes')})",
+                        f"👁 {user_link}, мои нейроны перегреваются от этих баянов. Кидай свежие кадры, а не из архива 2010 года! (Страйк {spam_count}/{cfg('repost_strikes')})",
+                        f"🖼 {user_link}, я сличил хеши. Эту картинку ты уже постил. У нас тут чат, а не музей антиквариата! (Страйк {spam_count}/{cfg('repost_strikes')})",
+                        f"🚨 {user_link}, моя база данных говорит, что этот ракурс уже заезжен до дыр. Жду новый контент. (Страйк {spam_count}/{cfg('repost_strikes')})",
+                        f"🥱 {user_link}, дежавю... Или ты опять скинул ту же самую фотку? Давай что-то свежее. (Страйк {spam_count}/{cfg('repost_strikes')})",
+                        f"🔎 {user_link}, алгоритмы распознавания образов не обманешь. За спам старыми фотками у нас наказывают. (Страйк {spam_count}/{cfg('repost_strikes')})",
+                        f"♻️ {user_link}, круговорот баянов в природе нужно остановить. Сделай новое фото, прояви уважение к чату! (Страйк {spam_count}/{cfg('repost_strikes')})",
+                        f"📸 {user_link}, у тебя что, память в телефоне закончилась? Хватит слать дубликаты! (Страйк {spam_count}/{cfg('repost_strikes')})"
                     ]
                     warn_msg = bot.send_message(chat_id, random.choice(phrases), parse_mode="Markdown", disable_web_page_preview=True)
                     
@@ -476,6 +477,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
 
         # 5. Имитация живого человека и отправка
         if response:
+            response = response.replace("@FAQMKBOT", "@" + cfg("support_bot"))
             bot.send_chat_action(message.chat.id, 'typing')
             time.sleep(1.5) 
             bot.reply_to(message, response)
@@ -876,7 +878,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         try: bot.delete_message(chat_id, message.message_id)
                         except: pass
                         
-                        if text_spam_count >= 3:
+                        if text_spam_count >= cfg("repost_strikes"):
                             mute_time = int(time.time()) + strike_mute_sec
                             muted = mute_user_everywhere(user_id, reason="Рецидив: Текстовый спам (Анти-Копипаст)", admin_name="Скайнет 📝", mute_time=mute_time)
                             
@@ -911,16 +913,16 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             db['text_memory'].update_one({"_id": text_memory_id}, {"$set": {"spam_count": 0}})
                         else:
                             text_phrases = [
-                                f"🥱 {user_link}, этот текст мы уже видели. Хватит копипастить одно и то же, прояви фантазию! (Страйк {text_spam_count}/3)",
-                                f"🤖 {user_link}, обнаружен дубликат текста. Чат создан для общения, а не для Ctrl+C -> Ctrl+V. Перепиши анкету! (Страйк {text_spam_count}/3)",
-                                f"📝 {user_link}, Скайнет засек копипаст. Публикация заготовленных шаблонов запрещена. (Страйк {text_spam_count}/3)",
-                                f"♻️ {user_link}, у тебя заело кнопки копировать-вставить? Напиши что-то новое ручками, хватит спамить! (Страйк {text_spam_count}/3)",
-                                f"🔎 {user_link}, индекс уникальности твоего текста пробил дно. Перестань публиковать одинаковые объявы. (Страйк {text_spam_count}/3)",
-                                f"📜 {user_link}, мы не доска бесплатных объявлений на столбе. Попробуй поздороваться и пообщаться вживую! (Страйк {text_spam_count}/3)",
-                                f"🚨 {user_link}, моя текстовая память отлично помнит эту пасту. Меняй текст, или скоро уйдешь в мут. (Страйк {text_spam_count}/3)",
-                                f"🥱 {user_link}, опять эта заезженная анкета... Попробуй хотя бы слова местами поменять для приличия. (Страйк {text_spam_count}/3)",
-                                f"⌨️ {user_link}, нейросети видят 100% плагиат твоего же прошлого сообщения. Мы тут за живое общение! (Страйк {text_spam_count}/3)",
-                                f"🤖 {user_link}, Скайнет против бото-поведения. Хватит слать шаблоны по таймеру, включай мозг. (Страйк {text_spam_count}/3)"
+                                f"🥱 {user_link}, этот текст мы уже видели. Хватит копипастить одно и то же, прояви фантазию! (Страйк {text_spam_count}/{cfg('repost_strikes')})",
+                                f"🤖 {user_link}, обнаружен дубликат текста. Чат создан для общения, а не для Ctrl+C -> Ctrl+V. Перепиши анкету! (Страйк {text_spam_count}/{cfg('repost_strikes')})",
+                                f"📝 {user_link}, Скайнет засек копипаст. Публикация заготовленных шаблонов запрещена. (Страйк {text_spam_count}/{cfg('repost_strikes')})",
+                                f"♻️ {user_link}, у тебя заело кнопки копировать-вставить? Напиши что-то новое ручками, хватит спамить! (Страйк {text_spam_count}/{cfg('repost_strikes')})",
+                                f"🔎 {user_link}, индекс уникальности твоего текста пробил дно. Перестань публиковать одинаковые объявы. (Страйк {text_spam_count}/{cfg('repost_strikes')})",
+                                f"📜 {user_link}, мы не доска бесплатных объявлений на столбе. Попробуй поздороваться и пообщаться вживую! (Страйк {text_spam_count}/{cfg('repost_strikes')})",
+                                f"🚨 {user_link}, моя текстовая память отлично помнит эту пасту. Меняй текст, или скоро уйдешь в мут. (Страйк {text_spam_count}/{cfg('repost_strikes')})",
+                                f"🥱 {user_link}, опять эта заезженная анкета... Попробуй хотя бы слова местами поменять для приличия. (Страйк {text_spam_count}/{cfg('repost_strikes')})",
+                                f"⌨️ {user_link}, нейросети видят 100% плагиат твоего же прошлого сообщения. Мы тут за живое общение! (Страйк {text_spam_count}/{cfg('repost_strikes')})",
+                                f"🤖 {user_link}, Скайнет против бото-поведения. Хватит слать шаблоны по таймеру, включай мозг. (Страйк {text_spam_count}/{cfg('repost_strikes')})"
                             ]
                             warn_msg = bot.send_message(chat_id, random.choice(text_phrases), parse_mode="Markdown", disable_web_page_preview=True)
                             
@@ -1060,7 +1062,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     safe_delete(bot, chat_id, message.message_id)
                     mute_user_everywhere(user_id, reason="Оранжевая зона: Возраст 18-21", admin_name="Скайнет 🔞", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
                     markup = types.InlineKeyboardMarkup()
-                    markup.add(types.InlineKeyboardButton("🛠 Пройти верификацию 🔞", url="https://t.me/FAQMKBOT"))
+                    markup.add(types.InlineKeyboardButton("🛠 Пройти верификацию 🔞", url=f"https://t.me/{cfg('support_bot')}"))
                     
                     db_texts = db['settings'].find_one({"_id": "skynet_texts"}) or {}
                     raw_text_minor = db_texts.get("minor_warn", "🚨 {user_link}, **Внимание!**\nВаша анкета попала под автоматический фильтр безопасности сети. Пользователи до 21 года включительно проходят обязательную верификацию 🔞.")
@@ -1147,8 +1149,8 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         # Кнопки
                         markup = types.InlineKeyboardMarkup(row_width=1)
                         markup.add(
-                            types.InlineKeyboardButton("🛠 Пройти верификацию", url="https://t.me/FAQMKBOT"),
-                            types.InlineKeyboardButton("👑 Купить VIP-статус", url="https://t.me/Elitepost_bot") 
+                            types.InlineKeyboardButton("🛠 Пройти верификацию", url=f"https://t.me/{cfg('support_bot')}"),
+                            types.InlineKeyboardButton("👑 Купить VIP-статус", url=f"https://t.me/{cfg('vip_bot')}") 
                         )
                         
                         flood_msg = bot.send_message(

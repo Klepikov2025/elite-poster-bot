@@ -16,11 +16,15 @@ def get_referral_bonus(invites_count):
     except Exception:
         current_vip_price = 250
 
-    if invites_count <= 10:   return 0.10, int(current_vip_price * 0.10)
-    elif invites_count <= 30: return 0.13, int(current_vip_price * 0.13)
-    elif invites_count <= 50: return 0.15, int(current_vip_price * 0.15)
-    elif invites_count <= 100:return 0.17, int(current_vip_price * 0.17)
-    else:                     return 0.20, int(current_vip_price * 0.20)
+    # Пороги и проценты — в панели «🎛 Управление» → «Рефералка»
+    from core.cfg import ref_tiers
+    tiers = ref_tiers()
+    pct = tiers[-1][1]
+    for limit, frac in tiers:
+        if limit is None or invites_count <= limit:
+            pct = frac
+            break
+    return pct, int(current_vip_price * pct)
 
 def escape_md(text):
     escape_chars = r'\_*[]()~`>#+=|{}'

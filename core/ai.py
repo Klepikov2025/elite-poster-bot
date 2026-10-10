@@ -14,7 +14,15 @@ GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 
 def groq_model():
-    return os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+    """Переменная окружения GROQ_MODEL главнее; иначе — модель из панели «🎛 Управление»."""
+    env = os.getenv("GROQ_MODEL")
+    if env:
+        return env
+    try:
+        from core.cfg import cfg
+        return cfg("groq_model") or "openai/gpt-oss-120b"
+    except Exception:
+        return "openai/gpt-oss-120b"
 
 
 def groq_chat(prompt, max_tokens=400, temperature=0.0, timeout=12, where="ИИ"):

@@ -29,8 +29,7 @@ from database import db, users_collection, banned_collection
 NETS = {"mk": "Мужской Клуб", "parni": "ПАРНИ 18+", "ns": "НС", "rainbow": "Радуга", "gayznak": "Гей Знакомства"}
 NET_BY_NAME = {v: k for k, v in NETS.items()}
 MAX_TEXT = 800
-MAX_TEMPLATES = 5
-MAX_DRAFTS = 10
+from core.cfg import cfg  # лимиты — в панели «🎛 Управление»
 
 VIP_TOP = ('<tg-emoji emoji-id="5467688183229610037">👑</tg-emoji>'
            '<tg-emoji emoji-id="5467466378233543299">👑</tg-emoji>'
@@ -207,9 +206,9 @@ def register_poster_routes(app, bot):
         if not targets:
             return deny("Город не найден в выбранной сети.", 400)
         try:
-            db['mini_app_rate'].insert_one({"_id": f"{uid}_{int(time.time() // 120)}"})
+            db['mini_app_rate'].insert_one({"_id": f"{uid}_{int(time.time() // (cfg('poster_cooldown_min') * 60))}"})
         except DuplicateKeyError:
-            return deny("Подождите пару минут перед следующей публикацией.", 429)
+            return deny(f"Подождите {cfg('poster_cooldown_min')} мин. перед следующей публикацией.", 429)
 
         name = u.get("first_name", "VIP")
         users_collection.update_one({"_id": uid}, {"$set": {"first_name": name}}, upsert=True)
@@ -467,7 +466,7 @@ def register_poster_routes(app, bot):
         for d in db['poster_drafts'].find({"uid": uid}).sort("ts", -1):
             rows.append({"id": str(d["_id"]), "kind": d.get("kind"), "name": d.get("name", ""), "text": d.get("text", ""),
                          "network": d.get("network"), "city": d.get("city"), "ts": d.get("ts", 0)})
-        return jsonify({"success": True, "items": rows, "max_templates": MAX_TEMPLATES})
+        return jsonify({"success": True, "items": rows, "max_templates": cfg("poster_max_templates")})
 
     @app.route('/api/poster/drafts/save', methods=['POST'])
     def api_poster_drafts_save():
@@ -486,10 +485,10 @@ def register_poster_routes(app, bot):
         if did and ObjectId.is_valid(did):
             db['poster_drafts'].update_one({"_id": ObjectId(did), "uid": uid}, {"$set": doc})
             return jsonify({"success": True, "id": did})
-        limit = MAX_TEMPLATES if kind == "template" else MAX_DRAFTS
+        limit = cfg("poster_max_templates") if kind == "template" else cfg("poster_max_drafts")
         if db['poster_drafts'].count_documents({"uid": uid, "kind": kind}) >= limit:
             if kind == "template":
-                return deny(f"Шаблонов не больше {MAX_TEMPLATES}. Удалите лишний.", 400)
+                return deny(f"Шаблонов не больше {limit}. Удалите лишний.", 400)
             old = db['poster_drafts'].find_one({"uid": uid, "kind": "draft"}, sort=[("ts", 1)])
             if old: db['poster_drafts'].delete_one({"_id": old["_id"]})
         res = db['poster_drafts'].insert_one(doc)
