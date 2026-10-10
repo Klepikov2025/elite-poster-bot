@@ -109,6 +109,7 @@ def register_home_routes(app, add_radar_log):
                 "uid": int(case["uid"]), "action": "global_ban" if decision == "ban" else "global_mute",
                 "reason": case.get("reason") or "Решение администратора", "admin_name": admin,
                 "trigger_text": case.get("trigger_text"), "origin_chat": case.get("origin_chat", ""),
-                "duration": int(case.get("duration") or 0), "skip_ai": True, "timestamp": datetime.now()})
+                "duration": int(case.get("duration") or 0), "skip_ai": True, "force": bool(case.get("force")),
+                "timestamp": datetime.now()})
         add_radar_log(f"🤖→👤 Веб-решение по {case['uid']}: {decision} ({case.get('reason')}) — {admin}")
         return jsonify({"success": True})

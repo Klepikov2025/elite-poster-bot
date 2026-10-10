@@ -605,6 +605,16 @@ def start(message):
             try: bot.send_message(admin_id, f"Ошибка в /start: {e}")
             except: pass
 
+def _evidence_md(trigger_text, origin_chat):
+    """Улика и место для алертов в STAFF (Markdown). origin_chat приходит уже экранированным."""
+    out = ""
+    if origin_chat:
+        out += f"• **Где попался:** {origin_chat}\n"
+    if trigger_text and trigger_text != "Без текста (медиа)":
+        out += f"• **Улика:** _{escape_md(str(trigger_text)[:400])}_\n"
+    return out
+
+
 def ban_user_everywhere(target_id, reason="Без причины", admin_name="Система", user_link=None, trigger_text=None, origin_chat=None, force=False):
     # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
     from config import get_network_data
@@ -623,7 +633,7 @@ def ban_user_everywhere(target_id, reason="Без причины", admin_name="�
             
             # Если в причине бана или тексте юзера есть слова о коммерции — СПАСАЕМ!
             if any(word in reason_and_text for word in safe_sponsor_triggers):
-                try: bot.send_message(STAFF_GROUP_ID, f"💎 **СПОНСОРСКИЙ ИММУНИТЕТ:** Юзер `{target_id}` написал про МП, но он официальный Спонсор! Бан отменен.", parse_mode="Markdown")
+                try: bot.send_message(STAFF_GROUP_ID, f"💎 **СПОНСОРСКИЙ ИММУНИТЕТ:** Юзер `{target_id}` написал про МП, но он официальный Спонсор! Бан отменен.\n" + _evidence_md(trigger_text, origin_chat), parse_mode="Markdown")
                 except: pass
                 add_radar_log(f"💎 ИММУНИТЕТ МП: {target_id} спасен от бана")
                 return 0
@@ -635,16 +645,28 @@ def ban_user_everywhere(target_id, reason="Без причины", admin_name="�
             status_name = "🏳️‍🌈 BEYOND" if user_data.get("is_queer") else ("👑 VIP" if user_data.get("is_vip") else "📜 Индульгенция")
             who_tried = admin_name if admin_name else "Система"
             
+            # Раньше в алерте были только ID и причина: что человек написал и где — терялось.
+            # Теперь — полное дело (кто, где, улика) и кнопки: решение остаётся за админом.
             alert_text = (
                 f"🛡 **СКАЙНЕТ: БЛОКИРОВКА БАНА!** 🛡\n\n"
-                f"Попытка забанить пользователя `{target_id}`.\n"
+                f"Попытка забанить {user_link or ''} `{target_id}` — это действующий {status_name}.\n"
                 f"**Инициатор:** {who_tried}\n"
-                f"**Причина:** {reason}\n\n"
-                f"❌ Действие отменено, так как это действующий {status_name}!\n\n"
-                f"👉 *Если вы действительно хотите уничтожить этого клиента, сначала снимите с него VIP-статус в Веб-Панели, а затем баньте.*"
+                f"**Причина:** {reason}\n"
+                + _evidence_md(trigger_text, origin_chat) +
+                f"\n❌ Автоматически бан не выдан. Решите сами:"
             )
-            try: bot.send_message(STAFF_GROUP_ID, alert_text, parse_mode="Markdown")
-            except: pass
+            mk = None
+            try:
+                from core.ai_review import create_review
+                mk = create_review(target_id, "ban", reason, trigger_text=trigger_text or "", origin_chat=origin_chat or "",
+                                   user_link=user_link, source=f"Щит {status_name}", force=True)
+            except Exception as e:
+                logger.error(f"Дело по щиту не создано: {e}")
+            try: bot.send_message(STAFF_GROUP_ID, alert_text, parse_mode="Markdown", reply_markup=mk)
+            except Exception:
+                # Markdown мог сломаться о текст улики — шлём без разметки, но с кнопками
+                try: bot.send_message(STAFF_GROUP_ID, alert_text.replace("**", "").replace("`", ""), reply_markup=mk)
+                except Exception: pass
             
             add_radar_log(f"🛡 ЗАЩИТА ОТ БАНА: {target_id} спасен от {who_tried}")
             return 0 # Прерываем функцию, 0 чатов забанено
@@ -969,7 +991,7 @@ def mute_user_everywhere(target_id, reason="Без причины", admin_name="
         reason_and_text = (str(reason) + " " + str(trigger_text)).lower()
         
         if any(word in reason_and_text for word in safe_sponsor_triggers):
-            try: bot.send_message(STAFF_GROUP_ID, f"💎 **СПОНСОРСКИЙ ИММУНИТЕТ:** Юзер `{target_id}` написал про МП, но он официальный Спонсор! Мут отменен.", parse_mode="Markdown")
+            try: bot.send_message(STAFF_GROUP_ID, f"💎 **СПОНСОРСКИЙ ИММУНИТЕТ:** Юзер `{target_id}` написал про МП, но он официальный Спонсор! Мут отменен.\n" + _evidence_md(trigger_text, origin_chat), parse_mode="Markdown")
             except: pass
             add_radar_log(f"💎 ИММУНИТЕТ МП: {target_id} спасен от мута")
             return 0
@@ -1007,7 +1029,7 @@ def mute_user_everywhere(target_id, reason="Без причины", admin_name="
         
         # 4. Уведомляем админов
         try:
-            bot.send_message(STAFF_GROUP_ID, f"🛡 **БРОНЯ ПРОБИТА:** Скайнет пытался выдать мут `{target_id}` за ({reason}), но **Щит Иммунитета** поглотил удар!", parse_mode="Markdown")
+            bot.send_message(STAFF_GROUP_ID, f"🛡 **БРОНЯ ПРОБИТА:** Скайнет пытался выдать мут `{target_id}` за ({reason}), но **Щит Иммунитета** поглотил удар!\n" + _evidence_md(trigger_text, origin_chat), parse_mode="Markdown")
         except: pass
         
         # 5. ПРЕРЫВАЕМ ФУНКЦИЮ! Мут не выдается (возвращаем 0).
@@ -1330,7 +1352,8 @@ def ai_review_decision(call):
     try:
         if decision == "ban":
             ban_user_everywhere(uid, reason=reason, admin_name=admin_info, user_link=case.get("user_link"),
-                                trigger_text=case.get("trigger_text"), origin_chat=escape_md(case.get("origin_chat", "")))
+                                trigger_text=case.get("trigger_text"), origin_chat=case.get("origin_chat", ""),
+                                force=bool(case.get("force")))
         elif decision == "mute":
             dur = int(case.get("duration") or 0)
             mute_user_everywhere(uid, reason=reason, admin_name=admin_info, user_link=case.get("user_link"),
@@ -1512,7 +1535,8 @@ def _execute_skynet_task(task):
                     reason=reason, 
                     admin_name=task_admin_name, 
                     trigger_text=trigger_text, 
-                    origin_chat=escape_md(task.get('origin_chat', ''))
+                    origin_chat=escape_md(task.get('origin_chat', '')),
+                    force=bool(task.get('force') and task.get('skip_ai'))  # пробой щита — только решение человека из панели
                 )
             else:
                 _dur = int(task.get('duration') or 0)

@@ -20,14 +20,15 @@ ZONE_REASONS = {
 }
 
 
-def create_review(uid, action, reason, trigger_text="", origin_chat="", duration=0, user_link=None, source="Скайнет"):
-    """-> разметка с кнопками для сообщения в админку."""
+def create_review(uid, action, reason, trigger_text="", origin_chat="", duration=0, user_link=None, source="Скайнет", force=False):
+    """-> разметка с кнопками для сообщения в админку.
+    force=True — дело по защищённому (VIP/BEYOND/Индульгенция): бан по кнопке пробивает щит."""
     doc = {"uid": int(uid), "action": action, "reason": reason, "trigger_text": str(trigger_text or "")[:1500],
            "origin_chat": origin_chat or "", "duration": int(duration or 0), "user_link": user_link,
-           "source": source, "status": "pending", "ts": time.time()}
+           "source": source, "status": "pending", "ts": time.time(), "force": bool(force)}
     rid = str(db['ai_reviews'].insert_one(doc).inserted_id)
     mk = types.InlineKeyboardMarkup(row_width=2)
-    ban_btn = types.InlineKeyboardButton("🔨 Забанить", callback_data=f"aire_b_{rid}")
+    ban_btn = types.InlineKeyboardButton("🔨 Забанить (снять статус)" if force else "🔨 Забанить", callback_data=f"aire_b_{rid}")
     mute_btn = types.InlineKeyboardButton("🔇 Замутить", callback_data=f"aire_m_{rid}")
     # Первой идёт кнопка того наказания, которое положено по зоне / просил Шпион
     mk.add(*([ban_btn, mute_btn] if action == "ban" else [mute_btn, ban_btn]))
