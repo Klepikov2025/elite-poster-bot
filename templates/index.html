@@ -954,7 +954,7 @@
 
             </div>
 
-                <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #333; padding: 20px; border-radius: 10px; max-width: 1000px;">
+                {% if is_owner %}<div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #333; padding: 20px; border-radius: 10px; max-width: 1000px;">
             <h3 style="color: #03dac6; margin-bottom: 10px; font-size: 18px;">💰 Управление тарифами сети (VIP и Реклама)</h3>
             <p style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Изменения вступают в силу мгновенно для всех ботов. Пароль не требуется.</p>
             
@@ -999,7 +999,7 @@
                 </div>
             </div>
             <button onclick="saveNetworkPrices()" class="form-btn" style="background: #03dac6; color: #121212; width: 100%; font-weight: bold; font-size: 15px;">💾 Сохранить тарифную сетку</button>
-        </div>
+        </div>{% endif %}
             
             <div id="toggles-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 16px;">
             </div>
@@ -3026,6 +3026,7 @@ function loadRootRevenue(pin, period = 'week') {
 }
 
         function loadNetworkPrices() {
+            if (!document.getElementById('price-vip')) return;  // блок тарифов виден только владельцу
             fetch('/glaz/api/get_prices')
             .then(res => res.json())
             .then(data => {

@@ -77,6 +77,9 @@ SCHEMA = [
 
     # --- Секретарь ---
     {"key": "support_price", "group": G_SEC, "label": "Доступ к поддержке, ⭐️", "type": "int", "default": 50, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "support_group_price", "group": G_SEC, "label": "Цена вопроса в платной группе поддержки (текст)", "type": "text",
+     "default": "от 60 до 150 звёзд", "help": "Подставляется в сообщение «Сначала задайте вопрос в платной группе и оплатите …». Пишите как в тексте: «от 60 до 150 звёзд».",
+     "bots": "Секретарь", "owner": True},
     {"key": "spam_fine", "group": G_SEC, "label": "Штраф за спам кнопками, ⭐️", "type": "int", "default": 111, "min": 1, "max": 100000,
      "help": "Выставляется после 3 ошибок подряд в меню Секретаря. Не должен совпадать с ценой поддержки.", "bots": "Секретарь", "owner": True},
     {"key": "indulgence_price", "group": G_SEC, "label": "Индульгенция, ⭐️", "type": "int", "default": 2000, "min": 1, "max": 100000,

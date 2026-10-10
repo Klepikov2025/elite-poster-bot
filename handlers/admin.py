@@ -367,7 +367,7 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
                 f"🕵️‍♂️ **ДОСЬЕ АГЕНТА: `{target_agent_id}`**\n\n"
                 f"👁 Всего переходов по его ссылкам: **{total_agent_leads}**\n"
                 f"🔄 Дубликаты (уже были в сети): **{agent_duplicates}**\n"
-                f"⏳ На проверке Скайнета (14 дней): **{agent_hold}**\n"
+                f"⏳ На проверке Скайнета ({__import__('core.cfg', fromlist=['cfg']).cfg('cpa_hold_days')} дн.): **{agent_hold}**\n"
                 f"🚫 Отбраковано (боты/спам): **{agent_fraud}**\n"
                 f"✅ **Одобрено (живые):** **{agent_approved}**\n\n"
                 f"💡 _Одобрено = количество человек, за которых агент получил выплату._"
@@ -401,7 +401,7 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
             f"👥 **Уникальных заявок:** {total_leads}\n"
             f"✅ **Одобрено (Живые):** {total_approved}\n"
             f"🚫 **Отбраковано Скайнетом:** {total_fraud}\n"
-            f"⏳ **В холде (14 дней):** {total_hold}\n\n"
+            f"⏳ **В холде ({__import__('core.cfg', fromlist=['cfg']).cfg('cpa_hold_days')} дн.):** {total_hold}\n\n"
             f"🔥 **Средняя конверсия:** {conversion}%\n\n"
             f"🏆 **ТОП-5 АГЕНТОВ (По живому трафику):**\n"
         )
