@@ -6,6 +6,8 @@ from datetime import datetime
 from flask import request, render_template, session, redirect, url_for, jsonify
 from core.settings import SkynetSettings
 from core.cfg import cfg
+
+_LEGACY_RATE_UNTIL = datetime(2026, 10, 25).timestamp()  # см. _rub_ok
 from database import db, users_collection, banned_collection, withdrawals_collection, proxy_sessions, archive_collection
 
 def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user_everywhere,
@@ -921,8 +923,12 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         return jsonify({"status": "ok"}), 200
 
     def _rub_ok(amount_rub, price_stars):
-        """Крипто-счёт выставляется в рублях: звёзды × курс из панели. Допуск 1₽ на округление."""
-        return amount_rub + 1 >= int(price_stars * cfg("rub_per_star"))
+        """Крипто-счёт выставляется в рублях: звёзды × курс из панели. Допуск 1₽ на округление.
+        До 25.10.2026 принимаем и старый курс 1,8: счета, выставленные до перехода на 2 ₽, ещё гуляют."""
+        rate = cfg("rub_per_star")
+        if time.time() < _LEGACY_RATE_UNTIL:
+            rate = min(rate, 1.8)
+        return amount_rub + 1 >= int(price_stars * rate)
 
     def _rub(price_stars):
         return int(price_stars * cfg("rub_per_star"))
@@ -1051,7 +1057,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         elif payload_str.startswith("indulgence_"):
             uid = int(payload_str.replace("indulgence_", ""))
             offer = db['pay_offers'].find_one({"_id": f"{uid}:indulgence"})
-            price = int(offer.get("amount", 2000)) if offer else 2000
+            price = int(offer.get("amount") or cfg("indulgence_price")) if offer else cfg("indulgence_price")
             if not _rub_ok(amount_rub, price):
                 _staff(f"⚠️ **Индульгенция криптой меньше цены!** `{uid}`: {amount_rub}₽ вместо {_rub(price)}₽. Не выдана.")
                 return
