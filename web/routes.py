@@ -106,6 +106,43 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                         method_str = wd.get('method', 'Неизвестно')
                         fin_history.append(f"[{dt}] ВЫВОД {wd['amount']}₽ ({method_str}) — {status_ru}")
 
+                    # 👇 Расширенная карточка: имя, мут, воронки, платежи, анкеты
+                    _mute_until = (u_info or {}).get("net_mute_until")
+                    mute_str = None
+                    if _mute_until is not None and (u_info or {}).get("net_mute_reason") is not None:
+                        mute_str = "бессрочно" if not _mute_until else (
+                            datetime.fromtimestamp(_mute_until).strftime('%d.%m %H:%M') if _mute_until > time.time() else None)
+                    vf = db['vip_funnel'].find_one({"_id": uid}) or {}
+                    bf = db['beyond_funnel'].find_one({"_id": uid}) or {}
+                    pay_rows = []
+                    for r in db['daily_revenue'].find({"uid": uid}).sort("timestamp", -1).limit(12):
+                        cur = "₽" if r.get("currency") == "RUB" else "⭐️"
+                        ts = r.get("timestamp")
+                        pay_rows.append({"date": datetime.fromtimestamp(ts).strftime('%d.%m.%y') if ts else r.get("date", ""),
+                                         "type": r.get("type", ""), "amount": f"{r.get('amount', 0)} {cur}"})
+                    for r in db['star_transactions'].find({"uid": uid}).sort("timestamp", -1).limit(12):
+                        if r.get("status") == "refunded":
+                            pay_rows.append({"date": datetime.fromtimestamp(r.get("timestamp", 0)).strftime('%d.%m.%y'),
+                                             "type": "возврат", "amount": f"−{r.get('amount', 0)} ⭐️"})
+                    pts_rows = []
+                    for r in db['points_ledger'].find({"uid": uid}).sort("ts", -1).limit(10):
+                        d = r.get("delta", 0)
+                        pts_rows.append(f"[{datetime.fromtimestamp(r.get('ts', 0)).strftime('%d.%m %H:%M')}] "
+                                        f"{'+' if d > 0 else ''}{d} {r.get('field', '')} — {r.get('reason', '')}")
+                    user_data_extra = {
+                        "first_name": (u_info or {}).get("first_name") or "Без имени",
+                        "username": (u_info or {}).get("username") or "",
+                        "mute_str": mute_str,
+                        "mute_reason": (u_info or {}).get("net_mute_reason") or "",
+                        "indulgence": bool((u_info or {}).get("indulgence")),
+                        "vip_stage": vf.get("stage"),
+                        "beyond_step": bf.get("step"),
+                        "posts_count": db['posts'].count_documents({"user_id": uid}),
+                        "invites": int(p_info.get("cpa_refs", 0) or 0) + int(p_info.get("invites", 0) or 0),
+                        "payments": pay_rows[:15],
+                        "points_history": pts_rows,
+                    }
+
                     user_data = {
                         "id": uid,
                         "is_quarantine": is_quarantine,
@@ -133,6 +170,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                         "active_chats": p_info.get("active_chats", []),
                         "fin_history": fin_history # <--- ВОТ ТУТ ДОБАВЛЕНА ВЫПИСКА
                     }
+                    user_data.update(user_data_extra)
                     add_radar_log(f"🔎 Обыск досье: {uid}")
                 else:
                     search_error = f"Юзер {uid} не найден в матрице базы данных."
@@ -1438,7 +1476,19 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
     @app.route('/glaz/api/moderation/save', methods=['POST'])
     def api_save_mod_settings():
         if not session.get('logged_in'): return jsonify({"success": False}), 401
-        data = request.json
+        raw = request.get_json(silent=True) or {}
+        # Только известные поля: раньше сюда можно было записать что угодно, в т.ч. сломать
+        # bump_hours / cleanup_minutes из вкладки «Управление».
+        ints = ("sim_normal", "sim_newbie", "strike_hours", "flood_norm_hours", "flood_hard_hours", "quaran_hours")
+        bools = ("radar_active", "antibayan_photo_active", "antibayan_text_active", "antiflood_active")
+        data = {}
+        for k in ints:
+            if k in raw:
+                try: data[k] = max(0, int(raw[k]))
+                except (TypeError, ValueError): return jsonify({"success": False, "error": f"{k}: нужно число"}), 400
+        for k in bools:
+            if k in raw: data[k] = bool(raw[k])
+        if not data: return jsonify({"success": False, "error": "пусто"}), 400
         db['settings'].update_one({"_id": "moderation_limits"}, {"$set": data}, upsert=True)
         add_radar_log("⚙️ Таймеры и настройки модерации изменены!")
         return jsonify({"success": True})
@@ -1522,6 +1572,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
     # === ОТДАЕМ ПУЛЬС БОТОВ В ВЕБ-ПАНЕЛЬ ===
     @app.route('/glaz/api/system_status', methods=['GET'])
     def api_get_system_status():
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
         status_data = db['settings'].find_one({"_id": "bot_status"}) or {}
         if "_id" in status_data:
             del status_data["_id"]

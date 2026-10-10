@@ -1469,7 +1469,7 @@ def _execute_skynet_task(task):
         
         # 🔥 СУДЬЯ СКАЙНЕТ ПРОВЕРЯЕТ УЛИКИ АНДРЮШЕНЬКИ 🔥
         is_guilty = True
-        if trigger_text:
+        if trigger_text and not task.get('skip_ai'):  # skip_ai: решение уже принял человек в панели
             reason_lower = reason.lower() # Приводим к нижнему регистру для надежности!
             if "черная зона" in reason_lower:
                 is_guilty = ai_context_checker(trigger_text, zone="black")
@@ -1888,7 +1888,9 @@ register_diag_routes(app, bot)
 from web.poster import register_poster_routes
 register_poster_routes(app, bot)
 from web.control import register_control_routes
+from web.home import register_home_routes
 register_control_routes(app, add_radar_log)
+register_home_routes(app, add_radar_log)
 
 if __name__ == '__main__':
     print("Бот запущен — мягкая версия с приветствием и удалением сообщений (кроме сети ПАРНИ)")

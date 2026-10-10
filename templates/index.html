@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Глаз Саурона | ЦУП Империи</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
@@ -170,46 +172,501 @@
             margin-top: 15px;
         }
 
+
+        /* =====================================================================
+           🛡 БУНКЕР 2.0 — единые токены, боковое меню, мобильная вёрстка.
+           Стоит в конце, поэтому перекрывает старые стили, не ломая вкладки.
+           ===================================================================== */
+        :root {
+            --bg: #0c0d10; --surface: #14161a; --surface-2: #1b1e23; --surface-3: #22262c;
+            --line: #262a31; --line-2: #323741;
+            --text: #ececf1; --muted: #8b909a; --dim: #5d626c;
+            --accent: #bb86fc; --accent-ink: #14081f; --teal: #03dac6; --danger: #ef6f86; --warn: #ffb74d; --ok: #4cd6a0;
+            --radius: 12px; --radius-sm: 8px;
+            --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+            --sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            --sidebar-w: 248px;
+        }
+        html { -webkit-text-size-adjust: 100%; }
+        body { background: var(--bg); color: var(--text); font-family: var(--sans); padding: 0; margin: 0; font-size: 14px; line-height: 1.45; overflow-x: hidden; }
+        ::selection { background: var(--accent); color: var(--accent-ink); }
+        * { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+
+        .app { display: flex; min-height: 100vh; }
+        .sidebar {
+            width: var(--sidebar-w); flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+            background: var(--surface); border-right: 1px solid var(--line); display: flex; flex-direction: column; z-index: 200;
+        }
+        .brand { display: flex; align-items: center; gap: 10px; padding: 18px 18px 14px; border-bottom: 1px solid var(--line); }
+        .brand-eye { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 18px;
+                     background: radial-gradient(circle at 50% 45%, #3a1f5c, #17101f 70%); box-shadow: 0 0 0 1px #3b2a52, 0 0 18px rgba(187,134,252,.25); }
+        .brand-title { font-weight: 800; letter-spacing: .08em; font-size: 13px; text-transform: uppercase; color: var(--text); }
+        .brand-sub { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: .12em; text-transform: uppercase; }
+
+        .nav { padding: 10px 10px 4px; flex: 1; }
+        .nav-group { margin-bottom: 10px; }
+        .nav-group-title { font-family: var(--mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); padding: 8px 10px 6px; }
+        .nav-item {
+            width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: var(--radius-sm);
+            background: none; border: 1px solid transparent; color: #c5c8cf; font: 500 13.5px var(--sans); cursor: pointer; text-align: left;
+            transition: background .15s, color .15s, border-color .15s;
+        }
+        .nav-item .ico { width: 20px; text-align: center; flex-shrink: 0; }
+        .nav-item .lbl { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .nav-item:hover { background: var(--surface-2); color: #fff; }
+        .nav-item.active { background: rgba(187,134,252,.12); border-color: rgba(187,134,252,.35); color: #fff; }
+        .nav-item.active .ico { filter: drop-shadow(0 0 6px rgba(187,134,252,.6)); }
+        .nav-badge { font: 700 11px var(--mono); background: var(--danger); color: #fff; border-radius: 999px; padding: 1px 7px; min-width: 18px; text-align: center; }
+        .nav-badge.warm { background: var(--warn); color: #1b1300; }
+
+        .pulse-box { margin: 6px 12px 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); }
+        .pulse-title { font: 500 10px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); margin-bottom: 6px; }
+        .pulse-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 3px 0; color: #c5c8cf; }
+        .pulse-row .when { margin-left: auto; font: 500 11px var(--mono); color: var(--muted); }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); flex-shrink: 0; }
+        .dot.ok { background: var(--ok); box-shadow: 0 0 8px rgba(76,214,160,.7); }
+        .dot.late { background: var(--warn); }
+        .dot.dead { background: var(--danger); }
+        .side-foot { padding: 10px 12px 16px; border-top: 1px solid var(--line); }
+        .logout-link { display: flex; justify-content: center; gap: 8px; font-size: 13px; padding: 9px 12px; border-radius: var(--radius-sm); border: 1px solid #4a2630; color: var(--danger); text-decoration: none; font-weight: 600; }
+        .logout-link:hover { background: rgba(239,111,134,.12); color: #ff9fb1; }
+
+        .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .topbar {
+            position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 14px; padding: 12px 28px;
+            background: rgba(12,13,16,.86); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
+        }
+        .burger { display: none; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--surface); color: var(--text); font-size: 18px; cursor: pointer; flex-shrink: 0; }
+        .page-title { font-weight: 700; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .page-title small { display: block; font: 500 10.5px var(--mono); color: var(--muted); letter-spacing: .12em; text-transform: uppercase; }
+        .quick-search { margin-left: auto; display: flex; gap: 6px; width: min(380px, 46vw); }
+        .quick-search input { flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--line-2); color: var(--text); border-radius: 10px; padding: 9px 12px; font: 500 14px var(--sans); }
+        .quick-search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(187,134,252,.18); }
+        .quick-search button { border: none; background: var(--accent); color: var(--accent-ink); border-radius: 10px; padding: 0 14px; font-weight: 700; cursor: pointer; }
+        .content { padding: 24px 28px 40px; width: 100%; max-width: 1320px; margin: 0 auto; box-sizing: border-box; }
+        .footer { margin-top: 48px; color: var(--dim); font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+        .scrim { display: none; }
+
+        /* Общие поверхности старых вкладок — приводим к одной палитре */
+        .panel-block, .search-container { background: var(--surface) !important; border: 1px solid var(--line) !important; box-shadow: none !important; border-radius: var(--radius) !important; }
+        .chart-block, .card { background: var(--surface); box-shadow: none; border: 1px solid var(--line); border-radius: var(--radius); }
+        .search-input, .form-input, .mass-textarea, .form-control, select, textarea { background: var(--bg) !important; border: 1px solid var(--line-2) !important; color: var(--text) !important; border-radius: var(--radius-sm) !important; font-family: var(--sans); }
+        .search-input:focus, .form-control:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent) !important; }
+        .form-btn, .search-btn { border-radius: var(--radius-sm); font-family: var(--sans); }
+        .admin-table { background: transparent; }
+        .admin-table th { background: var(--surface-2); color: var(--muted); font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+        .admin-table td { border-bottom-color: var(--line); }
+        .admin-table tr:nth-child(even) { background: rgba(255,255,255,.015); }
+        .toast { background: var(--surface-2); border-left-color: var(--accent); border-radius: 10px; font-weight: 600; }
+        .tab-content.active { animation: tabIn .18s ease-out; }
+        @keyframes tabIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+        /* ---------- Общие блоки новых экранов ---------- */
+        .sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 4px 0 14px; }
+        .sec-head h2 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.01em; }
+        .sec-head p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+        .eyebrow { font: 600 10.5px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+        .box { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 10px; padding: 9px 14px; font: 600 13px var(--sans); cursor: pointer; border: 1px solid var(--line-2); background: var(--surface-2); color: var(--text); transition: .15s; white-space: nowrap; }
+        .btn:hover { border-color: var(--muted); }
+        .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+        .btn.danger { background: rgba(239,111,134,.12); border-color: rgba(239,111,134,.45); color: #ff9fb1; }
+        .btn.warn { background: rgba(255,183,77,.12); border-color: rgba(255,183,77,.45); color: var(--warn); }
+        .btn.ok { background: rgba(76,214,160,.12); border-color: rgba(76,214,160,.45); color: var(--ok); }
+        .btn.ghost { background: transparent; }
+        .btn.sm { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+        .chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font: 600 11.5px var(--sans); border: 1px solid var(--line-2); color: #c5c8cf; background: var(--surface-2); }
+        .chip.red { color: #ff9fb1; border-color: rgba(239,111,134,.45); background: rgba(239,111,134,.1); }
+        .chip.amber { color: var(--warn); border-color: rgba(255,183,77,.45); background: rgba(255,183,77,.1); }
+        .chip.green { color: var(--ok); border-color: rgba(76,214,160,.45); background: rgba(76,214,160,.1); }
+        .chip.violet { color: #d9bcff; border-color: rgba(187,134,252,.45); background: rgba(187,134,252,.1); }
+        .chip.pink { color: #ffc2d6; border-color: rgba(246,165,192,.45); background: rgba(246,165,192,.1); }
+        .mono { font-family: var(--mono); }
+        .muted { color: var(--muted); }
+
+        /* ---------- 🔥 Что горит ---------- */
+        .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 18px; }
+        .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+        .kpi .v { font: 700 24px var(--mono); margin-top: 4px; }
+        .alerts { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin-bottom: 22px; }
+        .alert-card { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); cursor: pointer; text-align: left; color: var(--text); font: inherit; transition: .15s; }
+        .alert-card:hover { border-color: var(--line-2); transform: translateY(-1px); }
+        .alert-card.static { cursor: default; }
+        .alert-card.static:hover { transform: none; }
+        .alert-card .ic { font-size: 20px; width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-2); flex-shrink: 0; }
+        .alert-card .n { font: 700 22px var(--mono); margin-left: auto; padding-left: 8px; }
+        .alert-card .t { font-size: 13px; color: #c5c8cf; line-height: 1.3; }
+        .alert-card.hot { border-color: rgba(239,111,134,.5); background: linear-gradient(90deg, rgba(239,111,134,.10), var(--surface) 70%); }
+        .alert-card.hot .n { color: #ff9fb1; }
+        .alert-card.warm { border-color: rgba(255,183,77,.45); background: linear-gradient(90deg, rgba(255,183,77,.08), var(--surface) 70%); }
+        .alert-card.warm .n { color: var(--warn); }
+        .alert-card.zero { opacity: .55; }
+        .alert-card.zero .n { color: var(--muted); }
+        .all-clear { padding: 18px; border: 1px dashed var(--line-2); border-radius: var(--radius); color: var(--muted); text-align: center; }
+        .case { border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); padding: 14px; display: grid; gap: 10px; }
+        .case + .case { margin-top: 10px; }
+        .case-top { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .case-text { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; color: #d8d9de; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+        .case-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        /* ---------- 🗂 Досье ---------- */
+        .dossier-search { display: flex; gap: 8px; max-width: 640px; }
+        .dossier-search input { flex: 1; min-width: 0; }
+        .hero { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; margin-top: 16px; position: relative; overflow: hidden; }
+        .hero::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: linear-gradient(90deg, var(--accent), var(--teal)); }
+        .hero.banned::before { background: linear-gradient(90deg, var(--danger), #7a2738); }
+        .hero.muted-u::before { background: linear-gradient(90deg, var(--warn), #7a5420); }
+        .hero-top { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+        .avatar { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; font: 800 22px var(--sans); background: linear-gradient(135deg, #3b2a52, #1f2a3a); color: #fff; flex-shrink: 0; }
+        .hero-name { font-size: 22px; font-weight: 800; letter-spacing: -.01em; line-height: 1.15; }
+        .hero-meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 6px; color: var(--muted); font-size: 13px; }
+        .copy-id { cursor: pointer; border-bottom: 1px dashed var(--dim); }
+        .hero-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+        .hero-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-top: 16px; }
+        .hstat { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; }
+        .hstat .v { font: 700 17px var(--mono); margin-top: 2px; }
+        .hero-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); align-items: center; }
+        .mute-inline { display: inline-flex; align-items: center; gap: 0; border: 1px solid rgba(255,183,77,.45); border-radius: 10px; overflow: hidden; }
+        .mute-inline input { width: 56px; border: none !important; border-radius: 0 !important; text-align: center; padding: 8px 4px; background: var(--bg) !important; color: var(--warn) !important; font: 700 13px var(--mono); }
+        .mute-inline .btn { border: none; border-radius: 0; }
+        .dossier-grid { gap: 12px !important; }
+        .dossier-section { background: var(--surface) !important; border: 1px solid var(--line) !important; border-top-width: 1px !important; border-radius: var(--radius) !important; box-shadow: none !important; }
+        .dossier-section h4 { color: var(--muted) !important; font: 600 11px var(--mono) !important; letter-spacing: .14em !important; border-bottom: 1px solid var(--line) !important; }
+        .full-width-box { background: var(--surface) !important; border: 1px solid var(--line) !important; border-radius: var(--radius) !important; }
+        .kv-list { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; }
+        .kv-list li { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+        .kv-list li:last-child { border-bottom: none; }
+        .empty { color: var(--dim); font-style: italic; font-size: 12.5px; padding: 6px 0; }
+
+        /* ---------- ⚙️ Настройки ---------- */
+        .settings-bar { position: sticky; top: 64px; z-index: 40; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px; margin-bottom: 16px; background: rgba(20,22,26,.92); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--line); border-radius: var(--radius); }
+        .settings-bar input { flex: 1 1 220px; min-width: 0; background: var(--bg); border: 1px solid var(--line-2); color: var(--text); border-radius: 10px; padding: 9px 12px; font: 500 14px var(--sans); }
+        .settings-bar input:focus { outline: none; border-color: var(--accent); }
+        .jump-chips { display: flex; gap: 6px; overflow-x: auto; flex: 1 1 100%; min-width: 0; padding-bottom: 2px; }
+        .jump-chips .chip { cursor: pointer; white-space: nowrap; }
+        .jump-chips .chip:hover { border-color: var(--accent); color: #fff; }
+        .search-hit { box-shadow: 0 0 0 2px rgba(187,134,252,.55) !important; }
+        .no-hits { display: none; padding: 20px; text-align: center; color: var(--muted); border: 1px dashed var(--line-2); border-radius: var(--radius); }
+        body.settings-mode #tab-system { display: block; }
+        #tab-control .panel-block, #tab-system .panel-block { max-width: 1100px !important; margin-left: auto !important; margin-right: auto !important; }
+        .input-grid input, .dossier-section input { box-sizing: border-box; min-width: 0; }
+        .ctl-float { position: fixed; right: 24px; bottom: 24px; z-index: 300; display: none; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+        body.settings-mode.ctl-dirty .ctl-float { display: inline-flex; }
+
+        /* ---------- 📱 Телефон и узкие экраны ---------- */
+        @media (max-width: 960px) {
+            .sidebar { position: fixed; left: 0; top: 0; bottom: 0; transform: translateX(-102%); transition: transform .22s ease; box-shadow: 0 0 40px rgba(0,0,0,.6); }
+            body.nav-open .sidebar { transform: none; }
+            body.nav-open .scrim { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 150; }
+            .burger { display: grid; place-items: center; }
+            .topbar { padding: 10px 14px; gap: 10px; flex-wrap: wrap; }
+            .quick-search { width: 100%; order: 3; margin-left: 0; }
+            .content { padding: 16px 14px 32px; }
+            .settings-bar { top: 112px; }
+        }
+        @media (max-width: 760px) {
+            /* Старые вкладки свёрстаны инлайн-стилями под широкий экран — складываем их в одну колонку */
+            .content [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+            .content [style*="display: flex"][style*="gap: 20px"], .content [style*="display:flex"][style*="gap:20px"] { flex-wrap: wrap !important; }
+            .content [style*="width: 400px"], .content [style*="width: 500px"], .content [style*="width: 625px"], .content [style*="width: 350px"], .content [style*="width: 300px"] { width: 100% !important; max-width: 100% !important; }
+            .content [style*="min-width: 220px"] { min-width: 0 !important; }
+            .chart-block canvas { max-width: 100% !important; height: auto !important; }
+            .panel-block, .search-container { padding: 14px !important; margin-left: 0 !important; margin-right: 0 !important; }
+            .chat-app { flex-direction: column; height: auto !important; }
+            .chat-sidebar { width: 100% !important; max-height: 320px; }
+            .chat-main { min-height: 480px; }
+            .admin-table { display: block; overflow-x: auto; white-space: nowrap; }
+            .dashboard .card { width: calc(50% - 10px); padding: 14px; }
+            .number { font-size: 26px; }
+            .hero-name { font-size: 19px; }
+            .hero-actions .btn { flex: 1 1 calc(50% - 8px); }
+            .mute-inline { flex: 1 1 100%; }
+            .mute-inline .btn { flex: 1; }
+            .alerts { grid-template-columns: 1fr; }
+            .alert-card.zero { display: none; }
+            .dossier-search { display: none; }   /* на телефоне поиск — в шапке */
+            .content div[style*="display: flex"], .content div[style*="display:flex"] { flex-wrap: wrap; }
+            .content input, .content select, .content textarea { max-width: 100%; min-width: 0; box-sizing: border-box; }
+            .content table { display: block; overflow-x: auto; }
+            .ctl-float { left: 14px; right: 14px; bottom: 14px; justify-content: center; }
+            #toast-container { left: 12px; right: 12px; top: 12px; }
+            input, select, textarea { font-size: 16px !important; } /* без авто-зума на iPhone */
+        }
+
     </style>
 </head>
 <body>
 
     <div id="toast-container"></div>
 
-    <div class="header-container">
-        <h1>👁️ Глаз Саурона | ЦУП</h1>
-        <a href="/glaz/logout" class="logout-link">🔒 Выйти из Бункера</a>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-eye">👁️</div>
+      <div><div class="brand-title">Глаз Саурона</div><div class="brand-sub">ЦУП империи</div></div>
+    </div>
+    <nav class="nav">
+      <div class="nav-group">
+        <div class="nav-group-title">Главное</div>
+        <button class="nav-item" data-tab="tab-home" onclick="openTab('tab-home')"><span class="ico">🔥</span><span class="lbl">Что горит</span><span class="nav-badge" id="home-badge" style="display:none">0</span></button>
+        <button class="nav-item" data-tab="tab-main" onclick="openTab('tab-main')"><span class="ico">📊</span><span class="lbl">Статистика</span></button>
+        <button class="nav-item" data-tab="tab-radar" onclick="openTab('tab-radar')"><span class="ico">📡</span><span class="lbl">Радар и списки</span></button>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-title">Люди</div>
+        <button class="nav-item" data-tab="tab-dossier" onclick="openTab('tab-dossier')"><span class="ico">🗂</span><span class="lbl">Досье</span></button>
+        <button class="nav-item" data-tab="tab-quarantine" onclick="openTab('tab-quarantine')"><span class="ico">🥷</span><span class="lbl">Карантин</span></button>
+        <button class="nav-item" data-tab="tab-verif" onclick="openTab('tab-verif')"><span class="ico">🎥</span><span class="lbl">Live-вериф</span></button>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-title">Модерация</div>
+        <button class="nav-item" data-tab="tab-mass" onclick="openTab('tab-mass')"><span class="ico">💥</span><span class="lbl">Репрессии</span></button>
+        <button class="nav-item" data-tab="tab-blackbox" onclick="openTab('tab-blackbox')"><span class="ico">🕵️</span><span class="lbl">Чёрный ящик</span></button>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-title">Связь</div>
+        <button class="nav-item" data-tab="tab-support" onclick="openTab('tab-support')"><span class="ico">📩</span><span class="lbl">Входящие</span><span id="ticket-badge" class="nav-badge" style="display:none">0</span></button>
+        <button class="nav-item" data-tab="tab-broadcast" onclick="openTab('tab-broadcast')"><span class="ico">🚀</span><span class="lbl">Рассылка</span></button>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-title">Деньги</div>
+        <button class="nav-item" data-tab="tab-withdrawals" onclick="openTab('tab-withdrawals')"><span class="ico">🎁</span><span class="lbl">Касса и награды</span></button>
+        <button class="nav-item" data-tab="tab-promos" onclick="openTab('tab-promos')"><span class="ico">🎫</span><span class="lbl">Скидки</span></button>
+        <button class="nav-item" data-tab="ads-tab" onclick="openTab('ads-tab')"><span class="ico">📢</span><span class="lbl">Биржа рекламы</span></button>
+        {% if is_owner %}<button id="btn-secret-finance" class="nav-item" data-tab="tab-live-finance" onclick="openTab('tab-live-finance')" style="display: none;"><span class="ico">💰</span><span class="lbl">Live-финансы</span></button>{% endif %}
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-title">Система</div>
+        <button class="nav-item" data-tab="tab-control" onclick="openTab('tab-control')"><span class="ico">⚙️</span><span class="lbl">Настройки</span></button>
+        <button class="nav-item" data-tab="tab-infrastructure" onclick="openTab('tab-infrastructure')"><span class="ico">🗺</span><span class="lbl">Инфраструктура</span></button>
+        <button class="nav-item" data-tab="tab-diag" onclick="openTab('tab-diag')"><span class="ico">🩺</span><span class="lbl">Диагностика</span><span class="nav-badge warm" id="diag-badge" style="display:none">0</span></button>
+      </div>
+    </nav>
+    <div class="pulse-box">
+      <div class="pulse-title">Пульс ботов</div>
+      <div id="pulse-list"><div class="pulse-row"><span class="dot"></span>Загрузка…</div></div>
+    </div>
+    <div class="side-foot"><a href="/glaz/logout" class="logout-link">🔒 Выйти из бункера</a></div>
+  </aside>
+  <div class="scrim" onclick="toggleNav(false)"></div>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="burger" onclick="toggleNav()" aria-label="Меню">☰</button>
+      <div class="page-title" id="page-title"><small id="page-group">Главное</small><span id="page-name">Что горит</span></div>
+      <form class="quick-search" method="GET" action="/glaz">
+        <input type="text" name="search_id" placeholder="Досье: ID или @username" value="{{ search_id }}" autocomplete="off">
+        <button type="submit" aria-label="Найти">→</button>
+      </form>
+    </header>
+    <div class="content">
+
+    <!-- 🔥 ЧТО ГОРИТ: всё, что ждёт человека -->
+    <div id="tab-home" class="tab-content active">
+        <div class="sec-head">
+            <div><h2>Что горит</h2><p>Всё, что ждёт решения человека. Нажмите на карточку — откроется нужный раздел.</p></div>
+            <button class="btn sm" onclick="loadHome()">🔄 Обновить</button>
+        </div>
+        <div class="kpis" id="home-kpis"></div>
+        <div class="alerts" id="home-alerts"><div class="all-clear">Загрузка…</div></div>
+
+        <div class="sec-head" id="ai-cases-head">
+            <div><h2 style="font-size:17px;">🤖 ИИ не смог проверить</h2><p>Фильтр зацепил сообщение, а ИИ не ответил. Автоматика ничего не сделала — решите сами.</p></div>
+        </div>
+        <div id="ai-cases"><div class="all-clear">Загрузка…</div></div>
     </div>
 
-    <div class="header-status" style="display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; background: #1e1e1e; padding: 12px 20px; border-radius: 8px; border: 1px solid #333; max-width: 1060px; margin: 0 auto 25px auto; font-weight: bold; font-size: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
-        <div style="color: #bb86fc; text-transform: uppercase; font-size: 12px; display: flex; align-items: center;">📡 Пульс систем:</div>
-        <div id="status-skynet">🤖 Skynet: <span style="color:#aaa;">⏳...</span></div>
-        <div id="status-spy">🚜 Bulldozer: <span style="color:#aaa;">⏳...</span></div>
-        <div id="status-ads">📢 Реклама: <span style="color:#aaa;">⏳...</span></div>
-        <div id="status-sec">👩‍💼 Секретарь: <span style="color:#aaa;">⏳...</span></div>
+    <!-- 🗂 ДОСЬЕ: карточка человека -->
+    <div id="tab-dossier" class="tab-content">
+        <div class="sec-head">
+            <div><h2>Досье</h2><p>Поиск по ID или @username — всё о человеке на одном экране.</p></div>
+        </div>
+        <form method="GET" action="/glaz" class="dossier-search">
+            <input type="text" name="search_id" class="search-input" placeholder="ID или @username" value="{{ search_id }}" required autocomplete="off">
+            <button type="submit" class="btn primary">🔍 Найти</button>
+        </form>
+        {% if search_error %}<div class="error-msg" style="text-align:left;">⚠️ {{ search_error }}</div>{% endif %}
+
+        {% if user_data %}
+        <div class="hero {% if user_data.banned %}banned{% elif user_data.mute_str %}muted-u{% endif %}">
+            <div class="hero-top">
+                <div class="avatar">{{ (user_data.first_name or '?')[:1]|upper }}</div>
+                <div style="flex:1; min-width:0;">
+                    <div class="hero-name">{{ user_data.first_name }}</div>
+                    <div class="hero-meta">
+                        {% if user_data.username %}<span>{{ user_data.username }}</span>{% endif %}
+                        <span class="mono copy-id" title="Скопировать ID" onclick="navigator.clipboard && navigator.clipboard.writeText('{{ user_data.id }}'); showToast('ID скопирован');">ID {{ user_data.id }}</span>
+                        <span>· в сети с {{ user_data.first_seen_str }}</span>
+                        {% if user_data.main_city and user_data.main_city != 'Не привязан' %}<span>· 📍 {{ user_data.main_city }}</span>{% endif %}
+                    </div>
+                    <div class="hero-chips">
+                        {% if user_data.banned %}<span class="chip red">🔨 Забанен</span>{% endif %}
+                        {% if user_data.mute_str %}<span class="chip amber">🔇 Мут до {{ user_data.mute_str }}</span>{% endif %}
+                        {% if not user_data.banned and not user_data.mute_str %}<span class="chip green">✓ Чист</span>{% endif %}
+                        {% if user_data.is_vip %}<span class="chip violet">👑 VIP</span>{% endif %}
+                        {% if user_data.is_queer %}<span class="chip pink">🏳️‍🌈 QUEER</span>{% endif %}
+                        {% if user_data.indulgence %}<span class="chip violet">📜 Индульгенция</span>{% endif %}
+                        {% if user_data.is_verified %}<span class="chip green">🛡 Верифицирован</span>{% endif %}
+                        {% if user_data.is_quarantine %}<span class="chip amber">🥷 Карантин</span>{% endif %}
+                        {% if user_data.is_admin %}<span class="chip violet">⚔️ Админ</span>{% endif %}
+                        {% if user_data.custom_tag and user_data.custom_tag != 'Отсутствует' %}<span class="chip">🏷 {{ user_data.custom_tag }}</span>{% endif %}
+                        {% if user_data.shame_tag and user_data.shame_tag != 'Отсутствует' %}<span class="chip red">🤡 {{ user_data.shame_tag }}</span>{% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="hero-stats">
+                <div class="hstat"><div class="eyebrow">Очки</div><div class="v">{{ user_data.points }}</div></div>
+                <div class="hstat"><div class="eyebrow">Кэшбэк</div><div class="v">{{ user_data.cashback }} ₽</div></div>
+                <div class="hstat"><div class="eyebrow">Щиты</div><div class="v">{{ user_data.immunity }}</div></div>
+                <div class="hstat"><div class="eyebrow">Страйки</div><div class="v" style="{% if user_data.strikes >= 2 %}color:var(--warn){% endif %}">{{ user_data.strikes }}/3</div></div>
+                <div class="hstat"><div class="eyebrow">Анкет</div><div class="v">{{ user_data.posts_count }}</div></div>
+                <div class="hstat"><div class="eyebrow">Привёл</div><div class="v">{{ user_data.invites }}</div></div>
+            </div>
+            <div class="hero-actions">
+                {% if user_data.banned %}
+                    <button type="button" class="btn ok" onclick="fireAction({{ user_data.id }}, 'unban')">🕊️ Амнистировать</button>
+                {% else %}
+                    <button type="button" class="btn danger" onclick="fireAction({{ user_data.id }}, 'ban')">🔨 Забанить везде</button>
+                {% endif %}
+                <span class="mute-inline">
+                    <input type="number" id="mute-hours-{{ user_data.id }}" value="24" min="1" title="Часы мута">
+                    <button type="button" class="btn warn" onclick="fireMuteAction({{ user_data.id }})">🤐 Мут, ч</button>
+                </span>
+                {% if user_data.banned %}<button type="button" class="btn danger ghost" onclick="fireAction({{ user_data.id }}, 'ban')" title="Повторить бан во всех чатах">🔁 Добить бан</button>{% else %}<button type="button" class="btn ghost" onclick="fireAction({{ user_data.id }}, 'unban')" title="Снять мут и бан во всех чатах">🕊️ Снять ограничения</button>{% endif %}
+                {% if user_data.is_vip %}
+                    <button type="button" class="btn" onclick="fireAction({{ user_data.id }}, 'remove_vip')">✖ Снять VIP</button>
+                {% else %}
+                    <button type="button" class="btn" style="color:var(--warn)" onclick="fireAction({{ user_data.id }}, 'make_vip')">👑 Выдать VIP</button>
+                {% endif %}
+                {% if user_data.is_queer %}
+                    <button type="button" class="btn" onclick="fireAction({{ user_data.id }}, 'remove_queer')">✖ Снять QUEER</button>
+                {% else %}
+                    <button type="button" class="btn" style="color:#ffc2d6" onclick="fireAction({{ user_data.id }}, 'make_queer')">🏳️‍🌈 Сделать QUEER</button>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="dossier-grid">
+            <div class="dossier-section">
+                <div>
+                    <h4>⚙️ Статус и город</h4>
+                    <div class="info-row"><span class="info-label">Причина / улика</span><span style="color: var(--warn); text-align:right; max-width:60%;">{{ user_data.ban_reason }}</span></div>
+                    {% if user_data.mute_str %}<div class="info-row"><span class="info-label">Мут</span><span style="text-align:right;">до {{ user_data.mute_str }}{% if user_data.mute_reason %} · {{ user_data.mute_reason }}{% endif %}</span></div>{% endif %}
+                    <div class="info-row"><span class="info-label">VIP-воронка</span><span>{{ user_data.vip_stage or '—' }}</span></div>
+                    <div class="info-row"><span class="info-label">BEYOND-воронка</span><span>{{ user_data.beyond_step or '—' }}</span></div>
+                    {% if user_data.secret_code %}<div class="info-row"><span class="info-label">Код верификации</span><span class="mono">{{ user_data.secret_code }}</span></div>{% endif %}
+                </div>
+                <div class="info-row" style="border: none; gap:8px;">
+                    <span class="info-label">Город</span>
+                    <div style="display:flex; gap: 6px; flex: 0.75;">
+                        <input type="text" id="input-city-value" class="search-input" style="padding:6px 8px; font-size:13px;" placeholder="Не указан" value="{{ user_data.main_city if user_data.main_city != 'Не привязан' else '' }}">
+                        <button type="button" class="btn sm" onclick="saveCity({{ user_data.id }})">OK</button>
+                    </div>
+                </div>
+                {% if user_data.purchased_cities %}
+                <div style="display: flex; gap: 5px; flex-wrap: wrap; margin-top:6px;">
+                    <span class="muted" style="font-size:11px; width:100%;">🎟 Купленные города:</span>
+                    {% for p_city in user_data.purchased_cities %}<span class="chip">{{ p_city }}</span>{% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="dossier-section">
+                <div>
+                    <h4>💰 Кошелёк</h4>
+                    <div class="input-grid">
+                        <div><label>Очки бдительности</label><input type="number" id="inv-points" class="search-input" style="width:100%; padding:6px; font-size:13px;" value="{{ user_data.points }}"></div>
+                        <div><label>Осколки рулетки</label><input type="number" id="inv-shards" class="search-input" style="width:100%; padding:6px; font-size:13px;" value="{{ user_data.shards }}"></div>
+                        <div><label>Кэшбэк, ₽</label><input type="number" id="inv-cashback" class="search-input" style="width:100%; padding:6px; font-size:13px;" value="{{ user_data.cashback }}"></div>
+                        <div><label>Щиты (иммунитет)</label><input type="number" id="inv-immunity" class="search-input" style="width:100%; padding:6px; font-size:13px;" value="{{ user_data.immunity }}"></div>
+                    </div>
+                </div>
+                <button type="button" class="btn warn" style="width:100%;" onclick="saveInventory({{ user_data.id }})">💾 Сохранить кошелёк</button>
+            </div>
+
+            <div class="dossier-section">
+                <div>
+                    <h4>🏷 Тег и страйки</h4>
+                    <div class="info-row" style="gap:8px;"><span class="info-label">Тег</span>
+                        <div style="display:flex; gap: 6px; flex: 0.75;"><input type="text" id="input-tag-value" class="search-input" style="padding:6px; font-size:13px;" placeholder="none — сбросить" value="{{ user_data.custom_tag if user_data.custom_tag != 'Отсутствует' else '' }}"><button type="button" class="btn sm" onclick="saveCustomTag({{ user_data.id }})">OK</button></div>
+                    </div>
+                    <div class="info-row"><span class="info-label">Страйки в поддержке</span>
+                        <span style="display:flex; align-items:center; gap:8px;"><b class="mono" style="color: var(--warn);">{{ user_data.strikes }} / 3</b><button type="button" class="btn sm danger" onclick="resetStrikes({{ user_data.id }})">🔄 Обнулить</button></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dossier-section">
+                <div>
+                    <h4>🌐 Где состоит</h4>
+                    <ul id="active-chats-list-{{ user_data.id }}" class="kv-list" style="max-height:120px;">
+                        {% if user_data.active_chats %}{% for chat in user_data.active_chats %}<li>🟢 {{ chat }}</li>{% endfor %}
+                        {% else %}<li class="empty">Нет данных — нажмите «Сканировать».</li>{% endif %}
+                    </ul>
+                </div>
+                <button type="button" class="btn ghost" style="width:100%; border-style:dashed; color: var(--teal);" onclick="scanNetworks({{ user_data.id }})">📡 Сканировать чаты Telegram</button>
+            </div>
+
+            <div class="dossier-section">
+                <div>
+                    <h4>💳 Платежи</h4>
+                    <ul class="kv-list">
+                        {% for p in user_data.payments %}<li><span class="muted mono">{{ p.date }}</span><span style="flex:1;">{{ p.type }}</span><b class="mono">{{ p.amount }}</b></li>
+                        {% else %}<li class="empty">Платежей не найдено.</li>{% endfor %}
+                    </ul>
+                    {% if user_data.fin_history %}
+                    <div class="eyebrow" style="margin-top:10px;">Рубли и выводы</div>
+                    <ul class="kv-list" style="max-height:140px;">{% for log in user_data.fin_history %}<li style="display:block;">{{ log }}</li>{% endfor %}</ul>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="dossier-section">
+                <div>
+                    <h4>🎯 Очки: движение</h4>
+                    <ul class="kv-list">
+                        {% for log in user_data.points_history %}<li style="display:block;">{{ log }}</li>
+                        {% else %}<li class="empty">Нет записей.</li>{% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        {% if user_data.history %}
+        <div class="full-width-box">
+            <div class="eyebrow" style="margin-bottom:8px;">📜 Хронология нарушений</div>
+            <ul class="kv-list" style="max-height:200px;">{% for log in user_data.history %}<li style="display:block;">{{ log }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+
+        <div class="dossier-grid">
+            <div class="full-width-box" style="margin-top:12px;">
+                <div class="eyebrow" style="margin-bottom:8px; color: var(--teal);">👁‍🗨 Голос Саурона — написать в ЛС от бота</div>
+                <textarea id="sauron-msg-text-{{ user_data.id }}" class="form-control" placeholder="Сообщение пользователю. Поддерживается Markdown (*жирный*)." style="width: 100%; height: 70px; padding: 10px; font-size: 13px; resize: vertical; margin-bottom: 8px; box-sizing:border-box;"></textarea>
+                <button type="button" class="btn" style="width: 100%; color: var(--teal);" onclick="sendSauronMessage({{ user_data.id }})">✉️ Отправить</button>
+            </div>
+            <div class="full-width-box" style="margin-top:12px;">
+                <div class="eyebrow" style="margin-bottom:8px;">📝 Скрытые заметки (видят только админы)</div>
+                <textarea id="admin-user-notes" class="form-control" placeholder="Подозрения, пометки…" style="width: 100%; height: 70px; padding: 10px; font-size: 13px; resize: vertical; margin-bottom: 8px; box-sizing:border-box;">{{ user_data.admin_notes }}</textarea>
+                <button type="button" class="btn" style="width: 100%;" onclick="saveAdminNotes({{ user_data.id }})">📌 Сохранить заметку</button>
+            </div>
+        </div>
+
+        <div class="full-width-box">
+            <div class="eyebrow" style="margin-bottom:8px; color: var(--accent);">🧠 Память ИИ-поддержки (последние реплики)</div>
+            <div style="max-height: 160px; overflow-y: auto; font-size: 12.5px; margin-bottom: 8px;">
+                {% if user_data.ai_memory %}
+                    {% for msg in user_data.ai_memory %}
+                        <div style="margin-bottom: 6px; border-bottom: 1px solid var(--line); padding-bottom: 5px;"><b>{% if msg.role == 'user' %}👤 Юзер{% else %}🤖 Бот{% endif %}:</b> {{ msg.content }}</div>
+                    {% endfor %}
+                {% else %}<span class="empty">Память пуста.</span>{% endif %}
+            </div>
+            <button type="button" class="btn sm" onclick="clearAIMemory({{ user_data.id }})">🕶️ Стереть память ИИ</button>
+        </div>
+        {% endif %}
     </div>
 
-    <div class="tabs-nav">
-        <button class="tab-btn active" onclick="openTab('tab-main')">🔍 Обзор и Досье</button>
-        <button class="tab-btn" onclick="openTab('tab-radar')">🔴 Радар и Списки</button>
-        <button class="tab-btn" onclick="openTab('tab-support')" style="color: #03dac6; border-color: #03dac6; font-weight: bold;">📩 Входящие <span id="ticket-badge" style="display:none; background:#cf6679; color:#fff; border-radius:50%; padding:2px 6px; font-size:10px; margin-left:5px;">0</span></button>
-        <button class="tab-btn" onclick="openTab('tab-blackbox')" style="color: #03dac6; border-color: #03dac6;">🕵️‍♂️ Чёрный Ящик</button>
-        <button class="tab-btn" onclick="openTab('tab-quarantine')" style="color: #ffb74d;">🥷 Карантин</button>
-        <!-- 👇 НОВАЯ КНОПКА 👇 -->
-        <button class="tab-btn" onclick="openTab('tab-verif')" style="color: #ffeb3b; border-color: #ffeb3b; font-weight: bold;">🎥 Live-Вериф</button>
-        <button class="tab-btn" onclick="openTab('tab-broadcast')" style="color: #bb86fc;">🚀 Рассылка</button>
-        <button class="tab-btn" onclick="openTab('tab-mass')" style="color: #cf6679;">💥 Репрессии</button>
-        <button class="tab-btn" onclick="openTab('tab-system')">⚙️ Система</button>
-        <button class="tab-btn" onclick="openTab('tab-control')" style="color: #ffb74d; font-weight: bold;">🎛 Управление</button>
-        <button class="tab-btn" onclick="openTab('tab-diag')" style="color: #03dac6;">🩺 Диагностика</button>
-        <button class="tab-btn" onclick="openTab('ads-tab')">📊 Биржа рекламы</button>
-        <button class="tab-btn" onclick="openTab('tab-infrastructure')" style="color: #4caf50; font-weight: bold;">🗺 Инфраструктура</button>
-        {% if is_owner %}<button id="btn-secret-finance" class="tab-btn" onclick="openTab('tab-live-finance')" style="display: none; color: #00e676; border-color: #00e676; font-weight: bold;">💰 Live-Финансы</button>{% endif %}
-        <button class="tab-btn" onclick="openTab('tab-withdrawals')">🎁 Касса и Награды</button>
-        <button class="tab-btn" onclick="openTab('tab-promos')">🎫 Скидки</button>
-    </div>
-  
-    <div id="tab-main" class="tab-content active">
+    <div id="tab-main" class="tab-content">
         <div class="dashboard">
             <div class="card"><h3>Всего юзеров</h3><div class="number" id="stat-total">{{ total }}</div><p>В базе Скайнетика</p></div>
             <div class="card success"><h3>VIP Элита</h3><div class="number" id="stat-vips">{{ vips }}</div><p>Коронованные</p></div>
@@ -241,201 +698,6 @@
 
         </div>
     </div>
-        <div class="search-container">
-            <h3>🕵️‍♂️ Моментальный перехват досье</h3>
-            <form method="POST" action="/glaz" class="search-box">
-                <input type="text" name="search_id" class="search-input" placeholder="ID или @username для обыска..." value="{{ search_id }}" required>
-                <button type="submit" class="search-btn">Найти</button>
-            </form>
-            {% if search_error %}<div class="error-msg">⚠️ {{ search_error }}</div>{% endif %}
-        </div>
-        {% if user_data %}
-            <div class="dossier-card {% if user_data.banned %}banned{% endif %}" style="max-width: 1200px; margin: 20px auto;">
-                <div class="dossier-header {% if user_data.banned %}banned{% endif %}">
-                    📁 ТЕРМИНАЛ АНАЛИЗА [УЧАСТНИК ID: {{ user_data.id }}]
-                </div>
-                
-                <div class="dossier-grid">
-                    
-                    <div class="dossier-section" style="border-top: 3px solid #03dac6;">
-                        <div>
-                            <h4 style="color: #03dac6;">⚙️ Системный статус</h4>
-                            <div class="info-row"><span class="info-label">Дата вербовки:</span><span style="color: #ccc; font-weight: bold;">{{ user_data.first_seen_str }}</span></div>
-                            <div class="info-row"><span class="info-label">Администратор:</span><span>{% if user_data.is_admin %}<span class="badge yes" style="background-color: #bb86fc; color: #121212;">⚔️ ДА</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
-                            <div class="info-row"><span class="info-label">Статус:</span><span>{% if user_data.banned %}<span class="badge alert">ЗАБАНЕН</span>{% else %}<span class="badge yes">ЧИСТ</span>{% endif %}</span></div>
-                            <div class="info-row"><span class="info-label">VIP-Доступ:</span><span>{% if user_data.is_vip %}<span class="badge yes">👑 VIP</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
-                            <div class="info-row"><span class="info-label">Клуб BEYOND:</span><span>{% if user_data.is_queer %}<span class="badge yes" style="background: #f6a5c0; color:#121212;">🏳️‍🌈 QUEER</span>{% else %}<span class="badge no">НЕТ</span>{% endif %}</span></div>
-                        </div>
-                        <div class="info-row" style="padding-top: 10px; border: none; margin-bottom: 0;">
-                            <span class="info-label">Город (Основа):</span>
-                            <div style="display:flex; gap: 5px; flex: 0.7;">
-                                <input type="text" id="input-city-value" class="search-input" style="padding:4px 8px; font-size:13px; color: #03dac6; font-weight: bold;" placeholder="Не указан" value="{{ user_data.main_city if user_data.main_city != 'Не привязан' else '' }}">
-                                <button type="button" class="form-btn" style="padding:4px 10px; font-size:12px;" onclick="saveCity({{ user_data.id }})">OK</button>
-                            </div>
-                        </div>
-                        {% if user_data.purchased_cities %}
-                        <div style="margin-top: 5px; background: rgba(3, 218, 198, 0.05); padding: 8px; border-radius: 5px;">
-                            <span style="font-size: 11px; color: #888; display: block; margin-bottom: 5px;">🎟 Купленные доступы (Крипта):</span>
-                            <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-                                {% for p_city in user_data.purchased_cities %}
-                                    <span class="badge" style="background: transparent; color: #03dac6; border: 1px solid #03dac6; font-size: 10px;">{{ p_city }}</span>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        {% endif %}
-                    </div>
-
-                    <div class="dossier-section" style="border-top: 3px solid #ffb74d;">
-                        <div>
-                            <h4 style="color: #ffb74d;">💰 Кошелёк и Артефакты</h4>
-                            <div class="input-grid">
-                                <div>
-                                    <label>Очки бдительности:</label>
-                                    <input type="number" id="inv-points" class="search-input" style="width:100%; padding:5px; font-size:13px;" value="{{ user_data.points }}">
-                                </div>
-                                <div>
-                                    <label>Осколки рулетки:</label>
-                                    <input type="number" id="inv-shards" class="search-input" style="width:100%; padding:5px; font-size:13px;" value="{{ user_data.shards }}">
-                                </div>
-                                <div>
-                                    <label>Кэшбэк (руб):</label>
-                                    <input type="number" id="inv-cashback" class="search-input" style="width:100%; padding:5px; font-size:13px;" value="{{ user_data.cashback }}">
-                                </div>
-                                <div>
-                                    <label>Щиты (Иммунитет):</label>
-                                    <input type="number" id="inv-immunity" class="search-input" style="width:100%; padding:5px; font-size:13px;" value="{{ user_data.immunity }}">
-                                </div>
-                            </div>
-                        </div>
-
-                        {% if user_data.fin_history %}
-                        <div style="margin-bottom: 10px; background: rgba(3, 218, 198, 0.05); padding: 8px; border-radius: 5px; border: 1px solid rgba(3, 218, 198, 0.2);">
-                            <span style="font-size: 11px; color: #03dac6; display: block; margin-bottom: 5px; font-weight: bold;">💸 Выписки и Выводы (Последние 15):</span>
-                            <ul style="margin: 0; padding-left: 15px; color: #ccc; font-size: 11px; line-height: 1.5; max-height: 120px; overflow-y: auto;">
-                                {% for log in user_data.fin_history %}
-                                    <li style="margin-bottom: 3px;">{{ log }}</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                        {% endif %}
-
-                        <button type="button" class="form-btn" style="width: 100%; background: #ffb74d; color: #121212; padding: 6px; font-size: 12px; font-weight: bold;" onclick="saveInventory({{ user_data.id }})">💾 Сохранить инвентарь</button>
-                    </div>
-
-                    <div class="dossier-section" style="border-top: 3px solid #cf6679;">
-                        <div>
-                            <h4 style="color: #cf6679;">🚨 Нарушения и Погоны</h4>
-                            <div class="info-row"><span class="info-label">Текущий тег:</span><span style="color: #03dac6; font-weight: bold;">{{ user_data.custom_tag }}</span></div>
-                            <div class="info-row" style="padding: 6px 0;"><span class="info-label">Сменить:</span>
-                                <div style="display:flex; gap: 5px; flex: 0.7;"><input type="text" id="input-tag-value" class="search-input" style="padding:4px; font-size:12px;" placeholder="none для сброса" value="{{ user_data.custom_tag if user_data.custom_tag != 'Отсутствует' else '' }}"><button type="button" class="form-btn" style="padding:4px 10px; font-size:12px;" onclick="saveCustomTag({{ user_data.id }})">OK</button></div>
-                            </div>
-                            
-                            <div class="info-row" style="margin-top: 8px; background: rgba(207, 102, 121, 0.05); padding: 6px; border-radius: 5px; border: none;">
-                                <span class="info-label" style="color: #cf6679; font-weight: bold;">Штрафные страйки:</span>
-                                <div style="display: flex; align-items: center; gap: 10px;">
-                                    <span style="font-size: 14px; font-weight: bold; color: #ffb74d;">{{ user_data.strikes }} / 3</span>
-                                    <button type="button" class="tab-btn" style="padding: 2px 8px; font-size: 10px; margin:0; border: 1px solid #cf6679; color: #cf6679;" onclick="resetStrikes({{ user_data.id }})">🔄 Обнулить</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div style="background: #0d0d0d; padding: 6px 10px; border-radius: 4px; font-size: 11px; border: 1px solid #222; text-align: left; margin-top: 5px;">
-                            <span style="color: #888; font-weight: bold;">Улика:</span> <span style="color: #ffb74d; font-style: italic;">{{ user_data.ban_reason }}</span>
-                        </div>
-                    </div>
-
-                    <div class="dossier-section" style="border-top: 3px solid #bb86fc;">
-                        <div>
-                            <h4 style="color: #bb86fc;">🌐 Присутствие в сети</h4>
-                            <div style="max-height: 80px; overflow-y: auto; background: #0d0d0d; border: 1px solid #222; border-radius: 5px; padding: 8px; font-size: 12px; margin-bottom: 5px;">
-                                <ul id="active-chats-list-{{ user_data.id }}" style="margin: 0; padding-left: 5px; color: #ccc; list-style-type: none;">
-                                    {% if user_data.active_chats %}
-                                        {% for chat in user_data.active_chats %}
-                                            <li style="margin-bottom: 3px;">🟢 {{ chat }}</li>
-                                        {% endfor %}
-                                    {% else %}
-                                        <li style="color: #555; font-style: italic; text-align: center;">Нет данных. Нажмите сканировать.</li>
-                                    {% endif %}
-                                </ul>
-                            </div>
-                            <button type="button" class="form-btn" style="width: 100%; background: #1a1a1a; color: #03dac6; border: 1px dashed #03dac6; padding: 4px; font-size: 10px; margin-bottom: 10px; transition: 0.3s;" onclick="scanNetworks({{ user_data.id }})" onmouseover="this.style.background='#03dac6'; this.style.color='#000';" onmouseout="this.style.background='#1a1a1a'; this.style.color='#03dac6';">
-                                📡 Сканировать сервера Telegram
-                            </button>
-
-                            <h4 style="color: #bb86fc; font-size: 11px; margin-bottom: 5px; border: none;">📂 Пруфы верификации</h4>
-                            <div style="display: flex; justify-content: space-around; text-align: center; background: rgba(187, 134, 252, 0.05); padding: 8px; border-radius: 5px;">
-                                <div style="opacity: 0.5;">
-                                    <span style="font-size: 16px; display: block;">📜</span>
-                                    <span style="font-size: 10px; color: #888;">Фото паспорта</span>
-                                </div>
-                                <div style="opacity: 0.5;">
-                                    <span style="font-size: 16px; display: block;">🎥</span>
-                                    <span style="font-size: 10px; color: #888;">Кружок</span>
-                                </div>
-                            </div>
-                            <div style="text-align: center; margin-top: 5px;">
-                                <span style="font-size: 9px; color: #666;">*Модуль медиа-архива отключен*</span>
-                            </div>
-                        </div>
-                    </div> 
-
-                <div class="full-width-box" style="border-color: #03dac6;">
-                    <span style="color: #03dac6; font-weight: bold; font-size: 13px; display: block; margin-bottom: 8px;">👁‍🗨 Голос Саурона (Прямое ЛС от имени бота)</span>
-                    <textarea id="sauron-msg-text-{{ user_data.id }}" class="form-control" placeholder="Напишите ответ пользователю в ЛС. Поддерживается Markdown (*жирный*)." style="width: 100%; height: 50px; background: #0d0d0d; color: #fff; border: 1px solid #333; padding: 10px; border-radius: 5px; font-size: 13px; resize: vertical; margin-bottom: 8px;"></textarea>
-                    <button type="button" class="form-btn" style="width: 100%; background: #0d0d0d; border: 1px solid #03dac6; color: #03dac6; padding: 8px; font-size: 13px;" onclick="sendSauronMessage({{ user_data.id }})">✉️ Отправить сообщение</button>
-                </div>
-
-                <div class="full-width-box" style="border-color: #444;">
-                    <span style="color: #aaa; font-weight: bold; font-size: 13px; display: block; margin-bottom: 8px;">📝 Скрытые заметки (Видят только админы)</span>
-                    <textarea id="admin-user-notes" class="form-control" placeholder="Заметки о пользователе, подозрения, пометки..." style="width: 100%; height: 50px; background: #0d0d0d; color: #fff; border: 1px solid #333; padding: 10px; border-radius: 5px; font-size: 13px; resize: vertical; margin-bottom: 8px;">{{ user_data.admin_notes }}</textarea>
-                    <button type="button" class="form-btn" style="width: 100%; background: #333; color: #fff; padding: 8px; font-size: 12px;" onclick="saveAdminNotes({{ user_data.id }})">📌 Сохранить пометку</button>
-                </div>
-
-                <div class="full-width-box" style="border-color: #bb86fc;">
-                    <span style="color: #bb86fc; font-weight: bold; font-size: 13px; display: block; margin-bottom: 8px;">🧠 Текущий контекст памяти ИИ (Последние реплики)</span>
-                    <div style="max-height: 100px; overflow-y: auto; background: #0d0d0d; padding: 8px; border-radius: 5px; font-size: 12px; margin-bottom: 8px; border: 1px solid #222;">
-                        {% if user_data.ai_memory %}
-                            {% for msg in user_data.ai_memory %}
-                                <div style="margin-bottom: 6px; border-bottom: 1px dashed #222; padding-bottom: 4px;">
-                                    <b>{% if msg.role == 'user' %}👤 Юзер{% else %}🤖 Бот{% endif %}:</b> {{ msg.content }}
-                                </div>
-                            {% endfor %}
-                        {% else %}
-                            <span style="color: #555; font-style: italic;">Нейросеть пуста. Память чиста.</span>
-                        {% endif %}
-                    </div>
-                    <button type="button" class="form-btn" style="width: 100%; background: #3c1461; color: #fff; padding: 8px; font-size: 12px; font-weight: bold;" onclick="clearAIMemory({{ user_data.id }})">🕶️ Стереть краткосрочную память ИИ</button>
-                </div>
-
-                {% if user_data.history %}
-                <div class="full-width-box">
-                    <span style="color: #bb86fc; font-weight: bold; font-size: 13px; display: block; margin-bottom: 8px;">📜 Хронология нарушений:</span>
-                    <ul style="margin: 0; padding-left: 20px; color: #ccc; font-size: 12px; line-height: 1.6; max-height: 120px; overflow-y: auto;">
-                        {% for log in user_data.history %}<li>{{ log }}</li>{% endfor %}
-                    </ul>
-                </div>
-                {% endif %}
-
-                <div class="actions-grid" style="margin-top: 20px;">
-                    <button type="button" class="act-btn ban" onclick="fireAction({{ user_data.id }}, 'ban')">🔨 ЗАБАНИТЬ ВЕЗДЕ</button>
-                    <button type="button" class="act-btn unban" onclick="fireAction({{ user_data.id }}, 'unban')">🕊️ АМНИСТИРОВАТЬ</button>
-                    
-                    {% if user_data.is_vip %}
-                        <button type="button" class="act-btn devip" onclick="fireAction({{ user_data.id }}, 'remove_vip')">❌ СНЯТЬ VIP</button>
-                    {% else %}
-                        <button type="button" class="act-btn vip" onclick="fireAction({{ user_data.id }}, 'make_vip')">👑 ВЫДАТЬ VIP</button>
-                    {% endif %}
-                    
-                    {% if user_data.is_queer %}
-                        <button type="button" class="act-btn devip" style="background:#444;" onclick="fireAction({{ user_data.id }}, 'remove_queer')">✖ СНЯТЬ QUEER</button>
-                    {% else %}
-                        <button type="button" class="act-btn vip" style="background:#f6a5c0; color:#121212;" onclick="fireAction({{ user_data.id }}, 'make_queer')">🏳️‍🌈 СДЕЛАТЬ QUEER</button>
-                    {% endif %}
-                    
-                    <div style="grid-column: 1 / -1; display: flex; gap: 10px; margin-top: 5px; background: rgba(255, 183, 77, 0.05); padding: 10px; border-radius: 8px; border: 1px solid rgba(255, 183, 77, 0.2);">
-                        <input type="number" id="mute-hours-{{ user_data.id }}" class="search-input" style="width: 80px; padding: 8px; text-align: center; font-weight: bold; color: #ffb74d;" value="24" title="Часы мута">
-                        <button type="button" class="act-btn" style="background: #ffb74d; color: #121212; flex: 1;" onclick="fireMuteAction({{ user_data.id }})">🤐 ВЫДАТЬ ПРОФИЛАКТИЧЕСКИЙ МУТ (ЧАСЫ)</button>
-                    </div>
-                </div> </div> </div> {% endif %}
     </div> <div id="tab-radar" class="tab-content">
         <div class="charts-container" style="align-items: flex-start;">
             <div class="chart-block" style="width: 500px;"><h3 style="color: #03dac6;">🔴 Живой Радар (Web-Логи)</h3><div class="radar-box" id="radar-box"><div style="color: #888;">Загрузка канала связи...</div></div></div>
@@ -617,6 +879,30 @@
         </div>
     </div>
 
+    <!-- 🎛 УПРАВЛЕНИЕ: настройки ботов без деплоя -->
+    <div id="tab-control" class="tab-content">
+        <div class="sec-head" style="margin-top:0;">
+            <div><h2>Настройки</h2><p>Всё, что меняется без деплоя: цены, сроки, модули, таймеры, словари, тексты. Боты подхватывают изменения за ~20 секунд.</p></div>
+        </div>
+        <div class="settings-bar">
+            <input type="search" id="settings-search" placeholder="🔎 Найти настройку: курс, страйки, BEYOND, текст карантина…" oninput="filterSettings(this.value)" autocomplete="off">
+            <div class="jump-chips" id="settings-jumps"></div>
+        </div>
+        <button class="btn primary ctl-float" onclick="saveControl()">💾 Сохранить изменения</button>
+        <div class="no-hits" id="settings-nohits">Ничего не нашлось. Попробуйте другое слово.</div>
+
+        <div class="panel-block">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div>
+                    <h3 style="color:#ffb74d; margin:0;">🎛 Управление ботами</h3>
+                    <div style="color:#aaa; font-size:13px; margin-top:6px;">Изменения доходят до ботов примерно за 20 секунд, деплой не нужен. Изменённые значения подсвечены, пустое поле — вернуть как было.</div>
+                </div>
+                <button class="form-btn" style="width:auto;" onclick="saveControl()">💾 Сохранить изменения</button>
+            </div>
+            <div id="control-groups" style="margin-top:18px; display:flex; flex-direction:column; gap:18px;">Загрузка...</div>
+        </div>
+    </div>
+
     <div id="tab-system" class="tab-content">
         <div class="panel-block" style="max-width: 1000px; background: #121212; border-radius: 12px; padding: 25px; border: 1px solid #222;">
             <h3 style="color: #03dac6; margin-bottom: 10px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
@@ -762,19 +1048,19 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; background: #252525; padding: 12px; border-radius: 8px;">
                     <span style="color: #fff; font-size: 14px;">📡 <b>Радар твинков</b></span>
-                    <label class="toggle-switch"><input type="checkbox" id="toggle-radar"><span class="slider"></span></label>
+                    <label class="toggle-switch"><input type="checkbox" id="toggle-radar" onchange="saveModSettings()"><span class="slider"></span></label>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center; background: #252525; padding: 12px; border-radius: 8px;">
                     <span style="color: #fff; font-size: 14px;">🖼 <b>Анти-баян (Фото)</b></span>
-                    <label class="toggle-switch"><input type="checkbox" id="toggle-antibayan-photo"><span class="slider"></span></label>
+                    <label class="toggle-switch"><input type="checkbox" id="toggle-antibayan-photo" onchange="saveModSettings()"><span class="slider"></span></label>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center; background: #252525; padding: 12px; border-radius: 8px;">
                     <span style="color: #fff; font-size: 14px;">📝 <b>Анти-копипаст (Текст)</b></span>
-                    <label class="toggle-switch"><input type="checkbox" id="toggle-antibayan-text"><span class="slider"></span></label>
+                    <label class="toggle-switch"><input type="checkbox" id="toggle-antibayan-text" onchange="saveModSettings()"><span class="slider"></span></label>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center; background: #252525; padding: 12px; border-radius: 8px;">
                     <span style="color: #fff; font-size: 14px;">⏳ <b>Умный антифлуд</b></span>
-                    <label class="toggle-switch"><input type="checkbox" id="toggle-antiflood"><span class="slider"></span></label>
+                    <label class="toggle-switch"><input type="checkbox" id="toggle-antiflood" onchange="saveModSettings()"><span class="slider"></span></label>
                 </div>
             </div>
         </div>
@@ -900,19 +1186,6 @@
         </div>
     </div>
 
-    <!-- 🎛 УПРАВЛЕНИЕ: настройки ботов без деплоя -->
-    <div id="tab-control" class="tab-content">
-        <div class="panel-block">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                <div>
-                    <h3 style="color:#ffb74d; margin:0;">🎛 Управление ботами</h3>
-                    <div style="color:#aaa; font-size:13px; margin-top:6px;">Изменения доходят до ботов примерно за 20 секунд, деплой не нужен. Изменённые значения подсвечены, пустое поле — вернуть как было.</div>
-                </div>
-                <button class="form-btn" style="width:auto;" onclick="saveControl()">💾 Сохранить изменения</button>
-            </div>
-            <div id="control-groups" style="margin-top:18px; display:flex; flex-direction:column; gap:18px;">Загрузка...</div>
-        </div>
-    </div>
 
     <div id="tab-withdrawals" class="tab-content">
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1200px; margin: 0 auto;">
@@ -995,7 +1268,6 @@
                 </div>
             </div>
         </div>
-    </div>
 
     <div id="tab-promos" class="tab-content">
         <div class="panel-block">
@@ -1201,7 +1473,10 @@
         </div>
     </div>
 
-    <div class="footer">Skynet Enterprise © 2026 | Высший уровень контроля безопасности</div>
+    <div class="footer">Skynet Enterprise © 2026 · Глаз Саурона</div>
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
 
     <script>
         let statusChart, cityChart;
@@ -1215,6 +1490,7 @@
     let controlLabels = {};
     function loadControl() {
         controlDirty = {};
+        document.body.classList.remove('ctl-dirty');
         fetch('/glaz/api/config').then(r => r.json()).then(groups => {
             const box = document.getElementById('control-groups');
             box.innerHTML = '';
@@ -1239,7 +1515,7 @@
                     if (it.max !== null && it.max !== undefined) inp.max = it.max;
                     inp.value = it.value;
                     inp.style.cssText = 'flex:0 1 260px; min-width:120px; padding:8px; box-sizing:border-box;' + (it.changed ? 'border-color:#ffb74d;' : '');
-                    inp.addEventListener('input', () => { controlDirty[it.key] = inp.value; inp.style.borderColor = '#03dac6'; });
+                    inp.addEventListener('input', () => { controlDirty[it.key] = inp.value; inp.style.borderColor = '#03dac6'; document.body.classList.add('ctl-dirty'); });
                     row.appendChild(left); row.appendChild(inp); sec.appendChild(row);
                 });
                 box.appendChild(sec);
@@ -1292,67 +1568,214 @@
     }
 
         // 👇 ПОЛНОСТЬЮ ОБНОВЛЕННАЯ ФУНКЦИЯ ПЕРЕКЛЮЧЕНИЯ ВКЛАДОК 👇
-    function openTab(tabId) {
-    // 1. Скрываем все вкладки и кнопки
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-    
-    // 2. Показываем нужную вкладку
-    const el = document.getElementById(tabId);
-    if (!el) return;
-    el.classList.add('active');
-    
-    // 3. Подсвечиваем кнопку безопасно (ПУЛЕНЕПРОБИВАЕМАЯ ВЕРСИЯ)
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                if(btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(tabId)) {
-                    btn.classList.add('active');
-                }
-            });
-    
-    // 4. Сохраняем текущую вкладку
-    localStorage.setItem('activeTab', tabId);
-    if (tabId === 'tab-diag') loadDiag();
-    if (tabId === 'tab-control') loadControl();
-
-    // 5. Загружаем данные для конкретной вкладки
-    if(tabId === 'tab-blackbox') loadProxySessions();
-    if(tabId === 'tab-quarantine') loadQuarantine();
-    if(tabId === 'tab-verif') loadVerifList(); // <--- ДОБАВИТЬ ЭТУ СТРОЧКУ
-    if(tabId === 'tab-infrastructure') loadInfrastructure();
-    if(tabId === 'ads-tab') loadAds();
-    if(tabId === 'tab-live-finance') loadLiveFinance(1);
-    if(tabId === 'tab-system') { 
-        loadDictionary(); loadSystemTexts(); loadSystemSettings(); loadNetworkPrices(); 
-        loadAIPrompt(); loadModSettings(); 
-    }
-    
-    // 🛡 ИНИЦИАЛИЗАЦИЯ ВИЗУАЛЬНОГО РЕДАКТОРА
-    const minimalToolbar = {
-        toolbar: [
-            ['style', ['bold', 'italic', 'underline', 'strikethrough', 'clear']],
-            ['insert', ['link']],
-            ['view', ['codeview']]
-        ],
-        disableDragAndDrop: true, dialogsInBody: true
+    const TAB_META = {
+        'tab-home': ['Главное', 'Что горит'], 'tab-main': ['Главное', 'Статистика'], 'tab-radar': ['Главное', 'Радар и списки'],
+        'tab-dossier': ['Люди', 'Досье'], 'tab-quarantine': ['Люди', 'Карантин'], 'tab-verif': ['Люди', 'Live-вериф'],
+        'tab-mass': ['Модерация', 'Репрессии'], 'tab-blackbox': ['Модерация', 'Чёрный ящик'],
+        'tab-support': ['Связь', 'Входящие'], 'tab-broadcast': ['Связь', 'Рассылка'],
+        'tab-withdrawals': ['Деньги', 'Касса и награды'], 'tab-promos': ['Деньги', 'Скидки'], 'ads-tab': ['Деньги', 'Биржа рекламы'],
+        'tab-live-finance': ['Деньги', 'Live-финансы'],
+        'tab-control': ['Система', 'Настройки'], 'tab-infrastructure': ['Система', 'Инфраструктура'], 'tab-diag': ['Система', 'Диагностика']
     };
+    function toggleNav(force) {
+        const open = typeof force === 'boolean' ? force : !document.body.classList.contains('nav-open');
+        document.body.classList.toggle('nav-open', open);
+    }
+    function _store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+    function _load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 
-    if(tabId === 'tab-broadcast') {
-        loadTemplates();
-        loadBroadcastStats();
-        if (!$('#broadcast-text').hasClass('sn-loaded')) {
-            $('#broadcast-text').summernote({ ...minimalToolbar, height: 250, placeholder: 'Введите текст рассылки...' });
-            $('#broadcast-text').addClass('sn-loaded');
+    let _settingsLoaded = false;
+    function openTab(tabId) {
+        // «Система» и «Управление» теперь один раздел «Настройки»
+        if (tabId === 'tab-system') tabId = 'tab-control';
+        const el = document.getElementById(tabId);
+        if (!el) return;
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        el.classList.add('active');
+        document.body.classList.toggle('settings-mode', tabId === 'tab-control');
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.tab === tabId));
+        const meta = TAB_META[tabId] || ['', ''];
+        document.getElementById('page-group').textContent = meta[0];
+        document.getElementById('page-name').textContent = meta[1];
+        document.title = meta[1] + ' · Глаз Саурона';
+        _store('activeTab', tabId);
+        toggleNav(false);
+        window.scrollTo({ top: 0 });
+
+        if (tabId === 'tab-home') loadHome();
+        if (tabId === 'tab-diag') loadDiag();
+        if (tabId === 'tab-blackbox') loadProxySessions();
+        if (tabId === 'tab-quarantine') loadQuarantine();
+        if (tabId === 'tab-verif') loadVerifList();
+        if (tabId === 'tab-infrastructure') loadInfrastructure();
+        if (tabId === 'ads-tab') loadAds();
+        if (tabId === 'tab-live-finance') loadLiveFinance(1);
+        if (tabId === 'tab-control') {
+            loadControl();
+            if (!_settingsLoaded) {
+                loadDictionary(); loadSystemTexts(); loadSystemSettings(); loadNetworkPrices();
+                loadAIPrompt(); loadModSettings();
+                _settingsLoaded = true;
+            }
+            setTimeout(buildSettingsJumps, 600);
+        }
+
+        const minimalToolbar = {
+            toolbar: [['style', ['bold', 'italic', 'underline', 'strikethrough', 'clear']], ['insert', ['link']], ['view', ['codeview']]],
+            disableDragAndDrop: true, dialogsInBody: true
+        };
+        if (tabId === 'tab-broadcast') {
+            loadTemplates();
+            loadBroadcastStats();
+            if (!$('#broadcast-text').hasClass('sn-loaded')) {
+                $('#broadcast-text').summernote({ ...minimalToolbar, height: 250, placeholder: 'Введите текст рассылки...' });
+                $('#broadcast-text').addClass('sn-loaded');
+            }
+        }
+        if (tabId === 'tab-support') {
+            loadSupportTickets();
+            if (!$('#ticket-reply-text').hasClass('sn-loaded')) {
+                $('#ticket-reply-text').summernote({ ...minimalToolbar, height: 150, placeholder: 'Напишите ответ пользователю...' });
+                $('#ticket-reply-text').addClass('sn-loaded');
+            }
         }
     }
 
-    if(tabId === 'tab-support') {
-        loadSupportTickets();
-        if (!$('#ticket-reply-text').hasClass('sn-loaded')) {
-            $('#ticket-reply-text').summernote({ ...minimalToolbar, height: 150, placeholder: 'Напишите ответ пользователю...' });
-            $('#ticket-reply-text').addClass('sn-loaded');
-        }
+    // ===== 🔥 ЧТО ГОРИТ =====
+    function _esc2(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function _ago(sec) {
+        if (sec == null) return 'нет сигнала';
+        if (sec < 90) return 'сейчас';
+        if (sec < 3600) return Math.round(sec / 60) + ' мин';
+        if (sec < 86400) return Math.round(sec / 3600) + ' ч';
+        return Math.round(sec / 86400) + ' дн';
     }
-}
+    function renderPulse(pulses) {
+        const box = document.getElementById('pulse-list');
+        if (!box) return;
+        box.innerHTML = pulses.map(p => {
+            const cls = p.ago == null ? '' : (p.ago < 180 ? 'ok' : (p.ago < 900 ? 'late' : 'dead'));
+            return `<div class="pulse-row" title="${p.ago == null ? 'Бот ни разу не отмечался' : 'Последний сигнал ' + _ago(p.ago) + ' назад'}"><span class="dot ${cls}"></span>${_esc2(p.bot)}<span class="when">${_ago(p.ago)}</span></div>`;
+        }).join('');
+    }
+    function setBadge(id, n) {
+        const b = document.getElementById(id);
+        if (!b) return;
+        b.textContent = n; b.style.display = n > 0 ? 'inline-block' : 'none';
+    }
+    function loadAttention(render) {
+        return fetch('/glaz/api/attention').then(r => r.json()).then(d => {
+            renderPulse(d.pulses || []);
+            const hot = (d.items || []).filter(i => i.level === 'hot').reduce((a, i) => a + i.count, 0);
+            setBadge('home-badge', hot);
+            const err = (d.items || []).find(i => i.key === 'errors');
+            setBadge('diag-badge', err ? err.count : 0);
+            if (render) renderHome(d);
+            return d;
+        }).catch(() => {});
+    }
+    function renderHome(d) {
+        const t = d.today || {};
+        const k = [
+            ['Новых за сутки', t.new_users], ['VIP в сети', t.vips], ['В чёрном списке', t.bans_total], ['Событий радара (24ч)', t.radar_24h]
+        ];
+        if (t.stars_today !== undefined) k.unshift(['Звёзд сегодня', (t.stars_today || 0) + ' ⭐️']);
+        document.getElementById('home-kpis').innerHTML = k.map(([l, v]) => `<div class="kpi"><div class="eyebrow">${l}</div><div class="v">${v == null ? '—' : v}</div></div>`).join('');
+        const items = (d.items || []).slice().sort((a, b) => (b.count > 0) - (a.count > 0) || ({hot: 0, warm: 1, info: 2}[a.level] - {hot: 0, warm: 1, info: 2}[b.level]));
+        const active = items.filter(i => i.count > 0);
+        let html = active.length ? '' : '<div class="all-clear" style="grid-column:1/-1;">✅ Всё спокойно — ничего не ждёт решения.</div>';
+        html += items.map(i => {
+            const cls = i.count > 0 ? (i.level === 'info' ? '' : i.level) : 'zero';
+            const go = i.tab && i.tab !== 'tab-home' ? `onclick="openTab('${i.tab}')"` : (i.key === 'ai' ? `onclick="document.getElementById('ai-cases-head').scrollIntoView({behavior:'smooth'})"` : '');
+            const tag = go ? 'button' : 'div';
+            return `<${tag} class="alert-card ${cls} ${go ? '' : 'static'}" ${go}><span class="ic">${i.icon}</span><span class="t">${_esc2(i.label)}</span><span class="n">${i.count}</span></${tag}>`;
+        }).join('');
+        document.getElementById('home-alerts').innerHTML = html;
+    }
+    function loadAiCases() {
+        fetch('/glaz/api/ai_reviews').then(r => r.json()).then(rows => {
+            const box = document.getElementById('ai-cases');
+            if (!rows.length) { box.innerHTML = '<div class="all-clear">Нет дел — ИИ справляется сам.</div>'; return; }
+            box.innerHTML = rows.map(c => `
+                <div class="case" id="case-${c.id}">
+                    <div class="case-top">
+                        <span class="chip ${c.action === 'ban' ? 'red' : 'amber'}">${c.action === 'ban' ? '🔨 положен бан' : '🔇 положен мут'}</span>
+                        <b>${_esc2(c.reason)}</b>
+                        <span class="muted" style="margin-left:auto; font-size:12px;">${_esc2(c.time)} · ${_esc2(c.source)}</span>
+                    </div>
+                    <div class="muted" style="font-size:13px;">
+                        <a href="/glaz?search_id=${c.uid}" style="color:var(--accent);">${_esc2(c.name || 'Без имени')} ${_esc2(c.username)} · ${c.uid}</a>${c.chat ? ' · ' + _esc2(c.chat) : ''}
+                    </div>
+                    ${c.text ? `<div class="case-text">${_esc2(c.text)}</div>` : ''}
+                    <div class="case-actions">
+                        <button class="btn ${c.action === 'ban' ? 'danger' : ''}" onclick="decideAi('${c.id}','ban')">🔨 Забанить</button>
+                        <button class="btn ${c.action === 'mute' ? 'warn' : ''}" onclick="decideAi('${c.id}','mute')">🔇 Замутить</button>
+                        <button class="btn ok" onclick="decideAi('${c.id}','dismiss')">✅ Не нарушение</button>
+                    </div>
+                </div>`).join('');
+        }).catch(() => {});
+    }
+    function decideAi(id, decision) {
+        const labels = {ban: 'забанить', mute: 'замутить', dismiss: 'отметить «не нарушение»'};
+        if (decision !== 'dismiss' && !confirm('Точно ' + labels[decision] + '?')) return;
+        fetch('/glaz/api/ai_reviews/decide', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id, decision})})
+            .then(r => r.json()).then(d => {
+                showToast(d.success ? '✅ Готово' : '⚠️ ' + (d.error || 'Не получилось'));
+                const el = document.getElementById('case-' + id);
+                if (el) el.remove();
+                loadAttention(true);
+                if (!document.querySelector('#ai-cases .case')) loadAiCases();
+            });
+    }
+    function loadHome() { loadAttention(true); loadAiCases(); }
+
+    // ===== ⚙️ ПОИСК ПО НАСТРОЙКАМ =====
+    function _settingsBlocks() {
+        // Каждая «карточка» настроек: группы из «Управления» и блоки «Системы»
+        const ctl = Array.from(document.querySelectorAll('#control-groups > div'));
+        const sys = Array.from(document.querySelectorAll('#tab-system > .panel-block'));
+        return ctl.concat(sys);
+    }
+    function buildSettingsJumps() {
+        const box = document.getElementById('settings-jumps');
+        if (!box) return;
+        box.innerHTML = '';
+        _settingsBlocks().forEach((blk, i) => {
+            const h = blk.querySelector('h3, h4');
+            if (!h) return;
+            const id = blk.id || ('set-blk-' + i);
+            blk.id = id;
+            const chip = document.createElement('span');
+            chip.className = 'chip';
+            chip.textContent = h.textContent.replace(/\s+/g, ' ').trim().slice(0, 34);
+            chip.onclick = () => { const y = blk.getBoundingClientRect().top + window.scrollY - 140; window.scrollTo({top: y, behavior: 'smooth'}); };
+            box.appendChild(chip);
+        });
+    }
+    function filterSettings(q) {
+        q = (q || '').trim().toLowerCase();
+        let hits = 0;
+        const textOf = el => {
+            let t = el.textContent;
+            el.querySelectorAll('input, textarea, select').forEach(i => { t += ' ' + (i.placeholder || '') + ' ' + (i.value || ''); });
+            return t.toLowerCase();
+        };
+        _settingsBlocks().forEach(blk => {
+            // строки внутри блока: строки «Управления», тумблеры, карточки цен
+            const rows = blk.querySelectorAll('#control-groups > div > div, #toggles-container > div');
+            let blockHit = !q || textOf(blk.querySelector('h3, h4') || blk).includes(q);
+            if (rows.length) {
+                let any = false;
+                rows.forEach(r => { const ok = !q || blockHit || textOf(r).includes(q); r.style.display = ok ? '' : 'none'; any = any || ok; });
+                blockHit = blockHit || any;
+            } else {
+                blockHit = blockHit || textOf(blk).includes(q);
+            }
+            blk.style.display = blockHit ? '' : 'none';
+            if (blockHit) hits++;
+        });
+        document.getElementById('settings-nohits').style.display = hits ? 'none' : 'block';
+    }
 
         function showToast(text) {
             const container = document.getElementById('toast-container');
@@ -1886,7 +2309,7 @@ function previewBroadcast() {
                 data.bad_list.forEach(item => {
                     radarHtml += `<div style="padding: 4px 0; border-bottom: 1px dashed #444; display: flex; justify-content: space-between; align-items: center;">
                         <span>⏱ ${item.time} | <b>${item.admin_id}</b> ❌</span>
-                        <button class="tab-btn" style="padding: 2px 6px; font-size: 10px; margin: 0; border-color: #cf6679; color: #cf6679;" onclick="document.querySelector('[name=search_id]').value='${item.uid}'; openTab('tab-main');">Обыск ${item.rating}⭐</button>
+                        <button class="tab-btn" style="padding: 2px 6px; font-size: 10px; margin: 0; border-color: #cf6679; color: #cf6679;" onclick="location.href='/glaz?search_id=${item.uid}'">Обыск ${item.rating}⭐</button>
                     </div>`;
                 });
                 if(data.bad_list.length === 0) radarHtml = '<div style="color: #666; font-style: italic;">Жалоб нет, все довольны 🕊️</div>';
@@ -1947,47 +2370,17 @@ function previewBroadcast() {
             }
         }, 5000);
 
-       // 👇 СКРИПТ ДЛЯ ЛАМПОЧЕК ОНЛАЙН/ОФФЛАЙН 👇
-        // 👇 ИСПРАВЛЕННЫЙ ПУЛЬС СИСТЕМ 👇
-        function checkBotStatuses() {
-            fetch('/glaz/api/system_status')
-            .then(res => res.json())
-            .then(data => {
-                const now = Date.now() / 1000;
-                // Бот считается живым, если присылал пульс не позднее 3 минут (180 сек) назад
-                const isAlive = (lastSeen) => lastSeen && (now - lastSeen < 180);
-
-                const ok = '<span style="color:#03dac6; font-weight:bold;">🟢 ONLINE</span>';
-                const fail = '<span style="color:#cf6679; font-weight:bold;">🔴 OFFLINE</span>';
-
-                // Осторожно ищем элементы по правильным ID!
-                const elSkynet = document.getElementById('mod-skynet');
-                if (elSkynet) elSkynet.innerHTML = isAlive(data.skynet_last_seen) ? ok : fail;
-
-                // Бот публикаций (Секретарь)
-                const elPosts = document.getElementById('mod-posts');
-                if (elPosts) elPosts.innerHTML = isAlive(data.sec_last_seen) ? ok : fail;
-
-                // Рекламный бот
-                const elAds = document.getElementById('mod-ads');
-                if (elAds) elAds.innerHTML = isAlive(data.ads_last_seen) ? ok : fail;
-
-                // VIP & Саппорт (Андрюшенька / Бульдозер)
-                const elVip = document.getElementById('mod-vip');
-                if (elVip) elVip.innerHTML = isAlive(data.spy_last_seen) ? ok : fail;
-            }).catch(e => console.log("Ожидание статусов..."));
-        }
-
-        // Запускаем проверку пульса сразу при загрузке страницы, а затем каждые 30 секунд
-        checkBotStatuses();
+        // Пульс ботов и счётчики «Что горит» — раз в 30 секунд
+        function checkBotStatuses() { loadAttention(document.getElementById('tab-home').classList.contains('active')); }
         setInterval(checkBotStatuses, 30000);
-        // 👆 ===================================== 👆
 
         window.onload = function() {
             initCharts();
-            loadXRay(); 
-            let savedTab = localStorage.getItem('activeTab');
-            if (savedTab && document.getElementById(savedTab)) { openTab(savedTab); }
+            loadXRay();
+            const forced = {{ 'true' if (search_id or search_error) else 'false' }};
+            let savedTab = forced ? 'tab-dossier' : (_load('activeTab') || 'tab-home');
+            if (savedTab === 'tab-system') savedTab = 'tab-control';
+            openTab(document.getElementById(savedTab) ? savedTab : 'tab-home');
         }
 
 let sessionPin = "";
@@ -2013,7 +2406,7 @@ function unlockRoot() {
         
         // 👇 ДОБАВЛЯЕМ ЭТУ СТРОЧКУ ДЛЯ ПОЯВЛЕНИЯ КНОПКИ ФИНАНСОВ 👇
         const _fb = document.getElementById('btn-secret-finance');
-        if (_fb) { _fb.style.display = 'inline-block'; showToast("🔓 Секретный раздел Live-Финансов разблокирован!"); }
+        if (_fb) { _fb.style.display = 'flex'; showToast("🔓 Секретный раздел Live-Финансов разблокирован!"); }
         
         // Подтягиваем цвета и эмодзи из базы
         data.buttons.forEach(b => addButtonRow(b.text, b.url, b.style || 'default', b.emoji_id || ''));
@@ -2329,7 +2722,7 @@ function loadSupportTickets() {
                 : '<span style="color:#cf6679; font-size:10px; font-weight:bold;">🔴 Новое сообщение</span>';
                 
             const shortText = t.text.length > 30 ? t.text.substring(0, 30) + '...' : t.text;
-            const safeName = t.name.replace(/'/g, "\\'");
+            const safeName = String(t.name || 'Без имени').replace(/'/g, "\\'");
             
             html += `<div class="session-item" id="ticket-${t.uid}" onclick="openTicket(${t.uid}, '${safeName}')">
                         <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px; color: #fff;">${t.name} <span style="font-size: 11px; color: #aaa;">(${t.uid})</span></div>
@@ -3072,28 +3465,6 @@ function scanNetworks(uid) {
         }
 
         // 👇 СКРИПТ ДЛЯ ЛАМПОЧЕК ОНЛАЙН/ОФФЛАЙН (ПУЛЬС СИСТЕМ) 👇
-        function checkBotStatuses() {
-            fetch('/glaz/api/system_status')
-            .then(res => res.json())
-            .then(data => {
-                const now = Date.now() / 1000;
-                // Бот считается живым, если присылал пульс не позднее 3 минут (180 сек) назад
-                const isAlive = (lastSeen) => lastSeen && (now - lastSeen < 180);
-
-                const ok = '<span style="color:#03dac6;">🟢 Онлайн</span>';
-                const fail = '<span style="color:#cf6679;">🔴 ОФФЛАЙН</span>';
-
-                document.getElementById('status-skynet').innerHTML = `🤖 Skynet: ${isAlive(data.skynet_last_seen) ? ok : fail}`;
-                document.getElementById('status-spy').innerHTML = `🚜 Bulldozer: ${isAlive(data.spy_last_seen) ? ok : fail}`;
-                document.getElementById('status-ads').innerHTML = `📢 Реклама: ${isAlive(data.ads_last_seen) ? ok : fail}`;
-                document.getElementById('status-sec').innerHTML = `👩‍💼 Секретарь: ${isAlive(data.sec_last_seen) ? ok : fail}`;
-            }).catch(e => console.log("Ожидание статусов..."));
-        }
-
-        // Запускаем проверку пульса
-        checkBotStatuses();
-        setInterval(checkBotStatuses, 30000);
-
 // 👇 КРАСИВЫЕ КАРТОЧКИ ЦЕЛЕЙ РУССКОЙ ОБЩИНЫ (РО) 👇
         function renderInfraROEnemies() {
             fetch('/glaz/api/spy_ro')
