@@ -6,7 +6,8 @@ from config import (
     chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak
 )
 from database import users_collection, db, banned_collection, archive_collection
-from utils import get_user_name
+from utils import get_user_name, escape_md  # escape_md: без него /cpa падал на ТОП-5 агентов
+from core.guards import is_staff
 
 def parse_time_string(time_str):
     match = re.match(r"^(\d+)([smhd])$", time_str.lower())
@@ -354,7 +355,7 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
             # Считаем воронку прямиком из базы Скайнета
             agent_hold = db['cpa_traffic'].count_documents({"agent_id": target_agent_id, "status": "hold"})
             agent_approved = db['cpa_traffic'].count_documents({"agent_id": target_agent_id, "status": "approved"})
-            agent_fraud = db['cpa_traffic'].count_documents({"agent_id": target_agent_id, "status": "fraud"})
+            agent_fraud = db['cpa_traffic'].count_documents({"agent_id": target_agent_id, "status": {"$in": ["fraud", "fraud_banned", "fraud_left"]}})
             
             # Достаем дубликаты из базы Секретаря
             agent_data = db['paid_users'].find_one({"uid": target_agent_id}) or {}
@@ -366,7 +367,7 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
                 f"🕵️‍♂️ **ДОСЬЕ АГЕНТА: `{target_agent_id}`**\n\n"
                 f"👁 Всего переходов по его ссылкам: **{total_agent_leads}**\n"
                 f"🔄 Дубликаты (уже были в сети): **{agent_duplicates}**\n"
-                f"⏳ На проверке Скайнета (48ч): **{agent_hold}**\n"
+                f"⏳ На проверке Скайнета (14 дней): **{agent_hold}**\n"
                 f"🚫 Отбраковано (боты/спам): **{agent_fraud}**\n"
                 f"✅ **Одобрено (живые):** **{agent_approved}**\n\n"
                 f"💡 _Одобрено = количество человек, за которых агент получил выплату._"
@@ -381,7 +382,7 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
 
         total_hold = db['cpa_traffic'].count_documents({"status": "hold"})
         total_approved = db['cpa_traffic'].count_documents({"status": "approved"})
-        total_fraud = db['cpa_traffic'].count_documents({"status": "fraud"})
+        total_fraud = db['cpa_traffic'].count_documents({"status": {"$in": ["fraud", "fraud_banned", "fraud_left"]}})
         
         total_leads = total_hold + total_approved + total_fraud
         conversion = round((total_approved / total_leads * 100), 1) if total_leads > 0 else 0
@@ -400,7 +401,7 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
             f"👥 **Уникальных заявок:** {total_leads}\n"
             f"✅ **Одобрено (Живые):** {total_approved}\n"
             f"🚫 **Отбраковано Скайнетом:** {total_fraud}\n"
-            f"⏳ **В карантине (48ч):** {total_hold}\n\n"
+            f"⏳ **В холде (14 дней):** {total_hold}\n\n"
             f"🔥 **Средняя конверсия:** {conversion}%\n\n"
             f"🏆 **ТОП-5 АГЕНТОВ (По живому трафику):**\n"
         )
@@ -413,7 +414,7 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
                 count = agent['count']
                 
                 # Ищем количество брака конкретно у этого агента
-                fraud_by_agent = db['cpa_traffic'].count_documents({"agent_id": agent_id, "status": "fraud"})
+                fraud_by_agent = db['cpa_traffic'].count_documents({"agent_id": agent_id, "status": {"$in": ["fraud", "fraud_banned", "fraud_left"]}})
                 
                 # Пытаемся достать имя агента (если есть) или выводим ID
                 user_info = db['users'].find_one({"_id": agent_id})
@@ -460,12 +461,11 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
 
     @bot.message_handler(commands=['admin'])
     def promote_to_admin_global(message):
-        try:
-            staff_member = bot.get_chat_member(STAFF_GROUP_ID, message.from_user.id)
-            if staff_member.status not in ['administrator', 'creator']:
-                bot.send_message(message.chat.id, "❌ Отказано. Только руководство может раздавать погоны.")
-                return
-        except Exception: return 
+        # Любой админ STAFF-группы мог сделать кого угодно модератором во всех чатах
+        # (а /updatebot — ещё и с правом назначать админов). Теперь только OWNER и ADMIN_CHAT_IDS.
+        if not is_staff(message.from_user.id):
+            bot.send_message(message.chat.id, "❌ Отказано. Раздавать права по всей сети может только руководство.")
+            return
         args = message.text.split(maxsplit=2)
         if len(args) < 3:
             bot.send_message(message.chat.id, "❌ Формат: `/admin [ID] [Должность]`\nПример: `/admin 123456789 прЫнц`", parse_mode="Markdown")
@@ -512,12 +512,11 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
 
     @bot.message_handler(commands=['unadmin'])
     def demote_admin_global(message):
-        try:
-            staff_member = bot.get_chat_member(STAFF_GROUP_ID, message.from_user.id)
-            if staff_member.status not in ['administrator', 'creator']:
-                bot.send_message(message.chat.id, "❌ Отказано. Только руководство может срывать погоны.")
-                return
-        except Exception: return 
+        # Любой админ STAFF-группы мог сделать кого угодно модератором во всех чатах
+        # (а /updatebot — ещё и с правом назначать админов). Теперь только OWNER и ADMIN_CHAT_IDS.
+        if not is_staff(message.from_user.id):
+            bot.send_message(message.chat.id, "❌ Отказано. Снимать права по всей сети может только руководство.")
+            return
         args = message.text.split()
         if len(args) < 2:
             bot.send_message(message.chat.id, "❌ Формат: `/unadmin [ID]`\nПример: `/unadmin 123456789`", parse_mode="Markdown")
@@ -560,11 +559,11 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
 
     @bot.message_handler(commands=['updatebot'])
     def update_service_bot_perms(message):
-        try:
-            staff_member = bot.get_chat_member(STAFF_GROUP_ID, message.from_user.id)
-            if staff_member.status not in ['administrator', 'creator']:
-                return
-        except Exception: return 
+        # Любой админ STAFF-группы мог сделать кого угодно модератором во всех чатах
+        # (а /updatebot — ещё и с правом назначать админов). Теперь только OWNER и ADMIN_CHAT_IDS.
+        if not is_staff(message.from_user.id):
+            bot.send_message(message.chat.id, "❌ Отказано. Права ботам выдаёт только руководство.")
+            return
         
         args = message.text.split()
         if len(args) < 2:
@@ -574,6 +573,19 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
         try: target_bot_id = int(args[1])
         except ValueError:
             return bot.send_message(message.chat.id, "❌ Ошибка: ID должен состоять только из цифр!")
+        # Убеждаемся, что это бот, а не человек (иначе человек получил бы право назначать админов)
+        from config import get_network_data as _gnd
+        _nets = _gnd()
+        _probe = [STAFF_GROUP_ID] + [c for d in _nets[:5] for c in d.values()]
+        _is_bot = None
+        for _cid in _probe:
+            try:
+                _is_bot = bot.get_chat_member(_cid, target_bot_id).user.is_bot
+                break
+            except Exception:
+                continue
+        if _is_bot is not True:
+            return bot.send_message(message.chat.id, "❌ Не удалось подтвердить, что это бот (или это человек). Для людей используйте /admin.")
 
         bot.send_message(message.chat.id, f"🔄 Обновление прав для бота `{target_bot_id}`...\nПрименяю конфигурацию матричной маски по всей сети.", parse_mode="Markdown")
         

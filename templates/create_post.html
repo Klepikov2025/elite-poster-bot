@@ -540,7 +540,7 @@
             toggleLoading(true);
 
             let formData = new FormData();
-            formData.append('user_id', tg.initDataUnsafe.user?.id || 0);
+            formData.append('init_data', tg.initData || '');  // подписанные Telegram данные вместо голого user_id
             formData.append('text', text);
             formData.append('network', network); 
             formData.append('city', city);
@@ -586,10 +586,10 @@
                     <div class="space-y-2"><div class="h-2 bg-zinc-800 rounded w-full"></div><div class="h-2 bg-zinc-800 rounded w-5/6"></div></div>
                 </div>`;
             
-            fetch('/api/get_user_posts?user_id=' + userId)
+            fetch('/api/get_user_posts', { headers: { 'X-Telegram-Init-Data': tg.initData || '' } })
             .then(res => res.json())
             .then(data => {
-                if(data.posts.length === 0) {
+                if(!data.posts || data.posts.length === 0) {
                     list.innerHTML = `
                     <div class="bg-graphite p-8 rounded-[24px] border border-zinc-800/50 text-center opacity-80 mt-10">
                         <div class="text-5xl mb-3 drop-shadow-lg">🪹</div>
@@ -681,7 +681,7 @@
                     fetch('/api/delete_post', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ post_id: postId, user_id: userId })
+                        body: JSON.stringify({ post_id: postId, init_data: tg.initData || '' })
                     }).then(res => res.json())
                       .then(data => {
                           toggleLoading(false);
@@ -710,7 +710,7 @@ function deleteAllPosts() {
                     fetch('/api/delete_all_posts', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ user_id: userId })
+                        body: JSON.stringify({ init_data: tg.initData || '' })
                     }).then(res => res.json())
                       .then(data => {
                           toggleLoading(false);

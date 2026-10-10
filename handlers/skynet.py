@@ -22,101 +22,73 @@ from config import (
 )
 from database import users_collection, banned_collection, db, archive_collection
 from utils import escape_md, get_user_name
+from core.guards import classify_profile_name, safe_delete
+from core.janitor import schedule_delete
+from core.settings import SkynetSettings
 
 
-def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, safe_set_tag, add_radar_log, is_subscribed):
+def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, safe_set_tag, add_radar_log, is_subscribed, entry_hooks=None):
+    entry_hooks = entry_hooks if entry_hooks is not None else {}
+
+    def _name_alert(user, user_link, chat_title, marker):
+        """Подозрительное, но не однозначное имя: не баним автоматически, а зовём админов (раз в сутки)."""
+        key = f"name_alert_{user.id}"
+        if db['name_alerts'].find_one({"_id": key, "ts": {"$gt": time.time() - 86400}}):
+            return
+        db['name_alerts'].update_one({"_id": key}, {"$set": {"ts": time.time()}}, upsert=True)
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🔨 ЗАБАНИТЬ ВЕЗДЕ", callback_data=f"radar_ban_{user.id}"))
+        full = escape_md(f"{user.first_name or ''} {user.last_name or ''}".strip())
+        try:
+            bot.send_message(STAFF_GROUP_ID, f"🟡 **Подозрительное имя** {user_link} (`{user.id}`): _{full}_\nМаркер: `{marker}` · Чат: {chat_title}\nАвтобан не применён — решите вручную.", parse_mode="Markdown", reply_markup=markup)
+        except Exception:
+            pass
+
     
-    # 👇 НОВАЯ ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ЗРЕНИЯ (Vision с fallback'ами) 👇
-    def get_vision_description(base64_image: str) -> str:
-        prompt = (
-            "Опиши суть этого фото СТРОГО 5 ключевыми словами. "
-            "Слова должны быть в именительном падеже, разделены запятой и ОТСОРТИРОВАНЫ по алфавиту. "
-            "Пример: ванная, зеркало, мужчина, селфи, телефон. В ответе не должно быть НИКАКОГО ДРУГОГО ТЕКСТА!"
-        )
 
-        # 1. Попытка через Hugging Face
-        if HF_TOKEN:
+    def _send_roast(chat_id, user_link, prompt_text, fallback_text, title):
+        """Прожарка после мута. Раньше ответ ИИ отправлялся с parse_mode=Markdown: любая звёздочка или
+        подчёркивание в ответе ломали разметку, отправка падала, и в чат уходил запасной текст —
+        поэтому в чатах сотни одинаковых «доспамился…». Теперь: ротация ключей, HTML, автоудаление."""
+        import html as _html
+        m = re.match(r"\[(.*?)\]\((.*?)\)", user_link or "")
+        name, url = (m.group(1).replace("\\", ""), m.group(2)) if m else ("Пользователь", "")
+        mention = f'<a href="{_html.escape(url)}">{_html.escape(name)}</a>' if url else _html.escape(name)
+        prompt = prompt_text.replace(user_link, "{USER}")
+        text = None
+        for key in (GROQ_API_KEYS or ([GROQ_API_KEY] if GROQ_API_KEY else [])):
             try:
-                # Временно импортируем прямо тут, чтобы не крашить остальной код, если библиотеки нет
-                import urllib.request
-                import json
-                
-                url = "https://api-inference.huggingface.co/models/Qwen/Qwen2-VL-72B-Instruct/v1/chat/completions"
-                headers = {
-                    "Authorization": f"Bearer {HF_TOKEN}",
-                    "Content-Type": "application/json"
-                }
-                data = {
-                    "model": "Qwen/Qwen2-VL-72B-Instruct",
-                    "messages": [{
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                        ]
-                    }],
-                    "max_tokens": 50,
-                    "temperature": 0.1
-                }
-                req = urllib.request.Request(url, headers=headers, data=json.dumps(data).encode('utf-8'))
-                with urllib.request.urlopen(req, timeout=15) as response:
-                    resp_data = json.loads(response.read().decode())
-                    return resp_data["choices"][0]["message"]["content"].strip().lower()
+                r = requests.post("https://api.groq.com/openai/v1/chat/completions",
+                                  headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                                  json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}],
+                                        "temperature": 0.8, "max_tokens": 150}, timeout=10)
+                if r.status_code == 200:
+                    text = r.json()["choices"][0]["message"]["content"].strip()
+                    break
+                add_radar_log(f"🤖 Прожарка: Groq ответил {r.status_code}")
+                from core.diag import log_error; log_error("Groq", f"прожарка: HTTP {r.status_code} {r.text[:150]}")
             except Exception as e:
-                print(f"HF Vision error: {e}")
+                add_radar_log(f"🤖 Прожарка: ошибка связи с Groq ({str(e)[:60]})")
+                from core.diag import log_error; log_error("Groq", f"прожарка: {e}")
+        if text and any(w in text.lower() for w in ["извините", "не могу", "как ии", "языковая модель", "запрограммирован", "оскорбительн", "токсичн", "цензур"]):
+            text = None
+        if text:
+            body = _html.escape(text.replace("**", "").replace("__", ""))
+            body = body.replace("{USER}", mention) if "{USER}" in body else f"{mention}, {body}"
+        else:
+            body = _html.escape(fallback_text).replace("{USER}", mention)
+        try:
+            sent = bot.send_message(chat_id, f"👁 <b>СКАЙНЕТ ({title}):</b>\n{body}", parse_mode="HTML", disable_web_page_preview=True)
+            schedule_delete(chat_id, sent.message_id)  # прожарка висит cleanup_minutes (по умолчанию 10 мин)
+        except Exception as e:
+            print(f"roast send error: {e}")
 
-        # 2. Попытка через OpenRouter (uncensored)
-        if OPENROUTER_KEY:
-            try:
-                url = "https://openrouter.ai/api/v1/chat/completions"
-                headers = {
-                    "Authorization": f"Bearer {OPENROUTER_KEY}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://t.me/yourbot", 
-                }
-                data = {
-                    "model": "qwen/qwen-2-vl-72b-instruct",
-                    "messages": [{"role": "user", "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                    ]}],
-                    "temperature": 0.1,
-                    "max_tokens": 50
-                }
-                resp = requests.post(url, headers=headers, json=data, timeout=15)
-                if resp.status_code == 200:
-                    return resp.json()["choices"][0]["message"]["content"].strip().lower()
-            except Exception as e:
-                print(f"OpenRouter Vision error: {e}")
-
-        # 3. Fallback на Groq (зацензуренный, но стабильный)
-        if GROQ_API_KEY:
-            try:
-                url = "https://api.groq.com/openai/v1/chat/completions"
-                headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-                data_vision = {
-                    "model": "llama-3.2-11b-vision-preview", 
-                    "messages": [{"role": "user", "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                    ]}],
-                    "temperature": 0.1,
-                    "max_tokens": 40
-                }
-                response = requests.post(url, headers=headers, json=data_vision, timeout=12)
-                if response.status_code == 200:
-                    return response.json()["choices"][0]["message"]["content"].strip().lower()
-            except:
-                pass
-
-        return "" # Если все три нейросети упали
-    # 👆 ========================================== 👆
+    # (Удалена неиспользуемая get_vision_description: её нигде не вызывали; анти-баян работает по хешам картинок.)
 
 
     # 👇 ФУНКЦИЯ ЗРИТЕЛЬНОЙ ПАМЯТИ (АНТИ-БАЯН) 👇
     def check_photo_creativity_ai(bot, file_id, file_unique_id, user_id, chat_id, message_id, user_link):
-        if not (GROQ_API_KEY or HF_TOKEN or OPENROUTER_KEY): 
-            return
+        # Анти-баян сравнивает хеши картинок и ИИ не требует (ИИ нужен только для прожарки)
 
         # 🔥 ДОБАВЛЯЕМ ВОТ ЭТОТ БЛОК 🔥
         mod_limits = db['settings'].find_one({"_id": "moderation_limits"}) or {}
@@ -209,10 +181,10 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 if spam_count >= 3:
                     # 🔥 3 СТРАЙКА = МУТ НА 3 ДНЯ (259200 секунд) 🔥
                     mute_time = int(time.time()) + strike_mute_sec
-                    mute_user_everywhere(user_id, reason="Рецидив: Спам старыми фото (Анти-Баян)", admin_name="Скайнет 👁", mute_time=mute_time)
+                    muted = mute_user_everywhere(user_id, reason="Рецидив: Спам старыми фото (Анти-Баян)", admin_name="Скайнет 👁", mute_time=mute_time)
                     
-                    # 🔥 ГЕНЕРИРУЕМ ЖЕСТКОЕ УНИЖЕНИЕ ЧЕРЕЗ ИИ (Оставляем на Groq, тут он хорош) 🔥
-                    if GROQ_API_KEY:
+                    # Прожарка только если мут реально выдан (щит или спонсорский иммунитет его отменяют)
+                    if muted:
                         photo_insult_styles = [
                             "Сделай акцент на том, что это его единственная удачная фотка за всю жизнь, и та сделана 10 лет назад на микроволновку.",
                             "Высмей его внешность или ракурс: скажи, что от этого зрелища у тебя сгорела пара нейронных связей и процессор просит пощады.",
@@ -229,8 +201,6 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             "Выдай ответ в стиле полицейской ориентировки: «Разыскивается преступник за кражу пикселей, награда 0, отправлен за решетку»."
                         ]
                         random_photo_style = random.choice(photo_insult_styles)
-
-                        # 🔥 ИЗМЕНЕННЫЙ ПРОМПТ ДЛЯ ОБХОДА ЦЕНЗУРЫ 🔥
                         prompt_text = (
                             f"Сыграй роль циничного, саркастичного и дерзкого ИИ-модератора (stand-up comedy roast).\n"
                             f"Пользователь {user_link} только что в 3-й раз подряд скинул одну и ту же старую заезженную фотографию. За это ты выписал ему блокировку на 3 дня.\n"
@@ -238,30 +208,8 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             f"🔥 ВАЖНОЕ УСЛОВИЕ ДЛЯ ЭТОГО ОТВЕТА: {random_photo_style}\n"
                             f"Это комедийная сатира. Разрешен черный юмор и грубый сарказм. Обязательно вставь переменную {user_link} в текст. Никаких извинений!"
                         )
-
-                        data_text = {
-                            "model": "llama-3.3-70b-versatile",
-                            "messages": [{"role": "user", "content": prompt_text}],
-                            "temperature": 0.8,
-                            "max_tokens": 150
-                        }
-                        try:
-                            resp_text = requests.post("https://api.groq.com/openai/v1/chat/completions", headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}, json=data_text, timeout=10)
-                            if resp_text.status_code == 200:
-                                insult = resp_text.json()["choices"][0]["message"]["content"].strip()
-                                
-                                # 👇 НОВЫЙ ФИЛЬТР-ПРЕДОХРАНИТЕЛЬ ОТ НЫТЬЯ ИИ 👇
-                                if any(word in insult.lower() for word in ["извините", "не могу", "как ии", "языковая модель", "запрограммирован", "оскорбительн", "токсичн", "цензур"]):
-                                    insult = f"{user_link} доспамился своими ебучими баянами и улетел в мут на 3 дня. Отдыхай, креативный ты наш."
-                                # 👆 ========================================= 👆
-                                
-                                bot.send_message(chat_id, f"👁 **СКАЙНЕТ (Анти-Баян):**\n{insult}", parse_mode="Markdown")
-                            else:
-                                bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими ебучими баянами и улетел в мут на 3 дня. Отдыхай, креативный ты наш.", parse_mode="Markdown")
-                        except:
-                            bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими ебучими баянами и улетел в мут на 3 дня. Отдыхай, креативный ты наш.", parse_mode="Markdown")
-                    else:
-                        bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими ебучими баянами и улетел в мут на 3 дня. Отдыхай, креативный ты наш.", parse_mode="Markdown")
+                        _send_roast(chat_id, user_link, prompt_text,
+                                    "{USER} доспамился своими баянами и улетел в мут на 3 дня. Отдыхай, креативный ты наш.", "Анти-Баян")
                     
                     # Сбрасываем счетчик после мута
                     db['photo_memory'].update_one({"_id": user_id}, {"$set": {"spam_count": 0}})
@@ -282,11 +230,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     ]
                     warn_msg = bot.send_message(chat_id, random.choice(phrases), parse_mode="Markdown", disable_web_page_preview=True)
                     
-                    def delete_photo_warn():
-                        time.sleep(300)
-                        try: bot.delete_message(chat_id, warn_msg.message_id)
-                        except: pass
-                    threading.Thread(target=delete_photo_warn, daemon=True).start()
+                    schedule_delete(chat_id, warn_msg.message_id, 300)
 
         except Exception as e:
             print(f"Ошибка зрительной памяти: {e}")
@@ -629,34 +573,43 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             
         chat_title = escape_md(message.chat.title) if message.chat.title else f"Чат {chat_id}"
 
+        # Перехватчик забаненных / восстановление тегов / амнистия ПАРНИ из app.py.
+        # Раньше он был отдельным хэндлером и не срабатывал никогда (telebot запускает только первый).
+        hook = entry_hooks.get("entry")
+        if hook:
+            try: hook(message)
+            except Exception as e: print(f"entry hook error: {e}")
+
         for new_user in message.new_chat_members:
-            if new_user.id == bot.get_me().id: continue # Игнорируем добавление самого бота
+            if new_user.is_bot: continue # Ботов (и самого Скайнета) не проверяем
             
             user_id = new_user.id
+            if banned_collection.find_one({"_id": user_id}):
+                continue  # уже обработан перехватчиком выше
             user_link = get_user_name(new_user)
-            
-            full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".lower()
-            # 1. Вычищаем все знаки препинания и пробелы
-            clean_name = re.sub(r'[\.\,\_\|\-\s+]', '', full_name)
-        
-            # 🔥 2. ДЕШИФРАТОР (Анти-замена букв) 🔥
-            # Переводим английские буквы-шпионы обратно в русские
-            homoglyphs = str.maketrans('aeopcxykmtbh', 'аеорсхукмтвн')
-            clean_name = clean_name.translate(homoglyphs)
-        
-            name_triggers = [
-                r"жмина", r"впрофил", r"смотрипрофиль", r"ссылкав", r"ссылкув", 
-                r"децк", r"детск", r"дэти", r"деток", r"дети", r"малолет", r"школниц",
-                r"цэпэ", r"цп\b", r"порно", r"поорно", r"ебут", r"трах", 
-                r"каналв", r"переходив", r"меня", r"тме", r"tme", r"заработ", 
-                r"инвест", r"крипт", r"профэл"
-            ]
-            
-            if any(re.search(p, clean_name) for p in name_triggers):
-                try: bot.delete_message(chat_id, message.message_id) # Удаляем плашку "Вступил в группу"
-                except: pass
+
+            # Раньше проверялось имя message.from_user (того, КТО добавил), а не вошедшего.
+            # И триггеры искались по склеенным имени+фамилии: «Марат Мельников» давал «тме»,
+            # «Семён Яковлев» — «меня», «Гордецкий» — «децк», и человек получал вечный бан.
+            verdict, marker = classify_profile_name(new_user.first_name, new_user.last_name) if SkynetSettings.get().get("skynet_enabled", True) else (None, None)
+            full_name = f"{new_user.first_name or ''} {new_user.last_name or ''}".lower()
+            if verdict == "ban":
+                safe_delete(bot, chat_id, message.message_id) # Удаляем плашку "Вступил в группу"
                 # Мгновенный пермабан по всем базам!
                 ban_user_everywhere(user_id, reason="Запрещенное/Рекламное ИМЯ на входе", admin_name="Скайнет 🚪", user_link=user_link, trigger_text=full_name, origin_chat=chat_title)
+            elif verdict == "alert":
+                _name_alert(new_user, user_link, chat_title, marker)
+
+        # 🧹 Плашки «вступил в группу» (тумблер «Чистка служебных сообщений»)
+        if SkynetSettings.get().get("clean_service_messages", False):
+            safe_delete(bot, chat_id, message.message_id)
+
+    @bot.message_handler(content_types=['left_chat_member'], func=lambda m: m.chat.type in ['group', 'supergroup'])
+    def clean_left_plaque(message):
+        if str(message.chat.id) in [str(SUPPORT_GROUP_ID), str(STAFF_GROUP_ID), str(JOURNAL_CHAT_ID)]:
+            return
+        if SkynetSettings.get().get("clean_service_messages", False):
+            safe_delete(bot, message.chat.id, message.message_id)
     # ===================================================================
    
     @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'location', 'contact', 'video_note'], func=lambda message: message.chat.type in ['group', 'supergroup'])
@@ -717,23 +670,19 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         if message.from_user.username:
             users_collection.update_one({"_id": user_id}, {"$set": {"username": f"@{message.from_user.username}".lower()}}, upsert=True)
 
-        # === 🛑 ФЕЙС-КОНТРОЛЬ v2.0 (Бронебойный) 🛑 ===
+        # Тумблеры из веб-панели. Раньше 9 из 14 переключателей ни на что не влияли.
+        sk = SkynetSettings.get()
+        moderation_on = sk.get("skynet_enabled", True)
+
+        # === 🛑 ФЕЙС-КОНТРОЛЬ v2.0 (без ложных банов на стыке имени и фамилии) 🛑 ===
         full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".lower()
-        # Вычищаем все точки, запятые, слеши и пробелы, чтобы снять маскировку!
-        clean_name = re.sub(r'[\.\,\_\|\-\s+]', '', full_name)
-        
-        name_triggers = [
-            r"жмина", r"впрофил", r"смотрипрофиль", r"ссылкав", r"ссылкув", 
-            r"децк", r"детск", r"дэти", r"цэпэ", r"цп\b", r"порно", r"поорно", 
-            r"каналв", r"переходив", r"меня", r"тме", r"tme", r"заработ", 
-            r"инвест", r"крипт", r"профэл"
-        ]
-        
-        if any(re.search(p, clean_name) for p in name_triggers):
-            try: bot.delete_message(chat_id, message.message_id)
-            except: pass
+        verdict, marker = classify_profile_name(message.from_user.first_name, message.from_user.last_name) if moderation_on else (None, None)
+        if verdict == "ban":
+            safe_delete(bot, chat_id, message.message_id)
             ban_user_everywhere(user_id, reason="Запрещенное/Рекламное ИМЯ профиля", admin_name="Скайнет 🛡", user_link=user_link, trigger_text=full_name, origin_chat=chat_title)
             return
+        elif verdict == "alert":
+            _name_alert(message.from_user, user_link, chat_title, marker)
         # ========================================================
 
         try:
@@ -771,7 +720,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 users_collection.update_one({"_id": user_id}, {"$set": {"last_api_check": time.time()}})
                 
                 # 👇 БРОНЯ ИНДУЛЬГЕНЦИИ: Их мы не проверяем на физическое присутствие! 👇
-                if custom_tag != "Индульгенция":
+                if True:  # Индульгенция больше не даёт VIP/QUEER — синхронизируем по факту членства для всех
                     try:
                         m_vip = bot.get_chat_member(VIP_CHAT_ID, user_id)
                         is_physically_there = getattr(m_vip, 'is_member', False) if m_vip.status == 'restricted' else True
@@ -837,6 +786,10 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 except Exception as e:
                     pass # Молча глотаем ошибку API. База не обновится, и Скайнет попробует снова на следующем сообщении!
 
+            # 🔴 Главный рубильник: теги синхронизируем всегда, а модерацию — только если включена
+            if not moderation_on:
+                return
+
             # 👇 🛡️ ИММУНИТЕТ ДЛЯ АДМИНОВ И СЛУЖЕБНЫХ ЧАТОВ 🛡️ 👇
             # Скайнет не должен модерировать STAFF-чат, Поддержку и Журнал!
             if str(chat_id) in [str(SUPPORT_GROUP_ID), str(STAFF_GROUP_ID), str(JOURNAL_CHAT_ID)]:
@@ -870,8 +823,8 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             live_yellow = YELLOW_COMMERCE_REGEX + [w['pattern'] for w in dict_settings.get('yellow', [])]
             # ===============================================
 
-            if any(re.search(word, text) for word in live_red):
-                bot.delete_message(chat_id, message.message_id)
+            if sk.get("red_zone", True) and any(re.search(word, text) for word in live_red):
+                safe_delete(bot, chat_id, message.message_id)
                 ban_user_everywhere(user_id, reason="Мясорубка: Красная зона", admin_name="Скайнет ⚔️", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
                 return
 
@@ -887,17 +840,17 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             if any(re.search(p, safe_minor) for p in minor_patterns):
                 # 🔥 ПОДКЛЮЧАЕМ ИИ-АНАЛИТИКУ ПЕРЕД БАНОМ 🔥
                 if ai_context_checker(raw_text, zone="black"):
-                    bot.delete_message(chat_id, message.message_id)
+                    safe_delete(bot, chat_id, message.message_id)
                     ban_user_everywhere(user_id, reason="Черная зона: Несовершеннолетний (<18)", admin_name="Скайнет 🔞", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
                     return
 
             # 1. Сначала фильтруем коммерцию (для всех, даже для VIP/QUEER)
             clean_commerce = re.sub(r'без\s*м\.?п\.?|не\s*коммерция|без\s*мат(\.?|ериальной)\s*помощи', '', text)
-            if any(re.search(pattern, clean_commerce) for pattern in live_yellow):
+            if sk.get("yellow_commerce", True) and any(re.search(pattern, clean_commerce) for pattern in live_yellow):
                 
                 # 🔥 ПОДКЛЮЧАЕМ ИИ-АНАЛИТИКУ ПЕРЕД МУТОМ 🔥
                 if ai_context_checker(raw_text, zone="yellow"):
-                    bot.delete_message(chat_id, message.message_id)
+                    safe_delete(bot, chat_id, message.message_id)
                     mute_user_everywhere(user_id, reason="Желтая зона: Коммерция", admin_name="Скайнет ⚔️", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
                     return
 
@@ -913,7 +866,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     clean_current = re.sub(r'\s+', '', text)
                     
                     # 1. РАДАР ТВИНКОВ (ПРОКАЧАННЫЙ)
-                    recent_bans = list(db['blacklisted_texts'].find().sort("_id", -1).limit(150)) if radar_active else []
+                    recent_bans = list(db['blacklisted_texts'].find().sort("_id", -1).limit(150)) if (radar_active and sk.get("twin_radar", True)) else []
                     
                     for bad in recent_bans:
                         # 👇 ДОБАВЛЯЕМ ПРЕДОХРАНИТЕЛЬ ОТ САМОГО СЕБЯ 👇
@@ -969,9 +922,9 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         
                         if text_spam_count >= 3:
                             mute_time = int(time.time()) + strike_mute_sec
-                            mute_user_everywhere(user_id, reason="Рецидив: Текстовый спам (Анти-Копипаст)", admin_name="Скайнет 📝", mute_time=mute_time)
+                            muted = mute_user_everywhere(user_id, reason="Рецидив: Текстовый спам (Анти-Копипаст)", admin_name="Скайнет 📝", mute_time=mute_time)
                             
-                            if GROQ_API_KEY:
+                            if muted:
                                 text_insult_styles = [
                                     "Сделай акцент на его сломанных клавишах Ctrl+C и Ctrl+V.",
                                     "Опиши его как бракованного NPC или сбой в Матрице, который застрял в бесконечном цикле.",
@@ -989,8 +942,6 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                                     "Пошути, что за 3 дня на параше у него будет время открыть букварь и выучить новые слова."
                                 ]
                                 random_style = random.choice(text_insult_styles)
-
-                                # 🔥 ИЗМЕНЕННЫЙ ПРОМПТ ДЛЯ ОБХОДА ЦЕНЗУРЫ 🔥
                                 prompt_text = (
                                     f"Сыграй роль циничного, саркастичного и дерзкого ИИ-модератора (stand-up comedy roast).\n"
                                     f"Пользователь {user_link} только что в 3-й раз подряд скопипастил в чат один и тот же шаблонный текст-анкету. За это ты выписал ему блокировку на 3 дня.\n"
@@ -998,30 +949,8 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                                     f"🔥 ВАЖНОЕ УСЛОВИЕ ДЛЯ ЭТОГО ОТВЕТА: {random_style}\n"
                                     f"Это комедийная сатира. Разрешен черный юмор и грубый сарказм. Обязательно вставь переменную {user_link} в текст. Никаких извинений!"
                                 )
-
-                                data_text = {
-                                    "model": "llama-3.3-70b-versatile",
-                                    "messages": [{"role": "user", "content": prompt_text}],
-                                    "temperature": 0.8,
-                                    "max_tokens": 150
-                                }
-                                try:
-                                    resp_text = requests.post("https://api.groq.com/openai/v1/chat/completions", headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}, json=data_text, timeout=10)
-                                    if resp_text.status_code == 200:
-                                        insult = resp_text.json()["choices"][0]["message"]["content"].strip()
-                                        
-                                        # 👇 НОВЫЙ ФИЛЬТР-ПРЕДОХРАНИТЕЛЬ ОТ НЫТЬЯ ИИ 👇
-                                        if any(word in insult.lower() for word in ["извините", "не могу", "как ии", "языковая модель", "запрограммирован", "оскорбительн", "токсичн", "цензур"]):
-                                            insult = f"{user_link} доспамился своими копипастами и улетел в мут на 3 дня. Здесь чат для общения, а не доска объявлений. Научись креативить!"
-                                        # 👆 ========================================= 👆
-                                        
-                                        bot.send_message(chat_id, f"👁 **СКАЙНЕТ (Анти-Копипаст):**\n{insult}", parse_mode="Markdown", disable_web_page_preview=True)
-                                    else:
-                                        bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими копипастами и улетел в мут на 3 дня. Здесь чат для общения, а не доска объявлений. Научись креативить!", parse_mode="Markdown", disable_web_page_preview=True)
-                                except:
-                                    bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими копипастами и улетел в мут на 3 дня. Здесь чат для общения, а не доска объявлений. Научись креативить!", parse_mode="Markdown", disable_web_page_preview=True)
-                            else:
-                                bot.send_message(chat_id, f"👁 **СКАЙНЕТ:** {user_link} доспамился своими копипастами и улетел в мут на 3 дня. Здесь чат для общения, а не доска объявлений. Научись креативить!", parse_mode="Markdown", disable_web_page_preview=True)
+                                _send_roast(chat_id, user_link, prompt_text,
+                                            "{USER} доспамился своими копипастами и улетел в мут на 3 дня. Здесь чат для общения, а не доска объявлений. Научись креативить!", "Анти-Копипаст")
                             
                             db['text_memory'].update_one({"_id": text_memory_id}, {"$set": {"spam_count": 0}})
                         else:
@@ -1039,11 +968,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             ]
                             warn_msg = bot.send_message(chat_id, random.choice(text_phrases), parse_mode="Markdown", disable_web_page_preview=True)
                             
-                            def delete_text_warn():
-                                time.sleep(300)
-                                try: bot.delete_message(chat_id, warn_msg.message_id)
-                                except: pass
-                            threading.Thread(target=delete_text_warn, daemon=True).start()
+                            schedule_delete(chat_id, warn_msg.message_id, 300)
                         return 
                     else:
                         if antibayan_text_active:
@@ -1077,11 +1002,10 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
 
                     sent = bot.send_message(chat_id, "❗ Внимание, чтобы писать в чате вам необходимо подписаться на наш основной канал.\n\nБез подписки на канал ваши сообщения будут удаляться автоматически. Вступая в чат, я подтверждаю совершеннолетие и обязуюсь соблюдать правила, с которыми ознакомлен и согласен.", reply_markup=markup)
                     warned_users[key] = sent.message_id
+                    schedule_delete(chat_id, sent.message_id, 120)
                     def auto_delete():
                         time.sleep(120)
-                        try: bot.delete_message(chat_id, sent.message_id)
-                        except: pass
-                        if key in warned_users: del warned_users[key]
+                        warned_users.pop(key, None)
                     threading.Thread(target=auto_delete, daemon=True).start()
                 return
 
@@ -1124,11 +1048,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                                 parse_mode="Markdown",
                                 disable_web_page_preview=True
                             )
-                            def delete_ghost():
-                                time.sleep(15)
-                                try: bot.delete_message(chat_id, ghost_msg.message_id)
-                                except: pass
-                            threading.Thread(target=delete_ghost, daemon=True).start()
+                            schedule_delete(chat_id, ghost_msg.message_id, 15)
                         except: pass
                     
                     try: 
@@ -1153,7 +1073,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 if chat_id not in EXCLUDED_FROM_PARAMS and message.content_type != 'video_note':
                     strict_match = re.search(r'(?<!\d)[1-9]\d/1\d{2}/\d{2,3}(?:/\d{1,2}(?:[.,*xхX]\d{1,2})?)?(?!\d)', text)
                     if not strict_match:
-                        bot.delete_message(chat_id, message.message_id)
+                        safe_delete(bot, chat_id, message.message_id)
                         mute_user_everywhere(user_id, reason="Нет параметров или неверный формат (1 Мая)", admin_name="Скайнет 📏", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
                         markup = types.InlineKeyboardMarkup(row_width=1)
                         markup.add(
@@ -1168,11 +1088,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             raw_text_may1.replace("{user_link}", user_link),
                             reply_markup=markup, parse_mode="Markdown", disable_web_page_preview=True
                         )
-                        def delete_warning_may():
-                            time.sleep(300)
-                            try: bot.delete_message(chat_id, warning_msg.message_id)
-                            except: pass
-                        threading.Thread(target=delete_warning_may, daemon=True).start()
+                        schedule_delete(chat_id, warning_msg.message_id, 300)
                         return
 
             # Очищаем от безопасных контекстов
@@ -1182,7 +1098,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             if re.search(r'\b(?:1[89]|2[0-1])\s*(лет|год|годик|y\.?o\.?)\b|\b(?:1[89]|2[0-1])\s*[/\\-]\s*1\d{2}\b|\b(мне|я)\s*(?:1[89]|2[0-1])\b', safe_age):
                 # 🔥 ПОДКЛЮЧАЕМ ИИ-АНАЛИТИКУ ПЕРЕД БАНОМ 🔥
                 if ai_context_checker(raw_text, zone="orange"):
-                    bot.delete_message(chat_id, message.message_id)
+                    safe_delete(bot, chat_id, message.message_id)
                     mute_user_everywhere(user_id, reason="Оранжевая зона: Возраст 18-21", admin_name="Скайнет 🔞", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
                     markup = types.InlineKeyboardMarkup()
                     markup.add(types.InlineKeyboardButton("🛠 Пройти верификацию 🔞", url="https://t.me/FAQMKBOT"))
@@ -1191,11 +1107,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     raw_text_minor = db_texts.get("minor_warn", "🚨 {user_link}, **Внимание!**\nВаша анкета попала под автоматический фильтр безопасности сети. Пользователи до 21 года включительно проходят обязательную верификацию 🔞.")
                     
                     warning_msg = bot.send_message(chat_id, raw_text_minor.replace("{user_link}", user_link), reply_markup=markup, parse_mode="Markdown", disable_web_page_preview=True)
-                    def delete_warning_18():
-                        time.sleep(300)
-                        try: bot.delete_message(chat_id, warning_msg.message_id)
-                        except: pass
-                    threading.Thread(target=delete_warning_18, daemon=True).start()
+                    schedule_delete(chat_id, warning_msg.message_id, 300)
                     return
 
             new_tag = None

@@ -200,6 +200,7 @@
         <button class="tab-btn" onclick="openTab('tab-broadcast')" style="color: #bb86fc;">🚀 Рассылка</button>
         <button class="tab-btn" onclick="openTab('tab-mass')" style="color: #cf6679;">💥 Репрессии</button>
         <button class="tab-btn" onclick="openTab('tab-system')">⚙️ Система</button>
+        <button class="tab-btn" onclick="openTab('tab-diag')" style="color: #03dac6;">🩺 Диагностика</button>
         <button class="tab-btn" onclick="openTab('ads-tab')">📊 Биржа рекламы</button>
         <button class="tab-btn" onclick="openTab('tab-infrastructure')" style="color: #4caf50; font-weight: bold;">🗺 Инфраструктура</button>
         <button id="btn-secret-finance" class="tab-btn" onclick="openTab('tab-live-finance')" style="display: none; color: #00e676; border-color: #00e676; font-weight: bold;">💰 Live-Финансы</button>
@@ -242,7 +243,7 @@
         <div class="search-container">
             <h3>🕵️‍♂️ Моментальный перехват досье</h3>
             <form method="POST" action="/glaz" class="search-box">
-                <input type="text" name="search_id" class="search-input" placeholder="Введите ID для обыска..." value="{{ search_id }}" required>
+                <input type="text" name="search_id" class="search-input" placeholder="ID или @username для обыска..." value="{{ search_id }}" required>
                 <button type="submit" class="search-btn">Найти</button>
             </form>
             {% if search_error %}<div class="error-msg">⚠️ {{ search_error }}</div>{% endif %}
@@ -868,6 +869,36 @@
     </div> <!-- 🔥 ЗАКРЫВАЕМ ВКЛАДКУ СИСТЕМЫ 🔥 -->
 
     <!-- 👇 ОТКРЫВАЕМ ВКЛАДКУ КАССЫ И НАГРАД 👇 -->
+    <!-- 🩺 ДИАГНОСТИКА: журнал админов, что сломалось, выручка по источникам -->
+    <div id="tab-diag" class="tab-content">
+        <div class="panel-block">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <h3 style="color:#03dac6; margin:0;">🩺 Что сломалось</h3>
+                <button class="form-btn" style="width:auto; background:#2d2d2d; color:#fff; border:1px solid #444;" onclick="loadDiag()">🔄 Обновить</button>
+            </div>
+            <div id="diag-summary" style="display:flex; gap:10px; flex-wrap:wrap; margin:15px 0;"></div>
+            <table class="admin-table" style="font-size:12px;">
+                <thead><tr><th>Время</th><th>Где</th><th>ID</th><th>Что случилось</th></tr></thead>
+                <tbody id="diag-errors"><tr><td colspan="4" style="color:#888;">Загрузка...</td></tr></tbody>
+            </table>
+        </div>
+        <div class="panel-block" style="margin-top:20px;">
+            <h3 style="color:#00e676; margin-top:0;">💰 Выручка по источникам (30 дней)</h3>
+            <div id="diag-rev-totals" style="margin-bottom:10px; color:#ccc;"></div>
+            <table class="admin-table" style="font-size:12px;">
+                <thead><tr><th>Источник</th><th>Валюта</th><th>Сумма</th><th>Оплат</th></tr></thead>
+                <tbody id="diag-revenue"></tbody>
+            </table>
+        </div>
+        <div class="panel-block" style="margin-top:20px;">
+            <h3 style="color:#bb86fc; margin-top:0;">🧾 Журнал действий админов</h3>
+            <table class="admin-table" style="font-size:12px;">
+                <thead><tr><th>Время</th><th>Админ</th><th>Действие</th></tr></thead>
+                <tbody id="diag-audit"></tbody>
+            </table>
+        </div>
+    </div>
+
     <div id="tab-withdrawals" class="tab-content">
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1200px; margin: 0 auto;">
             
@@ -929,7 +960,7 @@
                                     {% if wd.status == 'pending' %}
                                     <tr>
                                         <td><code>{{ wd.user_id }}</code></td>
-                                        <td><b style="color: #ffb74d;">{{ wd.amount }} ₽</b></td>
+                                        <td><b style="color: #ffb74d;">{{ wd.amount }} {{ '⭐️' if (wd._id is string and wd._id.startswith('w_')) else '₽' }}</b></td>
                                         <td><code>{{ wd.details }}</code></td>
                                         <td>
                                             <div style="display:flex; gap:5px;">
@@ -1162,6 +1193,42 @@
         let currentListData = [];
         let activeProxySession = null;
 
+
+    // ===== 🩺 ДИАГНОСТИКА =====
+    function _esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+    function _card(label, value, bad) {
+        return `<div style="background:#1a1a1a; border:1px solid ${bad ? '#cf6679' : '#252525'}; border-radius:8px; padding:10px 14px; min-width:140px;">
+                    <div style="font-size:11px; color:#888;">${label}</div>
+                    <div style="font-size:18px; font-weight:bold; color:${bad ? '#cf6679' : '#03dac6'};">${value}</div></div>`;
+    }
+    function loadDiag() {
+        fetch('/glaz/api/diag/errors').then(r => r.json()).then(d => {
+            let cards = '';
+            (d.pulses || []).forEach(p => {
+                const ago = p.ago_sec < 120 ? `${p.ago_sec} сек назад` : `${Math.round(p.ago_sec / 60)} мин назад`;
+                cards += _card('Пульс: ' + _esc(p.bot), (p.ok ? '🟢 ' : '🔴 ') + ago, !p.ok);
+            });
+            cards += _card('Ошибок за 24ч', d.errors_24h, d.errors_24h > 0);
+            cards += _card('Приказы в очереди', d.tasks_pending, d.tasks_pending > 20);
+            cards += _card('Приказы с ошибкой', d.tasks_failed, d.tasks_failed > 0);
+            cards += _card('Ждут удаления', d.trash_queue, false);
+            document.getElementById('diag-summary').innerHTML = cards;
+            const rows = (d.errors || []).map(e => `<tr><td>${_esc(e.time)}</td><td>${_esc(e.kind)}</td><td><code>${_esc(e.uid || '')}</code></td><td>${_esc(e.text)}</td></tr>`).join('');
+            document.getElementById('diag-errors').innerHTML = rows || '<tr><td colspan="4" style="color:#4caf50;">✅ Ошибок нет</td></tr>';
+        });
+        fetch('/glaz/api/diag/revenue_month').then(r => r.json()).then(d => {
+            const cur = {stars: '⭐️ звёзды', rub: '₽ крипта', internal: '🎰 внутренняя (очки/кэшбэк)'};
+            document.getElementById('diag-rev-totals').innerHTML =
+                `⭐️ <b>${d.totals.stars.toLocaleString('ru-RU')}</b> &nbsp;|&nbsp; ₽ <b>${d.totals.rub.toLocaleString('ru-RU')}</b> &nbsp;|&nbsp; <span style="color:#888;">внутренние оплаты (не деньги): ${d.totals.internal.toLocaleString('ru-RU')}</span>`;
+            document.getElementById('diag-revenue').innerHTML = (d.rows || []).map(r =>
+                `<tr><td>${_esc(r.name)}</td><td>${cur[r.kind] || r.kind}</td><td><b>${r.sum.toLocaleString('ru-RU')}</b></td><td>${r.count}</td></tr>`).join('') || '<tr><td colspan="4" style="color:#888;">Нет данных</td></tr>';
+        });
+        fetch('/glaz/api/diag/audit').then(r => r.json()).then(rows => {
+            document.getElementById('diag-audit').innerHTML = (rows || []).map(r =>
+                `<tr><td>${_esc(r.time)}</td><td><b>${_esc(r.login)}</b></td><td>${_esc(r.text)}</td></tr>`).join('') || '<tr><td colspan="3" style="color:#888;">Пока пусто</td></tr>';
+        });
+    }
+
         // 👇 ПОЛНОСТЬЮ ОБНОВЛЕННАЯ ФУНКЦИЯ ПЕРЕКЛЮЧЕНИЯ ВКЛАДОК 👇
     function openTab(tabId) {
     // 1. Скрываем все вкладки и кнопки
@@ -1182,6 +1249,7 @@
     
     // 4. Сохраняем текущую вкладку
     localStorage.setItem('activeTab', tabId);
+    if (tabId === 'tab-diag') loadDiag();
 
     // 5. Загружаем данные для конкретной вкладки
     if(tabId === 'tab-blackbox') loadProxySessions();
@@ -1403,8 +1471,9 @@
             "referral_system": "🔗 Реферальная VIP-система (Начисление бонусов за друзей)",
             "parni_autounmute": "🕊️ Локальная амнистия (Авторазмут в сети ПАРНИ 18+ при входе)",
             "radar_logging": "📡 Живой Радар (Трансляция событий в хакерский терминал)",
-            "quarantine_active": "🥷 Карантин новорегов (Защита от свежих аккаунтов на 48ч)",
-            "may_1_active": "📏 Операция \"1 Мая\" (Строгий контроль формата параметров)"
+            "quarantine_active": "🥷 Карантин новорегов (срок задаётся в настройках модерации)",
+            "may_1_active": "📏 Операция \"1 Мая\" (Строгий контроль формата параметров)",
+            "clean_service_messages": "🧹 Чистка служебных сообщений (Удалять плашки «вступил/вышел» в чатах)"
         };
 
         Object.keys(labels).forEach(key => {
@@ -1905,7 +1974,8 @@ function loadRootFinance(pin) {
     .then(data => {
         if(!data.error) {
             const totalStars = parseInt(data.total_today) || 0;
-            const totalRubles = Math.floor(totalStars * 1.6); // Конвертация по курсу 1.6
+            // звёзды → рубли по курсу 1.6 + живые рубли с крипты (раньше крипта считалась «звёздами»)
+            const totalRubles = Math.floor(totalStars * 1.6) + (parseInt(data.crypto_rub_today) || 0);
             
             // Красивый вывод с пробелами (например: 10 500)
             document.getElementById('root-finance-total').innerText = totalStars.toLocaleString('ru-RU');

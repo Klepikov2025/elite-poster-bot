@@ -45,8 +45,17 @@ _DUMMY_HASH = generate_password_hash(secrets.token_hex(16))
 
 
 def client_ip():
-    xff = request.headers.get("X-Forwarded-For", "")
-    return (xff.split(",")[0].strip() if xff else request.remote_addr) or "?"
+    # Первый адрес в X-Forwarded-For присылает сам клиент и может подставить любой,
+    # обходя лимит попыток. Доверяем адресу, который дописал прокси хостинга
+    # (TRUSTED_PROXY_HOPS-й с конца, по умолчанию последний).
+    xff = [p.strip() for p in request.headers.get("X-Forwarded-For", "").split(",") if p.strip()]
+    try:
+        hops = max(1, int(os.getenv("TRUSTED_PROXY_HOPS", "1")))
+    except ValueError:
+        hops = 1
+    if len(xff) >= hops:
+        return xff[-hops]
+    return request.remote_addr or "?"
 
 
 def _eq(a, b):

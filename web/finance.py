@@ -4,6 +4,16 @@ import time
 from bson.objectid import ObjectId
 from datetime import datetime
 
+INTERNAL_REVENUE_TYPES = {"vip_points", "vip_rub_balance", "beyond_rub", "beyond_pts"}  # оплата очками/кэшбэком — не живые деньги
+
+def _rev_kind(r):
+    """stars | rub | internal. Новые крипто-записи помечены currency=RUB."""
+    if r.get("type") in INTERNAL_REVENUE_TYPES:
+        return "internal"
+    if r.get("currency") == "RUB":
+        return "rub"
+    return "stars"
+
 def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
 
     # ================= 📡 LIVE ФИНАНСОВЫЙ ЦЕНТР СЕТИ =================
@@ -121,22 +131,24 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
 
         # 4. 🔥 КРИПТО-КАССА (Реклама, VIP, BEYOND) 🔥
         if currency_filter in ['all', 'rub'] and not search_uid:
-            rev_records = list(target_db['daily_revenue'].find().sort("timestamp", -1).limit(200))
+            rev_records = list(target_db['daily_revenue'].find({"currency": "RUB"}).sort("timestamp", -1).limit(200))
             for rev in rev_records:
                 r_type = rev.get("type", "")
-                if r_type in ["ads", "vip", "beyond", "city", "donation"]:
+                if True:  # только крипто-записи (раньше сюда попадали и звёздные VIP с подписью «₽ CryptoBot»)
                     # Переводим технические названия в красивые для панели
                     type_ru = "Донат / Чаевые"
                     if r_type == 'ads': type_ru = "Покупка Рекламы"
                     elif r_type == 'vip': type_ru = "Покупка VIP"
                     elif r_type == 'beyond': type_ru = "Клуб BEYOND"
                     elif r_type == 'city': type_ru = "Доступ к городу"
+                    elif r_type == 'fine': type_ru = "Штраф"
+                    elif r_type == 'indulgence': type_ru = "Индульгенция"
                     
                     amt = rev.get("amount", 0)
                     items.append({
                         "id": str(rev.get("_id")),
                         "timestamp": rev.get("timestamp", 0),
-                        "uid": "Крипто-Шлюз", # У крипты не всегда пишется UID в revenue
+                        "uid": rev.get("uid", "Крипто-Шлюз"),
                         "currency": "₽",
                         "amount": amt,
                         "amount_str": f"+{amt} ₽",
@@ -187,10 +199,16 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
         wd_id = request.form.get('wd_id')
         action = request.form.get('action')
         
-        try:
-            from bson.objectid import ObjectId
-            wd_obj_id = ObjectId(wd_id)
-        except: return redirect(url_for('admin_panel'))
+        # Два вида заявок: рублёвые из Секретаря (ObjectId) и реферальные звёздные из Скайнета (w_...).
+        # Раньше реферальные из панели не обрабатывались вообще (ошибка ObjectId → тихий редирект).
+        is_ref = bool(wd_id) and wd_id.startswith("w_")
+        if is_ref:
+            wd_obj_id = wd_id
+        else:
+            try:
+                from bson.objectid import ObjectId
+                wd_obj_id = ObjectId(wd_id)
+            except: return redirect(url_for('admin_panel'))
             
         try:
             target_db = db.client['elite_bot_db']
@@ -198,17 +216,29 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
         except:
             collection = db['withdrawals']
             
-        wd = collection.find_one({"_id": wd_obj_id})
+        if action not in ('pay', 'reject'):
+            return redirect(url_for('admin_panel'))
+
+        # Атомарно: заявка меняет статус ровно один раз. Раньше двойной клик по «Отклонить»
+        # возвращал деньги на баланс дважды.
+        new_status = "paid" if action == 'pay' else "rejected"
+        wd = collection.find_one_and_update(
+            {"_id": wd_obj_id, "status": "pending"},
+            {"$set": {"status": new_status, "notify_status": action, "processed_at": time.time()}}
+        )
         
-        if wd and wd.get('status') == 'pending':
+        if wd:
             uid = wd['user_id']
             amount = wd['amount']
             
-            if action == 'pay':
-                collection.update_one(
-                    {"_id": wd_obj_id}, 
-                    {"$set": {"status": "paid", "notify_status": "pay"}}
-                )
+            if is_ref:
+                # реферальный баланс в звёздах: списываем только при выплате, при отказе возвращать нечего
+                if action == 'pay':
+                    update_user_stats(uid, balance_add=-amount)
+                try: bot.send_message(uid, f"✅ Ваш запрос на вывод {amount} звезд выплачен!" if action == 'pay' else "❌ Ваш запрос на вывод средств был отклонен администрацией.")
+                except Exception: pass
+                add_radar_log(f"💸 Реферальная заявка {wd_id}: {'оплачена' if action == 'pay' else 'отклонена'}")
+            elif action == 'pay':
                 add_radar_log(f"💸 ОПЛАЧЕНА ЗАЯВКА: {wd_id}")
                 
             elif action == 'reject':
@@ -221,18 +251,12 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
                     
                 paid_coll.update_one({"uid": uid}, {"$inc": {"cashback_balance": amount}})
                 
-                import time
                 rub_ledger.insert_one({
                     "uid": uid,
                     "amount": amount,
                     "reason": "Возврат средств (Отмена вывода админом)",
                     "timestamp": time.time()
                 })
-                
-                collection.update_one(
-                    {"_id": wd_obj_id}, 
-                    {"$set": {"status": "rejected", "notify_status": "reject"}}
-                )
                 add_radar_log(f"🚫 ОТКЛОНЕНА ЗАЯВКА: {wd_id}")
                 
         return redirect(url_for('admin_panel'))
@@ -275,7 +299,11 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
         
         # 🔥 ТЕПЕРЬ СЧИТАЕМ ВСЕ ТИПЫ ДОХОДОВ ЗА СЕГОДНЯ ИЗ DAILY_REVENUE
         today_revenue = list(db['daily_revenue'].find({"date": today_str}))
-        total_stars = sum(r.get('amount', 0) for r in today_revenue)
+        # Раньше в одну сумму «звёзд» складывались и рубли с крипты, и оплаты очками/кэшбэком
+        # (это не деньги), а потом всё умножалось на 1.6. Теперь раздельно.
+        total_stars = sum(r.get('amount', 0) for r in today_revenue if _rev_kind(r) == "stars")
+        crypto_rub = sum(r.get('amount', 0) for r in today_revenue if _rev_kind(r) == "rub")
+        internal = sum(r.get('amount', 0) for r in today_revenue if _rev_kind(r) == "internal")
         
         # Оставляем детальный список логов для авторазбанов внизу блока
         today_payments = list(db['fine_payments'].find({"date": today_str}))
@@ -290,6 +318,8 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             
         return jsonify({
             "total_today": total_stars,
+            "crypto_rub_today": round(crypto_rub),
+            "internal_today": internal,
             "payments": formatted_list
         })
 

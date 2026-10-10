@@ -6,6 +6,7 @@ import time
 from config import STAFF_GROUP_ID, ADMIN_CHAT_IDS
 from database import proxy_sessions, posts_collection, banned_collection, archive_collection
 from utils import get_user_name, escape_md
+from core.guards import is_staff, deny_callback
 
 # Локальное хранилище для жалоб на скам
 scam_reports = {}
@@ -48,6 +49,12 @@ def register_proxy_handlers(bot, ban_user_everywhere):
         vip_id = post["user_id"]
         if user_id == vip_id:
             bot.answer_callback_query(call.id, "❌ Вы не можете откликнуться на свое же объявление!", show_alert=True)
+            return
+
+        # Тумблер «Черный Ящик» в веб-панели (раньше ни на что не влиял)
+        from core.settings import SkynetSettings
+        if not SkynetSettings.get().get("proxy_system", True):
+            bot.answer_callback_query(call.id, "Анонимные отклики временно отключены.", show_alert=True)
             return
 
         # 👇 ЩИТ СКАЙНЕТА: Проверяем гостя по базе глобальных банов 👇
@@ -174,6 +181,11 @@ def register_proxy_handlers(bot, ban_user_everywhere):
             
         vip_id = session["vip_id"]
         guest_id = session["guest_id"]
+
+        # Кнопки есть только у VIP. Подделанной кнопкой посторонний мог закрыть чужой диалог
+        # или отправить чужую переписку админам «жалобой».
+        if call.from_user.id != vip_id:
+            return deny_callback(bot, call, "Это не ваш диалог.")
         
         proxy_sessions.update_one({"_id": session_id}, {"$set": {"is_active": False}})
         
@@ -212,7 +224,7 @@ def register_proxy_handlers(bot, ban_user_everywhere):
                 bot.send_message(vip_id, "✅ Жалоба отправлена администрации. Меры будут приняты!")
             except: pass
 
-    @bot.message_handler(func=lambda m: m.chat.type == "private" and not m.reply_to_message and not m.text.startswith('/'))
+    @bot.message_handler(func=lambda m: m.chat.type == "private" and not m.reply_to_message and not (m.text or '').startswith('/'))
     def catch_forgotten_reply(message):
         menu_buttons = ["Создать новое объявление", "Удалить объявление", "Удалить все объявления", "👑 Вступить в VIP-чат", "👤 Партнерская программа", "Мужской Клуб", "ПАРНИ 18+", "НС", "Радуга", "Гей Знакомства", "Все сети", "Назад", "Выбрать другую сеть", "Да", "Нет"]
         if message.text in menu_buttons: return
@@ -287,6 +299,8 @@ def register_proxy_handlers(bot, ban_user_everywhere):
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith(("scam_accept_", "scam_reject_", "scam_details_")))
     def handle_scam_admin_response(call):
+        if not is_staff(call.from_user.id):
+            return deny_callback(bot, call)
         try:
             parts = call.data.split("_", 2)
             action = parts[1]

@@ -37,13 +37,28 @@ VERIFICATION_LINK = "http://t.me/vip_znakbot"
 # Вставь вот сюда
 NON_CITIES = ["БЕЗ ПРЕДРАССУДКОВ", "RAINBOW MAN", "Мужской Чат", "Фетиши", "Аренда Жилья", "Секс Туризм", "Галерея", "Тестовая группа 🛠️"]
 
+# Тема (топик) в STAFF-группе для итогов CPA-конкурса. None = общий чат группы.
+PRIZES_THREAD_ID = int(os.getenv("PRIZES_THREAD_ID")) if os.getenv("PRIZES_THREAD_ID", "").lstrip("-").isdigit() else None
+
+# Резервная копия матрицы чатов. Раньше эти словари нигде не были объявлены, и при пустой
+# базе бот падал с NameError на старте. Заполните, если хотите аварийную копию в коде.
+FALLBACK_PARNI = {}
+FALLBACK_MK = {}
+FALLBACK_NS = {}
+FALLBACK_RAINBOW = {}
+FALLBACK_GAYZNAK = {}
+
 # Дальше идет функция
 def get_network_data():
     from database import db
     infra = db['settings'].find_one({"_id": "infrastructure"})
     
     # 🔥 ПАРАШЮТ БЕЗОПАСНОСТИ: Если база вдруг пустая или удалилась
-    if not infra or not infra.get("networks") or len(infra["networks"].get("mk", [])) == 0:
+    has_fallback = any([FALLBACK_PARNI, FALLBACK_MK, FALLBACK_NS, FALLBACK_RAINBOW, FALLBACK_GAYZNAK])
+    if (not infra or not infra.get("networks") or len(infra["networks"].get("mk", [])) == 0) and not has_fallback:
+        print("⚠️ Матрица городов в базе пуста, а резервной копии в config.py нет. Заполните её в ЦУП.")
+        infra = infra or {}
+    elif not infra or not infra.get("networks") or len(infra["networks"].get("mk", [])) == 0:
         print("⚙️ Матрица городов пуста. Восстанавливаю резервную копию...")
         def convert_dict_to_list(chat_dict):
             return [{"name": name, "id": str(chat_id)} for name, chat_id in chat_dict.items()]

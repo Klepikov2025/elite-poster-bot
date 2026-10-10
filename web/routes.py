@@ -13,6 +13,31 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
 
     # login / 2fa / logout теперь живут в web_auth.py
 
+    from core.guards import check_webapp_init_data
+    from config import TOKEN as _BOT_TOKEN, VIP_CHAT_ID as _VIP_CHAT_ID
+    from pymongo.errors import DuplicateKeyError
+
+    def _webapp_uid():
+        """user_id из ПОДПИСАННЫХ данных Telegram Mini App. Раньше бот верил полю user_id из формы,
+        и любой мог публиковать «VIP-анкеты» от чужого имени во все чаты и удалять чужие."""
+        body = request.get_json(silent=True) or {}
+        init = (request.headers.get("X-Telegram-Init-Data") or request.form.get("init_data")
+                or body.get("init_data") or "")
+        u = check_webapp_init_data(init, _BOT_TOKEN)
+        return (int(u["id"]), u) if u else (None, None)
+
+    def _is_vip_now(uid):
+        doc = users_collection.find_one({"_id": uid}) or {}
+        if banned_collection.find_one({"_id": uid}):
+            return False
+        if doc.get("is_vip"):
+            return True
+        try:
+            m = bot.get_chat_member(_VIP_CHAT_ID, uid)
+            return m.status in ("member", "administrator", "creator") or (m.status == "restricted" and getattr(m, "is_member", False))
+        except Exception:
+            return False
+
     @app.route('/glaz', methods=['GET', 'POST'])
     def admin_panel():
         if not session.get('logged_in'): return redirect(url_for('login'))
@@ -36,7 +61,15 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         search_id = request.args.get('search_id') or request.form.get('search_id')
         if search_id:
             try:
-                uid = int(search_id.strip())
+                q = search_id.strip()
+                if not q.lstrip('-').isdigit():
+                    # Поиск по @username (раньше только по ID)
+                    uname = "@" + q.lstrip("@").lower()
+                    found = users_collection.find_one({"username": uname})
+                    if not found:
+                        raise ValueError
+                    q = str(found["_id"])
+                uid = int(q)
                 u_info = users_collection.find_one({"_id": uid})
                 b_info = banned_collection.find_one({"_id": uid})
                 archive_info = archive_collection.find_one({"target": str(uid)})
@@ -56,7 +89,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
 
                     is_quarantine = False
                     first_seen = u_info.get("first_seen", 0) if u_info else 0
-                    if uid > 7800000000 and first_seen > 0 and (time.time() - first_seen) < 172800:
+                    _qh = int((db['settings'].find_one({"_id": "moderation_limits"}) or {}).get("quaran_hours", 120))
+                    if uid > 7800000000 and first_seen > 0 and (time.time() - first_seen) < _qh * 3600:
                         is_quarantine = True
 
                     # 💎 ВЫТАСКИВАЕМ СОКРОВИЩА ИЗ ПЛАТЕЖНОЙ БАЗЫ СКАЙНЕТА
@@ -123,7 +157,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                 else:
                     search_error = f"Юзер {uid} не найден в матрице базы данных."
             except ValueError:
-                search_error = "ID должен состоять только из цифр!"
+                search_error = "Не найдено: введите ID или @username, который бот уже видел в чатах."
 
         # 👇 ПРАВИЛЬНЫЙ ВОЗВРАТ В САМОМ КОНЦЕ ФУНКЦИИ 👇
         return render_template(
@@ -395,7 +429,11 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             staff_msg = f"📍 **ВЕБ-АДМИНКА:** Изменен город для `{uid}` на `{new_city}`"
         elif action == 'mute_temp':
             hours = request.form.get('hours', '24')
-            mute_user_everywhere(uid, reason=f"Профилактический Web-мут на {hours} ч.", admin_name="Web-Саурон 👁️")
+            try: hours_i = max(1, int(float(hours)))
+            except ValueError: hours_i = 24
+            # Раньше срок не передавался, и «мут на 24 ч» становился вечным
+            mute_user_everywhere(uid, reason=f"Профилактический Web-мут на {hours_i} ч.", admin_name="Web-Саурон 👁️",
+                                 mute_time=int(time.time()) + hours_i * 3600)
             msg = f"🤐 Пользователь {uid} отправлен в мут на {hours} ч."
             add_radar_log(f"🤐 МУТ [{hours} ч.]: {uid}")
             staff_msg = f"🤐 **ВЕБ-АДМИНКА: ПРОФИЛАКТИЧЕСКИЙ МУТ**\n\n• **Пользователь:** `{uid}`\n• **Срок:** `{hours} ч.`"
@@ -418,8 +456,10 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         if amount == 0:
             return jsonify({"success": False, "error": "Сумма не может быть нулем"})
 
+        from core.janitor import log_points
         if currency == 'points':
             db['paid_users'].update_one({"uid": uid}, {"$inc": {"bounty_points": amount}}, upsert=True)
+            log_points(uid, "bounty_points", amount, reason=f"web_admin:{session.get('login', '?')}")
             msg = f"💰 Очки Бдительности {'добавлены' if amount > 0 else 'списаны'}: {amount}"
             add_radar_log(f"💰 БАЛАНС ОЧКОВ [{amount}]: {uid}")
             staff_msg = f"💰 **ВЕБ-АДМИНКА: ИЗМЕНЕНИЕ ОЧКОВ**\n\n• **Юзер:** `{uid}`\n• **Изменение:** `{amount}` очков"
@@ -427,6 +467,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             
         elif currency == 'shards':
             db['paid_users'].update_one({"uid": uid}, {"$inc": {"jackpot_shards": amount}}, upsert=True)
+            log_points(uid, "jackpot_shards", amount, reason=f"web_admin:{session.get('login', '?')}")
             msg = f"🧩 Осколки {'добавлены' if amount > 0 else 'списаны'}: {amount}"
             add_radar_log(f"🧩 БАЛАНС ОСКОЛКОВ [{amount}]: {uid}")
             staff_msg = f"🧩 **ВЕБ-АДМИНКА: ИЗМЕНЕНИЕ ОСКОЛКОВ**\n\n• **Юзер:** `{uid}`\n• **Изменение:** `{amount}` осколков"
@@ -609,11 +650,10 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                 elif "deactivated" in err_text:
                     users_collection.delete_one({"_id": u['_id']})
                     dead_count += 1
-                    # 🔥 Физически выгоняем из всех чатов сети!
-                    try:
-                        ban_user_everywhere(u['_id'], reason="Удаленный аккаунт (Автоочистка)", admin_name="Скайнет")
-                    except:
-                        pass
+                    # 🔥 Тихо выносим удалённый аккаунт из чатов (тумблер «Автоочистка трупов»).
+                    # Раньше на каждый труп шёл полноценный #BAN с отчётами в журнал и STAFF.
+                    if SkynetSettings.get().get("auto_corpse_removal", True):
+                        threading.Thread(target=background_corpse_removal, args=(u['_id'],), daemon=True).start()
                         
                 # 3. Пользователь просто заблокировал бота в ЛС (он жив, но рассылку не хочет)
                 elif "blocked" in err_text:
@@ -637,10 +677,15 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         while True:
             try:
                 now = time.time()
-                tasks = list(db['scheduled_broadcasts'].find({"status": "pending", "run_at": {"$lte": now}}))
-                for t in tasks:
-                    db['scheduled_broadcasts'].update_one({"_id": t["_id"]}, {"$set": {"status": "done"}})
-                    execute_broadcast(t["text"], t["target"], t["buttons"])
+                # Атомарно «забираем» рассылку: при нескольких воркерах она уходила дважды
+                while True:
+                    t = db['scheduled_broadcasts'].find_one_and_update(
+                        {"status": "pending", "run_at": {"$lte": now}},
+                        {"$set": {"status": "done", "started_at": now}}
+                    )
+                    if not t:
+                        break
+                    execute_broadcast(t["text"], t["target"], t.get("buttons", []))
             except Exception as e: print(e)
             time.sleep(30)
             
@@ -883,14 +928,24 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         from datetime import datetime
         from telebot import types
         
-        user_id = request.form.get('user_id')
-        text = request.form.get('text')
+        user_id, tg_user = _webapp_uid()
+        text = (request.form.get('text') or '').strip()
         network = request.form.get('network')
         city = request.form.get('city')
         uploaded_files = request.files.getlist('media')
 
-        if not user_id: return jsonify({"status": "error", "message": "No user_id"}), 400
-        user_id = int(user_id)
+        if not user_id:
+            return jsonify({"status": "error", "message": "Откройте форму кнопкой из бота (подпись Telegram не прошла)."}), 401
+        if not _is_vip_now(user_id):
+            return jsonify({"status": "error", "message": "Публикация доступна только VIP-участникам."}), 403
+        if not text or len(text) > 3500:
+            return jsonify({"status": "error", "message": "Текст пустой или слишком длинный (до 3500 символов)."}), 400
+        # Не чаще раза в 2 минуты: защита от залива всех чатов одной кнопкой
+        try:
+            db['mini_app_rate'].insert_one({"_id": f"{user_id}_{int(time.time() // 120)}"})
+        except DuplicateKeyError:
+            return jsonify({"status": "error", "message": "Подождите пару минут перед следующей публикацией."}), 429
+        users_collection.update_one({"_id": user_id}, {"$set": {"first_name": tg_user.get("first_name", "VIP")}}, upsert=True)
 
         files_to_process = []
         for file in uploaded_files[:10]:
@@ -920,7 +975,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
 
             # Собираем красивую анкету
             user_doc = users_collection.find_one({"_id": uid}) or {}
-            safe_name = user_doc.get("first_name", "VIP").replace('<', '').replace('>', '')
+            safe_name = str(user_doc.get("first_name", "VIP")).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
             user_name_html = f'<a href="tg://user?id={uid}">{safe_name}</a>'
             
             vip_top = '<tg-emoji emoji-id="5467688183229610037">👑</tg-emoji><tg-emoji emoji-id="5467466378233543299">👑</tg-emoji><tg-emoji emoji-id="5467630896955815565">👑</tg-emoji>\n\n'
@@ -951,7 +1006,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                     f"🌟 Привилегированный участник {user_name_html} на радаре:"
                 ]
             
-            safe_text = str(txt).replace('<', '&lt;').replace('>', '&gt;')
+            safe_text = str(txt).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
             full_text = f"{vip_top}{random.choice(headers)}\n\n{safe_text}{vip_bot}"
             
             markup = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton(text="Откликнуться ♥", callback_data="respond"))
@@ -1039,8 +1094,9 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
     
     @app.route('/api/get_user_posts', methods=['GET'])
     def api_get_user_posts():
-        user_id_str = request.args.get('user_id', '0')
-        user_id = int(user_id_str) if user_id_str.isdigit() else 0
+        user_id, _ = _webapp_uid()
+        if not user_id:
+            return jsonify({"success": False, "posts": [], "message": "Нет подписи Telegram"}), 401
         
         # Получаем посты юзера из базы, сортируем от новых к старым
         posts = list(db['posts'].find({"user_id": user_id}).sort("time", -1))
@@ -1062,12 +1118,17 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
 
     @app.route('/api/delete_post', methods=['POST'])
     def api_delete_post():
-        data = request.json
+        data = request.get_json(silent=True) or {}
         post_id = data.get('post_id')
-        user_id = data.get('user_id')
+        user_id, _ = _webapp_uid()
+        if not user_id:
+            return jsonify({"success": False, "message": "Нет подписи Telegram"}), 401
         
         from bson import ObjectId
-        post = db['posts'].find_one({"_id": ObjectId(post_id), "user_id": int(user_id)})
+        try:
+            post = db['posts'].find_one({"_id": ObjectId(post_id), "user_id": user_id})
+        except Exception:
+            post = None
         
         if not post:
             return jsonify({"success": False, "message": "Анкета не найдена"})
@@ -1087,11 +1148,9 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
 
     @app.route('/api/delete_all_posts', methods=['POST'])
     def api_delete_all_posts():
-        data = request.json
-        user_id = data.get('user_id')
-        
+        user_id, _ = _webapp_uid()
         if not user_id:
-            return jsonify({"success": False, "message": "Нет user_id"})
+            return jsonify({"success": False, "message": "Нет подписи Telegram"}), 401
             
         # Ищем все анкеты пользователя
         posts = list(db['posts'].find({"user_id": int(user_id)}))
@@ -1120,84 +1179,190 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
 # 👇 УНИВЕРСАЛЬНЫЙ КРИПТО-КАССИР ДЛЯ VIP, ШТРАФОВ И ГОРОДОВ 👇
     @app.route('/glaz/api/cryptobot_webhook', methods=['POST'])
     def cryptobot_webhook():
-        import random
-        from config import VIP_CHAT_ID # Подтягиваем настройки
-        
         from web_auth import verify_cryptobot_signature
         raw = request.get_data()
         if not verify_cryptobot_signature(raw, request.headers.get("crypto-pay-api-signature", "")):
             return jsonify({"status": "forbidden"}), 403
-        data = json.loads(raw)
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            return jsonify({"status": "bad json"}), 400
         if not data or data.get("update_type") != "invoice_paid":
             return jsonify({"status": "ignored"}), 200
-            
-        invoice = data.get("payload", {})
-        payload_str = invoice.get("payload", "") 
-        amount_rub = float(invoice.get("amount", 0))
+
+        invoice = data.get("payload", {}) or {}
+        payload_str = str(invoice.get("payload", ""))
+        try:
+            amount_rub = float(invoice.get("amount", 0))
+        except (TypeError, ValueError):
+            amount_rub = 0.0
+        invoice_id = str(invoice.get("invoice_id") or data.get("update_id") or "")
+
+        # CryptoBot повторяет вебхук, если ответ не дошёл. Раньше повтор выдавал доступ/ссылки
+        # и писал доход ещё раз. Теперь каждый счёт обрабатывается один раз.
+        if invoice_id:
+            try:
+                db['crypto_payments'].insert_one({"_id": invoice_id, "payload": payload_str, "amount_rub": amount_rub,
+                                                  "asset": invoice.get("paid_asset"), "ts": time.time()})
+            except DuplicateKeyError:
+                return jsonify({"status": "duplicate"}), 200
+
+        try:
+            _process_crypto_invoice(payload_str, amount_rub)
+        except Exception as e:
+            # Снимаем отметку, чтобы CryptoBot прислал вебхук ещё раз
+            if invoice_id:
+                db['crypto_payments'].delete_one({"_id": invoice_id})
+            add_radar_log(f"⚠️ Ошибка крипто-кассы ({payload_str}): {e}")
+            from core.diag import log_error; log_error("Крипто-касса (упала)", f"{payload_str}: {e}")
+            print(f"cryptobot_webhook error: {e}")
+            return jsonify({"status": "error"}), 500
+        return jsonify({"status": "ok"}), 200
+
+    def _rub_ok(amount_rub, price_stars):
+        """Крипто-счёт выставляется в рублях: звёзды × 1.8. Допуск 1₽ на округление."""
+        return amount_rub + 1 >= int(price_stars * 1.8)
+
+    def _staff(text):
+        if text.startswith("⚠️") or text.startswith("🚨"):
+            from core.diag import log_error
+            log_error("Крипто-касса", text.replace("**", "").replace("`", ""))
+        try: bot.send_message(STAFF_GROUP_ID, text, parse_mode="Markdown")
+        except Exception:
+            try: bot.send_message(STAFF_GROUP_ID, text)
+            except Exception: pass
+
+    def _process_crypto_invoice(payload_str, amount_rub):
+        import random
+        from config import BEYOND_CHAT_ID
+        from handlers.vip import grant_vip_access, expected_vip_price, is_fine_eligible
+        # ВАЖНО: раньше внутри функции стоял `import time` (в ветке BEYOND), из-за чего Python считал
+        # time локальной переменной, и ветки рекламы и донатов падали с UnboundLocalError:
+        # оплаченная криптой реклама не записывалась вообще.
 
         # 👑 1. ОПЛАТА VIP-КЛУБА
         if payload_str.startswith("vip_"):
             uid = int(payload_str.replace("vip_", ""))
-            db['vip_funnel'].delete_one({"_id": uid})
-            try:
-                users_collection.update_one({"_id": uid}, {"$set": {"is_vip": True}}, upsert=True)
-                unmute_user_everywhere(uid)
-                unban_user_everywhere(uid)
-                users_collection.update_one({"_id": uid}, {"$unset": {"shame_tag": ""}})
-                archive_collection.update_one({"target": str(uid)}, {"$unset": {"banned_in_support": "", "strikes": ""}})
-            except Exception as e: print(e)
-            
-            try: 
-                bot.send_message(STAFF_GROUP_ID, f"🤑 **УСПЕШНАЯ ОПЛАТА VIP КРИПТОЙ!**\nЮзер: `{uid}`\nСумма: {amount_rub} руб.")
-                invite = bot.create_chat_invite_link(VIP_CHAT_ID, member_limit=1)
-                bot.send_message(uid, f"🎉 **Крипто-оплата успешно получена!**\n👉 [ВХОД В VIP-КЛУБ]({invite.invite_link})", parse_mode="Markdown", disable_web_page_preview=True)
-            except: pass
+            expected = expected_vip_price(uid)
+            if not _rub_ok(amount_rub, expected):
+                # Цена в кнопках раньше подделывалась — сверяем с серверной ценой заявки
+                _staff(f"⚠️ **Крипто-оплата VIP меньше цены!**\nЮзер `{uid}` заплатил {amount_rub}₽, ожидалось {int(expected * 1.8)}₽. Доступ НЕ выдан, решите вручную.")
+                try: bot.send_message(uid, "⚠️ Сумма оплаты не совпала с ценой VIP. Администрация свяжется с вами.")
+                except Exception: pass
+                return
+            db['daily_revenue'].insert_one({"type": "vip", "amount": amount_rub, "currency": "RUB", "uid": uid, "timestamp": time.time(), "date": datetime.now().strftime("%d.%m.%Y")})
+            grant_vip_access(bot, uid, unmute_user_everywhere, unban_user_everywhere, f"крипта: {amount_rub}₽")
+
+        # 🏳️‍🌈 1.4. ШТРАФ BEYOND (раньше попадал в ветку beyond_ и падал на int("fine_123"))
+        elif payload_str.startswith("beyond_fine_"):
+            uid = int(payload_str.replace("beyond_fine_", ""))
+            pricing = db['settings'].find_one({"_id": "skynet_pricing"}) or {}
+            price = int(pricing.get("beyond_price", 250))
+            ban = banned_collection.find_one({"_id": uid})
+            if not _rub_ok(amount_rub, price):
+                _staff(f"⚠️ **Штраф BEYOND (крипта) меньше цены!** Юзер `{uid}`: {amount_rub}₽ вместо {int(price * 1.8)}₽. Бан НЕ снят.")
+                return
+            if not ban or not is_fine_eligible(ban.get("reason")):
+                _staff(f"⚠️ **Штраф BEYOND оплачен криптой ({amount_rub}₽)**, но у `{uid}` " + ("нет бана" if not ban else "тяжёлый бан") + ". Ничего не снято — решите вручную.")
+                try: bot.send_message(uid, "ℹ️ Оплата штрафа получена. Администрация проверит её вручную и свяжется с вами.")
+                except Exception: pass
+                return
+            db['daily_revenue'].insert_one({"type": "fine", "amount": amount_rub, "currency": "RUB", "uid": uid, "timestamp": time.time(), "date": datetime.now().strftime("%d.%m.%Y"), "source": "crypto_beyond"})
+            banned_collection.delete_one({"_id": uid})
+            db['skynet_tasks'].insert_one({"uid": uid, "action": "fine_unban", "amount": price, "timestamp": time.time(), "source": "beyond_crypto"})
+            users_collection.update_one({"_id": uid}, {"$set": {"fine_paid_pending_beyond": True}}, upsert=True)
+            _staff(f"🏳️‍🌈 **ШТРАФ BEYOND ОПЛАЧЕН КРИПТОЙ!**\nЮзер: `{uid}`\nСумма: {amount_rub} руб.")
+            try: bot.send_message(uid, "✅ **Штраф оплачен!**\nВернитесь в бот BEYOND и нажмите /start, чтобы подать анкету с чистого листа.", parse_mode="Markdown")
+            except Exception: pass
 
         # 🏳️‍🌈 1.5. ОПЛАТА BEYOND КЛУБА
         elif payload_str.startswith("beyond_"):
             uid = int(payload_str.replace("beyond_", ""))
+            funnel = db['beyond_funnel'].find_one({"_id": uid}) or {}
+            pricing = db['settings'].find_one({"_id": "skynet_pricing"}) or {}
+            price = int(funnel.get("price") or pricing.get("beyond_price", 250))
+            step = funnel.get("step")
+            problem = None
+            if not _rub_ok(amount_rub, price):
+                problem = f"сумма {amount_rub}₽ меньше цены {int(price * 1.8)}₽"
+            elif banned_collection.find_one({"_id": uid}):
+                problem = "активный бан в сети"   # как в BEYOND-боте: оплата больше не снимает любой бан
+            elif not funnel or (step is not None and step not in ("waiting_payment", "paying", "decided")):
+                problem = f"заявка не на шаге оплаты (шаг: {step or 'нет анкеты'})"
+            if problem:
+                _staff(f"⚠️ **Оплата BEYOND криптой ({amount_rub}₽) от** `{uid}`: доступ НЕ выдан — {problem}. Решите вручную.")
+                try: bot.send_message(uid, "ℹ️ Оплата получена, но доступ требует ручной проверки. Администрация свяжется с вами.")
+                except Exception: pass
+                return
+
+            users_collection.update_one(
+                {"_id": uid},
+                {"$set": {"is_queer": True, "beyond_access": True, "beyond_joined_at": time.time(), "custom_tag": "𝐐𝐔𝐄𝐄𝐑 ♛"},
+                 "$unset": {"shame_tag": "", "fine_paid_pending_beyond": "", "beyond_verdict": "", "beyond_verdict_at": ""}},
+                upsert=True
+            )
             db['beyond_funnel'].delete_one({"_id": uid})
-            
-            # Выдаем права
-            users_collection.update_one({"_id": uid}, {"$set": {"is_queer": True, "custom_tag": "𝐐𝐔𝐄𝐄𝐑 ♛"}, "$unset": {"shame_tag": ""}}, upsert=True)
-            
-            # Приказ Скайнету на амнистию
-            import time
-            db['skynet_tasks'].insert_one({"uid": uid, "action": "full_unban", "timestamp": time.time()})
-            
-            try: 
-                bot.send_message(STAFF_GROUP_ID, f"🏳️‍🌈 **ОПЛАТА BEYOND (КРИПТА)!**\nЮзер: `{uid}`\nСумма: {amount_rub} руб.")
-                from config import BEYOND_CHAT_ID # Подтягиваем ID чата
-                invite = bot.create_chat_invite_link(BEYOND_CHAT_ID, member_limit=1)
-                
-                bot.send_message(uid, f"🎉 **Крипто-оплата BEYOND успешно получена!**\n\nСкайнет снимает ограничения.\n👉 [ВХОД В BEYOND]({invite.invite_link})", parse_mode="Markdown", disable_web_page_preview=True)
-            except: pass
+            db['daily_revenue'].insert_one({"type": "beyond", "amount": amount_rub, "currency": "RUB", "uid": uid, "timestamp": time.time(), "date": datetime.now().strftime("%d.%m.%Y")})
+            _staff(f"🏳️‍🌈 **ОПЛАТА BEYOND (КРИПТА)!**\nЮзер: `{uid}`\nСумма: {amount_rub} руб.")
+            try:
+                invite = bot.create_chat_invite_link(BEYOND_CHAT_ID, member_limit=1, expire_date=int(time.time()) + 7 * 86400)
+                bot.send_message(uid, f"🎉 **Крипто-оплата BEYOND успешно получена!**\n\n👉 [ВХОД В BEYOND]({invite.invite_link})", parse_mode="Markdown", disable_web_page_preview=True)
+            except Exception as e:
+                _staff(f"🚨 Не удалось выдать ссылку BEYOND юзеру `{uid}`: {e}")
 
         # 🚨 2. ОПЛАТА ШТРАФА (АМНИСТИЯ)
         elif payload_str.startswith("fine_"):
             uid = int(payload_str.replace("fine_", ""))
+            # Секретарь теперь запоминает сумму выставленного штрафа (pay_offers). Сверяем.
+            offer = db['pay_offers'].find_one({"_id": f"{uid}:fine"})
+            if offer and not _rub_ok(amount_rub, int(offer.get("amount", 0))):
+                _staff(f"⚠️ **Штраф криптой меньше выставленного!** `{uid}`: {amount_rub}₽ вместо {int(offer['amount'] * 1.8)}₽. Разбан НЕ выполнен.")
+                return
+            db['pay_offers'].delete_one({"_id": f"{uid}:fine"})
+            db['daily_revenue'].insert_one({"type": "fine", "amount": amount_rub, "currency": "RUB", "uid": uid, "timestamp": time.time(), "date": datetime.now().strftime("%d.%m.%Y")})
             now = datetime.now()
             ticket_num = now.strftime("%d%m%Y%H%M%S") + f"-{random.randint(100, 999)}"
-            
-            db['skynet_tasks'].insert_one({"uid": uid, "action": "fine_unban", "timestamp": now})
+            # Сумму передаём в звёздах: по ней Скайнет выдаёт теги «Свободен» (650⭐️) / «Спонсор» (750⭐️).
+            # Раньше её не было, и тег брался по последнему ЗВЁЗДНОМУ платежу юзера.
+            stars_equiv = int(round(amount_rub / 1.8))
+            db['skynet_tasks'].insert_one({"uid": uid, "action": "fine_unban", "amount": stars_equiv, "timestamp": now})
             archive_collection.update_one({"target": str(uid)}, {"$push": {"history": {"date": now.strftime("%d.%m.%Y %H:%M"), "action": "Разблокировка (Крипта)", "reason": "Штраф оплачен"}}}, upsert=True)
-            
-            # 👇 ДОСТАЕМ THREAD_ID ДЛЯ ЗАКРЫТИЯ ТОПИКА 👇
+
             user_data = db['paid_users'].find_one({"uid": uid})
             thread_id = user_data.get("thread_id") if user_data else None
-            
             db['paid_users'].update_one({"uid": uid}, {"$set": {"status": 0}, "$unset": {"topic_type": ""}})
-            
+
             try:
-                # Отправляем отчет прямо в топик и ЗАКРЫВАЕМ его
                 if thread_id:
-                    bot.send_message(STAFF_GROUP_ID, f"🤑 **ШТРАФ ОПЛАЧЕН КРИПТОЙ!**\nЮзер: `{uid}`\nСумма: {amount_rub} руб.", message_thread_id=thread_id)
+                    bot.send_message(STAFF_GROUP_ID, f"🤑 **ШТРАФ ОПЛАЧЕН КРИПТОЙ!**\nЮзер: `{uid}`\nСумма: {amount_rub} руб.", message_thread_id=thread_id, parse_mode="Markdown")
                     bot.close_forum_topic(STAFF_GROUP_ID, thread_id)
                 else:
-                    bot.send_message(STAFF_GROUP_ID, f"🤑 **ШТРАФ ОПЛАЧЕН КРИПТОЙ!**\nЮзер: `{uid}`\nСумма: {amount_rub} руб.")
-                    
+                    bot.send_message(STAFF_GROUP_ID, f"🤑 **ШТРАФ ОПЛАЧЕН КРИПТОЙ!**\nЮзер: `{uid}`\nСумма: {amount_rub} руб.", parse_mode="Markdown")
                 bot.send_message(uid, f"✅ **Оплата штрафа получена!**\n\nОграничения сняты. Уникальный номер: `{ticket_num}`\n*Больше не нарушайте правила!*", parse_mode="Markdown")
-            except: pass
+            except Exception: pass
+
+        # 📜 2.5 ИНДУЛЬГЕНЦИЯ КРИПТОЙ (Секретарь выставлял такой счёт, но Скайнет его не обрабатывал:
+        # деньги приходили, а человеку ничего не выдавалось). Логика — как у оплаты звёздами в Секретаре.
+        elif payload_str.startswith("indulgence_"):
+            uid = int(payload_str.replace("indulgence_", ""))
+            offer = db['pay_offers'].find_one({"_id": f"{uid}:indulgence"})
+            price = int(offer.get("amount", 2000)) if offer else 2000
+            if not _rub_ok(amount_rub, price):
+                _staff(f"⚠️ **Индульгенция криптой меньше цены!** `{uid}`: {amount_rub}₽ вместо {int(price * 1.8)}₽. Не выдана.")
+                return
+            db['pay_offers'].delete_one({"_id": f"{uid}:indulgence"})
+            db['daily_revenue'].insert_one({"type": "indulgence", "amount": amount_rub, "currency": "RUB", "uid": uid, "timestamp": time.time(), "date": datetime.now().strftime("%d.%m.%Y")})
+            db['paid_users'].update_one({"uid": uid}, {"$set": {"status": 0, "strikes": 0}, "$inc": {"immunity": 10}, "$unset": {"topic_type": ""}}, upsert=True)
+            from core.janitor import log_points
+            log_points(uid, "immunity", 10, reason="indulgence_crypto")
+            # Только снятие бана + иммунитет. Раньше ставились is_vip/is_queer → доступ в VIP-чат и BEYOND
+            users_collection.update_one({"_id": uid}, {"$set": {"custom_tag": "Индульгенция", "indulgence": True}}, upsert=True)
+            db['skynet_tasks'].insert_one({"uid": uid, "action": "full_unban", "timestamp": datetime.now()})
+            now = datetime.now()
+            archive_collection.update_one({"target": str(uid)}, {"$push": {"history": {"date": now.strftime("%d.%m.%Y %H:%M"), "action": "📜 Куплена Индульгенция (крипта)", "reason": f"Оплата {amount_rub}₽"}}}, upsert=True)
+            _staff(f"📜 **ИНДУЛЬГЕНЦИЯ КРИПТОЙ!** Юзер `{uid}`, {amount_rub}₽. Скайнет снимает ограничения.")
+            try: bot.send_message(uid, "🎉 **Грехи отпущены!**\n\nОплата получена, все блокировки снимаются, начислено 10 Щитов Иммунитета.", parse_mode="Markdown")
+            except Exception: pass
 
         # 🏙 3. ОПЛАТА ДОСТУПА К ГОРОДУ
         elif payload_str.startswith("city_"):
@@ -1205,38 +1370,41 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             parts = payload_str.split("_", 2)
             uid = int(parts[1])
             purchased_city = parts[2]
-            
             users_collection.update_one({"_id": uid}, {"$addToSet": {"purchased_cities": purchased_city}}, upsert=True)
+            db['daily_revenue'].insert_one({"type": "city", "amount": amount_rub, "currency": "RUB", "uid": uid, "timestamp": time.time(), "date": datetime.now().strftime("%d.%m.%Y")})
             try:
-                bot.send_message(STAFF_GROUP_ID, f"🤑 **ПРОПУСК В ГОРОД КРИПТОЙ!**\nЮзер: `{uid}`\nГород: {purchased_city}")
+                bot.send_message(STAFF_GROUP_ID, f"🤑 **ПРОПУСК В ГОРОД КРИПТОЙ!**\nЮзер: `{uid}`\nГород: {purchased_city}", parse_mode="Markdown")
                 bot.send_message(uid, f"🎉 **Оплата получена!** Доступ к городу **{purchased_city}** открыт.\n\n*Так как ссылки одноразовые, отправьте боту команду /start или нажмите на кнопку выбора города еще раз, чтобы получить их.*", parse_mode="Markdown")
-            except: pass
+            except Exception: pass
 
         # 📢 4. ОПЛАТА РЕКЛАМЫ
         elif payload_str.startswith("ad_access_"):
             # Расшифровываем маячок: ad_access_7_mk_Екатеринбург___123456789
             actual_payload, uid_str = payload_str.split("___")
             uid = int(uid_str)
-            
+
             # Пишем доход
-            db['daily_revenue'].insert_one({"type": "ads", "amount": amount_rub, "timestamp": time.time(), "date": datetime.now().strftime("%d.%m.%Y")})
-            
+            db['daily_revenue'].insert_one({"type": "ads", "amount": amount_rub, "currency": "RUB", "uid": uid, "timestamp": time.time(), "date": datetime.now().strftime("%d.%m.%Y")})
+
+            # Разбор — один в один как в боте МП (mpserv.py). Раньше VIP-реклама (ad_access_vip_...)
+            # роняла этот обработчик, а у купленной криптой рекламы не было can_post_links и напоминаний.
             has_pin = "_pin" in actual_payload
-            clean_payload = actual_payload.replace("_pin", "")
+            is_vip_ad = "_vip" in actual_payload
+            clean_payload = actual_payload.replace("ad_access_vip_", "").replace("ad_access_", "").replace("_pin", "")
             parts = clean_payload.split('_')
-            
-            if "discount" in actual_payload:
-                days = int(parts[3])
-                net_key = parts[4]
-                city = parts[5]
-                promo_code = parts[6]
+
+            if parts[0] == "discount":
+                days = int(parts[1])
+                net_key = parts[2]
+                city = parts[3]
+                promo_code = parts[4]
                 db['promocodes'].update_one({"_id": promo_code}, {"$inc": {"used_count": 1}})
             else:
-                days = int(parts[2])
-                net_key = parts[3]
-                city = parts[4]
-                
-            names = {"mk": "Мужской Клуб", "parni": "ПАРНИ 18+", "ns": "НС", "rainbow": "Радуга", "gayznak": "Гей Знакомства"}
+                days = int(parts[0])
+                net_key = parts[1]
+                city = parts[2]
+
+            names = {"mk": "Мужской Клуб", "parni": "ПАРНИ 18+", "ns": "НС", "rainbow": "Радуга", "gayznak": "Гей Знакомства", "all": "Все сети"}
             network = names.get(net_key, net_key)
 
             # Вычисляем срок годности по Екатеринбургу (как в mpserv.py)
@@ -1253,44 +1421,52 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                 "city": city,
                 "end_date": end_date,
                 "purchase_date": now_ekb,
-                "has_pin": has_pin 
+                "has_pin": has_pin,
+                "can_post_links": is_vip_ad,
+                "notified_72h": days <= 3,
+                "notified_24h": days <= 1,
+                "notified_3h": False,
             })
-            
+            db['users'].update_one({"_id": uid}, {"$unset": {"temp_ad_type": ""}})
+
             try:
                 bot.send_message(STAFF_GROUP_ID, f"💰 **Новая продажа Рекламы (КРИПТА)!**\nЮзер: `{uid}`\nСеть: **{network}**\nГород: **{city}**\nСрок: **{days}** дн.", parse_mode="Markdown")
-            except: pass
+            except Exception: pass
 
             try:
                 bot.send_message(uid, f"✅ **Оплата успешно получена!**\n\nДоступ к сети **{network}** ({city}) открыт на {days} дней.\nНажмите «Создать новое объявление».", parse_mode="Markdown")
-            except: pass
+            except Exception: pass
 
         # 💖 5. ДОНАТЫ (ЧАЕВЫЕ)
         elif payload_str.startswith("donation_"):
             uid = int(payload_str.replace("donation_", ""))
-            
+
             # Записываем деньги в кассу (amount_rub получаем от CryptoBot)
             db['daily_revenue'].insert_one({
-                "type": "donation", 
-                "amount": amount_rub, 
-                "timestamp": time.time(), 
+                "type": "donation",
+                "amount": amount_rub,
+                "currency": "RUB",
+                "uid": uid,
+                "timestamp": time.time(),
                 "date": datetime.now().strftime("%d.%m.%Y")
             })
-            
+
             try:
                 bot.send_message(
-                    uid, 
-                    f"💖 **Огромное спасибо за ваш крипто-донат ({amount_rub} руб.)!**\nЭти средства очень помогут нашему проекту развиваться.", 
+                    uid,
+                    f"💖 **Огромное спасибо за ваш крипто-донат ({amount_rub} руб.)!**\nЭти средства очень помогут нашему проекту развиваться.",
                     parse_mode="Markdown"
                 )
                 bot.send_message(
-                    STAFF_GROUP_ID, 
-                    f"💸 **КРИПТО-ДОНАТ!** Пользователь `{uid}` только что отправил чаевые: **{amount_rub} руб.**! 🎉", 
+                    STAFF_GROUP_ID,
+                    f"💸 **КРИПТО-ДОНАТ!** Пользователь `{uid}` только что отправил чаевые: **{amount_rub} руб.**! 🎉",
                     parse_mode="Markdown"
                 )
-            except: 
+            except Exception:
                 pass
+        else:
+            _staff(f"⚠️ Неизвестный крипто-платёж `{payload_str}` на {amount_rub}₽. Проверьте вручную.")
 
-        return jsonify({"status": "ok"}), 200
     # 👆 ============================================================== 👆
 
     # 👇 РОУТЫ ДЛЯ РЕДАКТОРА ШАБЛОНОВ И БАЗЫ ЗНАНИЙ ИИ 👇
@@ -1385,6 +1561,9 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             }},
             upsert=True
         )
+        from core.janitor import log_points
+        for fld, key in (("bounty_points", "points"), ("jackpot_shards", "shards"), ("immunity", "immunity")):
+            log_points(uid, fld, op="set", value=int(data.get(key, 0)), reason=f"web_admin:{session.get('login', '?')}")
         add_radar_log(f"💰 Web-Изменение инвентаря у юзера {uid}")
         return jsonify({"success": True})
 

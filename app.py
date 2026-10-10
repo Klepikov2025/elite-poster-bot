@@ -17,6 +17,13 @@ import re
 import time
 import difflib
 import threading
+import logging
+from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
+from core.guards import is_staff, is_staff_admin, deny_callback, acquire_lease, safe_delete
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("skynet")  # раньше logger не был объявлен: демоны CPA падали на первой же записи в лог
 
 
 # ====================== НОВЫЕ МОДУЛИ ======================
@@ -70,6 +77,21 @@ safe_from_autoban = set()
 
 # 📡 ЖИВОЙ РАДАР (Теперь использует общую базу данных MongoDB)
 def add_radar_log(text):
+    # Тумблер «Живой Радар»: события безопасности (входы в панель и т.п.) пишутся всегда
+    try:
+        if not SkynetSettings.get().get("radar_logging", True) and not str(text).startswith(("🔐", "🔑", "⚠️", "🚫", "🚨")):
+            return
+    except Exception:
+        pass
+    # Кто из админов нажал кнопку в веб-панели (раньше в логе было не понять — вы или MKprinc)
+    try:
+        from flask import has_request_context
+        if has_request_context() and request.path.startswith("/glaz") and session.get("login"):
+            from core.diag import log_admin
+            log_admin(session.get("login"), text)
+            text = f"[{session.get('login')}] {text}"
+    except Exception:
+        pass
     now = datetime.now(pytz.timezone('Asia/Yekaterinburg')).strftime("%H:%M:%S")
     # Пишем напрямую в матрицу, чтобы все процессы сервера это видели
     db['radar_logs'].insert_one({
@@ -110,6 +132,39 @@ def is_banned_in_network(user_id):
         except: pass 
     return False
 
+def is_indulgence(user_data):
+    """Купленная Индульгенция: снятие бана + иммунитет от автоматики, без доступа в премиум-чаты."""
+    return bool(user_data.get("indulgence") or user_data.get("custom_tag") == "Индульгенция")
+
+
+def migrate_indulgence_flags():
+    """Разовая миграция. Раньше Индульгенция ставила is_vip и is_queer, и человек проходил в VIP-чат
+    и в BEYOND. Оставляем флаги только тем, кто реально состоит в этих чатах."""
+    if db['settings'].find_one({"_id": "migration_indulgence_v1"}):
+        return
+    if not acquire_lease("migration_indulgence", 3600):
+        return
+    fixed = 0
+    for u in users_collection.find({"custom_tag": "Индульгенция"}):
+        uid = u["_id"]
+        upd = {"indulgence": True}
+        for flag, chat in (("is_vip", VIP_CHAT_ID), ("is_queer", BEYOND_CHAT_ID)):
+            if not u.get(flag):
+                continue
+            try:
+                m = bot.get_chat_member(chat, uid)
+                inside = m.status in ("member", "administrator", "creator") or (m.status == "restricted" and getattr(m, "is_member", False))
+            except Exception:
+                inside = True  # не смогли проверить — не трогаем
+            if not inside:
+                upd[flag] = False
+                fixed += 1
+        users_collection.update_one({"_id": uid}, {"$set": upd})
+        time.sleep(0.1)
+    db['settings'].update_one({"_id": "migration_indulgence_v1"}, {"$set": {"done": time.time(), "fixed_flags": fixed}}, upsert=True)
+    add_radar_log(f"📜 Миграция Индульгенции: снято лишних VIP/QUEER-флагов: {fixed}")
+
+
 def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup.add(types.KeyboardButton("Создать новое объявление"))
@@ -137,9 +192,7 @@ def safe_set_tag(chat_id, user_id, tag):
 def is_real_vip(user_id: int) -> bool:
     """Надёжная проверка VIP-статуса по живому состоянию в чате"""
     # 👇 НОВАЯ ЗАЩИТА ИНДУЛЬГЕНЦИИ (Верим базе на слово) 👇
-    user_data = users_collection.find_one({"_id": user_id}) or {}
-    if user_data.get("custom_tag") == "Индульгенция":
-        return True
+    # Индульгенция — снятие бана и иммунитет, а не VIP: VIP-публикации ей не положены
     # 👆 ================================================ 👆
     
     try:
@@ -181,24 +234,44 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
 
     user_id = message.from_user.id
     chat_id = message.chat.id
-    
+
+    # 🔐 Платные клубы обслуживают свои боты. Раньше Скайнет одобрял сюда любую заявку
+    # от VIP/QUEER, и VIP попадал в BEYOND в обход анкеты BEYOND-бота.
+    if chat_id == BEYOND_CHAT_ID:
+        return
+    if chat_id == VIP_CHAT_ID:
+        try:
+            u = users_collection.find_one({"_id": user_id}) or {}
+            if u.get("is_vip") and not banned_collection.find_one({"_id": user_id}):
+                bot.approve_chat_join_request(chat_id, user_id)
+        except Exception as e:
+            print(f"Таможня VIP: {e}")
+        return
+
     # 👇 1. СИСТЕМА УЧЕТА CPA ТРАФИКА (ПЕРЕХВАТ ССЫЛКИ + АНТИФРОД) 👇
+    agent_id = None
     if message.invite_link and message.invite_link.name and message.invite_link.name.startswith("cpa_"):
-        agent_id = int(message.invite_link.name.split("_")[1])
-        
-        # Ищем, был ли этот юзер когда-либо в нашей базе
-        existing_traffic = db['cpa_traffic'].find_one({"new_user_id": user_id})
-        
-        if not existing_traffic:
-            # ✅ ЮЗЕР УНИКАЛЬНЫЙ!
-            db['cpa_traffic'].insert_one({
-                "new_user_id": user_id,
-                "agent_id": agent_id, 
-                "status": "hold", 
-                "join_time": time.time(), 
-                "chat_id": chat_id
-            })
-            
+        try:
+            agent_id = int(message.invite_link.name.split("_")[1])
+        except (IndexError, ValueError):
+            agent_id = None
+    if agent_id and agent_id != user_id:
+        # Уже знакомый сети человек (писал в чатах / привязан к городу / в ЧС) — не новый лид
+        known = users_collection.find_one({"_id": user_id, "$or": [
+            {"main_city": {"$exists": True}}, {"first_seen": {"$exists": True}}]})
+        is_new_lead = False
+        if not known and not banned_collection.find_one({"_id": user_id}):
+            # Атомарно: две заявки подряд (в два чата) больше не создают два лида
+            res = db['cpa_traffic'].update_one(
+                {"new_user_id": user_id},
+                {"$setOnInsert": {"new_user_id": user_id, "agent_id": agent_id, "status": "hold",
+                                  "join_time": time.time(), "chat_id": chat_id}},
+                upsert=True
+            )
+            is_new_lead = res.upserted_id is not None
+
+        if is_new_lead:
+
             # 1. Радуем Агента быстрым дофамином
             try:
                 bot.send_message(
@@ -216,6 +289,9 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
                     {"$inc": {"bounty_points": 50, "immunity": 1}}, 
                     upsert=True
                 )
+                from core.janitor import log_points
+                log_points(user_id, "bounty_points", 50, reason="cpa_welcome_box")
+                log_points(user_id, "immunity", 1, reason="cpa_welcome_box")
                 
                 # Достаем имя агента для красивого приветствия
                 agent_info = db['users'].find_one({"_id": agent_id}) or {}
@@ -241,8 +317,12 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
 
         else:
             # ❌ ЮЗЕР УЖЕ ЕСТЬ В СЕТИ (Или зашел по ссылке другого агента ранее)
-            # Просто тихо плюсуем счетчик "Дубликаты"
-            db['paid_users'].update_one({"uid": agent_id}, {"$inc": {"cpa_duplicates": 1}}, upsert=True)
+            # Просто тихо плюсуем счетчик "Дубликаты" (один раз на пару агент+юзер)
+            try:
+                db['cpa_duplicates_seen'].insert_one({"_id": f"{agent_id}_{user_id}"})
+                db['paid_users'].update_one({"uid": agent_id}, {"$inc": {"cpa_duplicates": 1}}, upsert=True)
+            except DuplicateKeyError:
+                pass
     # 👆 ============================================================= 👆
     
     # 1. ФИКСИРУЕМ ЗАЯВКУ В СТАТИСТИКЕ (Строго 1 раз за весь период!)
@@ -276,7 +356,7 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
             return
 
         # --- 🕊️ ЛОКАЛЬНАЯ АМНИСТИЯ ПАРНИ (Размут ТОЛЬКО в 18+) ---
-        if chat_id in PARNI_CHATS:
+        if chat_id in PARNI_CHATS and SkynetSettings.get().get("parni_autounmute", True):
             user_data = users_collection.find_one({"_id": user_id}) or {}
             last_reason = user_data.get("last_mute_reason", "")
             
@@ -295,7 +375,8 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
 
         # --- ФАЗА 1: Режим БОГА (VIP и BEYOND) ---
         user_data = users_collection.find_one({"_id": user_id}) or {}
-        is_privileged = user_data.get("is_vip", False) or user_data.get("is_queer", False)
+        # Индульгенция: таможня пропускает во все города (но не в VIP/BEYOND — они отсечены выше)
+        is_privileged = user_data.get("is_vip", False) or user_data.get("is_queer", False) or is_indulgence(user_data)
         
         if not is_privileged:
             for priv_chat in [VIP_CHAT_ID, BEYOND_CHAT_ID]:
@@ -319,8 +400,11 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
         # --- ФАЗА 0: Санитарный контроль (БИО) [ТОЛЬКО ДЛЯ ОБЫЧНЫХ ЮЗЕРОВ] ---
         settings = SkynetSettings.get()
         if settings.get("bio_hardcheck", True):
-            user_info = bot.get_chat(user_id)
-            bio = user_info.bio.lower() if user_info.bio else ""
+            try:
+                user_info = bot.get_chat(user_id)
+                bio = user_info.bio.lower() if user_info.bio else ""
+            except Exception:
+                bio = ""  # раньше ошибка API тут обрывала таможню, и заявка висела вечно
             
             allowed_links = ["anonquebot", "secretmessagebot", "askbot", "contactme", "voprosy"]
             has_bad_link = ("t.me/" in bio or "http" in bio) and not any(allowed in bio for allowed in allowed_links)
@@ -478,7 +562,7 @@ def start(message):
         # 1. Ловим реферальную ссылку (t.me/bot?start=ref_12345)
         start_params = message.text.split()
         is_referral = False
-        if len(start_params) > 1 and start_params[1].startswith('ref_'):
+        if len(start_params) > 1 and start_params[1].startswith('ref_') and SkynetSettings.get().get("referral_system", True):
             ref_id = int(start_params[1].replace('ref_', ''))
             
             # Проверяем, не переходил ли он уже по ссылке ранее (защита от накрутки)
@@ -541,9 +625,10 @@ def ban_user_everywhere(target_id, reason="Без причины", admin_name="�
                 return 0
         # ---------------------------------------------
         
-        # ЗАЩИТА VIP И QUEER (ОТ ВСЕГО)
-        if user_data.get("is_vip", False) or user_data.get("is_queer", False):
-            status_name = "🏳️‍🌈 BEYOND" if user_data.get("is_queer") else "👑 VIP"
+        # ЗАЩИТА VIP И QUEER (ОТ ВСЕГО) + ИНДУЛЬГЕНЦИЯ (от всего, кроме тяжёлых статей)
+        heavy = any(k in str(reason).upper() for k in ["КРАСНАЯ ЗОНА", "ЧЕРНАЯ ЗОНА", "ЧЁРНАЯ ЗОНА", "НАРКОТ", "<18", "НЕСОВЕРШЕННОЛЕТ", "ЦП"])
+        if user_data.get("is_vip", False) or user_data.get("is_queer", False) or (is_indulgence(user_data) and not heavy):
+            status_name = "🏳️‍🌈 BEYOND" if user_data.get("is_queer") else ("👑 VIP" if user_data.get("is_vip") else "📜 Индульгенция")
             who_tried = admin_name if admin_name else "Система"
             
             alert_text = (
@@ -628,8 +713,8 @@ def ban_user_everywhere(target_id, reason="Без причины", admin_name="�
     archive_collection.update_one(
         {"target": str(target_id)}, 
         {"$push": {"history": {
-            "date": now_str, 
-            "action": "Глобальный МУТ (Скайнет)", 
+            "date": now_str,
+            "action": "Глобальный БАН (Скайнет)",  # раньше бан записывался в досье как «МУТ»
             "reason": reason,
             # 🔥 И СЮДА ДОБАВЛЯЕМ УЛИКУ 🔥
             "evidence_summary": trigger_text if trigger_text and trigger_text != "Без текста (медиа)" else "Отсутствует"
@@ -637,12 +722,11 @@ def ban_user_everywhere(target_id, reason="Без причины", admin_name="�
         upsert=True
     )
     # ===========================================
-    
-    return len(banned_in)
-    
-    # 📡 ОТПРАВЛЯЕМ СИГНАЛ В WEB-РАДАР
-    add_radar_log(f"💥 БАН ({admin_name}): {target_id} | {reason}")
-    
+
+    # 📡 ОТПРАВЛЯЕМ СИГНАЛ В WEB-РАДАР (раньше стоял после return и не выполнялся)
+    try: add_radar_log(f"💥 БАН ({admin_name}): {target_id} | {reason}")
+    except Exception: pass
+
     return len(banned_in)
 
 # ==================== 📩 СИСТЕМА ТИКЕТОВ (САППОРТ) ====================
@@ -777,6 +861,7 @@ def unmute_user_everywhere(target_id):
         all_chats.append(BEYOND_CHAT_ID)
     # ---------------------------------------
     
+    users_collection.update_one({"_id": target_id}, {"$unset": {"net_mute_until": "", "net_mute_reason": ""}})
     unmuted_count = 0
     for cid in all_chats:
         try:
@@ -887,12 +972,21 @@ def mute_user_everywhere(target_id, reason="Без причины", admin_name="
     # ---------------------------------------------
     
     # Достаем данные юзера из базы для проверки одноразовых щитов
-    user_paid_data = db['paid_users'].find_one({"uid": target_id}) or {}
-    
-    if not ignore_shield and user_paid_data.get("immunity", 0) > 0:
-        # 1. Списываем один щит
-        db['paid_users'].update_one({"uid": target_id}, {"$inc": {"immunity": -1}})
-        
+    # Атомарно: щит списывается, только если он есть. Раньше два мута подряд
+    # тратили один щит дважды и уводили баланс щитов в минус.
+    shield_used = None
+    if not ignore_shield:
+        shield_used = db['paid_users'].find_one_and_update(
+            {"uid": target_id, "immunity": {"$gt": 0}},
+            {"$inc": {"immunity": -1}}
+        )
+
+    if shield_used:
+        try:
+            from core.janitor import log_points
+            log_points(target_id, "immunity", -1, reason="mute_shield")
+        except Exception: pass
+
         # 2. Пишем в веб-радар
         add_radar_log(f"🛡 ЩИТ СРАБОТАЛ: {target_id} спасен от мута ({reason})")
         
@@ -917,7 +1011,11 @@ def mute_user_everywhere(target_id, reason="Без причины", admin_name="
     # 👆 ======================================================== 👆
 
     # --- СОХРАНЯЕМ ПРИЧИНУ ДЛЯ АМНИСТИИ В ПАРНЯХ ---
-    users_collection.update_one({"_id": target_id}, {"$set": {"last_mute_reason": reason}}, upsert=True)
+    # net_mute_until: общий для всех ботов флаг сетевого мута (0 = бессрочно). Раньше Секретарь видел
+    # только муты, заказанные через skynet_tasks, а муты самого Скайнета (зоны, 1 Мая, копипаст) — нет.
+    users_collection.update_one({"_id": target_id}, {"$set": {"last_mute_reason": reason,
+                                                              "net_mute_until": int(mute_time or 0),
+                                                              "net_mute_reason": reason}}, upsert=True)
     chats_to_mute = {}
     for city, cid in chat_ids_parni.items(): chats_to_mute[cid] = f"ПАРНИ 18+ | {city}"
     for city, cid in chat_ids_mk.items(): chats_to_mute[cid] = f"МК | {city}"
@@ -1018,7 +1116,8 @@ register_vip_handlers(
 
 register_post_handlers(bot, is_banned_in_network, get_main_keyboard, is_real_vip)
 register_proxy_handlers(bot, ban_user_everywhere)
-register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, safe_set_tag, add_radar_log, is_subscribed)
+ENTRY_HOOKS = {}  # заполняется ниже, когда объявлен catch_illegal_entry
+register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, safe_set_tag, add_radar_log, is_subscribed, entry_hooks=ENTRY_HOOKS)
 
 from web.support import register_support_routes
 from web.finance import register_finance_routes
@@ -1045,7 +1144,7 @@ def catch_bot_block(message):
             
             # А) Сначала проверяем по нашей базе данных (самый надежный способ)
             user_data = users_collection.find_one({"_id": user_id}) or {}
-            if user_data.get("is_vip", False) or user_data.get("is_queer", False):
+            if user_data.get("is_vip", False) or user_data.get("is_queer", False) or is_indulgence(user_data):
                 return  # Своих не трогаем, пусть блокируют бота сколько влезет
                 
             # Б) На всякий случай проверяем живое присутствие в VIP-чате
@@ -1095,6 +1194,9 @@ def catch_bot_block(message):
 
 @bot.message_handler(commands=['удали'])
 def test_kill_cookie(message):
+    # Раньше любой участник группы мог удалить чужое сообщение руками бота
+    if not is_staff_admin(bot, message.from_user.id):
+        return
     if message.reply_to_message:
         target_id = message.reply_to_message.message_id
         try:
@@ -1104,7 +1206,10 @@ def test_kill_cookie(message):
             bot.reply_to(message, f"❌ Скайнет смотрит в упор, но Телеграм не дает: {e}")
 
 # ==================== ПЕРЕХВАТЧИК "МЕРТВЫХ ДУШ" (Защита от старых заявок + Амнистия + Теги) ====================
-@bot.message_handler(content_types=['new_chat_members'])
+# ВАЖНО: в telebot срабатывает только ПЕРВЫЙ подходящий хэндлер. Фейс-контроль входа в
+# handlers/skynet.py регистрировался раньше, поэтому этот перехватчик не выполнялся никогда:
+# забаненных, которых админ одобрил вручную, никто не выкидывал, теги не восстанавливались.
+# Теперь фейс-контроль вызывает эту функцию сам (через ENTRY_HOOKS).
 def catch_illegal_entry(message):
     # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
     from config import get_network_data
@@ -1136,7 +1241,7 @@ def catch_illegal_entry(message):
             )
             try: bot.send_message(STAFF_GROUP_ID, report, parse_mode="Markdown")
             except: pass
-            return # Если юзер в бане, дальше не идем
+            continue # Если юзер в бане, дальше не идем (раньше return пропускал остальных вошедших)
 
         # 👇 НОВЫЙ БЛОК: АВТО-ВОССТАНОВЛЕНИЕ ТЕГОВ 👇
         user_data = users_collection.find_one({"_id": user_id}) or {}
@@ -1151,7 +1256,7 @@ def catch_illegal_entry(message):
         # 👆 ========================================== 👆
 
         # --- 🕊️ ЛОКАЛЬНАЯ АМНИСТИЯ ПАРНИ (Для тех, кто вошел сам или одобрен вручную) ---
-        if chat_id in PARNI_CHATS:
+        if chat_id in PARNI_CHATS and SkynetSettings.get().get("parni_autounmute", True):
             last_reason = user_data.get("last_mute_reason", "")
             
             # Если мут был за параметры (1 Мая)
@@ -1168,9 +1273,17 @@ def catch_illegal_entry(message):
                 except: pass
 # ===========================================================================================
 
+ENTRY_HOOKS["entry"] = catch_illegal_entry
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith("radar_ban_"))
 def radar_confirm_ban(call):
-    target_id = int(call.data.split("_")[2])
+    # Кнопку можно подделать (callback_data) — без проверки любой мог забанить кого угодно
+    if not is_staff_admin(bot, call.from_user.id):
+        return deny_callback(bot, call)
+    try:
+        target_id = int(call.data.split("_")[2])
+    except (IndexError, ValueError):
+        return
     admin_info = get_user_name(call.from_user)
     
     # Меняем текст сообщения, чтобы другие админы не нажали повторно
@@ -1187,11 +1300,17 @@ def vip_funnel_sniper():
     while True:
         try:
             settings = SkynetSettings.get()
-            if settings.get("vip_sniper", True):
+            # Замок: при нескольких воркерах gunicorn снайпер работал в каждом и дублировал баны
+            if settings.get("vip_sniper", True) and acquire_lease("vip_funnel_sniper", 13 * 3600):
                 now = time.time()
-                
+
                 for doc in db['vip_funnel'].find():
                     user_id = doc['_id']
+
+                    # Ход за админами (кружок на проверке) — кандидата не трогаем.
+                    # Раньше тех, кого админы не успели проверить, через 10 дней банили «за затягивание».
+                    if doc.get("stage") in ("admin_review", "deciding"):
+                        continue
                     
                     # 👇 ЗАЩИТА ОТ ДРУЖЕСТВЕННОГО ОГНЯ (ДЛЯ ДЕЙСТВУЮЩИХ ВИПОВ) 👇
                     user_data = users_collection.find_one({"_id": user_id}) or {}
@@ -1272,114 +1391,140 @@ def ai_context_checker(text, zone="black"):
 # 👆 ===================================== 👆
 
 # ==================== СЛУШАТЕЛЬ СЕКРЕТАРЯ (РАЗБАН ПО КНОПКЕ) ====================
+SKYNET_TASK_ACTIONS = ["full_unban", "fine_unban", "auto_heal", "global_unmute", "global_ban", "global_mute"]
+
+def _execute_skynet_task(task):
+    if task['action'] in ["full_unban", "fine_unban", "auto_heal"]:
+        target_uid = int(task['uid'])
+        
+        # 1. Снимаем бан и мут везде
+        unbanned = unban_user_everywhere(target_uid)
+        unmuted = unmute_user_everywhere(target_uid)
+
+        # 2. ВЫДАЕМ ИММУНИТЕТ ИЛИ ПРОСТО ЧИСТИМ ТЕГ
+        if task['action'] == "full_unban":
+            # 👇 БРОНЯ ОТ СТИРАНИЯ ТЕГОВ 👇
+            u_info = users_collection.find_one({"_id": target_uid}) or {} 
+            if not u_info.get("custom_tag"):
+                users_collection.update_one(
+                    {"_id": target_uid}, 
+                    {"$set": {"is_verified": True, "custom_tag": "Верифицирован МК"}, "$unset": {"shame_tag": ""}},
+                    upsert=True
+                )
+            else:
+                # Если тег уже есть (Элита) - просто подтверждаем вериф без стирания статуса
+                users_collection.update_one({"_id": target_uid}, {"$set": {"is_verified": True}, "$unset": {"shame_tag": ""}}, upsert=True)
+        
+        elif task['action'] == "fine_unban":
+            amount = task.get('amount') or task.get('price')
+            if not amount:
+                last_pay = db['fine_payments'].find_one({"uid": target_uid}, sort=[("timestamp", -1)])
+                amount = last_pay.get('amount', 0) if last_pay else 0
+            
+            if int(amount) == 650:
+                users_collection.update_one({"_id": target_uid}, {"$set": {"custom_tag": "Свободен"}, "$unset": {"shame_tag": ""}}, upsert=True)
+                add_radar_log(f"🎖️ Юзер {target_uid} оплатил 650⭐️ и получил тег 'Свободен'")
+            elif int(amount) == 750:
+                users_collection.update_one({"_id": target_uid}, {"$set": {"custom_tag": "Спонсор_Одобрен"}, "$unset": {"shame_tag": ""}}, upsert=True)
+                add_radar_log(f"💎 Юзер {target_uid} оплатил 750⭐️ и получил тег 'Спонсор_Одобрен'")
+            else:
+                users_collection.update_one({"_id": target_uid}, {"$unset": {"shame_tag": "", "custom_tag": ""}})
+                add_radar_log(f"🧹 Юзер {target_uid} оплатил обычный штраф ({amount}⭐️), теги сброшены")
+        
+        # 3. ОТЧЕТ В ФЛУДИЛКУ АДМИНАМ!
+        if task['action'] == "fine_unban":
+            report_text = f"💸 **Скайнет (Автоматика):**\nЮзер `{target_uid}` оплатил штраф!\nОграничения сняты. Глобально разбанен ({unbanned} чатов) и размучен ({unmuted} чатов)."
+        elif task['action'] == "auto_heal":
+            report_text = f"🛡 **Скайнет (Авто-Исцеление):**\nVIP-юзер `{target_uid}` открыл поддержку. Скайнет профилактически снял с него все возможные ограничения!\nГлобально разбанен ({unbanned} чатов) и размучен ({unmuted} чатов)."
+        else:
+            report_text = f"✅ **Скайнет (Автоматика):**\nЮзер `{target_uid}` прошел верификацию!\nГлобально разбанен ({unbanned} чатов) и размучен ({unmuted} чатов)."
+        
+        try: bot.send_message(STAFF_GROUP_ID, report_text, parse_mode="Markdown")
+        except: pass
+        
+
+    elif task['action'] == "global_unmute":
+        unmute_user_everywhere(int(task['uid']))
+    
+    # 👇 ИСПОЛНЕНИЕ ПРИКАЗОВ ОТ ШПИОНА (С ДВОЙНОЙ ПРОВЕРКОЙ ИИ) 👇
+    elif task['action'] in ["global_ban", "global_mute"]:
+        trigger_text = task.get('trigger_text', '')
+        reason = task.get('reason', 'Шпионаж')
+        
+        # 🔥 СУДЬЯ СКАЙНЕТ ПРОВЕРЯЕТ УЛИКИ АНДРЮШЕНЬКИ 🔥
+        is_guilty = True
+        if trigger_text:
+            reason_lower = reason.lower() # Приводим к нижнему регистру для надежности!
+            if "черная зона" in reason_lower:
+                is_guilty = ai_context_checker(trigger_text, zone="black")
+            elif "оранжевая зона" in reason_lower:
+                is_guilty = ai_context_checker(trigger_text, zone="orange")
+            elif "желтая зона" in reason_lower:
+                is_guilty = ai_context_checker(trigger_text, zone="yellow")
+
+        if is_guilty:
+            # 👇 БЕРЕМ ИМЯ ИЗ ПРИКАЗА (иначе дефолт шпиона) 👇
+            task_admin_name = task.get('admin_name', "Андрюшенька (Спецагент Шпион) 🕵️‍♂️")
+            
+            # ИИ подтвердил вину -> Наказываем!
+            if task['action'] == "global_ban":
+                ban_user_everywhere(
+                    target_id=int(task['uid']), 
+                    reason=reason, 
+                    admin_name=task_admin_name, 
+                    trigger_text=trigger_text, 
+                    origin_chat=escape_md(task.get('origin_chat', ''))
+                )
+            else:
+                _dur = int(task.get('duration') or 0)
+                mute_user_everywhere(
+                    target_id=int(task['uid']),
+                    reason=reason,
+                    admin_name=task_admin_name,
+                    trigger_text=trigger_text,
+                    mute_time=int(time.time() + _dur) if _dur else 0,
+                    origin_chat=escape_md(task.get('origin_chat', '')),
+                    ignore_shield=bool(task.get('ignore_shield'))
+                )
+        else:
+            # 🛡 ИИ ОПРАВДАЛ ЮЗЕРА! Ордер аннулирован.
+            print(f"🛡 СКАЙНЕТ ОТМЕНИЛ АРЕСТ! Андрюшенька ошибся. Улика: {trigger_text}")
+
+
 def skynet_listener():
+    """Исполняет приказы других ботов из skynet_tasks.
+    Каждую задачу атомарно «забирает» один процесс (status=processing), поэтому при нескольких
+    воркерах приказ больше не исполняется дважды. Ошибка в одной задаче больше не валит весь
+    цикл и не повторяет ту же задачу (с отчётом в STAFF) каждые 3 секунды."""
     while True:
         try:
-            # Ищем невыполненные приказы в базе
-            tasks = db['skynet_tasks'].find({"status": {"$ne": "done"}})
-            for task in tasks:
-                if task['action'] in ["full_unban", "fine_unban", "auto_heal"]:
-                    target_uid = task['uid']
-                    
-                    # 1. Снимаем бан и мут везде
-                    unbanned = unban_user_everywhere(target_uid)
-                    unmuted = unmute_user_everywhere(target_uid)
-
-                    # 2. ВЫДАЕМ ИММУНИТЕТ ИЛИ ПРОСТО ЧИСТИМ ТЕГ
-                    if task['action'] == "full_unban":
-                        # 👇 БРОНЯ ОТ СТИРАНИЯ ТЕГОВ 👇
-                        u_info = users_collection.find_one({"_id": target_uid}) or {} 
-                        if not u_info.get("custom_tag"):
-                            users_collection.update_one(
-                                {"_id": target_uid}, 
-                                {"$set": {"is_verified": True, "custom_tag": "Верифицирован МК"}, "$unset": {"shame_tag": ""}},
-                                upsert=True
-                            )
-                        else:
-                            # Если тег уже есть (Элита) - просто подтверждаем вериф без стирания статуса
-                            users_collection.update_one({"_id": target_uid}, {"$set": {"is_verified": True}, "$unset": {"shame_tag": ""}}, upsert=True)
-                    
-                    elif task['action'] == "fine_unban":
-                        amount = task.get('amount') or task.get('price')
-                        if not amount:
-                            last_pay = db['fine_payments'].find_one({"uid": target_uid}, sort=[("timestamp", -1)])
-                            amount = last_pay.get('amount', 0) if last_pay else 0
-                        
-                        if int(amount) == 650:
-                            users_collection.update_one({"_id": target_uid}, {"$set": {"custom_tag": "Свободен"}, "$unset": {"shame_tag": ""}}, upsert=True)
-                            add_radar_log(f"🎖️ Юзер {target_uid} оплатил 650⭐️ и получил тег 'Свободен'")
-                        elif int(amount) == 750:
-                            users_collection.update_one({"_id": target_uid}, {"$set": {"custom_tag": "Спонсор_Одобрен"}, "$unset": {"shame_tag": ""}}, upsert=True)
-                            add_radar_log(f"💎 Юзер {target_uid} оплатил 750⭐️ и получил тег 'Спонсор_Одобрен'")
-                        else:
-                            users_collection.update_one({"_id": target_uid}, {"$unset": {"shame_tag": "", "custom_tag": ""}})
-                            add_radar_log(f"🧹 Юзер {target_uid} оплатил обычный штраф ({amount}⭐️), теги сброшены")
-                    
-                    # 3. ОТЧЕТ В ФЛУДИЛКУ АДМИНАМ!
-                    if task['action'] == "fine_unban":
-                        report_text = f"💸 **Скайнет (Автоматика):**\nЮзер `{target_uid}` оплатил штраф!\nОграничения сняты. Глобально разбанен ({unbanned} чатов) и размучен ({unmuted} чатов)."
-                    elif task['action'] == "auto_heal":
-                        report_text = f"🛡 **Скайнет (Авто-Исцеление):**\nVIP-юзер `{target_uid}` открыл поддержку. Скайнет профилактически снял с него все возможные ограничения!\nГлобально разбанен ({unbanned} чатов) и размучен ({unmuted} чатов)."
-                    else:
-                        report_text = f"✅ **Скайнет (Автоматика):**\nЮзер `{target_uid}` прошел верификацию!\nГлобально разбанен ({unbanned} чатов) и размучен ({unmuted} чатов)."
-                    
-                    try: bot.send_message(STAFF_GROUP_ID, report_text, parse_mode="Markdown")
-                    except: pass
-                    
-                    # 4. Закрываем задачу
-                    db['skynet_tasks'].update_one({"_id": task['_id']}, {"$set": {"status": "done"}})
-
-                elif task['action'] == "global_unmute":
-                    unmute_user_everywhere(int(task['uid']))
-                    db['skynet_tasks'].update_one({"_id": task['_id']}, {"$set": {"status": "done"}})
-                
-                # 👇 ИСПОЛНЕНИЕ ПРИКАЗОВ ОТ ШПИОНА (С ДВОЙНОЙ ПРОВЕРКОЙ ИИ) 👇
-                elif task['action'] in ["global_ban", "global_mute"]:
-                    trigger_text = task.get('trigger_text', '')
-                    reason = task.get('reason', 'Шпионаж')
-                    
-                    # 🔥 СУДЬЯ СКАЙНЕТ ПРОВЕРЯЕТ УЛИКИ АНДРЮШЕНЬКИ 🔥
-                    is_guilty = True
-                    if trigger_text:
-                        reason_lower = reason.lower() # Приводим к нижнему регистру для надежности!
-                        if "черная зона" in reason_lower:
-                            is_guilty = ai_context_checker(trigger_text, zone="black")
-                        elif "оранжевая зона" in reason_lower:
-                            is_guilty = ai_context_checker(trigger_text, zone="orange")
-                        elif "желтая зона" in reason_lower:
-                            is_guilty = ai_context_checker(trigger_text, zone="yellow")
-
-                    if is_guilty:
-                        # 👇 БЕРЕМ ИМЯ ИЗ ПРИКАЗА (иначе дефолт шпиона) 👇
-                        task_admin_name = task.get('admin_name', "Андрюшенька (Спецагент Шпион) 🕵️‍♂️")
-                        
-                        # ИИ подтвердил вину -> Наказываем!
-                        if task['action'] == "global_ban":
-                            ban_user_everywhere(
-                                target_id=int(task['uid']), 
-                                reason=reason, 
-                                admin_name=task_admin_name, 
-                                trigger_text=trigger_text, 
-                                origin_chat=escape_md(task.get('origin_chat', ''))
-                            )
-                        else:
-                            _dur = int(task.get('duration') or 0)
-                            mute_user_everywhere(
-                                target_id=int(task['uid']),
-                                reason=reason,
-                                admin_name=task_admin_name,
-                                trigger_text=trigger_text,
-                                mute_time=int(time.time() + _dur) if _dur else 0,
-                                origin_chat=escape_md(task.get('origin_chat', '')),
-                                ignore_shield=bool(task.get('ignore_shield'))
-                            )
-                    else:
-                        # 🛡 ИИ ОПРАВДАЛ ЮЗЕРА! Ордер аннулирован.
-                        print(f"🛡 СКАЙНЕТ ОТМЕНИЛ АРЕСТ! Андрюшенька ошибся. Улика: {trigger_text}")
-
-                    # В любом случае закрываем задачу, чтобы не зациклилась
-                    db['skynet_tasks'].update_one({"_id": task['_id']}, {"$set": {"status": "done"}})
-
+            now = time.time()
+            # Подбираем задачи, зависшие в обработке (процесс упал посреди исполнения)
+            db['skynet_tasks'].update_many(
+                {"status": "processing", "claimed_at": {"$lt": now - 600}},
+                {"$set": {"status": "pending"}, "$inc": {"attempts": 1}}
+            )
+            while True:
+                task = db['skynet_tasks'].find_one_and_update(
+                    {"status": {"$nin": ["done", "processing", "error"]},
+                     "action": {"$in": SKYNET_TASK_ACTIONS},
+                     "attempts": {"$not": {"$gte": 3}}},
+                    {"$set": {"status": "processing", "claimed_at": time.time()}},
+                    sort=[("_id", 1)],
+                    return_document=ReturnDocument.AFTER
+                )
+                if not task:
+                    break
+                try:
+                    _execute_skynet_task(task)
+                    db['skynet_tasks'].update_one({"_id": task['_id']}, {"$set": {"status": "done", "done_at": time.time()}})
+                except Exception as e:
+                    logger.error(f"Ошибка задачи Скайнета {task.get('_id')}: {e}")
+                    from core.diag import log_error
+                    log_error("Приказ Скайнету", f"{task.get('action')}: {e}", task.get('uid'))
+                    db['skynet_tasks'].update_one({"_id": task['_id']}, {"$set": {"status": "error", "error": str(e)[:300]}})
+                    try: bot.send_message(STAFF_GROUP_ID, f"⚠️ Скайнет не смог выполнить приказ {task.get('action')} для {task.get('uid')}: {str(e)[:200]}")
+                    except Exception: pass
         except Exception as e:
             print(f"Ошибка слушателя: {e}")
             
@@ -1394,14 +1539,21 @@ threading.Thread(target=skynet_listener, daemon=True).start()
 def cpa_tracker_daemon():
     while True:
         try:
+            if not acquire_lease("cpa_tracker", 7 * 3600):
+                time.sleep(21600)
+                continue
             now = time.time()
             # 🔥 НОВЫЙ ХОЛД: 14 дней (1 209 600 секунд) 🔥
             HOLD_TIME = 1209600 
             
-            pending_traffic = db['cpa_traffic'].find({"status": "hold"})
+            pending_traffic = list(db['cpa_traffic'].find({"status": "hold", "join_time": {"$lt": now - HOLD_TIME}}))
             
             for record in pending_traffic:
-                if now - record['join_time'] > HOLD_TIME:
+                # Атомарно забираем запись: при нескольких воркерах агент получал кейс дважды
+                if not db['cpa_traffic'].find_one_and_update({"_id": record['_id'], "status": "hold"},
+                                                             {"$set": {"status": "checking"}}):
+                    continue
+                if True:
                     new_user_id = record['new_user_id']
                     agent_id = record['agent_id']
                     target_chat_id = record.get('chat_id')
@@ -1409,13 +1561,22 @@ def cpa_tracker_daemon():
                     is_banned = banned_collection.find_one({"_id": new_user_id})
                     
                     is_physically_present = False
+                    check_failed = False
                     if target_chat_id and not is_banned:
                         try:
                             member = bot.get_chat_member(target_chat_id, new_user_id)
                             # Мут (restricted) тоже считается присутствием!
                             if member.status in ['member', 'administrator', 'creator'] or (member.status == 'restricted' and getattr(member, 'is_member', False)):
                                 is_physically_present = True
-                        except: pass 
+                        except Exception as e:
+                            # «not found» = человека в чате нет. Прочие ошибки (таймаут, лимиты) —
+                            # не списываем лид в брак, а проверим в следующий проход.
+                            if "not found" not in str(e).lower():
+                                check_failed = True
+
+                    if check_failed:
+                        db['cpa_traffic'].update_one({"_id": record['_id']}, {"$set": {"status": "hold"}})
+                        continue
 
                     if is_banned:
                         db['cpa_traffic'].update_one({"_id": record['_id']}, {"$set": {"status": "fraud_banned"}})
@@ -1444,10 +1605,18 @@ def cpa_tracker_daemon():
                         
         except Exception as e:
             logger.error(f"Ошибка CPA Tracker: {e}")
+            from core.diag import log_error; log_error("CPA", e)
         
         time.sleep(21600) # Спит 6 часов
 
 # ==================== АВТО-КОНКУРС АГЕНТОВ (КАЖДОЕ 1 ЧИСЛО) ====================
+def _claim_contest_month(month_str):
+    try:
+        db['settings'].insert_one({"_id": f"cpa_contest_resolved_{month_str}", "done": False, "started": time.time()})
+        return True
+    except DuplicateKeyError:
+        return False
+
 def cpa_monthly_daemon():
     while True:
         try:
@@ -1467,8 +1636,10 @@ def cpa_monthly_daemon():
                     # Ставим заглушку в базу, чтобы бот даже не пытался ничего считать
                     db['settings'].update_one({"_id": f"cpa_contest_resolved_{prev_month_str}"}, {"$set": {"done": True, "skipped": "before_launch"}}, upsert=True)
                 
-                # Проверяем, не выдавали ли мы уже призы за этот месяц
-                elif not db['settings'].find_one({"_id": f"cpa_contest_resolved_{prev_month_str}"}):
+                # Проверяем, не выдавали ли мы уже призы за этот месяц.
+                # Флаг ставится ДО раздачи и атомарно (insert с уникальным _id): два воркера
+                # или рестарт посреди раздачи больше не выдадут призы дважды.
+                elif _claim_contest_month(prev_month_str):
                     logger.info(f"🏆 СКАЙНЕТ НАЧИНАЕТ ПОДВЕДЕНИЕ ИТОГОВ КОНКУРСА АГЕНТОВ ЗА {prev_month_str}...")
                     
                     # 1. Выгружаем ТОП агентов с лидами >= 50 за ПРОШЛЫЙ месяц
@@ -1482,7 +1653,7 @@ def cpa_monthly_daemon():
                     top_agents = list(db['cpa_traffic'].aggregate(pipeline))
                     
                     if top_agents:
-                        from config import STAFF_GROUP_ID, PRIZES_THREAD_ID
+                        from config import STAFF_GROUP_ID, PRIZES_THREAD_ID  # раньше PRIZES_THREAD_ID не существовал → ImportError 1-го числа
                         from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
                         
                         report_to_admins = f"🏆 **ИТОГИ CPA-КОНКУРСА ({prev_month_str})** 🏆\n\n_Порог в 50 лидов прошли {len(top_agents)} агентов!_\n\n"
@@ -1508,9 +1679,11 @@ def cpa_monthly_daemon():
                             elif place == 4:
                                 prize_str = "3000 Очков 💎"
                                 db['paid_users'].update_one({"uid": agent_id}, {"$inc": {"bounty_points": 3000}}, upsert=True)
+                                from core.janitor import log_points; log_points(agent_id, "bounty_points", 3000, reason="cpa_contest")
                             elif place == 5:
                                 prize_str = "1500 Очков 💎"
                                 db['paid_users'].update_one({"uid": agent_id}, {"$inc": {"bounty_points": 1500}}, upsert=True)
+                                from core.janitor import log_points; log_points(agent_id, "bounty_points", 1500, reason="cpa_contest")
                                 
                             report_to_admins += f"**{place} МЕСТО:** {agent_name} ({leads} лидов)\n🎁 Приз: {prize_str}\n\n"
                             
@@ -1538,6 +1711,7 @@ def cpa_monthly_daemon():
                     
         except Exception as e:
             logger.error(f"Ошибка CPA Конкурса: {e}")
+            from core.diag import log_error; log_error("CPA-конкурс", e)
             
         time.sleep(3600) # Проверяем дату каждый час
 
@@ -1558,8 +1732,14 @@ def autopilot_daemon():
                 
                 # Если прошло нужное время с последнего запуска
                 if current_time - t.get('last_run', 0) >= interval_sec:
-                    # 1. Сразу обновляем время в базе, чтобы не было спама!
-                    db['templates'].update_one({"id": t['id']}, {"$set": {"last_run": current_time}})
+                    # 1. Атомарно «забираем» запуск: обновится только если last_run не менялся.
+                    # Раньше при нескольких воркерах рассылка уходила по 2–4 раза.
+                    claimed = db['templates'].update_one(
+                        {"id": t['id'], "last_run": t.get('last_run', 0)} if 'last_run' in t else {"id": t['id'], "last_run": {"$exists": False}},
+                        {"$set": {"last_run": current_time}}
+                    )
+                    if claimed.modified_count == 0:
+                        continue
                     
                     # 2. Собираем клавиатуру (если есть кнопки)
                     markup = None
@@ -1614,7 +1794,10 @@ def autopilot_daemon():
                                 # Отправляем ИНДИВИДУАЛЬНУЮ сборку
                                 bot.send_message(uid, final_txt, parse_mode="HTML", disable_web_page_preview=True, reply_markup=final_markup)
                                 count += 1
+                                time.sleep(0.05)  # ~20 сообщений/сек, иначе Telegram режет флуд-лимитом
                             except Exception as e:
+                                if "too many requests" in str(e).lower():
+                                    time.sleep(5)
                                 # Спасаем текст, если слетел Markdown
                                 if "parse entities" in str(e).lower():
                                     try: bot.send_message(uid, final_txt, disable_web_page_preview=True, reply_markup=final_markup)
@@ -1646,6 +1829,11 @@ def heartbeat_skynet():
 
 import threading
 threading.Thread(target=heartbeat_skynet, daemon=True).start()
+
+# 🧹 Уборщик: удаляет сообщения бота по расписанию и раз в сутки чистит служебные коллекции
+from core.janitor import janitor_loop
+threading.Thread(target=janitor_loop, args=(bot,), daemon=True).start()
+threading.Thread(target=migrate_indulgence_flags, daemon=True).start()
 # ==============================
 
 # ==================== WEBHOOK ====================
@@ -1666,6 +1854,8 @@ register_main_routes(
     WEB_USER, WEB_PASS, OWNER_ID, ADMIN_CHAT_IDS, ROOT_PIN, STAFF_GROUP_ID
 )
 register_ads_routes(app, bot, add_radar_log)
+from web.diag import register_diag_routes
+register_diag_routes(app, bot)
 
 if __name__ == '__main__':
     print("Бот запущен — мягкая версия с приветствием и удалением сообщений (кроме сети ПАРНИ)")
