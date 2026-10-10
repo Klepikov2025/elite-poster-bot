@@ -57,31 +57,21 @@ def groq_chat(prompt, max_tokens=400, temperature=0.0, timeout=12, where="ИИ")
     return None
 
 
-# Анкета «возраст/рост/вес[/размер]»: «21/169/58», «21 169 58», «21-169-58». Первое число — возраст АВТОРА.
-_ANKETA = re.compile(r'(?<![\d/])(\d{2})\s*[/\\|,\- ]\s*(1[4-9]\d|2[0-2]\d)\s*[/\\|,\- ]\s*\d{2,3}(?![\d])')
-_SEEKING = re.compile(r'\b(ищу|ищем|нужен|нужна|нравятся|предпочитаю|интересуют|от|до|старше|младше)\b')
-
-def anketa_age(text):
-    """Возраст автора из анкеты или None. Если перед анкетой «ищу/от/до…» — это описание того, кого ищут."""
-    t = str(text or "").lower()
-    for m in _ANKETA.finditer(t):
-        if _SEEKING.search(t[max(0, m.start() - 25):m.start()]):
-            continue
-        return int(m.group(1))
-    return None
-
-_ANKETA_HINT = ("В чатах знакомств анкету пишут числами через дробь: «возраст/рост/вес/размер», например «21/169/58» — "
-                "это автору 21 год, рост 169, вес 58. ПЕРВОЕ число — возраст автора. ")
-
 def ai_verdict(text, zone):
     """True — нарушение, False — безопасно, None — ИИ недоступен (решает человек)."""
-    # Однозначная анкета решается без ИИ: модель не знала формат и оправдывала «21/169/58»
-    age = anketa_age(text)
-    if age is not None:
-        if zone == "orange" and 18 <= age <= 21:
+    # Анкета разбирается по ролям (core/anketa.py): однозначный возраст решается без ИИ —
+    # модель не знала формат и оправдывала «21/169/58».
+    from core.anketa import parse_anketa, ANKETA_HINT
+    a = parse_anketa(text)
+    if a and a[1]:
+        if zone == "orange" and 18 <= a[0] <= 21:
             return True
-        if zone == "black" and age < 18:
+        if zone == "black" and a[0] < 18:
             return True
+    hint = ANKETA_HINT
+    if a and not a[1]:
+        hint += f"Внимание: в анкете возможно спрятан возраст автора — {a[0]}; оцени по контексту, возраст это или размер/вес. "
+    _ANKETA_HINT = hint
     prompts = {
         "black": ("Ты модератор. " + _ANKETA_HINT + "Сообщение: \"{t}\"\n1. Автор СЕЙЧАС младше 18 лет?\n2. Ищет интим с несовершеннолетними?\n"
                   "Жалобы на других, прошлое («в 14 лет я был…») и размеры — НЕ нарушение. Ответь СТРОГО одним словом: BAN или SKIP."),
