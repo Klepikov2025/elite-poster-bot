@@ -1,3 +1,4 @@
+import re
 import time
 import uuid
 import json
@@ -782,7 +783,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         return jsonify({
             "red": data.get("red", []), 
             "yellow": data.get("yellow", []), 
-            "black": data.get("black", [])
+            "black": data.get("black", []),
+            "soft_red": data.get("soft_red", [])
         })
 
     @app.route('/glaz/api/dictionary/add', methods=['POST'])
@@ -792,9 +794,17 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         word = data.get('word', '').strip().lower()
         zone = data.get('zone')
         exact = data.get('exact', False)
-        if not word or zone not in ['red', 'yellow', 'black']: return jsonify({"success": False, "error": "Некорректные данные"})
-        if exact: pattern = rf"\b{word}\b"
+        if not word or zone not in ['red', 'yellow', 'black', 'soft_red']: return jsonify({"success": False, "error": "Некорректные данные"})
+        has_letters = bool(re.search(r'[a-zа-яё0-9]', word))
+        if zone == 'soft_red' and not has_letters:
+            pattern = re.escape(word.replace('\ufe0f', ''))   # эмодзи: \b вокруг смайла не работает
+        elif exact: pattern = rf"\b{word}\b"
         else: pattern = rf"\b{word}[а-я]*\b"
+        # Слово с ошибкой в шаблоне (например, «(» или «[») ломало проверку сообщений в Скайнете
+        try:
+            re.compile(pattern)
+        except re.error:
+            return jsonify({"success": False, "error": "Слово содержит спецсимволы, которые ломают фильтр. Уберите скобки и т.п."})
         new_entry = {"word": word, "pattern": pattern, "exact": exact}
         db['settings'].update_one({"_id": "skynet_dictionary"}, {"$push": {zone: new_entry}}, upsert=True)
         return jsonify({"success": True, "message": f"Слово '{word}' добавлено в {zone} zone!"})

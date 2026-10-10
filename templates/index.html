@@ -1099,6 +1099,16 @@
                     <button onclick="addDictWord('black')" class="btn btn-sm" style="background: #bb86fc; color: #121212; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%;">➕ Блокировать в рекламе</button>
                 </div>
             </div>
+            <div style="margin-top: 20px; border: 1px solid #ff8a65; padding: 15px; border-radius: 8px; background: rgba(255, 138, 101, 0.05);">
+                <h4 style="color: #ff8a65; margin-top: 0;">🕵️ Сленг и эмодзи под проверку ИИ (Шпион)</h4>
+                <p style="color: #aaa; font-size: 12px; margin: 0 0 10px;">Не банит сразу: Шпион отдаёт сообщение ИИ, тот решает по смыслу («угощу 🐻» — бан, «ищу пухлого 🐻» — нет). Если ИИ недоступен — дело придёт вам на ручное решение.</p>
+                <div id="dict-soft_red-list" style="margin-bottom: 15px; min-height: 30px; display: flex; flex-wrap: wrap; gap: 5px;"></div>
+                <input type="text" id="dict-soft_red-input" class="form-control" placeholder="Например: 🍭 или клад" style="width: 100%; margin-bottom: 10px; background: #222; color: #fff; border: 1px solid #555; padding: 8px; box-sizing: border-box;">
+                <label style="font-size: 12px; color: #aaa; display: flex; align-items: center; gap: 5px; margin-bottom: 10px;">
+                    <input type="checkbox" id="dict-soft_red-exact"> Точное совпадение (для слов)
+                </label>
+                <button onclick="addDictWord('soft_red')" class="btn btn-sm" style="background: #ff8a65; color: #121212; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%;">➕ Добавить на проверку ИИ</button>
+            </div>
         </div>
         <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #03dac6; padding: 20px; border-radius: 10px; max-width: 1000px; box-shadow: 0 0 15px rgba(3, 218, 198, 0.05);">
             <h3 style="color: #03dac6; margin-bottom: 10px; font-size: 18px; display: flex; align-items: center; gap: 8px;">
@@ -2508,6 +2518,7 @@ function loadDictionary() {
         renderDictList('red', data.red || []);
         renderDictList('yellow', data.yellow || []);
         renderDictList('black', data.black || []); // <--- Учим загружать Черную зону
+        renderDictList('soft_red', data.soft_red || []);
     });
 }
 
@@ -2520,6 +2531,7 @@ function renderDictList(zone, words) {
     let color = '#ffb74d'; // по умолчанию желтый
     if (zone === 'red') color = '#cf6679'; // красный
     if (zone === 'black') color = '#bb86fc'; // фиолетовый для рекламы
+    if (zone === 'soft_red') color = '#ff8a65'; // сленг под проверку ИИ Шпиона
 
     words.forEach(item => {
         const exactIcon = item.exact ? '🎯' : '🔤';

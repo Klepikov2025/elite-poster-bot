@@ -1407,7 +1407,7 @@ def ai_context_checker(text, zone="black"):
 # 👆 ===================================== 👆
 
 # ==================== СЛУШАТЕЛЬ СЕКРЕТАРЯ (РАЗБАН ПО КНОПКЕ) ====================
-SKYNET_TASK_ACTIONS = ["full_unban", "fine_unban", "auto_heal", "global_unmute", "global_ban", "global_mute"]
+SKYNET_TASK_ACTIONS = ["full_unban", "fine_unban", "auto_heal", "global_unmute", "global_ban", "global_mute", "review_request"]
 
 def _execute_skynet_task(task):
     if task['action'] in ["full_unban", "fine_unban", "auto_heal"]:
@@ -1461,6 +1461,17 @@ def _execute_skynet_task(task):
 
     elif task['action'] == "global_unmute":
         unmute_user_everywhere(int(task['uid']))
+
+    elif task['action'] == "review_request":
+        # Шпион не смог проверить сленг своим ИИ: не наказываем вслепую и не пропускаем молча —
+        # дело уходит админам (кнопки в STAFF и раздел ручных решений в /glaz).
+        from core.ai_review import create_review
+        want = "mute" if task.get('want') == "mute" else "ban"
+        trigger_text = task.get('trigger_text', '')
+        reason = task.get('reason') or "Шпион: требуется ручное решение"
+        mk = create_review(int(task['uid']), want, reason, trigger_text=trigger_text,
+                           origin_chat=task.get('origin_chat', ''), duration=int(task.get('duration') or 0), source="Шпион")
+        bot.send_message(STAFF_GROUP_ID, f"🤖 ИИ Шпиона недоступен. Нужен ваш вердикт по {task['uid']}\nЧат: {task.get('origin_chat', '')}\nПричина: {reason}\nУлика: {str(trigger_text)[:300]}", reply_markup=mk)
     
     # 👇 ИСПОЛНЕНИЕ ПРИКАЗОВ ОТ ШПИОНА (С ДВОЙНОЙ ПРОВЕРКОЙ ИИ) 👇
     elif task['action'] in ["global_ban", "global_mute"]:
