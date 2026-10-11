@@ -17,13 +17,14 @@ G_LINKS = "🔗 Ссылки"
 G_STEALTH = "🥷 Автопилот"
 G_SEC = "🗂 Секретарь"
 G_BEYOND = "🏳️‍🌈 BEYOND"
+G_MP = "📢 МП (реклама)"
 
 SCHEMA = [
     # --- деньги ---
     {"key": "rub_per_star", "group": G_MONEY, "label": "Курс: рублей за 1 ⭐️", "type": "float", "default": 2.0, "min": 0.5, "max": 10,
      "help": "Единый курс сети: оплата с рублёвого баланса, крипто-счета, цены на рынке.", "bots": "Скайнет, Секретарь, BEYOND, МП", "owner": True},
     {"key": "points_per_star", "group": G_MONEY, "label": "Курс: очков за 1 ⭐️", "type": "int", "default": 5, "min": 1, "max": 100,
-     "help": "Оплата очками: VIP, штрафы, индульгенция, BEYOND.", "bots": "Скайнет, Секретарь, BEYOND", "owner": True},
+     "help": "Оплата очками: VIP, штрафы, индульгенция, BEYOND, реклама.", "bots": "Скайнет, Секретарь, BEYOND, МП", "owner": True},
     {"key": "city_pass_price", "group": G_MONEY, "label": "Пропуск в чужой город, ⭐️", "type": "int", "default": 250, "min": 1, "max": 100000,
      "bots": "Скайнет", "owner": True},
     {"key": "fine_tag_free", "group": G_MONEY, "label": "Штраф, после которого тег «Свободен», ⭐️", "type": "int", "default": 650, "min": 1, "max": 100000,
@@ -39,7 +40,7 @@ SCHEMA = [
     {"key": "vip_ban_days", "group": G_VIP, "label": "Бан после напоминания через, дней", "type": "int", "default": 3, "min": 1, "max": 60,
      "help": "Работает, только если включён тумблер «VIP-Снайпер». Тех, чей кружок на проверке, не трогает.", "bots": "Скайнет"},
     {"key": "cheap_stars_url", "group": G_VIP, "label": "Ссылка «купить звёзды дешевле»", "type": "text",
-     "default": "https://t.me/Avrrorkastarbot?start=7924963993", "help": "Отправляется вместе со счётом на VIP. Пусто — не отправлять.", "bots": "Скайнет", "owner": True},
+     "default": "https://t.me/Avrrorkastarbot?start=7924963993", "help": "Отправляется вместе со счётом на VIP и перед тарифами рекламы. Пусто — не отправлять.", "bots": "Скайнет, МП", "owner": True},
 
     # --- CPA ---
     {"key": "cpa_hold_days", "group": G_CPA, "label": "Холд лида, дней", "type": "int", "default": 14, "min": 1, "max": 90,
@@ -70,7 +71,7 @@ SCHEMA = [
      "help": "Если Groq снова отключит модель, впишите новую из console.groq.com/docs/models. Пусто — по умолчанию.", "bots": "Скайнет, Шпион"},
 
     # --- ссылки ---
-    {"key": "support_bot", "group": G_LINKS, "label": "Бот поддержки (без @)", "type": "text", "default": "FAQMKBOT", "bots": "Скайнет",
+    {"key": "support_bot", "group": G_LINKS, "label": "Бот поддержки (без @)", "type": "text", "default": "FAQMKBOT", "bots": "Скайнет, МП",
      "help": "Куда ведут кнопки «Поддержка» / «Пройти верификацию» и автоответы Скайнета в чатах."},
     {"key": "vip_bot", "group": G_LINKS, "label": "Бот VIP-вступления (без @)", "type": "text", "default": "Elitepost_bot", "bots": "Скайнет",
      "help": "Кнопка «Купить VIP-статус» в предупреждениях Скайнета."},
@@ -94,6 +95,14 @@ SCHEMA = [
     {"key": "beyond_ban_days", "group": G_BEYOND, "label": "Бан после напоминания через, дней", "type": "int", "default": 3, "min": 1, "max": 60, "bots": "BEYOND"},
     {"key": "beyond_invite_days", "group": G_BEYOND, "label": "Ссылка-приглашение живёт, дней", "type": "int", "default": 7, "min": 1, "max": 30, "bots": "BEYOND"},
 
+    # --- МП (рекламный бот) ---
+    {"key": "mp_daily_limit", "group": G_MP, "label": "Публикаций в день на одну сеть/город", "type": "int", "default": 3, "min": 1, "max": 50,
+     "help": "Сколько раз рекламодатель может выложить объявление в одной сети одного города за сутки (автопосты тоже считаются).", "bots": "МП"},
+    {"key": "mp_vip_markup", "group": G_MP, "label": "Наценка за рекламу TG-групп/каналов (×)", "type": "float", "default": 1.5, "min": 1, "max": 10,
+     "help": "1.5 = +50% к прайсу. Применяется после одобрения ресурса админом.", "bots": "МП", "owner": True},
+    {"key": "mp_pin_markup", "group": G_MP, "label": "Наценка за закреп (×)", "type": "float", "default": 1.2, "min": 1, "max": 10,
+     "help": "1.2 = +20% к цене тарифа.", "bots": "МП", "owner": True},
+
     # --- автопилот (стелс) ---
     {"key": "stealth_enemy_ref", "group": G_STEALTH, "label": "Стелс: какую реф-ссылку подменять", "type": "text", "default": "ref_EQHH7XHV", "bots": "Скайнет", "owner": True},
     {"key": "stealth_boss_ref", "group": G_STEALTH, "label": "Стелс: на какую подменять", "type": "text", "default": "ref_2BBPF35H", "bots": "Скайнет", "owner": True},
@@ -101,4 +110,4 @@ SCHEMA = [
 ]
 
 BY_KEY = {e["key"]: e for e in SCHEMA}
-GROUP_ORDER = [G_MONEY, G_SEC, G_VIP, G_BEYOND, G_CPA, G_POSTER, G_MOD, G_AI, G_LINKS, G_STEALTH]
+GROUP_ORDER = [G_MONEY, G_SEC, G_VIP, G_BEYOND, G_MP, G_CPA, G_POSTER, G_MOD, G_AI, G_LINKS, G_STEALTH]
