@@ -65,6 +65,8 @@ SCHEMA = [
     {"key": "spy_delete_delay", "group": G_MOD, "label": "Шпион: удалять спам ботов-мусорщиков через, сек", "type": "int", "default": 12, "min": 0, "max": 3600, "bots": "Шпион"},
     {"key": "spy_trash_bots", "group": G_MOD, "label": "Шпион: ID ботов-мусорщиков (через запятую)", "type": "text", "default": "7195399721",
      "help": "Сообщения этих ботов Шпион удаляет из чатов. Сейчас: @CPBlockerBot.", "bots": "Шпион"},
+    {"key": "corpse_sweep_hours", "group": G_MOD, "label": "Шпион: искать удалённые аккаунты в группах раз в, часов", "type": "int", "default": 24, "min": 0, "max": 720,
+     "help": "Шпион просматривает участников групп сети и отдаёт Скайнету «Deleted Account» на вынос. 0 — выключено. Вынос работает, пока включён тумблер «Автоочистка трупов».", "bots": "Шпион, Скайнет"},
 
     # --- ИИ ---
     {"key": "groq_model", "group": G_AI, "label": "Модель Groq", "type": "text", "default": "openai/gpt-oss-120b",

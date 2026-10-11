@@ -70,3 +70,32 @@ def register_diag_routes(app, bot):
             r["sum"] = round(r["sum"])
             totals[r["kind"]] += r["sum"]
         return jsonify({"days": days, "rows": rows, "totals": totals})
+
+    # ===== 💀 Чистка мёртвых душ (удалённых аккаунтов) =====
+    @app.route('/glaz/api/corpses')
+    def api_corpses():
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+        q = db['corpse_queue']
+        sweep = db['settings'].find_one({"_id": "corpse_sweep"}) or {}
+        day = time.time() - 86400
+        from core.settings import SkynetSettings
+        return jsonify({
+            "enabled": SkynetSettings.get().get("auto_corpse_removal", True),
+            "pending": q.count_documents({"status": {"$in": ["pending", "processing"]}}),
+            "done_24h": q.count_documents({"status": "done", "done_at": {"$gt": day}}),
+            "done_total": q.count_documents({"status": "done"}),
+            "errors": q.count_documents({"status": "error"}),
+            "last_errors": [{"chat": r.get("chat_id"), "uid": r.get("uid"), "error": r.get("error")}
+                            for r in q.find({"status": "error"}).sort("done_at", -1).limit(5)],
+            "running": bool(sweep.get("running")),
+            "requested": bool(sweep.get("requested")),
+            "last_run": _fmt(sweep["last_run"]) if sweep.get("last_run") else None,
+            "total_dead": sweep.get("total_dead", 0),
+            "report": sweep.get("report", []),
+        })
+
+    @app.route('/glaz/api/corpses/run', methods=['POST'])
+    def api_corpses_run():
+        if not session.get('logged_in'): return jsonify({"success": False}), 401
+        db['settings'].update_one({"_id": "corpse_sweep"}, {"$set": {"requested": True, "requested_at": time.time()}}, upsert=True)
+        return jsonify({"success": True})

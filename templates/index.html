@@ -1330,6 +1330,20 @@
                 <tbody id="diag-errors"><tr><td colspan="4" style="color:#888;">Загрузка...</td></tr></tbody>
             </table>
         </div>
+        <div class="panel-block" style="margin-top:20px;" id="corpse-block">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+                <div>
+                    <h3 style="margin:0;">💀 Мёртвые души в группах</h3>
+                    <div style="color:var(--muted); font-size:13px; margin-top:6px; max-width:640px;">Шпион просматривает участников групп сети и находит удалённые аккаунты («Deleted Account»), Скайнет их выносит. В базе они остаются с пометкой «удалён», рассылки им больше не уходят. Частота проверки — в «Настройки → Модерация и уборка».</div>
+                </div>
+                <button class="btn primary" id="corpse-run-btn" onclick="runCorpseSweep()">🔎 Проверить группы сейчас</button>
+            </div>
+            <div id="corpse-cards" style="display:flex; gap:10px; flex-wrap:wrap; margin:14px 0;"></div>
+            <table class="admin-table" style="font-size:12.5px;">
+                <thead><tr><th>Группа</th><th>Участников</th><th>Проверено</th><th>Удалённых</th><th>Примечание</th></tr></thead>
+                <tbody id="corpse-report"><tr><td colspan="5" style="color:var(--muted);">Загрузка...</td></tr></tbody>
+            </table>
+        </div>
         {% if is_owner %}<div class="panel-block" style="margin-top:20px;">
             <h3 style="color:#00e676; margin-top:0;">💰 Выручка по источникам (30 дней)</h3>
             <div id="diag-rev-totals" style="margin-bottom:10px; color:#ccc;"></div>
@@ -1700,7 +1714,30 @@
                     <div style="font-size:11px; color:#888;">${label}</div>
                     <div style="font-size:18px; font-weight:bold; color:${bad ? '#cf6679' : '#03dac6'};">${value}</div></div>`;
     }
+    function loadCorpses() {
+        fetch('/glaz/api/corpses').then(r => r.json()).then(d => {
+            if (d.error) return;
+            const st = d.running ? '🔄 идёт проверка…' : (d.requested ? '⏳ проверка заказана, Шпион начнёт в течение 5 минут' : (d.last_run ? 'последняя проверка ' + d.last_run : 'проверок ещё не было'));
+            let cards = _card('Ждут выноса', d.pending, false) + _card('Вынесено за сутки', d.done_24h, false) + _card('Вынесено всего', d.done_total, false) + _card('Не удалось вынести', d.errors, d.errors > 0);
+            if (!d.enabled) cards = _card('Вынос', '⏸ выключен тумблером «Автоочистка трупов»', true) + cards;
+            document.getElementById('corpse-cards').innerHTML = cards + `<div style="align-self:center; color:var(--muted); font-size:12.5px;">${_esc(st)}</div>`;
+            const btn = document.getElementById('corpse-run-btn');
+            btn.disabled = d.running || d.requested; btn.style.opacity = btn.disabled ? .5 : 1;
+            const rows = (d.report || []).slice().sort((a, b) => (b.dead || 0) - (a.dead || 0));
+            document.getElementById('corpse-report').innerHTML = rows.length ? rows.map(r => {
+                let note = r.error ? '⚠️ ' + r.error : (r.capped ? `⚠️ Telegram отдал только ${r.scanned} из ${r.members}` : '✓');
+                return `<tr><td>${_esc(r.title || r.chat_id)}</td><td>${r.members ?? '—'}</td><td>${r.scanned ?? 0}</td><td><b>${r.dead || 0}</b></td><td style="color:var(--muted)">${_esc(note)}</td></tr>`;
+            }).join('') : '<tr><td colspan="5" style="color:var(--muted);">Отчёта пока нет — нажмите «Проверить группы сейчас».</td></tr>';
+        }).catch(() => {});
+    }
+    function runCorpseSweep() {
+        fetch('/glaz/api/corpses/run', {method: 'POST'}).then(r => r.json()).then(d => {
+            showToast(d.success ? '🔎 Шпион проверит группы в течение 5 минут' : '⚠️ Не получилось');
+            loadCorpses();
+        });
+    }
     function loadDiag() {
+        loadCorpses();
         fetch('/glaz/api/diag/errors').then(r => r.json()).then(d => {
             let cards = '';
             (d.pulses || []).forEach(p => {

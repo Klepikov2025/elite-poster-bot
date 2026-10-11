@@ -837,30 +837,75 @@ def process_support_msg(message):
     bot.send_message(message.chat.id, "✅ Ваше сообщение успешно доставлено Администрации! Ожидайте ответа, мы напишем вам сюда.")
 # ======================================================================
 
-def background_corpse_removal(dead_uid):
-    """Медленно и аккуратно выносит труп из всех чатов сети, чтобы не словить Flood Wait"""
-    # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
-    from config import get_network_data
-    chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, PARNI_CHATS, all_cities, MAIN_CHANNEL_LINK = get_network_data()
+def all_network_chat_ids():
+    """Все чаты сети из «Инфраструктуры» (все пять сетей) + VIP и BEYOND."""
+    ids = set()
+    try:
+        infra = db['settings'].find_one({"_id": "infrastructure"}) or {}
+        for chat_list in (infra.get("networks") or {}).values():
+            for c in chat_list or []:
+                cid = str((c or {}).get("id", "")).strip()
+                if cid.lstrip('-').isdigit():
+                    ids.add(int(cid))
+    except Exception as e:
+        logger.warning(f"all_network_chat_ids: {e}")
+    ids.update([VIP_CHAT_ID, BEYOND_CHAT_ID])
+    return [i for i in ids if i]
 
-    # Собираем все чаты Империи в один список
-    all_empire_chats = []
-    if isinstance(PARNI_CHATS, list): all_empire_chats.extend(PARNI_CHATS)
-    if isinstance(chat_ids_mk, dict): all_empire_chats.extend(chat_ids_mk.values())
-    if isinstance(chat_ids_parni, dict): all_empire_chats.extend(chat_ids_parni.values())
-    all_empire_chats.extend([VIP_CHAT_ID, BEYOND_CHAT_ID])
-    
-    # Убираем дубликаты
-    all_empire_chats = list(set(all_empire_chats))
-    
-    for chat in all_empire_chats:
+
+def background_corpse_removal(dead_uid):
+    """Ставит удалённый аккаунт в очередь на вынос из всех чатов сети.
+    Раньше выносил сам и только из сетей МК и ПАРНИ — НС, Радуга и Гей Знакомства пропускались.
+    Теперь каждый чат — отдельная задача в corpse_queue, их спокойно разбирает corpse_kicker_daemon."""
+    now = time.time()
+    for chat in all_network_chat_ids():
         try:
-            # ban + revoke_messages=True: Вышвыриваем и сжигаем ВСЕ его сообщения в этом чате! 🔥
-            bot.ban_chat_member(chat, dead_uid, revoke_messages=True)
-            # unban: Сразу снимаем системный блок, чтобы не засорять черный список группы
-            bot.unban_chat_member(chat, dead_uid)
-        except: pass
-        time.sleep(0.3)  # Пауза, чтобы Телеграм не счел это спамом
+            db['corpse_queue'].update_one(
+                {"_id": f"{chat}:{dead_uid}"},
+                {"$setOnInsert": {"uid": int(dead_uid), "chat_id": int(chat), "status": "pending", "source": "рассылка", "ts": now}},
+                upsert=True)
+        except Exception:
+            pass
+
+
+def corpse_kicker_daemon():
+    """Выносит удалённые аккаунты (Deleted Account) из чатов по очереди corpse_queue.
+    Очередь наполняют рассылки (кто удалил аккаунт) и Шпион (проверяет списки участников групп).
+    Отдельная очередь — чтобы тысяча «трупов» не задерживала баны и муты из skynet_tasks."""
+    while True:
+        try:
+            if not SkynetSettings.get().get("auto_corpse_removal", True) or not acquire_lease("corpse_kicker", 180):
+                time.sleep(60)
+                continue
+            db['corpse_queue'].update_many({"status": "processing", "claimed_at": {"$lt": time.time() - 600}},
+                                           {"$set": {"status": "pending"}})
+            for _ in range(300):
+                job = db['corpse_queue'].find_one_and_update(
+                    {"status": "pending"}, {"$set": {"status": "processing", "claimed_at": time.time()}},
+                    sort=[("ts", 1)], return_document=ReturnDocument.AFTER)
+                if not job:
+                    break
+                status, err = "done", None
+                try:
+                    bot.ban_chat_member(job["chat_id"], job["uid"], revoke_messages=True)
+                    bot.unban_chat_member(job["chat_id"], job["uid"], only_if_banned=True)
+                except Exception as e:
+                    err = str(e)
+                    low = err.lower()
+                    if "too many requests" in low:
+                        m = re.search(r"retry after (\d+)", low)
+                        db['corpse_queue'].update_one({"_id": job["_id"]}, {"$set": {"status": "pending"}})
+                        time.sleep(int(m.group(1)) + 1 if m else 5)
+                        continue
+                    # «не участник» / «пользователь не найден» — значит, уже вынесен
+                    status = "done" if any(x in low for x in ("not a member", "user not found", "participant_id_invalid", "user_not_participant")) else "error"
+                db['corpse_queue'].update_one({"_id": job["_id"]}, {"$set": {"status": status, "done_at": time.time(), "error": err[:200] if err and status == "error" else None}})
+                users_collection.update_one({"_id": job["uid"]}, {"$set": {"is_deleted": True}})
+                time.sleep(0.4)
+        except Exception as e:
+            logger.error(f"corpse_kicker: {e}")
+        time.sleep(15)
+
 
 def unmute_user_everywhere(target_id):
     # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
@@ -1597,6 +1642,7 @@ def skynet_listener():
 # === ЗАПУСКАЕМ ФОНОВЫЕ ПРОЦЕССЫ ЗДЕСЬ (КОГДА ПИТОН УЖЕ ЗНАЕТ ВСЕ ФУНКЦИИ) ===
 threading.Thread(target=vip_funnel_sniper, daemon=True).start()
 threading.Thread(target=skynet_listener, daemon=True).start()
+threading.Thread(target=corpse_kicker_daemon, daemon=True).start()
 # ============================================================================
 
 # ==================== ДЕМОН CPA-СЕТИ (БУХГАЛТЕР 2.0) ====================

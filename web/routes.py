@@ -71,7 +71,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                     is_quarantine = False
                     first_seen = u_info.get("first_seen", 0) if u_info else 0
                     _qh = int((db['settings'].find_one({"_id": "moderation_limits"}) or {}).get("quaran_hours", 120))
-                    if uid > 7800000000 and first_seen > 0 and (time.time() - first_seen) < _qh * 3600:
+                    if uid > 7800000000 and first_seen > 0 and not (u_info or {}).get("quarantine_released") and (time.time() - first_seen) < _qh * 3600:
                         is_quarantine = True
 
                     # 💎 ВЫТАСКИВАЕМ СОКРОВИЩА ИЗ ПЛАТЕЖНОЙ БАЗЫ СКАЙНЕТА
@@ -534,7 +534,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         now = time.time()
         threshold = now - quaran_seconds
         
-        newbies = list(users_collection.find({"_id": {"$gt": 7800000000}, "first_seen": {"$gt": threshold}}))
+        newbies = list(users_collection.find({"_id": {"$gt": 7800000000}, "first_seen": {"$gt": threshold}, "quarantine_released": {"$ne": True}}))
         
         result = []
         for u in newbies:
@@ -555,7 +555,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
     def release_quarantine():
         if not session.get('logged_in'): return jsonify({"success": False}), 401
         uid = int(request.form.get('uid'))
-        users_collection.update_one({"_id": uid}, {"$set": {"first_seen": 0}}) 
+        # Дату появления не трогаем (по ней считается статистика), просто снимаем карантин флагом
+        users_collection.update_one({"_id": uid}, {"$set": {"quarantine_released": True}})
         add_radar_log(f"🥷 Амнистия новорега: {uid}")
         try: bot.send_message(uid, "Base Администрация досрочно сняла с вас карантин! Можете писать в чаты.")
         except: pass
@@ -644,7 +645,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         # 👆 ========================================== 👆
 
         # --- СТАРАЯ ЛОГИКА ДЛЯ ЛС ПОЛЬЗОВАТЕЛЕЙ ---
-        cursor = users_collection.find({}) if tgt == 'all' else users_collection.find({"is_vip": True}) if tgt == 'vip' else users_collection.find({"is_queer": True}) if tgt == 'queer' else None
+        _alive = {"is_deleted": {"$ne": True}}  # удалённые аккаунты рассылку не получают
+        cursor = users_collection.find(_alive) if tgt == 'all' else users_collection.find({"is_vip": True, **_alive}) if tgt == 'vip' else users_collection.find({"is_queer": True, **_alive}) if tgt == 'queer' else None
         if not cursor: return
         
         for u in cursor:
@@ -667,7 +669,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                     
                 # 2. Пользователь УДАЛИЛ аккаунт (настоящий "труп")
                 elif "deactivated" in err_text:
-                    users_collection.delete_one({"_id": u['_id']})
+                    # Из базы не удаляем (история, досье, статистика) — помечаем и больше не шлём рассылки
+                    users_collection.update_one({"_id": u['_id']}, {"$set": {"is_deleted": True, "deleted_at": time.time()}})
                     dead_count += 1
                     # 🔥 Тихо выносим удалённый аккаунт из чатов (тумблер «Автоочистка трупов»).
                     # Раньше на каждый труп шёл полноценный #BAN с отчётами в журнал и STAFF.

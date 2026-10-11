@@ -410,6 +410,16 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             return f"{d} " + ("день" if d % 10 == 1 and d % 100 != 11 else "дня" if 2 <= d % 10 <= 4 and not 12 <= d % 100 <= 14 else "дней")
         return f"{h} ч"
 
+    def _mark_first_seen(uid):
+        """Запоминает, когда человек впервые появился в сети (вошёл в чат или написал)."""
+        now = time.time()
+        try:
+            users_collection.update_one({"_id": uid, "first_seen": None}, {"$set": {"first_seen": now}})  # 0 = карантин снят вручную, не трогаем
+            users_collection.update_one({"_id": uid}, {"$setOnInsert": {"first_seen": now}}, upsert=True)
+            return now
+        except Exception:
+            return None
+
     def ai_down_alert(user_link, user_id, chat_title, text, zone_name, zone="black"):
         """ИИ не ответил: не наказываем вслепую, а зовём админов. Кнопки — с настоящей причиной зоны
         (раньше была одна кнопка бана с причиной «Клон забаненной анкеты»)."""
@@ -548,6 +558,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             if new_user.is_bot: continue # Ботов (и самого Скайнета) не проверяем
             
             user_id = new_user.id
+            _mark_first_seen(user_id)
             if banned_collection.find_one({"_id": user_id}):
                 continue  # уже обработан перехватчиком выше
             user_link = get_user_name(new_user)
@@ -651,6 +662,10 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
 
         try:
             user_data = users_collection.find_one({"_id": user_id}) or {}
+            if user_data.get("first_seen") is None:
+                # Раньше дата появления писалась только при включённом карантине —
+                # без неё «Новые участники» в статистике показывали 0.
+                user_data["first_seen"] = _mark_first_seen(user_id) or time.time()
             # ... и дальше пошел твой код (is_vip, is_queer и т.д.)
             is_vip = user_data.get("is_vip", False)
             is_queer = user_data.get("is_queer", False)
@@ -982,11 +997,10 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 return
 
             # === 🛡 ГЛУХОЙ КАРАНТИН НОВОРЕГОВ (HARD MUTE) ===
-            if sys_settings.get("quarantine_active", True):
-                first_seen = user_data.get('first_seen')
-                if not first_seen:
-                    first_seen = time.time()
-                    users_collection.update_one({"_id": user_id}, {"$set": {"first_seen": first_seen}}, upsert=True)
+            if sys_settings.get("quarantine_active", True) and not user_data.get("quarantine_released"):
+                # first_seen = 0 — старый способ «досрочно снять карантин». Раньше бот тут же
+                # ставил first_seen заново, и карантин начинался сначала — амнистия не работала.
+                first_seen = user_data.get('first_seen') or 0
                 seconds_passed = time.time() - first_seen
                 
                 if user_id > 7800000000 and seconds_passed < quarantine_sec:

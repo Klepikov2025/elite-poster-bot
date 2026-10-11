@@ -66,6 +66,7 @@ _RETENTION = [
     ("admin_audit", "ts", 180 * 86400),
     ("post_replies", "ts", 60 * 86400),
     ("ai_reviews", "ts", 14 * 86400),
+    ("corpse_queue", "done_at", 30 * 86400),
 ]
 
 
