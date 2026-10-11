@@ -1925,8 +1925,10 @@ from web.poster import register_poster_routes
 register_poster_routes(app, bot)
 from web.control import register_control_routes
 from web.home import register_home_routes
+from web.stats import register_stats_routes
 register_control_routes(app, add_radar_log)
 register_home_routes(app, add_radar_log)
+register_stats_routes(app)
 
 if __name__ == '__main__':
     print("Бот запущен — мягкая версия с приветствием и удалением сообщений (кроме сети ПАРНИ)")

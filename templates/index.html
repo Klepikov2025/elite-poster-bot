@@ -6,7 +6,7 @@
     <title>Глаз Саурона | ЦУП Империи</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.js"></script>
@@ -393,6 +393,107 @@
             input, select, textarea { font-size: 16px !important; } /* без авто-зума на iPhone */
         }
 
+
+        /* =================== 📊 СТАТИСТИКА 2.0 =================== */
+        #tab-main {
+            --s-1: #8f74e6; --s-ban: #d47428; --s-mute: #8f74e6; --s-post: #1ca58b; --s-ticket: #8f74e6; --s-user: #8f74e6;
+            --grid: #22252b; --axis: #32363e; --tip-bg: #1d2026;
+        }
+        .st-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .live-dot { display: inline-flex; align-items: center; gap: 7px; font: 500 11.5px var(--mono); color: var(--muted); }
+        .live-dot i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); position: relative; }
+        .live-dot i::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--ok); opacity: 0; animation: livePing 2.4s ease-out infinite; }
+        .live-dot.stale i { background: var(--warn); } .live-dot.stale i::after { border-color: var(--warn); }
+        @keyframes livePing { 0% { transform: scale(.6); opacity: .7; } 100% { transform: scale(1.8); opacity: 0; } }
+        .seg { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+        .seg-btn { border: none; background: none; color: var(--muted); font: 600 12.5px var(--sans); padding: 6px 12px; border-radius: 7px; cursor: pointer; }
+        .seg-btn:hover { color: var(--text); }
+        .seg-btn.active { background: var(--surface-3); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-2); }
+
+        .st-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 14px; }
+        .st-kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px 10px; position: relative; overflow: hidden; }
+        .st-kpi .lbl { font-size: 12.5px; color: var(--muted); }
+        .st-kpi .val { font: 700 28px var(--sans); letter-spacing: -.02em; margin-top: 2px; }
+        .st-kpi .delta { font: 600 12px var(--sans); margin-left: 6px; vertical-align: 5px; }
+        .st-kpi .delta.up { color: var(--ok); } .st-kpi .delta.down { color: #ff9fb1; } .st-kpi .delta.flat { color: var(--muted); }
+        .st-kpi .delta.bad.up { color: #ff9fb1; } .st-kpi .delta.bad.down { color: var(--ok); }
+        .st-kpi .cmp { font-size: 11.5px; color: var(--dim); }
+        .st-kpi svg { display: block; width: 100%; height: 34px; margin-top: 6px; overflow: visible; }
+        .st-kpi .spark { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: var(--len); stroke-dashoffset: var(--len); animation: drawIn 1.1s ease-out forwards; }
+        .st-kpi .spark-area { opacity: 0; animation: fadeIn .8s .5s ease-out forwards; }
+        @keyframes drawIn { to { stroke-dashoffset: 0; } }
+        @keyframes fadeIn { to { opacity: 1; } }
+
+        .st-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .st-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; min-width: 0; transition: opacity .25s; }
+        .st-card.st-wide { grid-column: 1 / -1; }
+        .st-grid.loading .st-card, .st-kpis.loading { opacity: .55; }
+        .st-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+        .st-title { font-weight: 700; font-size: 15px; }
+        .st-sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+        .st-link { background: none; border: none; color: var(--muted); font: 500 12px var(--sans); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+        .st-link:hover { color: var(--text); }
+        .st-legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); }
+        .st-legend span { display: inline-flex; align-items: center; gap: 6px; }
+        .st-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+        .st-legend i.ln { height: 2px; width: 14px; border-radius: 2px; }
+        .st-canvas { position: relative; height: 220px; }
+        .st-canvas.tall { height: 260px; }
+        .st-table { display: none; margin-top: 12px; max-height: 260px; overflow: auto; }
+        .st-table.open { display: block; }
+        .st-table table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+        .st-table th, .st-table td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+        .st-table th:first-child, .st-table td:first-child { text-align: left; }
+        .st-table th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--surface); }
+
+        .heat { display: grid; grid-template-columns: 28px repeat(24, minmax(0, 1fr)); gap: 3px; }
+        .heat .hd { font: 500 10.5px var(--mono); color: var(--dim); text-align: center; align-self: end; padding-bottom: 2px; }
+        .heat .dl { font-size: 11.5px; color: var(--muted); display: flex; align-items: center; }
+        .heat .c { height: 22px; border-radius: 4px; background: var(--surface-2); transform: scale(.4); opacity: 0; animation: cellIn .45s ease-out forwards; transition: box-shadow .12s; }
+        .heat .c:hover { box-shadow: 0 0 0 2px var(--text); }
+        @keyframes cellIn { to { transform: none; opacity: 1; } }
+        .heat-scale { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+        .heat-scale i { width: 80px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #262036, #5a4796, #8f74e6, #cbbcff); }
+
+        .comp-bar { display: flex; gap: 2px; height: 14px; border-radius: 7px; overflow: hidden; background: var(--surface-2); margin: 4px 0 14px; }
+        .comp-bar span { display: block; height: 100%; width: 0; transition: width .9s cubic-bezier(.2,.8,.2,1); }
+        .comp-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+        .comp-list li { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+        .comp-list i { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+        .comp-list .n { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .comp-list .p { width: 46px; text-align: right; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+        .comp-foot { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+        .comp-foot b { color: var(--text); }
+
+        .hbars { display: grid; gap: 9px; }
+        .hbar { display: grid; grid-template-columns: minmax(80px, 34%) 1fr auto; align-items: center; gap: 10px; font-size: 13px; }
+        .hbar .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #c5c8cf; }
+        .hbar .tr { height: 12px; background: var(--surface-2); border-radius: 0 4px 4px 0; position: relative; }
+        .hbar .fl { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--s-1); border-radius: 0 4px 4px 0; transition: width .9s cubic-bezier(.2,.8,.2,1); }
+        .hbar:hover .fl { filter: brightness(1.18); }
+        .hbar .v { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+        .st-empty { color: var(--dim); font-size: 13px; padding: 14px 0; text-align: center; }
+
+        .st-xray { font-size: 13.5px; color: #c5c8cf; line-height: 1.7; }
+        .st-xray [style*="background"] { border-radius: 8px !important; }
+
+        .st-tip { position: fixed; z-index: 500; pointer-events: none; background: var(--tip-bg); border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 11px; font-size: 12.5px; color: var(--text); box-shadow: 0 10px 30px rgba(0,0,0,.45); opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s; max-width: 240px; }
+        .st-tip.on { opacity: 1; transform: none; }
+        .st-tip b { font-size: 14px; }
+        .st-tip .k { color: var(--muted); }
+
+        @media (max-width: 860px) {
+            .st-grid { grid-template-columns: 1fr; }
+            .st-canvas, .st-canvas.tall { height: 200px; }
+            .heat { gap: 2px; grid-template-columns: 24px repeat(24, minmax(0, 1fr)); }
+            .heat .c { border-radius: 2px; height: 13px; }
+            .heat .hd:not(.show) { visibility: hidden; }
+            .st-kpi .val { font-size: 24px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .st-kpi .spark, .st-kpi .spark-area, .heat .c { animation: none; stroke-dashoffset: 0; opacity: 1; transform: none; }
+        }
+
     </style>
 </head>
 <body>
@@ -667,38 +768,88 @@
     </div>
 
     <div id="tab-main" class="tab-content">
-        <div class="dashboard">
-            <div class="card"><h3>Всего юзеров</h3><div class="number" id="stat-total">{{ total }}</div><p>В базе Скайнетика</p></div>
-            <div class="card success"><h3>VIP Элита</h3><div class="number" id="stat-vips">{{ vips }}</div><p>Коронованные</p></div>
-            <div class="card warning"><h3>BEYOND</h3><div class="number" id="stat-queers">{{ queers }}</div><p>Спец. статус</p></div>
-            <div class="card danger"><h3>В Черном Списке</h3><div class="number" id="stat-banned">{{ banned }}</div><p>Ликвидированы</p></div>
+        <div class="sec-head">
+            <div><h2>Статистика</h2><p>Как живёт сеть: приток людей, анкеты, наказания, поддержка. Наведите на график — увидите цифры за день.</p></div>
+            <div class="st-controls">
+                <span class="live-dot" id="st-live" title="Данные обновляются сами раз в минуту"><i></i><span id="st-updated">загрузка…</span></span>
+                <div class="seg" role="tablist" aria-label="Период">
+                    <button class="seg-btn" data-days="7" onclick="loadStats(7)">7 дней</button>
+                    <button class="seg-btn active" data-days="30" onclick="loadStats(30)">30 дней</button>
+                    <button class="seg-btn" data-days="90" onclick="loadStats(90)">90 дней</button>
+                </div>
+            </div>
         </div>
-        <div class="charts-container">
-            <div class="chart-block" style="width: 400px;"><h3 style="color: #bb86fc;">📊 Соотношение сил</h3><canvas id="statusChart" width="360" height="240"></canvas></div>
-            <div class="chart-block" style="width: 400px;"><h3 style="color: #03dac6;">🧠 Удовлетворенность саппортом</h3><canvas id="ratingsChart" width="360" height="240"></canvas></div>
-            <div class="chart-block" style="width: 625px;"><h3 style="color: #03dac6;">📍 Топ-10 активных городов сети</h3><canvas id="cityChart" width="580" height="240"></canvas></div>
-        </div>
-<div class="charts-container" style="margin-top: 5px;">
-        <div class="chart-block" style="width: 100%; display: flex; gap: 20px; background: #121212; border: 1px solid #333; padding: 15px;">
-            
-            <div style="flex: 1; padding: 15px; background: #1e1e1e; border-radius: 8px; border-left: 4px solid #bb86fc;">
-                <h3 style="color: #bb86fc; margin-top: 0; text-align: left;">🔍 Рентген Базы</h3>
-                <div id="xray-content" style="font-size: 14px; color: #aaa; line-height: 1.8;">
-                    Загрузка сканера...
+
+        <div class="st-kpis" id="st-kpis"></div>
+
+        <div class="st-grid" id="st-grid">
+            <div class="st-card st-wide">
+                <div class="st-card-head">
+                    <div><div class="st-title">Приток участников</div><div class="st-sub" id="st-users-sub">новые люди в базе по дням</div></div>
+                    <button class="st-link" onclick="toggleStTable('users')">таблицей</button>
+                </div>
+                <div class="st-canvas tall"><canvas id="st-users-chart"></canvas></div>
+                <div class="st-table" id="st-table-users"></div>
+            </div>
+
+            <div class="st-card">
+                <div class="st-card-head">
+                    <div><div class="st-title">Наказания</div><div class="st-sub">баны и муты по дням</div></div>
+                    <div class="st-legend"><span><i style="background:var(--s-ban)"></i>Баны</span><span><i style="background:var(--s-mute)"></i>Муты</span></div>
+                </div>
+                <div class="st-canvas"><canvas id="st-punish-chart"></canvas></div>
+            </div>
+
+            <div class="st-card">
+                <div class="st-card-head">
+                    <div><div class="st-title">Анкеты и обращения</div><div class="st-sub">публикации и тикеты поддержки по дням</div></div>
+                    <div class="st-legend"><span><i class="ln" style="background:var(--s-post)"></i>Анкеты</span><span><i class="ln" style="background:var(--s-ticket)"></i>Тикеты</span></div>
+                </div>
+                <div class="st-canvas"><canvas id="st-activity-chart"></canvas></div>
+            </div>
+
+            <div class="st-card st-wide">
+                <div class="st-card-head">
+                    <div><div class="st-title">Когда нарушают</div><div class="st-sub">баны и муты по дням недели и часам, время московское</div></div>
+                    <div class="heat-scale"><span>реже</span><i></i><span>чаще</span></div>
+                </div>
+                <div class="heat" id="st-heat"></div>
+            </div>
+
+            <div class="st-card">
+                <div class="st-card-head"><div><div class="st-title">Топ-10 городов</div><div class="st-sub">по основному городу участника</div></div></div>
+                <div class="hbars" id="st-cities"></div>
+            </div>
+
+            <div class="st-card">
+                <div class="st-card-head"><div><div class="st-title">🔍 Рентген базы</div><div class="st-sub">где сейчас люди в воронках</div></div></div>
+                <div id="xray-content" class="st-xray">Загрузка сканера...</div>
+            </div>
+
+            <div class="st-card">
+                <div class="st-card-head"><div><div class="st-title">Состав сети</div><div class="st-sub">кто есть кто среди <b id="stat-total">{{ total }}</b> участников</div></div></div>
+                <div class="comp-bar" id="st-comp-bar"></div>
+                <ul class="comp-list" id="st-comp-list"></ul>
+                <div class="comp-foot">
+                    <span>👑 VIP <b id="stat-vips">{{ vips }}</b></span>
+                    <span>🏳️‍🌈 BEYOND <b id="stat-queers">{{ queers }}</b></span>
+                    <span>🔨 В чёрном списке <b id="stat-banned">{{ banned }}</b></span>
                 </div>
             </div>
 
-            <div style="flex: 1; padding: 15px; background: #1e1e1e; border-radius: 8px; border-left: 4px solid #ffb74d;">
-                <h3 style="color: #ffb74d; margin-top: 0; text-align: left;">🎯 Истинные мотивы (Зачем пришли)</h3>
-                <div style="font-size: 12px; color: #666; margin-bottom: 10px;">Статистика срабатывания трекеров-жучков.</div>
-                <div id="motives-content" style="font-size: 14px; color: #aaa; line-height: 1.8;">
-                    Загрузка данных трекеров...
-                </div>
+            <div class="st-card">
+                <div class="st-card-head"><div><div class="st-title">Оценки поддержки</div><div class="st-sub">средний балл из 5 по каждому, кто отвечал</div></div></div>
+                <div class="hbars" id="st-ratings"></div>
             </div>
 
+            <div class="st-card st-wide">
+                <div class="st-card-head"><div><div class="st-title">🎯 Зачем пришли</div><div class="st-sub">что люди нажимали в ботах (трекеры)</div></div></div>
+                <div id="motives-content" class="st-xray">Загрузка данных трекеров...</div>
+            </div>
         </div>
+        <div class="st-tip" id="st-tip" role="tooltip"></div>
     </div>
-    </div> <div id="tab-radar" class="tab-content">
+    <div id="tab-radar" class="tab-content">
         <div class="charts-container" style="align-items: flex-start;">
             <div class="chart-block" style="width: 500px;"><h3 style="color: #03dac6;">🔴 Живой Радар (Web-Логи)</h3><div class="radar-box" id="radar-box"><div style="color: #888;">Загрузка канала связи...</div></div></div>
             <div class="chart-block" style="width: 500px;"><h3 style="color: #bb86fc;">📋 Умные Списки</h3>
@@ -2276,14 +2427,7 @@ function previewBroadcast() {
         let ratingsChartInstance = null;
 
         function initCharts() {
-            fetch('/glaz/api/chart_data').then(res => res.json()).then(data => {
-                const ctxStatus = document.getElementById('statusChart').getContext('2d');
-                statusChart = new Chart(ctxStatus, { type: 'doughnut', data: { labels: ['Обычные юзеры', 'VIP Элита', 'BEYOND', 'Черный Список'], datasets: [{ data: data.status_values, backgroundColor: ['#444444', '#ffb74d', '#f6a5c0', '#cf6679'], borderWidth: 1, borderColor: '#121212' }] }, options: { responsive: false, plugins: { legend: { labels: { color: '#fff' } } } } });
-                const ctxCity = document.getElementById('cityChart').getContext('2d');
-                cityChart = new Chart(ctxCity, { type: 'bar', data: { labels: data.city_labels, datasets: [{ label: 'Участников', data: data.city_values, backgroundColor: 'rgba(3, 218, 198, 0.6)', borderColor: '#03dac6', borderWidth: 1 }] }, options: { responsive: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: '#252525' }, ticks: { color: '#fff' } }, y: { grid: { color: '#252525' }, ticks: { color: '#fff' } } } } });
-            });
-
-            // Подгружаем аналитику оценок
+            loadStats(ST.days);
             updateRatingsPanel();
         }
 
@@ -2295,24 +2439,7 @@ function previewBroadcast() {
                 const labels = data.stats.map(item => `${item.admin} (${item.count} шт)`);
                 const scores = data.stats.map(item => item.avg);
 
-                const ctxRatings = document.getElementById('ratingsChart').getContext('2d');
-                if(ratingsChartInstance) ratingsChartInstance.destroy();
-                
-                ratingsChartInstance = new Chart(ctxRatings, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [{ data: scores, backgroundColor: ['#03dac6', '#bb86fc', '#ffb74d', '#3390ec'], borderWidth: 1 }]
-                    },
-                    options: {
-                        responsive: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: { min: 1, max: 5, ticks: { color: '#fff' }, grid: { color: '#252525' } },
-                            x: { ticks: { color: '#fff' }, grid: { color: '#252525' } }
-                        }
-                    }
-                });
+                renderStHbars('st-ratings', data.stats.map(it => ({ name: `${it.admin} · ${it.count} шт`, v: it.avg, title: `${it.admin}: средний балл ${it.avg} из 5 по ${it.count} оценкам` })), v => v.toFixed(1), 5);
 
                 // Отрисовка Радара Гнева
                 let radarHtml = '';
@@ -3717,5 +3844,276 @@ function loadVerifList() {
         }
 
     </script>
+<script>
+    // =================== 📊 СТАТИСТИКА 2.0 ===================
+    const ST = { days: 30, data: null, charts: {}, timer: null, updatedAt: 0, tableOpen: {} };
+    const ST_COL = { user: '#8f74e6', ban: '#d47428', mute: '#8f74e6', post: '#1ca58b', ticket: '#8f74e6', other: '#3a3e46',
+                     surface: '#14161a', grid: '#22252b', axis: '#32363e', muted: '#8b909a', text: '#ececf1' };
+    const ST_HEAT = ['#262036', '#5a4796', '#8f74e6', '#cbbcff'];
+
+    function _stNum(n) {
+        n = Number(n) || 0;
+        if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(1).replace('.0', '') + 'M';
+        if (Math.abs(n) >= 1e4) return (n / 1e3).toFixed(1).replace('.0', '') + 'K';
+        return n.toLocaleString('ru-RU');
+    }
+    function _stCountUp(el, to, suffix) {
+        const from = Number(el.dataset.v || 0); el.dataset.v = to;
+        const t0 = performance.now(), dur = 900;
+        const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        function step(t) {
+            const k = reduce ? 1 : Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+            el.textContent = _stNum(Math.round(from + (to - from) * e)) + (suffix || '');
+            if (k < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+    }
+    function _stSpark(values, color) {
+        const w = 200, h = 34, n = values.length, max = Math.max(1, ...values);
+        if (n < 2) return '';
+        const pts = values.map((v, i) => [i * (w / (n - 1)), h - 3 - (v / max) * (h - 6)]);
+        const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+        let len = 0; for (let i = 1; i < n; i++) len += Math.hypot(pts[i][0] - pts[i-1][0], pts[i][1] - pts[i-1][1]);
+        const last = pts[n - 1];
+        return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+            <path class="spark-area" d="${d} L${w} ${h} L0 ${h} Z" fill="${color}" fill-opacity=".10"/>
+            <path class="spark" d="${d}" stroke="${color}" style="--len:${Math.ceil(len)}"/>
+            <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="${color}" stroke="${ST_COL.surface}" stroke-width="2"/>
+        </svg>`;
+    }
+    function _stDelta(cur, prev, bad) {
+        if (!prev && !cur) return '<span class="delta flat">—</span>';
+        if (!prev) return `<span class="delta ${bad ? 'bad ' : ''}up">новое</span>`;
+        const p = Math.round((cur - prev) / prev * 100);
+        const dir = p > 0 ? 'up' : (p < 0 ? 'down' : 'flat');
+        return `<span class="delta ${bad ? 'bad ' : ''}${dir}">${p > 0 ? '▲' : (p < 0 ? '▼' : '')} ${Math.abs(p)}%</span>`;
+    }
+
+    function renderStKpis(d) {
+        const items = [
+            { k: 'new_users', label: 'Новые участники', c: ST_COL.user },
+            { k: 'posts', label: 'Анкет опубликовано', c: ST_COL.post },
+            { k: 'punish', label: 'Наказаний (баны и муты)', c: ST_COL.ban, bad: true },
+            { k: 'tickets', label: 'Обращений в поддержку', c: ST_COL.ticket, bad: true },
+        ];
+        if (d.revenue) items.push({ k: 'revenue', label: 'Звёзд заработано ⭐️', c: '#e0a43a' });
+        const box = document.getElementById('st-kpis');
+        box.innerHTML = items.map(it => `
+            <div class="st-kpi" title="Сравнение с предыдущими ${d.days} днями">
+                <div class="lbl">${it.label}</div>
+                <div><span class="val" id="st-kv-${it.k}">0</span><span id="st-kd-${it.k}"></span></div>
+                <div class="cmp" id="st-kc-${it.k}"></div>
+                <div id="st-ks-${it.k}"></div>
+            </div>`).join('');
+        items.forEach(it => {
+            const s = d[it.k];
+            const el = document.getElementById('st-kv-' + it.k);
+            el.dataset.v = 0;
+            _stCountUp(el, s.total, it.suffix);
+            document.getElementById('st-kd-' + it.k).innerHTML = _stDelta(s.total, s.prev, it.bad);
+            document.getElementById('st-kc-' + it.k).textContent = `было ${_stNum(s.prev)} за прошлые ${d.days} дн.`;
+            document.getElementById('st-ks-' + it.k).innerHTML = _stSpark(s.series, it.c);
+        });
+    }
+
+    // Вертикальная линия-прицел под курсором (линейные графики)
+    const stCrosshair = {
+        id: 'stCrosshair',
+        afterDatasetsDraw(chart) {
+            const a = chart.tooltip && chart.tooltip.getActiveElements && chart.tooltip.getActiveElements();
+            if (!a || !a.length || chart.config.type !== 'line') return;
+            const x = a[0].element.x, { top, bottom } = chart.chartArea, ctx = chart.ctx;
+            ctx.save(); ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom);
+            ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(236,236,241,.35)'; ctx.stroke(); ctx.restore();
+        }
+    };
+    function _stBaseOpts(stacked) {
+        return {
+            responsive: true, maintainAspectRatio: false,
+            animation: { duration: 800, easing: 'easeOutQuart' },
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1d2026', borderColor: '#323741', borderWidth: 1, padding: 10, cornerRadius: 10,
+                    titleColor: ST_COL.muted, titleFont: { family: 'Inter', size: 11, weight: '500' },
+                    bodyColor: ST_COL.text, bodyFont: { family: 'Inter', size: 13, weight: '600' },
+                    displayColors: true, boxWidth: 10, boxHeight: 2, boxPadding: 6,
+                    callbacks: { label: c => ` ${_stNum(c.parsed.y)}  ${c.dataset.label}` }
+                }
+            },
+            scales: {
+                x: { stacked, grid: { display: false }, border: { color: ST_COL.axis },
+                     ticks: { color: ST_COL.muted, font: { family: 'Inter', size: 11 }, maxRotation: 0, autoSkip: true, autoSkipPadding: 14 } },
+                y: { stacked, beginAtZero: true, grid: { color: ST_COL.grid, drawTicks: false }, border: { display: false },
+                     ticks: { color: ST_COL.muted, font: { family: 'Inter', size: 11 }, precision: 0, padding: 8, maxTicksLimit: 5, callback: v => _stNum(v) } }
+            }
+        };
+    }
+    function _stGradient(ctx, area, hex) {
+        const g = ctx.createLinearGradient(0, area.top, 0, area.bottom);
+        g.addColorStop(0, hex + '38'); g.addColorStop(1, hex + '00');
+        return g;
+    }
+    function _stUpsert(id, cfg) {
+        const ex = ST.charts[id];
+        if (ex) {
+            ex.data.labels = cfg.data.labels;
+            cfg.data.datasets.forEach((ds, i) => { ex.data.datasets[i].data = ds.data; });
+            ex.update();
+            return ex;
+        }
+        const el = document.getElementById(id);
+        if (!el || typeof Chart === 'undefined') return null;
+        ST.charts[id] = new Chart(el.getContext('2d'), cfg);
+        return ST.charts[id];
+    }
+    function _stLine(label, data, color, fill) {
+        return {
+            label, data, borderColor: color, borderWidth: 2, tension: 0.35, cubicInterpolationMode: 'monotone',
+            pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: color, pointHoverBorderColor: ST_COL.surface, pointHoverBorderWidth: 2,
+            fill: !!fill,
+            backgroundColor: fill ? (c => { const { chart } = c; return chart.chartArea ? _stGradient(chart.ctx, chart.chartArea, color) : 'transparent'; }) : color,
+        };
+    }
+    function renderStCharts(d) {
+        const L = d.labels;
+        _stUpsert('st-users-chart', { type: 'line', plugins: [stCrosshair],
+            data: { labels: L, datasets: [_stLine('новых', d.new_users.series, ST_COL.user, true)] }, options: _stBaseOpts(false) });
+
+        const bar = (label, data, color, top) => ({
+            label, data, backgroundColor: color, hoverBackgroundColor: color + 'dd', maxBarThickness: 24,
+            borderRadius: top ? { topLeft: 4, topRight: 4 } : 0, borderSkipped: false,
+            borderColor: ST_COL.surface, borderWidth: top ? { bottom: 2 } : 0,
+        });
+        const po = _stBaseOpts(true); po.interaction = { mode: 'index', intersect: false };
+        _stUpsert('st-punish-chart', { type: 'bar',
+            data: { labels: L, datasets: [bar('банов', d.bans.series, ST_COL.ban, false), bar('мутов', d.mutes.series, ST_COL.mute, true)] }, options: po });
+
+        _stUpsert('st-activity-chart', { type: 'line', plugins: [stCrosshair],
+            data: { labels: L, datasets: [_stLine('анкет', d.posts.series, ST_COL.post, false), _stLine('тикетов', d.tickets.series, ST_COL.ticket, false)] },
+            options: _stBaseOpts(false) });
+
+        if (ST.tableOpen.users) toggleStTable('users', true);
+    }
+
+    function _stHeatColor(v, max) {
+        if (!v) return null;
+        const t = Math.min(1, v / max) * (ST_HEAT.length - 1), i = Math.min(ST_HEAT.length - 2, Math.floor(t)), f = t - i;
+        const a = ST_HEAT[i], b = ST_HEAT[i + 1];
+        const mix = k => Math.round(parseInt(a.substr(k, 2), 16) * (1 - f) + parseInt(b.substr(k, 2), 16) * f).toString(16).padStart(2, '0');
+        return '#' + mix(1) + mix(3) + mix(5);
+    }
+    function renderStHeat(heat) {
+        const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+        const max = Math.max(1, ...heat.flat());
+        const box = document.getElementById('st-heat');
+        let html = '<div></div>';
+        for (let h = 0; h < 24; h++) html += `<div class="hd ${h % 6 === 0 ? 'show' : ''}">${h % 3 === 0 ? h : ''}</div>`;
+        heat.forEach((row, di) => {
+            html += `<div class="dl">${days[di]}</div>`;
+            row.forEach((v, h) => {
+                const c = _stHeatColor(v, max);
+                html += `<div class="c" data-v="${v}" data-d="${di}" data-h="${h}" tabindex="0" style="${c ? 'background:' + c + ';' : ''}animation-delay:${(h * 12 + di * 25)}ms"></div>`;
+            });
+        });
+        box.innerHTML = html;
+        const tip = document.getElementById('st-tip');
+        const show = (el, x, y) => {
+            const v = +el.dataset.v, h = +el.dataset.h;
+            tip.innerHTML = `<b>${v}</b> <span class="k">${v % 10 === 1 && v % 100 !== 11 ? 'наказание' : (v % 10 >= 2 && v % 10 <= 4 && (v % 100 < 10 || v % 100 >= 20) ? 'наказания' : 'наказаний')}</span><br><span class="k">${days[+el.dataset.d]}, ${String(h).padStart(2, '0')}:00–${String((h + 1) % 24).padStart(2, '0')}:00</span>`;
+            tip.style.left = Math.min(window.innerWidth - 200, x + 12) + 'px'; tip.style.top = (y - 54) + 'px';
+            tip.classList.add('on');
+        };
+        box.onmousemove = e => { const el = e.target.closest('.c'); if (el) show(el, e.clientX, e.clientY); else tip.classList.remove('on'); };
+        box.onmouseleave = () => tip.classList.remove('on');
+        box.onfocusin = e => { const el = e.target.closest('.c'); if (el) { const r = el.getBoundingClientRect(); show(el, r.right, r.top + 40); } };
+        box.onfocusout = () => tip.classList.remove('on');
+    }
+
+    function renderStComposition(c) {
+        const parts = [
+            { k: 'vip', n: '👑 VIP', c: '#8f74e6' }, { k: 'beyond', n: '🏳️‍🌈 BEYOND', c: '#1ca58b' },
+            { k: 'verified', n: '🛡 Верифицированные', c: '#d47428' }, { k: 'regular', n: 'Остальные', c: ST_COL.other },
+        ];
+        const total = Math.max(1, c.total);
+        document.getElementById('st-comp-bar').innerHTML = parts.map(p => `<span data-w="${(c[p.k] / total * 100).toFixed(2)}" style="background:${p.c}" title="${p.n}: ${c[p.k]}"></span>`).join('');
+        requestAnimationFrame(() => document.querySelectorAll('#st-comp-bar span').forEach(s => { s.style.width = s.dataset.w + '%'; }));
+        document.getElementById('st-comp-list').innerHTML = parts.map(p =>
+            `<li><i style="background:${p.c}"></i>${p.n}<span class="n">${_stNum(c[p.k])}</span><span class="p">${(c[p.k] / total * 100).toFixed(1)}%</span></li>`).join('');
+        const st = document.getElementById('stat-total'); if (st) st.textContent = _stNum(c.total);
+        const sb = document.getElementById('stat-banned'); if (sb) sb.textContent = _stNum(c.banned);
+    }
+
+    function renderStHbars(boxId, rows, fmt, maxVal) {
+        const box = document.getElementById(boxId);
+        if (!rows.length) { box.innerHTML = '<div class="st-empty">Пока нет данных</div>'; return; }
+        const max = maxVal || Math.max(1, ...rows.map(r => r.v));
+        box.innerHTML = '';
+        rows.forEach(r => {
+            const row = document.createElement('div'); row.className = 'hbar'; row.title = r.title || '';
+            const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.name;
+            const tr = document.createElement('span'); tr.className = 'tr';
+            const fl = document.createElement('span'); fl.className = 'fl'; fl.dataset.w = (r.v / max * 100).toFixed(1);
+            if (r.color) fl.style.background = r.color;
+            tr.appendChild(fl);
+            const v = document.createElement('span'); v.className = 'v'; v.textContent = fmt(r.v);
+            row.append(nm, tr, v); box.appendChild(row);
+        });
+        requestAnimationFrame(() => box.querySelectorAll('.fl').forEach(f => { f.style.width = f.dataset.w + '%'; }));
+    }
+
+    function toggleStTable(which, keep) {
+        const box = document.getElementById('st-table-' + which);
+        const d = ST.data; if (!box || !d) return;
+        const open = keep ? true : !box.classList.contains('open');
+        ST.tableOpen[which] = open;
+        box.classList.toggle('open', open);
+        if (!open) return;
+        const rows = d.labels.map((l, i) => [l, d.new_users.series[i], d.posts.series[i], d.bans.series[i], d.mutes.series[i], d.tickets.series[i]]).reverse();
+        box.innerHTML = '<table><thead><tr><th>День</th><th>Новые</th><th>Анкеты</th><th>Баны</th><th>Муты</th><th>Тикеты</th></tr></thead><tbody>' +
+            rows.map(r => '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
+    }
+
+    function _stTick() {
+        const el = document.getElementById('st-updated'), live = document.getElementById('st-live');
+        if (!el || !ST.updatedAt) return;
+        const s = Math.round((Date.now() - ST.updatedAt) / 1000);
+        el.textContent = s < 10 ? 'обновлено только что' : (s < 60 ? `обновлено ${s} сек назад` : `обновлено ${Math.round(s / 60)} мин назад`);
+        live.classList.toggle('stale', s > 150);
+    }
+    setInterval(_stTick, 5000);
+
+    function loadStats(days) {
+        if (days) ST.days = days;
+        document.querySelectorAll('#tab-main .seg-btn').forEach(b => b.classList.toggle('active', +b.dataset.days === ST.days));
+        const grid = document.getElementById('st-grid'), kp = document.getElementById('st-kpis');
+        grid.classList.add('loading'); kp.classList.add('loading');   // держим прошлую картинку, без мигания
+        return fetch('/glaz/api/stats/trends?days=' + ST.days).then(r => r.json()).then(d => {
+            if (d.error) return;
+            const periodChanged = !ST.data || ST.data.days !== d.days;
+            ST.data = d; ST.updatedAt = Date.now(); _stTick();
+            d.punish = { series: d.bans.series.map((v, i) => v + d.mutes.series[i]), total: d.bans.total + d.mutes.total, prev: d.bans.prev + d.mutes.prev };
+            if (periodChanged || !document.querySelector('#st-kpis .st-kpi')) renderStKpis(d);
+            else ['new_users', 'posts', 'punish', 'tickets', 'revenue'].forEach(k => {
+                const el = document.getElementById('st-kv-' + k); if (el && d[k]) _stCountUp(el, d[k].total);
+            });
+            renderStCharts(d);
+            renderStHeat(d.heat);
+            renderStComposition(d.composition);
+            renderStHbars('st-cities', d.cities.map(c => ({ name: c.name, v: c.count })), _stNum);
+        }).catch(() => {}).finally(() => { grid.classList.remove('loading'); kp.classList.remove('loading'); });
+    }
+    // Тихое автообновление раз в минуту, пока вкладка открыта и видна
+    setInterval(() => {
+        const tab = document.getElementById('tab-main');
+        if (tab && tab.classList.contains('active') && !document.hidden) loadStats();
+    }, 60000);
+
+    if (typeof Chart !== 'undefined') {
+        Chart.defaults.font.family = "'Inter', 'Segoe UI', system-ui, sans-serif";
+        Chart.defaults.color = ST_COL.muted;
+    }
+</script>
 </body>
 </html>
