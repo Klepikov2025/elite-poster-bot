@@ -802,11 +802,24 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
 
             # === 🤬 СЛОВАРЬ ИНКВИЗИТОРА (ТЯНЕМ ИЗ БАЗЫ) ===
             dict_settings = db['settings'].find_one({"_id": "skynet_dictionary"}) or {}
-            live_red = RED_WORDS + [w['pattern'] for w in dict_settings.get('red', [])]
-            live_yellow = YELLOW_COMMERCE_REGEX + [w['pattern'] for w in dict_settings.get('yellow', [])]
+            # base_v1: встроенные слова уже лежат в базе (панель → «Словарь») — берём только оттуда,
+            # иначе (старая база) как раньше: зашитые слова + добавленные в панели. «only: spy» — слово только для Шпиона.
+            _mine = lambda z: [w['pattern'] for w in dict_settings.get(z, []) if isinstance(w, dict) and w.get('pattern') and w.get('only') in (None, 'skynet')]
+            _base = not dict_settings.get("base_v1")
+            live_red = (RED_WORDS if _base else []) + _mine('red')
+            live_yellow = (YELLOW_COMMERCE_REGEX if _base else []) + _mine('yellow')
+            red_text = text
             # ===============================================
 
-            if sk.get("red_zone", True) and any(re.search(word, text) for word in live_red):
+            def _hit(pats, src):
+                for w in pats:
+                    try:
+                        if re.search(w, src): return True
+                    except re.error:
+                        continue   # одно битое слово из панели не ломает проверку
+                return False
+
+            if sk.get("red_zone", True) and _hit(live_red, red_text):
                 safe_delete(bot, chat_id, message.message_id)
                 ban_user_everywhere(user_id, reason="Мясорубка: Красная зона", admin_name="Скайнет ⚔️", user_link=user_link, trigger_text=trigger_text, origin_chat=chat_title)
                 return
@@ -834,7 +847,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
 
             # 1. Сначала фильтруем коммерцию (для всех, даже для VIP/QUEER)
             clean_commerce = re.sub(r'без\s*м\.?п\.?|не\s*коммерция|без\s*мат(\.?|ериальной)\s*помощи', '', text)
-            if sk.get("yellow_commerce", True) and any(re.search(pattern, clean_commerce) for pattern in live_yellow):
+            if sk.get("yellow_commerce", True) and _hit(live_yellow, clean_commerce):
                 
                 # 🔥 ПОДКЛЮЧАЕМ ИИ-АНАЛИТИКУ ПЕРЕД МУТОМ 🔥
                 verdict_yellow = ai_context_checker(raw_text, zone="yellow")

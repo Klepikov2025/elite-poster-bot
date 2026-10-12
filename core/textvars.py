@@ -23,6 +23,15 @@ VARS = {
     "vip_price": "Цена VIP, ⭐️",
     "beyond_price": "Цена BEYOND, ⭐️",
     "rub_per_star": "Курс ₽ за ⭐️",
+    "fine_nark": "Штраф: наркотики, ⭐️",
+    "fine_minor": "Штраф: <18 / обман с возрастом, ⭐️",
+    "fine_nark_react": "Штраф: реакция на запрещёнку, ⭐️",
+    "fine_minor_react": "Штраф: реакция на детское, ⭐️",
+    "fine_commerce": "Штраф: коммерция, ⭐️",
+    "fine_bio": "Штраф: ссылка в БИО, ⭐️",
+    "fine_flood": "Штраф: флуд, ⭐️",
+    "fine_bot_block": "Штраф: блок бота, ⭐️",
+    "fine_manual": "Штраф: ручной бан без суммы, ⭐️",
 }
 
 _RX = re.compile(r"\{(" + "|".join(VARS) + r")\}")
@@ -50,6 +59,15 @@ def values():
         "vip_price": int(price.get("vip_price", 250)),
         "beyond_price": int(price.get("beyond_price", 250)),
         "rub_per_star": (int(rate) if float(rate).is_integer() else rate),
+        "fine_nark": c("fine_nark", 2000),
+        "fine_minor": c("fine_minor", 2000),
+        "fine_nark_react": c("fine_nark_react", 1563),
+        "fine_minor_react": c("fine_minor_react", 1563),
+        "fine_commerce": c("fine_commerce", 1563),
+        "fine_bio": c("fine_bio", 250),
+        "fine_flood": c("fine_flood", 500),
+        "fine_bot_block": c("fine_bot_block", 250),
+        "fine_manual": c("fine_manual", 1500),
     }
 
 

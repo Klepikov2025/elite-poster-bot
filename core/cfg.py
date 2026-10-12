@@ -38,6 +38,13 @@ def coerce(entry, value):
         v = value if isinstance(value, bool) else str(value).lower() in ("1", "true", "да", "on")
     else:
         v = str(value).strip()
+        rx = entry.get("regex")
+        if rx and v and not __import__("re").fullmatch(rx, v, __import__("re").I):
+            raise ValueError(entry.get("regex_hint") or "неверный формат")
+        if entry.get("sum") and v:
+            nums = [int(x) for x in __import__("re").findall(r"\d+", v)]
+            if sum(nums) != entry["sum"]:
+                raise ValueError(f"сумма должна быть {entry['sum']} (сейчас {sum(nums)})")
     if t in ("int", "float"):
         if "min" in entry and v < entry["min"]:
             raise ValueError(f"не меньше {entry['min']}")

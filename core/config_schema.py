@@ -18,6 +18,14 @@ G_STEALTH = "🥷 Автопилот"
 G_SEC = "🗂 Секретарь"
 G_BEYOND = "🏳️‍🌈 BEYOND"
 G_MP = "📢 МП (реклама)"
+G_FINES = "⚖️ Прайс штрафов"
+G_CASH = "💸 Кэшбэк и вывод"
+G_CASINO = "🎰 Казино и экономика"
+G_JOBS = "⏰ Автособытия Секретаря"
+
+_LIST = r"\d+(\s*[,;]\s*\d+)*"
+_PAIRS = r"\d+\s*:\s*\d+(\s*[,;]\s*\d+\s*:\s*\d+)*"
+_TIME = r"([01]?\d|2[0-3]):[0-5]\d"
 
 SCHEMA = [
     # --- деньги ---
@@ -27,10 +35,10 @@ SCHEMA = [
      "help": "Оплата очками: VIP, штрафы, индульгенция, BEYOND, реклама.", "bots": "Скайнет, Секретарь, BEYOND, МП", "owner": True},
     {"key": "city_pass_price", "group": G_MONEY, "label": "Пропуск в чужой город, ⭐️", "type": "int", "default": 250, "min": 1, "max": 100000,
      "bots": "Скайнет", "owner": True},
-    {"key": "fine_tag_free", "group": G_MONEY, "label": "Штраф, после которого тег «Свободен», ⭐️", "type": "int", "default": 650, "min": 1, "max": 100000,
-     "help": "Если штраф оплачен ровно на эту сумму, человек получает тег «Свободен».", "bots": "Скайнет", "owner": True},
-    {"key": "fine_tag_sponsor", "group": G_MONEY, "label": "Штраф-взнос спонсора, ⭐️", "type": "int", "default": 750, "min": 1, "max": 100000,
-     "help": "Оплата этой суммы даёт тег «Спонсор_Одобрен» (иммунитет к фильтру коммерции).", "bots": "Скайнет", "owner": True},
+    {"key": "fine_tag_free", "group": G_FINES, "label": "Иммунитет (тег «Свободен»), ⭐️", "type": "int", "default": 650, "min": 1, "max": 100000,
+     "help": "Оплата ровно этой суммы даёт тег «Свободен». Этой же суммой Секретарь штрафует за карантин, «1 мая», проваленный и просроченный кружок.", "bots": "Скайнет, Секретарь", "owner": True},
+    {"key": "fine_tag_sponsor", "group": G_FINES, "label": "Взнос спонсора (тег «Спонсор_Одобрен»), ⭐️", "type": "int", "default": 750, "min": 1, "max": 100000,
+     "help": "Оплата этой суммы даёт тег «Спонсор_Одобрен» (иммунитет к фильтру коммерции). Секретарь берёт её за спонсорство.", "bots": "Скайнет, Секретарь", "owner": True},
     {"key": "ref_tiers", "group": G_MONEY, "label": "Рефералка: пороги и проценты", "type": "text", "default": "10:10, 30:13, 50:15, 100:17, *:20",
      "help": "Формат «до N приглашённых : процент». Звёздочка — все, кто больше. Процент считается от цены VIP.", "bots": "Скайнет", "owner": True},
 
@@ -111,6 +119,13 @@ SCHEMA = [
     {"key": "beyond_remind_days", "group": G_BEYOND, "label": "Напомнить застрявшему через, дней", "type": "int", "default": 7, "min": 1, "max": 60, "bots": "BEYOND"},
     {"key": "beyond_ban_days", "group": G_BEYOND, "label": "Бан после напоминания через, дней", "type": "int", "default": 3, "min": 1, "max": 60, "bots": "BEYOND"},
     {"key": "beyond_invite_days", "group": G_BEYOND, "label": "Ссылка-приглашение живёт, дней", "type": "int", "default": 7, "min": 1, "max": 30, "bots": "BEYOND"},
+    {"key": "beyond_fine_price", "group": G_BEYOND, "label": "Штраф BEYOND, ⭐️", "type": "int", "default": 0, "min": 0, "max": 100000, "help": "Сколько платит человек из ЧС, чтобы подать заявку. 0 — равен цене вступления (как было раньше).", "bots": "BEYOND, Скайнет", "owner": True},
+    {"key": 'beyond_txt_start', "group": G_BEYOND, "label": 'Текст приветствия (/start)', "type": "textarea", "default": 'Привет, {name}!\nЭто бот поддержки участников и кандидатов в <b>Beyond</b> — закрытое транс-пространство для знакомств, общения и поддержки.\n\nДЛЯ ТЕХ, КТО НЕ НАУЧИЛСЯ ЧИТАТЬ В 1 КЛАССЕ - ДОСТУП ПЛАТНЫЙ ДЛЯ ОПРЕДЕЛЕННЫХ КАТЕГОРИЙ!\n\n📌 Здесь не ведётся обсуждение других групп.\n❌ Не блокируй бота — это приведёт к отказу и глобальному бану.\n💬 Все вопросы — только по теме Beyond.\n🚪 Передумал(а) на любом этапе до отправки анкеты — напиши <b>{opt_out}</b>, после этого бота можно спокойно заблокировать.\n\nПожалуйста, цени своё и наше время. Если готов, жми кнопку ниже:', "help": '{name} — имя человека, {opt_out} — фраза отказа. HTML: <b>, <i>.', "bots": "BEYOND"},
+    {"key": 'beyond_txt_bio', "group": G_BEYOND, "label": 'Вопрос-анкета', "type": "textarea", "default": 'Оставь краткую анкету о себе одним сообщением:\n- Имя/Ник\n- Возраст\n- Кратко о себе\n\n<i>Пиши честно, система проверяет заявки.</i>', "help": 'Что прислать о себе.', "bots": "BEYOND"},
+    {"key": 'beyond_txt_proof_trans', "group": G_BEYOND, "label": 'Запрос подтверждения (транс)', "type": "textarea", "default": 'Обязательное условие: отправь <b>фото или видео-кружок в образе</b>', "help": 'Пусто — текст по умолчанию.', "bots": "BEYOND"},
+    {"key": 'beyond_txt_proof_nb', "group": G_BEYOND, "label": 'Вопрос для небинарных', "type": "textarea", "default": 'Объясни своими словами в одном сообщении:\nЧто для тебя значит небинарность?', "help": 'Пусто — текст по умолчанию.', "bots": "BEYOND"},
+    {"key": 'beyond_txt_rejected', "group": G_BEYOND, "label": 'Текст отказа', "type": "textarea", "default": '❌ <b>К сожалению, ваша заявка отклонена.</b>\n\nНесоответствие правилам или формату сообщества.\nУточнить причину, пройти проверку или оспорить решение можно в Службе Поддержки: @FAQMKBOT', "help": 'Пусто — текст по умолчанию.', "bots": "BEYOND"},
+    {"key": 'beyond_txt_fake', "group": G_BEYOND, "label": 'Текст «проверка не пройдена → в платники»', "type": "textarea", "default": '⚠️ <b>Проверка не пройдена.</b>\n\nВы переведены в категорию «Интересующиеся». Оплатите взнос.', "help": 'Пусто — текст по умолчанию.', "bots": "BEYOND"},
 
     # --- МП (рекламный бот) ---
     {"key": "mp_daily_limit", "group": G_MP, "label": "Публикаций в день на одну сеть/город", "type": "int", "default": 3, "min": 1, "max": 50,
@@ -143,10 +158,70 @@ SCHEMA = [
      "help": "Можно <b>жирный</b>, <i>курсив</i>, <a href=\"…\">ссылку</a>. Если в HTML ошибка, бот возьмёт стандартную подпись и напишет об этом в «Диагностике». Пусто — по умолчанию.", "bots": "МП"},
 
     # --- автопилот (стелс) ---
+
+    # --- ⚖️ прайс штрафов (ИИ поддержки Секретаря и кнопки админов) ---
+    {"key": "fine_nark", "group": G_FINES, "label": 'Наркотики (красная зона), ⭐️', "type": "int", "default": 2000, "min": 1, "max": 100000, "help": 'Ставится ИИ поддержки, если в причине бана наркотики.', "bots": "Секретарь", "owner": True},
+    {"key": "fine_minor", "group": G_FINES, "label": 'Несовершеннолетний / обман с возрастом, ⭐️', "type": "int", "default": 2000, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "fine_nark_react", "group": G_FINES, "label": 'Реакция на запрещёнку, ⭐️', "type": "int", "default": 1563, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "fine_minor_react", "group": G_FINES, "label": 'Реакция на детское, ⭐️', "type": "int", "default": 1563, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "fine_commerce", "group": G_FINES, "label": 'Коммерция (жёлтая зона), ⭐️', "type": "int", "default": 1563, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "fine_flood", "group": G_FINES, "label": 'Флуд / спам / копипаст, ⭐️', "type": "int", "default": 500, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "fine_bio", "group": G_FINES, "label": 'Ссылка в БИО, ⭐️', "type": "int", "default": 250, "min": 1, "max": 100000, "help": 'Можно вставить в текст шаблона как {fine_bio}.', "bots": "Секретарь", "owner": True},
+    {"key": "fine_bot_block", "group": G_FINES, "label": 'Блок бота / сбежал с проверки, ⭐️', "type": "int", "default": 250, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "fine_manual", "group": G_FINES, "label": 'Ручной бан, если в досье нет суммы, ⭐️', "type": "int", "default": 1500, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "fine_quick", "group": G_FINES, "label": 'Кнопки быстрого штрафа у админов, ⭐️', "type": "text", "default": '250, 650, 1563', "regex": _LIST, "regex_hint": 'числа через запятую', "help": 'До 4 сумм через запятую — кнопки «💳 …⭐️» в топике поддержки.', "bots": "Секретарь", "owner": True},
+
+    # --- 💸 кэшбэк ---
+    {"key": "cb_min_phone", "group": G_CASH, "label": 'Минимум вывода на телефон, ₽', "type": "int", "default": 500, "min": 1, "max": 100000, "help": 'Это и общий минимум для вывода.', "bots": "Секретарь", "owner": True},
+    {"key": "cb_min_crypto", "group": G_CASH, "label": 'Минимум вывода в крипте, ₽', "type": "int", "default": 1000, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "cb_min_card", "group": G_CASH, "label": 'Минимум вывода на карту, ₽', "type": "int", "default": 3500, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "cb_exchange_packs", "group": G_CASH, "label": 'Обменник: пакеты рубли:очки', "type": "text", "default": '50:50, 150:175, 250:300, 500:650', "regex": _PAIRS, "regex_hint": 'формат «рубли:очки, рубли:очки»', "help": 'Кнопки обменника в боте и в мини-приложении. Выгода в процентах считается сама.', "bots": "Секретарь", "owner": True},
+
+    # --- 🎰 казино ---
+    {"key": "casino_spin_price", "group": G_CASINO, "label": 'Рулетка: цена прокрутки, очков', "type": "int", "default": 50, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "casino_tax_pct", "group": G_CASINO, "label": 'Рулетка: сектор «Налоговая», % очков', "type": "int", "default": 30, "min": 0, "max": 100, "bots": "Секретарь", "owner": True},
+    {"key": "casino_tax_outcast_pct", "group": G_CASINO, "label": '«Налоговая» для изгоев (карма ≤ −50), %', "type": "int", "default": 50, "min": 0, "max": 100, "bots": "Секретарь", "owner": True},
+    {"key": "casino_points_wins", "group": G_CASINO, "label": 'Рулетка: сектор «Куш», варианты очков', "type": "text", "default": '100, 150, 250', "regex": _LIST, "regex_hint": 'числа через запятую', "bots": "Секретарь", "owner": True},
+    {"key": "casino_cash_wins", "group": G_CASINO, "label": 'Рулетка: денежный купон, рубли:вес', "type": "text", "default": '100:75, 250:20, 500:5', "regex": _PAIRS, "regex_hint": 'формат «рубли:вес»', "help": 'Вес — насколько часто выпадает сумма. Деньги берутся из фонда казино; если фонда не хватает — даются очки ×2.', "bots": "Секретарь", "owner": True},
+    {"key": "casino_jackpot_points", "group": G_CASINO, "label": 'Джекпот 777: очков к VIP-билету', "type": "int", "default": 300, "min": 0, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "casino_mini_points", "group": G_CASINO, "label": 'Мини-джекпот (фонд пуст): очков', "type": "int", "default": 1000, "min": 0, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "casino_mini_shards", "group": G_CASINO, "label": 'Мини-джекпот: осколков', "type": "int", "default": 5, "min": 0, "max": 1000, "bots": "Секретарь", "owner": True},
+    {"key": "casino_premium_cost", "group": G_CASINO, "label": 'Фонд: цена Telegram Premium, ⭐️', "type": "int", "default": 1500, "min": 1, "max": 100000, "help": 'Столько звёзд уходит из фонда казино, когда кто-то выбивает Premium.', "bots": "Секретарь", "owner": True},
+    {"key": "casino_cert_cost", "group": G_CASINO, "label": 'Фонд: цена сертификата, ⭐️', "type": "int", "default": 1250, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "casino_cert_rub", "group": G_CASINO, "label": 'Номинал сертификата, ₽', "type": "int", "default": 1000, "min": 1, "max": 100000, "help": 'Раньше в боте было 1000 ₽, а в мини-приложении 1500 ₽ — теперь одна цифра.', "bots": "Секретарь", "owner": True},
+    {"key": "craft_shards", "group": G_CASINO, "label": 'Наковальня: осколков на сборку', "type": "int", "default": 50, "min": 1, "max": 10000, "bots": "Секретарь", "owner": True},
+    {"key": "craft_odds", "group": G_CASINO, "label": 'Наковальня: шансы VIP, щит, Premium, %', "type": "text", "default": '60, 30, 10', "regex": _LIST, "regex_hint": 'три числа через запятую', "sum": 100, "help": 'В сумме 100.', "bots": "Секретарь", "owner": True},
+    {"key": "chest_price", "group": G_CASINO, "label": 'Секретный сундук: цена, очков', "type": "int", "default": 1000, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "chest_odds", "group": G_CASINO, "label": 'Сундук: шансы кот, осколки, щит, джекпот, %', "type": "text", "default": '45, 35, 15, 5', "regex": _LIST, "regex_hint": 'четыре числа через запятую', "sum": 100, "help": 'В сумме 100. В мини-приложении карма сдвигает шанс кота (святым меньше, изгоям больше).', "bots": "Секретарь", "owner": True},
+    {"key": "chest_jackpot_rub", "group": G_CASINO, "label": 'Сундук: джекпот, ₽ кэшбэка', "type": "int", "default": 500, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "bonus_min", "group": G_CASINO, "label": 'Бонус /bonus в боте: от, очков', "type": "int", "default": 15, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "bonus_max", "group": G_CASINO, "label": 'Бонус /bonus в боте: до, очков', "type": "int", "default": 50, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "bonus_shard_pct", "group": G_CASINO, "label": 'Бонус /bonus: шанс осколка, %', "type": "int", "default": 5, "min": 0, "max": 100, "bots": "Секретарь", "owner": True},
+    {"key": "bonus_streak", "group": G_CASINO, "label": 'Бонус в мини-приложении по дням серии, очков', "type": "text", "default": '15, 25, 40, 50, 50, 50, 100', "regex": _LIST, "regex_hint": 'числа через запятую', "help": 'Награда за 1-й, 2-й… день подряд. За последний день — ещё осколок, и серия начинается заново.', "bots": "Секретарь", "owner": True},
+    {"key": "donate_buttons", "group": G_CASINO, "label": 'Кнопки донатов, ⭐️', "type": "text", "default": '50, 150, 500', "regex": _LIST, "regex_hint": 'числа через запятую', "help": 'До 4 сумм. Кнопка «своя сумма» остаётся.', "bots": "Секретарь", "owner": True},
+
+    # --- ⏰ автособытия ---
+    {"key": "job_bomb", "group": G_JOBS, "label": 'Кибер-бомба в чаты', "type": "bool", "default": True, "help": 'Случайный дроп очков в чат сети.', "bots": "Секретарь"},
+    {"key": "job_bomb_every_min", "group": G_JOBS, "label": 'Кибер-бомба: раз в, минут', "type": "int", "default": 120, "min": 10, "max": 10080, "bots": "Секретарь", "owner": False},
+    {"key": "job_cat", "group": G_JOBS, "label": 'Набег соседского кота', "type": "bool", "default": True, "help": 'Ежедневный «налог» кота.', "bots": "Секретарь"},
+    {"key": "job_cat_time", "group": G_JOBS, "label": 'Набег кота: время (МСК)', "type": "text", "default": '12:00', "regex": _TIME, "regex_hint": 'время ЧЧ:ММ', "bots": "Секретарь", "owner": False},
+    {"key": "job_beetle", "group": G_JOBS, "label": 'Колорадский жук на фермах', "type": "bool", "default": True, "help": 'Жуки нападают на картофельные поля.', "bots": "Секретарь"},
+    {"key": "job_beetle_every_min", "group": G_JOBS, "label": 'Жук: раз в, минут', "type": "int", "default": 30, "min": 5, "max": 1440, "bots": "Секретарь", "owner": False},
+    {"key": "job_auction", "group": G_JOBS, "label": 'Авто-аукцион', "type": "bool", "default": True, "help": 'Еженедельный лот на аукционе.', "bots": "Секретарь"},
+    {"key": "job_auction_when", "group": G_JOBS, "label": 'Авто-аукцион: день и время (МСК)', "type": "text", "default": 'пт 18:00', "regex": r'(пн|вт|ср|чт|пт|сб|вс)\s+' + _TIME, "regex_hint": 'например «пт 18:00»', "bots": "Секретарь", "owner": False},
+    {"key": "job_bonus_push", "group": G_JOBS, "label": 'Вечерний пуш о бонусах', "type": "bool", "default": True, "help": 'Напоминание в личку забрать ежедневный бонус.', "bots": "Секретарь"},
+    {"key": "job_bonus_push_time", "group": G_JOBS, "label": 'Пуш о бонусах: время (МСК)', "type": "text", "default": '20:00', "regex": _TIME, "regex_hint": 'время ЧЧ:ММ', "bots": "Секретарь", "owner": False},
+    {"key": "job_scout", "group": G_JOBS, "label": 'Разведчик праздничных конкурсов', "type": "bool", "default": True, "help": 'Ищет праздник через 10 дней и готовит фотоконкурс.', "bots": "Секретарь"},
+    {"key": "job_scout_time", "group": G_JOBS, "label": 'Разведчик: время (МСК)', "type": "text", "default": '10:00', "regex": _TIME, "regex_hint": 'время ЧЧ:ММ', "bots": "Секретарь", "owner": False},
+    {"key": "job_funnel", "group": G_JOBS, "label": 'Тизеры-воронка в чаты', "type": "bool", "default": True, "help": 'Реклама рулетки, наковальни, обменника и т.п. по кругу.', "bots": "Секретарь"},
+    {"key": "job_funnel_every_h", "group": G_JOBS, "label": 'Тизеры: раз в, часов', "type": "int", "default": 6, "min": 1, "max": 168, "bots": "Секретарь", "owner": False},
+    {"key": "job_farm_dm", "group": G_JOBS, "label": 'Уведомления фермы в личку', "type": "bool", "default": True, "help": '«Урожай созрел», «пора полить».', "bots": "Секретарь"},
+    {"key": "job_collectors", "group": G_JOBS, "label": 'Коллекторы', "type": "bool", "default": True, "help": 'Напоминания и взыскание с должников по займам.', "bots": "Секретарь"},
+
     {"key": "stealth_enemy_ref", "group": G_STEALTH, "label": "Стелс: какую реф-ссылку подменять", "type": "text", "default": "ref_EQHH7XHV", "bots": "Скайнет", "owner": True},
     {"key": "stealth_boss_ref", "group": G_STEALTH, "label": "Стелс: на какую подменять", "type": "text", "default": "ref_2BBPF35H", "bots": "Скайнет", "owner": True},
     {"key": "stealth_exempt_ids", "group": G_STEALTH, "label": "Стелс: кому показывать оригинал (ID через запятую)", "type": "text", "default": "7235010425", "bots": "Скайнет", "owner": True},
 ]
 
 BY_KEY = {e["key"]: e for e in SCHEMA}
-GROUP_ORDER = [G_MONEY, G_SEC, G_VIP, G_BEYOND, G_MP, G_CPA, G_POSTER, G_MOD, G_AI, G_LINKS, G_STEALTH]
+GROUP_ORDER = [G_MONEY, G_FINES, G_CASH, G_CASINO, G_JOBS, G_SEC, G_VIP, G_BEYOND, G_MP, G_CPA, G_POSTER, G_MOD, G_AI, G_LINKS, G_STEALTH]

@@ -445,14 +445,16 @@
         /* словарь */
         .dict-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(235px, 1fr)); gap: 12px; }
         .dict-zone { --z: var(--muted); border: 1px solid var(--line); border-top: 3px solid var(--z); border-radius: var(--radius); padding: 12px; background: var(--bg); display: flex; flex-direction: column; gap: 10px; }
-        .dict-zone.z-red { --z: var(--danger); } .dict-zone.z-yellow { --z: var(--warn); } .dict-zone.z-black { --z: var(--accent); } .dict-zone.z-soft { --z: #ff8a65; }
+        .dict-zone.z-red { --z: var(--danger); } .dict-zone.z-yellow { --z: var(--warn); } .dict-zone.z-black { --z: var(--accent); } .dict-zone.z-soft { --z: #ff8a65; } .dict-zone.z-orange { --z: #ffa040; }
         .dz-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .dz-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--z); }
         .dz-act { color: var(--muted); font-size: 12px; }
         .dz-n { margin-left: auto; font: 700 12px var(--mono); color: var(--z); }
         .dz-note { color: var(--muted); font-size: 12px; line-height: 1.4; }
-        .dz-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: 180px; overflow-y: auto; }
+        .dz-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: 230px; overflow-y: auto; }
         .wchip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 9px; border-radius: 999px; font-size: 12.5px; background: var(--surface-2); border: 1px solid var(--line-2); }
+        .wchip.bi { background: transparent; border-style: dashed; color: #a7abb3; }
+        .wchip .only { font: 600 9.5px var(--mono); color: var(--dim); text-transform: uppercase; letter-spacing: .06em; }
         .wchip button { border: none; background: none; color: var(--dim); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px; border-radius: 50%; }
         .wchip button:hover { color: #ff9fb1; background: rgba(239,111,134,.15); }
         .dz-add { display: flex; gap: 6px; align-items: center; margin-top: auto; }
@@ -563,7 +565,11 @@
         .num-ctl input.dirty, .ctl-row .dirty, .dz-add input.dirty { border-color: var(--warn) !important; }
         .ctl-groups { display: grid; gap: 12px; }
         .ctl-group { border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); padding: 4px 14px 6px; }
-        .ctl-gh { margin: 12px 0 2px !important; font-size: 14px; font-weight: 700; }
+        .ctl-gh { margin: 0 !important; padding: 12px 0; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; user-select: none; }
+        .ctl-gh::after { content: "›"; margin-left: auto; color: var(--muted); font-size: 18px; transform: rotate(90deg); transition: transform .15s; }
+        .ctl-group.closed .ctl-gh::after { transform: none; }
+        .ctl-group.closed > .set-row { display: none; }
+        .ctl-n { font: 600 11px var(--mono); color: var(--dim); }
         .ctl-row { flex-wrap: wrap; }
         .ctl-in { flex: 0 1 240px; min-width: 120px; padding: 8px 10px; box-sizing: border-box; }
         .ctl-ta { flex: 1 1 100%; min-height: 90px; resize: vertical; font-size: 13px; padding: 9px 11px; box-sizing: border-box; }
@@ -1684,7 +1690,8 @@
         <div class="panel-block set-card" id="set-dict">
             <div class="set-head">
                 <div class="set-ic">🛡</div>
-                <div class="set-title"><h3>Словарь автомодератора</h3><p>Слова-триггеры. Начинают работать сразу. 🔤 — ловит и склонения, 🎯 — только точное слово.</p></div>
+                <div class="set-title"><h3>Словарь автомодератора</h3><p>Один словарь на всех ботов: Скайнет, Шпион и МП берут слова отсюда, изменения подхватываются за минуту. 🔤 — ловит и склонения, 🎯 — только точное слово. Серые — встроенные, их тоже можно убрать.</p></div>
+                <button class="btn sm ghost" onclick="restoreDictBuiltin()" title="Вернуть встроенные слова, которые были удалены">↺ Вернуть встроенные</button>
             </div>
             <div class="dict-grid">
                 <div class="dict-zone z-red">
@@ -1724,6 +1731,16 @@
                         <button class="btn sm" onclick="addDictWord('soft_red')">Добавить</button>
                     </div>
                 </div>
+                <div class="dict-zone z-orange">
+                    <div class="dz-head"><span class="dz-dot"></span><b>Оранжевая зона</b><span class="dz-act">мут 18–21 · Шпион</span><span class="dz-n" id="dict-orange-n">0</span></div>
+                    <div class="dz-note">Возраст 18–21: Шпион мутит автора до паспортной проверки. «Ищу 19–25» и «от 18» не ловит.</div>
+                    <div class="dz-list" id="dict-orange-list"></div>
+                    <div class="dz-add">
+                        <input type="text" id="dict-orange-input" placeholder="Например: мне 20" onkeydown="if(event.key==='Enter')addDictWord('orange')">
+                        <label class="dz-exact" title="Только точное совпадение"><input type="checkbox" id="dict-orange-exact">🎯</label>
+                        <button class="btn sm" onclick="addDictWord('orange')">Добавить</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1758,7 +1775,6 @@
                 <div class="set-title"><h3>Ответы Секретаря</h3><p>Тексты, которые Секретарь (@FAQMKBOT) отправляет в поддержке. Хранятся в общей базе — Секретарь берёт их оттуда.</p></div>
             </div>
             <div class="tpl-picker" id="tpl-picker">
-                <button class="tpl-opt" data-tpl="network_links">📍 Ссылки на чаты</button>
                 <button class="tpl-opt" data-tpl="tpl_18">🛑 Проверка возраста</button>
                 <button class="tpl-opt" data-tpl="tpl_minor">👶 Реакция на несовершеннолетнего</button>
                 <button class="tpl-opt" data-tpl="tpl_nark">⛔️ Наркотики: упоминание</button>
@@ -1776,16 +1792,6 @@
                 <div class="var-chips" data-for="template-editor-text"></div>
                 <div class="tpl-foot"><span class="muted" id="tpl-status"></span><button id="save-template-btn" class="btn primary sm" disabled onclick="saveSelectedTemplate()">Сохранить текст</button></div>
             </div>
-        </div>
-
-        <!-- 🧠 Промпт ИИ поддержки -->
-        <div class="panel-block set-card" id="set-ai">
-            <div class="set-head">
-                <div class="set-ic">🧠</div>
-                <div class="set-title"><h3>Инструкция ИИ поддержки</h3><p>Системный промпт нейросети, которая отвечает людям в Секретаре. Меняется сразу.</p></div>
-                <button class="btn primary sm set-save" onclick="saveAIPrompt()">Сохранить</button>
-            </div>
-            <textarea id="ai-system-prompt" class="mono-area" rows="12" placeholder="Здесь живут инструкции для ИИ…"></textarea>
         </div>
 
         {% if is_owner %}
@@ -2216,8 +2222,8 @@
             box.innerHTML = '';
             groups.forEach(g => {
                 const sec = document.createElement('div');
-                sec.className = 'ctl-group';
-                const h = document.createElement('h4'); h.textContent = g.group; h.className = 'ctl-gh'; sec.appendChild(h);
+                sec.className = 'ctl-group closed';
+                const h = document.createElement('h4'); h.textContent = g.group; h.className = 'ctl-gh'; h.dataset.t = g.group; h.onclick = () => sec.classList.toggle('closed'); h.title = 'Свернуть / развернуть'; sec.appendChild(h);
                 g.items.forEach(it => {
                     controlLabels[it.key] = it.label;
                     const row = document.createElement('div');
@@ -2239,6 +2245,7 @@
                     inp.addEventListener(it.type === 'bool' ? 'change' : 'input', () => { controlDirty[it.key] = inp.value; inp.classList.add('dirty'); document.body.classList.add('ctl-dirty'); });
                     row.appendChild(left); row.appendChild(inp); sec.appendChild(row);
                 });
+                const n = document.createElement('span'); n.className = 'ctl-n'; n.textContent = g.items.length; h.appendChild(n);
                 box.appendChild(sec);
             });
         });
@@ -2361,7 +2368,7 @@
             loadControl();
             if (!_settingsLoaded) {
                 loadDictionary(); loadSystemTexts(); loadSystemSettings(); loadNetworkPrices();
-                loadAIPrompt(); loadModSettings();
+                loadModSettings();
                 if (IS_OWNER) loadOwnerBlock();
                 _settingsLoaded = true;
             }
@@ -2490,8 +2497,8 @@
             blk.id = id;
             const chip = document.createElement('span');
             chip.className = 'chip';
-            chip.textContent = h.textContent.replace(/\s+/g, ' ').trim().slice(0, 34);
-            chip.onclick = () => { const y = blk.getBoundingClientRect().top + window.scrollY - 140; window.scrollTo({top: y, behavior: 'smooth'}); };
+            chip.textContent = (h.dataset.t || h.textContent).replace(/\s+/g, ' ').trim().slice(0, 34);
+            chip.onclick = () => { blk.classList.remove('closed'); const y = blk.getBoundingClientRect().top + window.scrollY - 140; window.scrollTo({top: y, behavior: 'smooth'}); };
             box.appendChild(chip);
         });
     }
@@ -2515,6 +2522,7 @@
                 blockHit = blockHit || textOf(blk).includes(q);
             }
             blk.style.display = blockHit ? '' : 'none';
+            if (blk.classList.contains('ctl-group')) blk.classList.toggle('closed', !q);   // при поиске раскрываем найденное
             if (blockHit) hits++;
         });
         document.getElementById('settings-nohits').style.display = hits ? 'none' : 'block';
@@ -4402,13 +4410,13 @@ document.addEventListener('input', e => {
 // ---------- 🛡 Словарь ----------
 function loadDictionary() {
     fetch('/glaz/api/dictionary').then(r => r.json()).then(d => {
-        ['red', 'yellow', 'black', 'soft_red'].forEach(z => renderDictList(z, d[z] || []));
+        ['red', 'yellow', 'black', 'soft_red', 'orange'].forEach(z => renderDictList(z, d[z] || []));
     });
 }
 function renderDictList(zone, words) {
     const box = document.getElementById(`dict-${zone}-list`); if (!box) return;
     const n = document.getElementById(`dict-${zone}-n`); if (n) n.textContent = words.length;
-    box.innerHTML = words.length ? words.map(w => `<span class="wchip" title="${w.exact ? 'Только точное слово' : 'Слово и его формы'}">${w.exact ? '🎯' : '🔤'} ${_h(w.word)}<button type="button" aria-label="Убрать" data-w="${_h(w.word)}" data-z="${zone}" onclick="removeDictWord(this.dataset.w, this.dataset.z)">×</button></span>`).join('')
+    box.innerHTML = words.length ? words.map(w => `<span class="wchip ${w.builtin ? 'bi' : ''}" title="${w.builtin ? 'Встроенное слово' + (w.only === 'spy' ? ' — ловит только Шпион' : '') : (w.exact ? 'Только точное слово' : 'Слово и его формы')}">${w.builtin ? '' : (w.exact ? '🎯' : '🔤')} ${_h(w.word)}${w.only === 'spy' ? ' <span class="only">шпион</span>' : ''}<button type="button" aria-label="Убрать" data-w="${_h(w.word)}" data-z="${zone}" onclick="removeDictWord(this.dataset.w, this.dataset.z)">×</button></span>`).join('')
         : '<span class="set-empty sm">Пусто</span>';
 }
 function addDictWord(zone) {
@@ -4418,6 +4426,9 @@ function addDictWord(zone) {
         if (d.success) { input.value = ''; showToast('✅ Добавлено: ' + word); loadDictionary(); }
         else showToast('❌ ' + (d.error || 'Не получилось'));
     });
+}
+function restoreDictBuiltin() {
+    _post('/glaz/api/dictionary/restore', {}).then(d => { if (d.success) { showToast(d.added ? `↺ Возвращено встроенных слов: ${d.added}` : 'Все встроенные слова на месте'); loadDictionary(); } });
 }
 function removeDictWord(word, zone) {
     if (!confirm(`Убрать «${word}» из словаря?`)) return;
@@ -4454,15 +4465,6 @@ document.addEventListener('input', e => {
     }
 });
 
-// ---------- 🧠 Промпт ИИ ----------
-function loadAIPrompt() {
-    fetch('/glaz/api/ai_prompt').then(r => r.json()).then(d => { document.getElementById('ai-system-prompt').value = d.prompt || ''; });
-}
-function saveAIPrompt() {
-    const prompt = document.getElementById('ai-system-prompt').value.trim();
-    if (!prompt) { showToast('⚠️ Инструкция не может быть пустой'); return; }
-    _post('/glaz/api/ai_prompt/save', {prompt}).then(d => showToast(d.success ? '🧠 Инструкция ИИ обновлена' : '❌ Не сохранилось'));
-}
 
 // ---------- 💰 Тарифы (владелец) ----------
 const PRICE_IDS = {vip_price: 'price-vip', beyond_price: 'price-beyond', reg_small_1: 'price-sm-1', reg_small_7: 'price-sm-7', reg_small_15: 'price-sm-15', reg_small_30: 'price-sm-30',

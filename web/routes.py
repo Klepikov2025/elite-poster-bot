@@ -895,13 +895,23 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
 
     @app.route('/glaz/api/dictionary', methods=['GET'])
     def get_dictionary():
-        data = db['settings'].find_one({"_id": "skynet_dictionary"}) or {"red": [], "yellow": [], "black": []}
-        return jsonify({
-            "red": data.get("red", []), 
-            "yellow": data.get("yellow", []), 
-            "black": data.get("black", []),
-            "soft_red": data.get("soft_red", [])
-        })
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+        # Встроенные слова ботов (раньше зашитые в код Скайнета/Шпиона/МП) — один раз переносим в базу
+        try:
+            from core.dict_builtin import ensure_builtin
+            ensure_builtin(db)
+        except Exception as e:
+            print(f"dict builtin seed error: {e}")
+        data = db['settings'].find_one({"_id": "skynet_dictionary"}) or {}
+        return jsonify({z: data.get(z, []) for z in ("red", "yellow", "black", "soft_red", "orange")})
+
+    @app.route('/glaz/api/dictionary/restore', methods=['POST'])
+    def restore_dictionary_builtin():
+        if not session.get('logged_in'): return jsonify({"success": False}), 401
+        from core.dict_builtin import ensure_builtin
+        n = ensure_builtin(db, force=True)
+        add_radar_log(f"🛡 Словарь: возвращены встроенные слова ({n})")
+        return jsonify({"success": True, "added": n})
 
     @app.route('/glaz/api/dictionary/add', methods=['POST'])
     def add_dictionary_word():
@@ -910,7 +920,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         word = data.get('word', '').strip().lower()
         zone = data.get('zone')
         exact = data.get('exact', False)
-        if not word or zone not in ['red', 'yellow', 'black', 'soft_red']: return jsonify({"success": False, "error": "Некорректные данные"})
+        if not word or zone not in ['red', 'yellow', 'black', 'soft_red', 'orange']: return jsonify({"success": False, "error": "Некорректные данные"})
         has_letters = bool(re.search(r'[a-zа-яё0-9]', word))
         if zone == 'soft_red' and not has_letters:
             pattern = re.escape(word.replace('\ufe0f', ''))   # эмодзи: \b вокруг смайла не работает
@@ -931,6 +941,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         data = request.json
         word = data.get('word')
         zone = data.get('zone')
+        if zone not in ('red', 'yellow', 'black', 'soft_red', 'orange') or not word:
+            return jsonify({"success": False, "error": "Некорректные данные"}), 400
         db['settings'].update_one({"_id": "skynet_dictionary"}, {"$pull": {zone: {"word": word}}})
         return jsonify({"success": True})
 
@@ -1144,7 +1156,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         elif payload_str.startswith("beyond_fine_"):
             uid = int(payload_str.replace("beyond_fine_", ""))
             pricing = db['settings'].find_one({"_id": "skynet_pricing"}) or {}
-            price = int(pricing.get("beyond_price", 250))
+            # Штраф BEYOND — своя цифра в панели (0 — как цена вступления)
+            price = int(cfg("beyond_fine_price") or pricing.get("beyond_price", 250))
             ban = banned_collection.find_one({"_id": uid})
             if not _rub_ok(amount_rub, price):
                 _staff(f"⚠️ **Штраф BEYOND (крипта) меньше цены!** Юзер `{uid}`: {amount_rub}₽ вместо {_rub(price)}₽. Бан НЕ снят.")
@@ -1390,7 +1403,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             "tpl_nark": "⛔️ **БЛОКИРОВКА: Наркотические вещества**\n\nПричина вашей блокировки — упоминание наркотиков. Любые вещества и их эвфемизмы (смайлики, сленг, положительные реакции, комментарии) строго запрещены.\n\n⚖️ **Условия разблокировки:**\nРазбан возможен только после предоставления справки от врача-нарколога либо справки от МВД.\n\n*В исключительных случаях возможен разбан после оплаты штрафа (сумма определяется старшим администратором).*.",
             "tpl_flood": "🔇 **Ограничение: Флуд в чатах**\n\nВы получили временный мут за флуд (однотипные сообщения более 3-х раз подряд).\n\n⏳ **Ограничение снимется автоматически** (точное время указано в системном сообщении внутри чата).\n\n⚡️ Если вы не хотите ждать, возможно досрочное снятие мута на платной основе (от 100₽).",
             "tpl_vip": "⚠️ **Служебное уведомление системы**\n\nВы были заблокированы по внутренней сети партнерских проектов.\n\nℹ️ **Причина:** Вы заблокировали VIP или ТРАНС-бота в момент проведения диалога и не отправили ключевую фразу.\n\n🔓 Разблокировка возможна только на платной основе.",
-            "tpl_bio": "🛑 **Ограничение: Ссылка в профиле**\n\nАвтомодератор обнаружил в вашем профиле (BIO) стороннюю ссылку или тег канала.\n\nℹ️ **Порядок действий:**\n1. Полностью уберите ссылку/канал из профиля Telegram.\n2. Не возвращайте ее на всё время пребывания в сетях МК, ПАРНИ 18+, ГЕЙ чаты, НС, Радуга.\n3. Оплатите штраф 250⭐️.\n\n*После оплаты и проверки профиля администратором ограничения будут сняты.*",
+            "tpl_bio": "🛑 **Ограничение: Ссылка в профиле**\n\nАвтомодератор обнаружил в вашем профиле (BIO) стороннюю ссылку или тег канала.\n\nℹ️ **Порядок действий:**\n1. Полностью уберите ссылку/канал из профиля Telegram.\n2. Не возвращайте ее на всё время пребывания в сетях МК, ПАРНИ 18+, ГЕЙ чаты, НС, Радуга.\n3. Оплатите штраф {fine_bio}⭐️.\n\n*После оплаты и проверки профиля администратором ограничения будут сняты.*",
             "tpl_minor": "⛔️ **БЛОКИРОВКА: Несовершеннолетние**\n\nВы заблокированы за то, что оставили реакцию на объявление несовершеннолетнего пользователя.\n\nℹ️ Мы строго следим за возрастным цензом. Это грубое нарушение правил безопасности.\n\n🔓 Разблокировка возможна только на платной основе (штраф)."
         }
 
