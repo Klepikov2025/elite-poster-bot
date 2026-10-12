@@ -1538,7 +1538,31 @@ def _execute_skynet_task(task):
         
 
     elif task['action'] == "global_unmute":
-        unmute_user_everywhere(int(task['uid']))
+        _uid = int(task['uid'])
+        if task.get('source') == 'angel':
+            # Вторая линия защиты для Ангела-Хранителя: размутить можно только ИГРОВОЙ мут —
+            # «Ордер на Арест» (users.net_mute_reason) или локальный игровой мут (paid_users.game_mute_until).
+            # Баны, гуантанамо, админские и авто-муты (причина мута перезаписывается каждым новым мутом) — отказ.
+            def _t(v):
+                try: return v.timestamp() if hasattr(v, "timestamp") else float(v)
+                except (TypeError, ValueError): return 0.0
+            _now = time.time()
+            _mu = users_collection.find_one({"_id": _uid}, {"net_mute_until": 1, "net_mute_reason": 1}) or {}
+            _pu = db['paid_users'].find_one({"uid": _uid}, {"guantanamo_until": 1, "game_mute_until": 1, "game_mute_reason": 1}) or {}
+            _nm = _mu.get("net_mute_until")
+            _net_on = _nm is not None and (_t(_nm) == 0 or _t(_nm) > _now)
+            _net_game = _net_on and str(_mu.get("net_mute_reason") or "").startswith("Ордер на Арест")
+            _loc_game = (_t(_pu.get("game_mute_until", 0)) > _now
+                         and not str(_pu.get("game_mute_reason") or "").startswith("Ордер Гуантанамо"))
+            if (banned_collection.find_one({"_id": _uid})
+                    or _t(_pu.get("guantanamo_until", 0)) > _now
+                    or (_net_on and not _net_game)
+                    or not (_net_game or _loc_game)):
+                add_radar_log(f"👼 Ангел отклонён для {_uid}: наказание не игровое")
+                from core.diag import log_error
+                log_error("Ангел-Хранитель", f"отказ: у {_uid} не игровой мут (бан/гуантанамо/админский мут)", _uid)
+                return
+        unmute_user_everywhere(_uid)
 
     elif task['action'] == "review_request":
         # Шпион не смог проверить сленг своим ИИ: не наказываем вслепую и не пропускаем молча —
