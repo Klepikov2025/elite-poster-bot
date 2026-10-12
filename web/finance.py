@@ -16,6 +16,14 @@ def _rev_kind(r):
         return "rub"
     return "stars"
 
+def _rate():
+    try:
+        from core.cfg import cfg
+        return float(cfg("rub_per_star"))
+    except Exception:
+        return 2.0
+
+
 def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
 
     # ================= 📡 LIVE ФИНАНСОВЫЙ ЦЕНТР СЕТИ =================
@@ -299,9 +307,7 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
     # === API РОУТЫ ===
     @app.route('/glaz/api/root/finance', methods=['POST'])
     def api_get_root_finance():
-        data = request.json
-        if data.get('pin') != ROOT_PIN:
-            return jsonify({"error": "Access Denied"}), 403
+        # Только владелец — проверяет web_auth (OWNER_ONLY_PATHS); ROOT-пароль больше не нужен
             
         today_str = datetime.now().strftime("%d.%m.%Y")
         
@@ -328,14 +334,13 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
             "total_today": total_stars,
             "crypto_rub_today": round(crypto_rub),
             "internal_today": internal,
+            "rub_per_star": _rate(),
             "payments": formatted_list
         })
 
     @app.route('/glaz/api/analytics/revenue', methods=['POST'])
     def api_get_revenue_stats():
-        data = request.json
-        if data.get('pin') != ROOT_PIN: 
-            return jsonify({"error": "Unauthorized"}), 403
+        data = request.get_json(silent=True) or {}
         
         # 1. Получаем период из запроса вебки (по умолчанию неделя)
         period = data.get('period', 'week')

@@ -91,6 +91,7 @@ OWNER_ONLY_PATHS = (
     "/glaz/api/live_finance", "/glaz/api/root/finance", "/glaz/api/analytics/revenue",
     "/glaz/api/diag/revenue_month",
     "/glaz/api/get_prices", "/glaz/api/save_prices",   # тарифы VIP/BEYOND/рекламы — только владелец
+    "/glaz/api/root/",   # кнопки подписки, касса: раньше закрывались ROOT-паролем, теперь — входом владельца (+2FA)
 )
 
 

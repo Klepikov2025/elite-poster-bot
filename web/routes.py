@@ -516,9 +516,13 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
     def toggle_setting():
         if not session.get('logged_in'): return jsonify({"success": False}), 401
         setting_name = request.form.get('setting')
-        if not setting_name: return jsonify({"success": False, "error": "No setting specified"})
-        current = SkynetSettings.get()
-        new_val = not current.get(setting_name, True)
+        if setting_name not in SkynetSettings._default:
+            return jsonify({"success": False, "error": "Неизвестный тумблер"}), 400
+        want = request.form.get('value')
+        if want in ('true', 'false'):
+            new_val = (want == 'true')   # панель шлёт нужное состояние — без «переворота» устаревшего значения
+        else:
+            new_val = not SkynetSettings.get().get(setting_name, True)
         SkynetSettings.set(setting_name, new_val)
         add_radar_log(f"⚙️ Тумблер: {setting_name} ➡️ {'ВКЛ' if new_val else 'ВЫКЛ'}")
         return jsonify({"success": True, "state": new_val, "setting": setting_name})
@@ -1015,11 +1019,10 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         db['templates'].update_one({"id": tid}, {"$set": {"autopilot_interval": interval, "last_run": 0}})
         return jsonify({"success": True})
 
-    @app.route('/glaz/api/root/buttons', methods=['POST'])
+    @app.route('/glaz/api/root/buttons', methods=['GET', 'POST'])
     def api_get_root_buttons():
-        data = request.json
-        if data.get('pin') != ROOT_PIN:
-            return jsonify({"error": "Access Denied"}), 403
+        data = request.get_json(silent=True) or {}
+        # Доступ: только владелец (OWNER_ONLY_PATHS в web_auth), ROOT-пароль больше не нужен
         
         btns = db['settings'].find_one({"_id": "skynet_buttons"})
         if not btns or not btns.get("buttons"):
@@ -1032,18 +1035,24 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
 
     @app.route('/glaz/api/root/save_buttons', methods=['POST'])
     def api_save_root_buttons():
-        data = request.json
-        if data.get('pin') != ROOT_PIN:
-            return jsonify({"error": "Access Denied"}), 403
+        data = request.get_json(silent=True) or {}
+        # Доступ: только владелец (OWNER_ONLY_PATHS в web_auth), ROOT-пароль больше не нужен
         
-        new_buttons = data.get('buttons', [])
+        new_buttons = []
+        for b in (data.get('buttons') or [])[:12]:
+            text, url = str(b.get('text', '')).strip()[:64], str(b.get('url', '')).strip()[:256]
+            if not text or not re.match(r'^(https?://|tg://)', url): continue
+            style = b.get('style') if b.get('style') in ('default', 'primary', 'success', 'danger') else 'default'
+            emoji = re.sub(r'\D', '', str(b.get('emoji_id', '')))[:32]
+            new_buttons.append({"text": text, "url": url, "style": style, "emoji_id": emoji})
         # Теперь кнопки сохраняются правильно в общую таблицу настроек!
         db['settings'].update_one(
             {"_id": "skynet_buttons"}, 
             {"$set": {"buttons": new_buttons}}, 
             upsert=True
         )
-        return jsonify({"status": "ok"})
+        add_radar_log(f"👑 Кнопки подписки обновлены ({len(new_buttons)} шт.)")
+        return jsonify({"status": "ok", "saved": len(new_buttons)})
 
     # Мини-приложение публикации переехало в web/poster.py
 
@@ -1530,7 +1539,22 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
     def api_save_infrastructure():
         if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
         
-        data = request.json
+        raw = request.get_json(silent=True) or {}
+        data = {}
+        if isinstance(raw.get("networks"), dict):
+            nets = {}
+            for k, chats in raw["networks"].items():
+                if k not in ("parni", "mk", "ns", "rainbow", "gayznak") or not isinstance(chats, list): continue
+                clean = []
+                for c in chats:
+                    cid = str((c or {}).get("id", "")).strip()
+                    name = str((c or {}).get("name", "")).strip()[:80]
+                    if re.fullmatch(r"-?\d{5,20}", cid): clean.append({"name": name or f"Чат {cid}", "id": cid})
+                nets[k] = clean
+            data["networks"] = nets
+        if isinstance(raw.get("global_links"), dict):
+            data["global_links"] = {k: str(v).strip()[:256] for k, v in raw["global_links"].items() if k in ("main_channel", "faq")}
+        if not data: return jsonify({"success": False, "error": "пусто"}), 400
         db['settings'].update_one(
             {"_id": "infrastructure"},
             {"$set": data},
@@ -1540,62 +1564,63 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         return jsonify({"success": True, "message": "✅ Инфраструктура сети успешно сохранена в MongoDB!"})
     # =======================================
 
-    @app.route('/glaz/api/infrastructure/ping', methods=['GET'])
+    # Проверка прав ботов в чатах сети. Раньше шла прямо в запросе (85 чатов × 3 бота ≈ минута) —
+    # запрос падал по таймауту и всё краснело. Теперь проверка идёт в фоне, результат лежит в базе.
+    INFRA_BOTS = {"Скайнет": 7674203992, "МП": 7492221662, "Секретарь": 7229467953}
+
+    def _infra_ping_worker():
+        data = db['settings'].find_one({"_id": "infrastructure"}) or {}
+        statuses = {}
+        for chats in (data.get("networks") or {}).values():
+            for chat in chats or []:
+                cid = str((chat or {}).get("id", "")).strip()
+                if not cid: continue
+                bots, err = {}, ""
+                try:
+                    for name, b_id in INFRA_BOTS.items():
+                        try:
+                            m = bot.get_chat_member(int(cid), b_id)
+                            bots[name] = m.status in ('administrator', 'creator')
+                        except Exception as e:
+                            es = str(e).lower()
+                            if "too many requests" in es:
+                                time.sleep(3)
+                                m = bot.get_chat_member(int(cid), b_id)
+                                bots[name] = m.status in ('administrator', 'creator')
+                            elif "user not found" in es or "participant_id_invalid" in es or "member not found" in es:
+                                bots[name] = False
+                            else:
+                                raise
+                        time.sleep(0.05)
+                except Exception as e:
+                    es = str(e).lower()
+                    if "chat not found" in es or "forbidden" in es or "kicked" in es:
+                        err = "Скайнет не видит чат (кикнут или неверный ID)"
+                    elif "inaccessible" in es:
+                        err = "Список участников закрыт"
+                    else:
+                        err = str(e)[:80]
+                missing = sum(1 for v in bots.values() if not v)
+                code = "err" if err or (bots and missing == len(bots)) else ("warn" if missing else "ok")
+                statuses[cid] = {"code": code, "bots": bots, "err": err}
+        db['settings'].update_one({"_id": "infra_ping"},
+                                  {"$set": {"statuses": statuses, "ts": time.time(), "running": False}}, upsert=True)
+
+    @app.route('/glaz/api/infrastructure/ping', methods=['GET', 'POST'])
     def api_ping_infrastructure():
         if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
-        
-        data = db['settings'].find_one({"_id": "infrastructure"}) or {}
-        networks = data.get("networks", {})
-        statuses = {}
-        
-        # Точные ID из твоих токенов
-        BOTS_TO_CHECK = {
-            "Скайнет": 7674203992,
-            "Реклама": 7492221662,
-            "Секретарь": 7229467953
-        }
-        
-        for net_key, chats in networks.items():
-            for chat in chats:
-                cid = chat.get("id")
-                if not cid: continue
-                try:
-                    status_lines = []
-                    bots_missing = 0
-                    
-                    # 🔥 Пробиваем каждого бота персонально в лоб
-                    for bot_name, b_id in BOTS_TO_CHECK.items():
-                        member = bot.get_chat_member(cid, b_id)
-                        # Статус может быть administrator, creator, member, restricted, left, kicked
-                        if member.status in ['administrator', 'creator']:
-                            status_lines.append(f"🟢 {bot_name}")
-                        else:
-                            status_lines.append(f"🔴 {bot_name}")
-                            bots_missing += 1
-                            
-                    final_text = "<br>".join(status_lines)
-                    
-                    if bots_missing == 0:
-                        statuses[cid] = {"code": "ok", "text": final_text}
-                    elif bots_missing == len(BOTS_TO_CHECK):
-                        statuses[cid] = {"code": "err", "text": final_text}
-                    else:
-                        statuses[cid] = {"code": "warn", "text": final_text}
-                        
+        doc = db['settings'].find_one({"_id": "infra_ping"}) or {}
+        running = doc.get("running") and time.time() - doc.get("started", 0) < 600
+        if request.method == 'POST' and not running:
+            db['settings'].update_one({"_id": "infra_ping"}, {"$set": {"running": True, "started": time.time()}}, upsert=True)
+            def _run():
+                try: _infra_ping_worker()
                 except Exception as e:
-                    err_str = str(e).lower()
-                    if "too many requests" in err_str:
-                        statuses[cid] = {"code": "warn", "text": "🟡 ТГ просит подождать (Лимит)"}
-                    elif "chat not found" in err_str or "forbidden" in err_str or "member list is inaccessible" in err_str:
-                        statuses[cid] = {"code": "err", "text": "🔴 Скайнет кикнут / Ослеп"}
-                    else:
-                        # Обрезаем системную ошибку для красоты таблицы
-                        safe_err = str(e).replace('"', "'")[:40] 
-                        statuses[cid] = {"code": "err", "text": f"🔴 Ошибка: {safe_err}"}
-                        
-                time.sleep(0.3) # Отдыхаем долю секунды перед следующим чатом
-                        
-        return jsonify(statuses)
+                    print(f"infra ping error: {e}")
+                    db['settings'].update_one({"_id": "infra_ping"}, {"$set": {"running": False}})
+            threading.Thread(target=_run, daemon=True).start()
+            running = True
+        return jsonify({"statuses": doc.get("statuses", {}), "ts": doc.get("ts"), "running": bool(running)})
 
     @app.route('/glaz/api/moderation', methods=['GET'])
     def api_get_mod_settings():
@@ -1624,37 +1649,11 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         return jsonify({"success": True})
 
 # 👇 МАГИЧЕСКАЯ МИГРАЦИЯ ИЗ CONFIG.PY В MONGODB 👇
+    # Перенос из config.py отключён: чаты давно живут в базе, а кнопка перезаписывала их снимком
+    # со старта сервера (чаты, добавленные после старта, и FAQ-ссылка терялись).
     @app.route('/glaz/api/infrastructure/migrate', methods=['GET'])
     def api_migrate_infrastructure():
-        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
-        
-        # Загружаем старые данные из конфига
-        from config import all_cities, chat_ids_parni, chat_ids_mk, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak, MAIN_CHANNEL_LINK
-        
-        # Умный конвертер словарей в нужный нам формат
-        def convert_dict_to_list(chat_dict):
-            return [{"name": name, "id": str(chat_id)} for name, chat_id in chat_dict.items()]
-
-        migrated_data = {
-            "cities": ", ".join(all_cities),
-            "global_links": {"main_channel": MAIN_CHANNEL_LINK, "faq": ""},
-            "networks": {
-                "parni": convert_dict_to_list(chat_ids_parni),
-                "mk": convert_dict_to_list(chat_ids_mk),
-                "ns": convert_dict_to_list(chat_ids_ns),
-                "rainbow": convert_dict_to_list(chat_ids_rainbow),
-                "gayznak": convert_dict_to_list(chat_ids_gayznak)
-            },
-            "competitors": []
-        }
-        
-        # Записываем в базу
-        db['settings'].update_one(
-            {"_id": "infrastructure"},
-            {"$set": migrated_data},
-            upsert=True
-        )
-        return "✅ Миграция успешно завершена! Вернитесь в ЦУП и обновите страницу."
+        return jsonify({"error": "Перенос из config.py отключён — чаты уже хранятся в базе"}), 410
 
     # === ПРЯМОЕ УПРАВЛЕНИЕ АНДРЮШЕНЬКОЙ (ЦЕЛИ) ===
     @app.route('/glaz/api/spy', methods=['GET'])

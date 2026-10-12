@@ -394,6 +394,198 @@
         }
 
 
+        /* =================== ⚙️ НАСТРОЙКИ 2.0 и 🗺 ИНФРАСТРУКТУРА =================== */
+        #tab-system .set-card, #tab-infrastructure .set-card { padding: 18px 20px !important; margin-top: 16px !important; max-width: 1100px; }
+        .set-card h3, .set-card h4 { color: var(--text) !important; }
+        .set-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+        .set-ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; font-size: 18px; background: var(--surface-2); border: 1px solid var(--line); flex-shrink: 0; }
+        .set-title { flex: 1; min-width: 0; }
+        .set-title h3 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: -.005em; }
+        .set-title p { margin: 3px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+        .set-title code { font: 500 12px var(--mono); background: var(--surface-2); padding: 1px 5px; border-radius: 5px; color: #d9bcff; }
+        .set-save { flex-shrink: 0; }
+        .set-save:disabled, .btn:disabled { opacity: .45; cursor: default; }
+        .set-sub { font: 600 10.5px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 16px 0 4px; display: flex; gap: 10px; align-items: baseline; }
+        .set-sub .cnt { letter-spacing: 0; text-transform: none; font: 500 11.5px var(--sans); color: var(--dim); }
+        .set-row { display: flex; align-items: center; gap: 16px; padding: 11px 0; border-top: 1px solid var(--line); }
+        .set-sub + .set-row { border-top: none; }
+        .set-txt { flex: 1; min-width: 0; }
+        .set-lbl { display: block; font-weight: 600; font-size: 14px; color: var(--text); }
+        .set-hint { color: var(--muted); font-size: 12.5px; margin-top: 2px; line-height: 1.4; }
+        .set-row.tgl:not(.on) .set-lbl { color: #a7abb3; }
+        .set-row.busy { opacity: .5; pointer-events: none; }
+        .set-group.dimmed { opacity: .45; }
+        .set-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); column-gap: 32px; }
+        .set-empty { color: var(--dim); font-size: 13px; padding: 14px; text-align: center; border: 1px dashed var(--line-2); border-radius: var(--radius-sm); }
+        .set-empty.sm { padding: 4px 0; border: none; text-align: left; font-size: 12.5px; }
+
+        /* переключатель */
+        .sw { position: relative; display: inline-block; width: 42px; height: 24px; flex-shrink: 0; cursor: pointer; }
+        .sw input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; z-index: 1; }
+        .sw span { position: absolute; inset: 0; border-radius: 99px; background: var(--surface-3); border: 1px solid var(--line-2); transition: .18s; }
+        .sw span::after { content: ""; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px; border-radius: 50%; background: #9aa0aa; transition: .18s; }
+        .sw input:checked + span { background: rgba(76,214,160,.25); border-color: rgba(76,214,160,.6); }
+        .sw input:checked + span::after { transform: translateX(18px); background: var(--ok); }
+        .sw input:focus-visible + span { box-shadow: 0 0 0 3px rgba(187,134,252,.35); }
+        .sw.big { width: 52px; height: 30px; } .sw.big span::after { width: 24px; height: 24px; } .sw.big input:checked + span::after { transform: translateX(22px); }
+
+        .master { display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-radius: var(--radius); border: 1px solid rgba(76,214,160,.35); background: linear-gradient(90deg, rgba(76,214,160,.08), transparent 70%); }
+        .master.off { border-color: rgba(239,111,134,.5); background: linear-gradient(90deg, rgba(239,111,134,.12), transparent 70%); }
+        .master .set-lbl { font-size: 15px; }
+
+        .range-ctl { display: flex; align-items: center; gap: 10px; flex: 0 0 280px; }
+        .range-ctl input[type=range] { flex: 1; accent-color: var(--accent); }
+        .range-ctl output, .num-ctl input { font: 700 15px var(--mono); }
+        .range-ctl output { min-width: 32px; text-align: right; }
+        .num-ctl { display: flex; align-items: center; gap: 8px; }
+        .num-ctl input { width: 92px; padding: 7px 10px; text-align: right; background: var(--bg); border: 1px solid var(--line-2); color: var(--text); border-radius: var(--radius-sm); box-sizing: border-box; }
+        .unit { color: var(--muted); font-size: 13px; min-width: 14px; }
+        .dirty { border-color: var(--warn) !important; }
+
+        /* словарь */
+        .dict-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(235px, 1fr)); gap: 12px; }
+        .dict-zone { --z: var(--muted); border: 1px solid var(--line); border-top: 3px solid var(--z); border-radius: var(--radius); padding: 12px; background: var(--bg); display: flex; flex-direction: column; gap: 10px; }
+        .dict-zone.z-red { --z: var(--danger); } .dict-zone.z-yellow { --z: var(--warn); } .dict-zone.z-black { --z: var(--accent); } .dict-zone.z-soft { --z: #ff8a65; }
+        .dz-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .dz-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--z); }
+        .dz-act { color: var(--muted); font-size: 12px; }
+        .dz-n { margin-left: auto; font: 700 12px var(--mono); color: var(--z); }
+        .dz-note { color: var(--muted); font-size: 12px; line-height: 1.4; }
+        .dz-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: 180px; overflow-y: auto; }
+        .wchip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 9px; border-radius: 999px; font-size: 12.5px; background: var(--surface-2); border: 1px solid var(--line-2); }
+        .wchip button { border: none; background: none; color: var(--dim); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px; border-radius: 50%; }
+        .wchip button:hover { color: #ff9fb1; background: rgba(239,111,134,.15); }
+        .dz-add { display: flex; gap: 6px; align-items: center; margin-top: auto; }
+        .dz-add input[type=text] { flex: 1; min-width: 0; padding: 7px 10px; background: var(--surface) !important; border: 1px solid var(--line-2); color: var(--text); border-radius: var(--radius-sm); }
+        .dz-exact { display: inline-flex; align-items: center; gap: 3px; font-size: 13px; color: var(--muted); cursor: pointer; padding: 0 2px; }
+        .dz-exact input { accent-color: var(--accent); }
+
+        /* тексты */
+        .txt-field { margin-top: 12px; }
+        .txt-field label { display: block; font-weight: 600; font-size: 13.5px; margin-bottom: 6px; }
+        .txt-field textarea, .tpl-editor textarea, .mono-area { width: 100%; box-sizing: border-box; padding: 10px 12px; font: 400 13.5px/1.5 var(--sans); resize: vertical; }
+        .mono-area { font: 400 12.5px/1.55 var(--mono) !important; color: #b8f3ea !important; }
+        .tpl-picker { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        .tpl-opt { border: 1px solid var(--line-2); background: var(--surface-2); color: #c5c8cf; padding: 6px 11px; border-radius: 999px; font: 500 12.5px var(--sans); cursor: pointer; }
+        .tpl-opt:hover { border-color: var(--muted); color: #fff; }
+        .tpl-opt.active { background: rgba(187,134,252,.15); border-color: rgba(187,134,252,.55); color: #fff; }
+        .tpl-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; font-size: 12.5px; }
+
+        /* владелец */
+        .owner-divider { display: flex; align-items: center; gap: 12px; margin: 30px auto 0; max-width: 1100px; color: var(--warn); font: 600 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+        .owner-divider::before, .owner-divider::after { content: ""; flex: 1; height: 1px; background: rgba(255,183,77,.3); }
+        .price-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+        .price-card { --c: var(--accent); border: 1px solid var(--line); border-top: 3px solid var(--c); border-radius: var(--radius); background: var(--bg); padding: 12px; }
+        .pc-vip { --c: var(--warn); } .pc-beyond { --c: #f6a5c0; } .pc-big { --c: var(--danger); } .pc-sm { --c: var(--accent); } .pc-bg { --c: var(--teal); }
+        .pc-name { font-weight: 700; font-size: 13.5px; margin-bottom: 6px; }
+        .pc-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 8px; padding: 4px 0; font-size: 13px; color: var(--muted); }
+        .pc-row .rub { grid-column: 2; text-align: right; font: 500 11px var(--mono); color: var(--dim); }
+        .star-in { display: flex; align-items: center; background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--radius-sm); overflow: hidden; }
+        .star-in:has(.dirty) { border-color: var(--warn); }
+        .star-in input { width: 74px; border: none !important; background: transparent !important; padding: 6px 4px 6px 8px; text-align: right; font: 700 14px var(--mono); color: var(--text); }
+        .star-in input:focus { outline: none; }
+        .star-in i { font-style: normal; padding-right: 7px; font-size: 12px; }
+        .cash-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+        .cash-kpi { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+        .cash-kpi .v { font: 700 24px var(--mono); margin-top: 4px; color: var(--warn); }
+        .cash-kpi:nth-child(2) .v { color: var(--ok); } .cash-kpi:nth-child(3) .v { color: var(--muted); font-size: 20px; }
+        .cash-kpi .sub { color: var(--dim); font-size: 11.5px; margin-top: 2px; }
+        .rev-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 18px 0 8px; }
+        .rev-chart { position: relative; height: 260px; }
+        .rev-chart .set-empty { position: absolute; inset: 0; display: grid; place-items: center; }
+        .pay-log { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+        .pay-log summary { cursor: pointer; color: #c5c8cf; font-size: 13px; display: flex; gap: 8px; align-items: center; }
+        .pay-list { max-height: 220px; overflow-y: auto; margin-top: 8px; }
+        .pay-row { display: grid; grid-template-columns: 74px 1fr auto 90px; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; align-items: center; }
+        .pay-row a { color: var(--accent); text-decoration: none; }
+        .pay-row span:last-child { text-align: right; }
+        .btn-preview { background: #0e1621; border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; max-width: 420px; display: grid; gap: 4px; }
+        .tg-msg { background: #182533; color: #e8eef4; border-radius: 10px; padding: 8px 10px; font-size: 12.5px; margin-bottom: 2px; }
+        .tg-btn { text-align: center; padding: 7px; border-radius: 8px; background: rgba(255,255,255,.08); color: #e8eef4; font-size: 12.5px; font-weight: 600; }
+        .tg-btn.primary { background: #2f6ea5; } .tg-btn.success { background: #2e8b57; } .tg-btn.danger { background: #b23b4e; }
+        .btnc-list { display: grid; gap: 8px; margin-bottom: 10px; }
+        .btnc-row { display: grid; grid-template-columns: 1.2fr 1.6fr 120px 120px auto; gap: 8px; }
+        .btnc-row input, .btnc-row select { padding: 7px 10px; min-width: 0; box-sizing: border-box; }
+
+        /* инфраструктура */
+        .infra-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; max-width: 1100px; margin: 0 auto; }
+        .infra-kpis .kpi .v { font-size: 22px; }
+        .infra-kpis .kpi.bad .v { color: #ff9fb1; } .infra-kpis .kpi.good .v { color: var(--ok); }
+        .infra-kpis .kpi:last-child .v { font: 600 15px var(--sans); margin-top: 8px; color: #c5c8cf; }
+        .ping-box { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; font-size: 12px; }
+        .chat-add { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        .chat-add input, .chat-add select, .chat-add textarea { flex: 1 1 180px; min-width: 0; padding: 9px 12px; box-sizing: border-box; }
+        .chat-add select { flex: 0 1 170px; }
+        .chat-filter { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 4px 0 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+        .chat-filter input[type=search] { flex: 1 1 200px; min-width: 0; padding: 8px 12px; }
+        .chat-filter .seg { overflow-x: auto; max-width: 100%; }
+        .chat-filter .seg-btn { white-space: nowrap; }
+        .chip.chk { cursor: pointer; padding: 6px 11px; } .chip.chk input { accent-color: var(--danger); margin: 0; }
+        .net-list { display: grid; gap: 8px; }
+        .net-group { border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
+        .net-group > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 11px 14px; }
+        .net-group > summary::-webkit-details-marker { display: none; }
+        .net-group > summary::before { content: "›"; color: var(--muted); font-size: 18px; transition: transform .15s; width: 10px; }
+        .net-group[open] > summary::before { transform: rotate(90deg); }
+        .ch-list { border-top: 1px solid var(--line); }
+        .ch-row { display: grid; grid-template-columns: 10px minmax(160px, 1.1fr) 2fr auto; gap: 12px; align-items: center; padding: 9px 14px; border-bottom: 1px solid var(--line); }
+        .ch-row:last-child { border-bottom: none; }
+        .ch-row:hover { background: rgba(255,255,255,.015); }
+        .ch-name { font-weight: 600; font-size: 13.5px; }
+        .ch-id { font-size: 11.5px; color: var(--muted); cursor: copy; display: inline-block; }
+        .ch-id:hover { color: var(--text); }
+        .ch-bots { display: flex; flex-wrap: wrap; gap: 5px; font-size: 12px; }
+        .bb { padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; border: 1px solid; }
+        .bb.ok { color: var(--ok); border-color: rgba(76,214,160,.35); background: rgba(76,214,160,.08); }
+        .bb.no { color: #ff9fb1; border-color: rgba(239,111,134,.45); background: rgba(239,111,134,.1); }
+        .ch-err { color: #ff9fb1; font-size: 12px; }
+        .ch-act { display: flex; gap: 4px; }
+        .icon-btn { width: 28px; height: 28px; border-radius: 8px; border: 1px solid transparent; background: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; flex-shrink: 0; }
+        .icon-btn:hover { background: var(--surface-2); border-color: var(--line-2); color: var(--text); }
+        .icon-btn.del:hover { color: #ff9fb1; border-color: rgba(239,111,134,.45); background: rgba(239,111,134,.1); }
+        .target-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+        .target-grid.scroll { max-height: 420px; overflow-y: auto; padding-right: 4px; }
+        .target { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); padding: 9px 10px; display: grid; gap: 3px; min-width: 0; }
+        .target.err { border-color: rgba(239,111,134,.4); }
+        .t-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+        .t-top b { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+        .t-top .icon-btn { width: 22px; height: 22px; font-size: 14px; }
+        .t-id { font-size: 11px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .t-st { font-size: 11.5px; color: var(--muted); }
+        .ro-search { width: 100%; box-sizing: border-box; padding: 8px 12px; margin-bottom: 10px; }
+        .danger-card { border-color: rgba(239,111,134,.3) !important; }
+
+        #tab-system input[type=text], #tab-system input[type=url], #tab-system input[type=number]:not(.star-in input), #tab-system select,
+        #tab-infrastructure input[type=text], #tab-infrastructure input[type=url], #tab-infrastructure input[type=search], #tab-infrastructure select, #tab-infrastructure textarea,
+        .ctl-in { background: var(--bg) !important; border: 1px solid var(--line-2) !important; color: var(--text) !important; border-radius: var(--radius-sm) !important; font: 500 14px var(--sans); }
+        #tab-system input:focus, #tab-infrastructure input:focus, #tab-infrastructure textarea:focus { outline: none; border-color: var(--accent) !important; }
+        .dz-add input[type=text] { background: var(--surface) !important; }
+        .num-ctl input.dirty, .ctl-row .dirty, .dz-add input.dirty { border-color: var(--warn) !important; }
+        .ctl-groups { display: grid; gap: 12px; }
+        .ctl-group { border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); padding: 4px 14px 6px; }
+        .ctl-gh { margin: 12px 0 2px !important; font-size: 14px; font-weight: 700; }
+        .ctl-row { flex-wrap: wrap; }
+        .ctl-in { flex: 0 1 240px; min-width: 120px; padding: 8px 10px; box-sizing: border-box; }
+        .ctl-ta { flex: 1 1 100%; min-height: 90px; resize: vertical; font-size: 13px; padding: 9px 11px; box-sizing: border-box; }
+        .ctl-row .changed { border-color: rgba(255,183,77,.6) !important; }
+        .ctl-row .dirty { border-color: var(--teal) !important; box-shadow: 0 0 0 2px rgba(3,218,198,.15); }
+        .ctl-wrap { margin-top: 0 !important; }
+        @media (max-width: 760px) {
+            .set-groups { grid-template-columns: 1fr; }
+            .set-head { flex-wrap: wrap; }
+            .set-head .set-save, .set-head .ping-box { width: 100%; justify-content: stretch; }
+            .set-head .set-save { width: 100%; }
+            .range-ctl { flex: 1 1 100%; }
+            .set-row:has(.range-ctl) { flex-wrap: wrap; }
+            .btnc-row { grid-template-columns: 1fr 1fr; }
+            .btnc-row .bc-url { grid-column: 1 / -1; grid-row: 2; }
+            .ch-row { grid-template-columns: 10px 1fr auto; }
+            .ch-bots { grid-column: 2 / -1; grid-row: 2; }
+            .ch-act { grid-column: 3; grid-row: 1; }
+            .pay-row { grid-template-columns: 64px 1fr auto; } .pay-row span:last-child { display: none; }
+            #tab-system .set-card, #tab-infrastructure .set-card { padding: 14px !important; }
+        }
+
         /* =================== 📊 СТАТИСТИКА 2.0 =================== */
         #tab-main {
             --s-1: #8f74e6; --s-ban: #d47428; --s-mute: #8f74e6; --s-post: #1ca58b; --s-ticket: #8f74e6; --s-user: #8f74e6;
@@ -850,12 +1042,12 @@
         <button class="nav-item" data-tab="tab-withdrawals" onclick="openTab('tab-withdrawals')"><span class="ico">🎁</span><span class="lbl">Касса и награды</span></button>
         <button class="nav-item" data-tab="tab-promos" onclick="openTab('tab-promos')"><span class="ico">🎫</span><span class="lbl">Скидки</span></button>
         <button class="nav-item" data-tab="ads-tab" onclick="openTab('ads-tab')"><span class="ico">📢</span><span class="lbl">Биржа рекламы</span></button>
-        {% if is_owner %}<button id="btn-secret-finance" class="nav-item" data-tab="tab-live-finance" onclick="openTab('tab-live-finance')" style="display: none;"><span class="ico">💰</span><span class="lbl">Live-финансы</span></button>{% endif %}
+        {% if is_owner %}<button id="btn-secret-finance" class="nav-item" data-tab="tab-live-finance" onclick="openTab('tab-live-finance')"><span class="ico">💰</span><span class="lbl">Live-финансы</span></button>{% endif %}
       </div>
       <div class="nav-group">
         <div class="nav-group-title">Система</div>
         <button class="nav-item" data-tab="tab-control" onclick="openTab('tab-control')"><span class="ico">⚙️</span><span class="lbl">Настройки</span></button>
-        {% if is_owner %}<button class="nav-item" onclick="openRoot()"><span class="ico">👑</span><span class="lbl">Касса и ROOT</span></button>{% endif %}
+        {% if is_owner %}<button class="nav-item" onclick="openRoot()"><span class="ico">👑</span><span class="lbl">Касса владельца</span></button>{% endif %}
         <button class="nav-item" data-tab="tab-infrastructure" onclick="openTab('tab-infrastructure')"><span class="ico">🗺</span><span class="lbl">Инфраструктура</span></button>
         <button class="nav-item" data-tab="tab-diag" onclick="openTab('tab-diag')"><span class="ico">🩺</span><span class="lbl">Диагностика</span><span class="nav-badge warm" id="diag-badge" style="display:none">0</span></button>
       </div>
@@ -1431,282 +1623,251 @@
         <button class="btn primary ctl-float" onclick="saveControl()">💾 Сохранить изменения</button>
         <div class="no-hits" id="settings-nohits">Ничего не нашлось. Попробуйте другое слово.</div>
 
-        <div class="panel-block">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                <div>
-                    <h3 style="color:#ffb74d; margin:0;">🎛 Управление ботами</h3>
-                    <div style="color:#aaa; font-size:13px; margin-top:6px;">Изменения доходят до ботов примерно за 20 секунд, деплой не нужен. Изменённые значения подсвечены, пустое поле — вернуть как было.</div>
-                </div>
-                <button class="form-btn" style="width:auto;" onclick="saveControl()">💾 Сохранить изменения</button>
+        <div class="panel-block set-card ctl-wrap">
+            <div class="set-head">
+                <div class="set-ic">🤖</div>
+                <div class="set-title"><h3>Цены, сроки и тексты ботов</h3><p>Доходят до ботов примерно за 20 секунд. Оранжевая рамка — значение отличается от стандартного; пустое поле — вернуть стандартное.</p></div>
+                <button class="btn primary sm set-save" onclick="saveControl()">Сохранить</button>
             </div>
-            <div id="control-groups" style="margin-top:18px; display:flex; flex-direction:column; gap:18px;">Загрузка...</div>
+            <div id="control-groups" class="ctl-groups"><div class="set-empty">Загрузка…</div></div>
         </div>
     </div>
 
     <div id="tab-system" class="tab-content">
-        <div class="panel-block" style="max-width: 1000px; background: #121212; border-radius: 12px; padding: 25px; border: 1px solid #222;">
-            <h3 style="color: #03dac6; margin-bottom: 10px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
-                ⚙️ Пульт Управления Коммандным Центром Империи
-                <span onclick="unlockRoot()" style="cursor:pointer; opacity:0.1; font-size: 14px;" title="Root Access">🔒</span>
-            </h3>
-            <p style="color: #777; margin-bottom: 25px; font-size: 14px;">
-                Все переключатели меняют конфигурацию нейросети Скайнета «на лету». Сервер перезагружать не требуется.
-            </p>
-            
-            <div id="root-panel" style="display: none; margin-top: 20px; margin-bottom: 25px; border-top: 2px dashed #ff4d4d; padding-top: 15px;">
-                <h4 style="color: #ff4d4d;">👑 ROOT: Конструктор кнопок Скайнета</h4>
-                <p style="font-size: 12px; color: #aaa;">Эти кнопки выводятся всем новорегам в предупреждении о подписке.</p>
-                <div id="buttons-container"></div>
-                <button onclick="addButtonRow('', '')" class="btn btn-sm btn-outline-primary mt-3">➕ Добавить кнопку</button>
-                <button onclick="saveRootButtons()" class="btn btn-sm btn-danger mt-3" style="float: right;">💾 Сохранить в сеть</button>
-                <div style="clear: both;"></div>
 
-                {% if is_owner %}<div style="background: rgba(3, 218, 198, 0.05); border: 1px solid #03dac6; padding: 20px; border-radius: 8px; margin-top: 20px; text-align: center;">
-                    <h5 style="margin: 0 0 10px 0; color: #03dac6; text-transform: uppercase; font-size: 14px; letter-spacing: 1px; font-weight: bold;">
-                        💰 ОБЩАЯ КАССА ИМПЕРИИ (ЗА СЕГОДНЯ)
-                    </h5>
-                    <div style="display: flex; justify-content: center; align-items: baseline; gap: 15px; margin-bottom: 15px; background: #121212; padding: 10px; border-radius: 8px; border: 1px solid #333;">
-                        <div style="font-size: 32px; font-weight: bold; color: #ffb74d;">
-                            <span id="root-finance-total">0</span> ⭐️
-                        </div>
-                        <div style="font-size: 24px; font-weight: bold; color: #888;">
-                            ≈ <span id="root-finance-rubles">0</span> ₽
-                        </div>
-                    </div>
-                    <div id="root-finance-list" style="font-size: 12px; color: #aaa; max-height: 120px; overflow-y: auto; font-family: monospace; text-align: left; background: #1e1e1e; padding: 10px; border-radius: 5px;">
-                        📊 Сводка пуста.
-                    </div>
-                </div>
-
-                <div style="background: rgba(187, 134, 252, 0.05); border: 1px solid #bb86fc; padding: 15px; border-radius: 8px; margin-top: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h5 style="margin: 0; color: #bb86fc; text-transform: uppercase; font-size: 13px; letter-spacing: 1px;">📈 Финансовая аналитика</h5>
-                        
-                        <div style="display: flex; gap: 5px;">
-                            <button class="tab-btn active" id="btn-period-week" onclick="loadRootRevenue(sessionPin, 'week')" style="padding: 4px 10px; font-size: 11px;">Неделя</button>
-                            <button class="tab-btn" id="btn-period-month" onclick="loadRootRevenue(sessionPin, 'month')" style="padding: 4px 10px; font-size: 11px;">Месяц</button>
-                            <button class="tab-btn" id="btn-period-all" onclick="loadRootRevenue(sessionPin, 'all')" style="padding: 4px 10px; font-size: 11px;">Всё время</button>
-                        </div>
-                    </div>
-                    
-                    <canvas id="revenueChart" width="600" height="250" style="margin: 0 auto; display: block;"></canvas>
-                </div>{% endif %}
-
+        <!-- 🎛 Модули Скайнета (бывший «Пульт управления») -->
+        <div class="panel-block set-card" id="set-modules">
+            <div class="set-head">
+                <div class="set-ic">🎛</div>
+                <div class="set-title"><h3>Модули Скайнета</h3><p>Включаются и выключаются сразу, без перезапуска. Бот подхватывает изменение за ~15 секунд.</p></div>
             </div>
+            <div id="sk-master"></div>
+            <div id="toggles-container" class="set-groups"><div class="set-empty">Загрузка…</div></div>
+        </div>
 
-                {% if is_owner %}<div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #333; padding: 20px; border-radius: 10px; max-width: 1000px;">
-            <h3 style="color: #03dac6; margin-bottom: 10px; font-size: 18px;">💰 Управление тарифами сети (VIP и Реклама)</h3>
-            <p style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Изменения вступают в силу мгновенно для всех ботов. Пароль не требуется.</p>
-            
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                <div style="border: 1px solid #ffb74d; padding: 12px; border-radius: 8px; background: rgba(255,183,77,0.02);">
-                    <h4 style="color: #ffb74d; margin-top: 0; margin-bottom: 10px;">👑 VIP-Доступ</h4>
-                    <label style="font-size: 11px; color: #888;">Цена (звёзды ⭐️):</label>
-                    <input type="number" id="price-vip" class="search-input" style="width: 100%; padding: 6px; margin-top: 5px; box-sizing: border-box;">
-                </div>
-                
-                <!-- 👇 НОВЫЙ БЛОК ДЛЯ ЦЕНЫ BEYOND 👇 -->
-                <div style="border: 1px solid #f6a5c0; padding: 12px; border-radius: 8px; background: rgba(246, 165, 192, 0.02);">
-                    <h4 style="color: #f6a5c0; margin-top: 0; margin-bottom: 10px;">🏳️‍🌈 BEYOND-Доступ</h4>
-                    <label style="font-size: 11px; color: #888;">Цена (звёзды ⭐️):</label>
-                    <input type="number" id="price-beyond" class="search-input" style="width: 100%; padding: 6px; margin-top: 5px; box-sizing: border-box;">
-                </div>
-                <!-- 👆 ======================= 👆 -->
-                <div style="border: 1px solid #bb86fc; padding: 12px; border-radius: 8px; background: rgba(187,134,252,0.02);">
-                    <h4 style="color: #bb86fc; margin-top: 0; margin-bottom: 10px;">🧩 Чаты &lt; 1000 юзеров</h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                        <div><label style="font-size: 10px; color: #888;">1 дн:</label><input type="number" id="price-sm-1" class="search-input" style="width:100%; padding:4px;"></div>
-                        <div><label style="font-size: 10px; color: #888;">7 дн:</label><input type="number" id="price-sm-7" class="search-input" style="width:100%; padding:4px;"></div>
-                        <div><label style="font-size: 10px; color: #888;">15 дн:</label><input type="number" id="price-sm-15" class="search-input" style="width:100%; padding:4px;"></div>
-                        <div><label style="font-size: 10px; color: #888;">30 дн:</label><input type="number" id="price-sm-30" class="search-input" style="width:100%; padding:4px;"></div>
-                    </div>
-                </div>
-                <div style="border: 1px solid #03dac6; padding: 12px; border-radius: 8px; background: rgba(3,218,198,0.02);">
-                    <h4 style="color: #03dac6; margin-top: 0; margin-bottom: 10px;">📢 Чаты &gt; 1000 юзеров</h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                        <div><label style="font-size: 10px; color: #888;">1 дн:</label><input type="number" id="price-bg-1" class="search-input" style="width:100%; padding:4px;"></div>
-                        <div><label style="font-size: 10px; color: #888;">7 дн:</label><input type="number" id="price-bg-7" class="search-input" style="width:100%; padding:4px;"></div>
-                        <div><label style="font-size: 10px; color: #888;">15 дн:</label><input type="number" id="price-bg-15" class="search-input" style="width:100%; padding:4px;"></div>
-                        <div><label style="font-size: 10px; color: #888;">30 дн:</label><input type="number" id="price-bg-30" class="search-input" style="width:100%; padding:4px;"></div>
-                    </div>
-                </div>
-                <div style="border: 1px solid #cf6679; padding: 12px; border-radius: 8px; background: rgba(207,102,121,0.02);">
-                    <h4 style="color: #cf6679; margin-top: 0; margin-bottom: 10px;">🎪 БИГ-Чаты сети</h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                        <div><label style="font-size: 10px; color: #888;">1 день:</label><input type="number" id="price-bigchat-1" class="search-input" style="width:100%; padding:4px;"></div>
-                        <div><label style="font-size: 10px; color: #888;">7 дней:</label><input type="number" id="price-bigchat-7" class="search-input" style="width:100%; padding:4px;"></div>
-                    </div>
-                </div>
+        <!-- ⏱ Таймеры и пороги -->
+        <div class="panel-block set-card" id="set-timers">
+            <div class="set-head">
+                <div class="set-ic">⏱</div>
+                <div class="set-title"><h3>Таймеры и пороги</h3><p>Сколько длятся наказания и насколько похожим должен быть клон, чтобы радар его поймал.</p></div>
+                <button class="btn primary sm set-save" id="mod-save-btn" onclick="saveModSettings()" disabled>Сохранить</button>
             </div>
-            <button onclick="saveNetworkPrices()" class="form-btn" style="background: #03dac6; color: #121212; width: 100%; font-weight: bold; font-size: 15px;">💾 Сохранить тарифную сетку</button>
-        </div>{% endif %}
-            
-            <div id="toggles-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 16px;">
+            <div class="set-sub">Радар твинков</div>
+            <div class="set-row">
+                <div class="set-txt"><label class="set-lbl" for="sim-norm">Сходство для обычных участников</label><div class="set-hint">Выше — ловит только почти точные копии. Ниже — больше ложных срабатываний.</div></div>
+                <div class="range-ctl"><input type="range" id="sim-norm" min="50" max="100" value="85"><output id="val-sim-norm">85</output><span class="unit">%</span></div>
+            </div>
+            <div class="set-row">
+                <div class="set-txt"><label class="set-lbl" for="sim-new">Сходство для новорегов</label><div class="set-hint">Для свежих аккаунтов порог обычно ниже — они чаще оказываются твинками.</div></div>
+                <div class="range-ctl"><input type="range" id="sim-new" min="50" max="100" value="75"><output id="val-sim-new">75</output><span class="unit">%</span></div>
+            </div>
+            <div class="set-sub">Сроки наказаний</div>
+            <div class="set-row">
+                <div class="set-txt"><label class="set-lbl" for="timer-strike">Мут за страйки</label><div class="set-hint">Баяны и копипаст. Сколько страйков до мута — в «Управлении ботами → Модерация».</div></div>
+                <div class="num-ctl"><input type="number" id="timer-strike" min="0" value="72"><span class="unit">ч</span></div>
+            </div>
+            <div class="set-row">
+                <div class="set-txt"><label class="set-lbl" for="timer-flood-norm">Мут за флуд</label><div class="set-hint">Обычные чаты сети.</div></div>
+                <div class="num-ctl"><input type="number" id="timer-flood-norm" min="0" value="6"><span class="unit">ч</span></div>
+            </div>
+            <div class="set-row">
+                <div class="set-txt"><label class="set-lbl" for="timer-flood-hard">Мут за флуд в биг-чатах</label></div>
+                <div class="num-ctl"><input type="number" id="timer-flood-hard" min="0" value="120"><span class="unit">ч</span></div>
+            </div>
+            <div class="set-row">
+                <div class="set-txt"><label class="set-lbl" for="timer-quarantine">Карантин новорегов</label><div class="set-hint">Сколько часов свежий аккаунт не может писать. Включается модулем «Карантин» выше.</div></div>
+                <div class="num-ctl"><input type="number" id="timer-quarantine" min="0" value="120"><span class="unit">ч</span></div>
             </div>
         </div>
-        
-        <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #ffb74d; padding: 20px; border-radius: 10px; max-width: 1000px; box-shadow: 0 0 15px rgba(255, 183, 77, 0.05);">
-            <h3 style="color: #ffb74d; margin-bottom: 10px; font-size: 18px;">⚖️ Лимиты модерации и Таймеры</h3>
-            <p style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Настройки радаров и таймеры банов. Изменения применяются без перезагрузки сервера.</p>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <div style="background: #252525; padding: 15px; border-radius: 8px; border-left: 3px solid #03dac6;">
-                    <h4 style="color: #03dac6; margin-top: 0;">👁 Радар Твинков (Анти-Баян)</h4>
-                    <label style="font-size: 12px; color: #ccc;">Сходство для обычных: <b id="val-sim-norm" style="color:#fff;">85</b>%</label>
-                    <input type="range" id="sim-norm" min="50" max="100" value="85" style="width: 100%; margin-bottom: 15px;" oninput="document.getElementById('val-sim-norm').innerText = this.value">
-                    
-                    <label style="font-size: 12px; color: #ccc;">Сходство для новорегов: <b id="val-sim-new" style="color:#cf6679;">75</b>%</label>
-                    <input type="range" id="sim-new" min="50" max="100" value="75" style="width: 100%; margin-bottom: 10px;" oninput="document.getElementById('val-sim-new').innerText = this.value">
-                </div>
 
-                <div style="background: #252525; padding: 15px; border-radius: 8px; border-left: 3px solid #cf6679;">
-                    <h4 style="color: #cf6679; margin-top: 0;">⏱ Таймеры наказаний (Часы)</h4>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                        <label style="font-size: 12px; color: #ccc;">Мут за страйки (баяны, копипаст), ч:</label>
-                        <input type="number" id="timer-strike" class="search-input" style="width: 70px; padding: 4px;" value="72">
-                    </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                        <label style="font-size: 12px; color: #ccc;">Антифлуд (Обычный):</label>
-                        <input type="number" id="timer-flood-norm" class="search-input" style="width: 70px; padding: 4px;" value="6">
-                    </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                        <label style="font-size: 12px; color: #ccc;">Антифлуд (Биг-чат):</label>
-                        <input type="number" id="timer-flood-hard" class="search-input" style="width: 70px; padding: 4px;" value="120">
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <label style="font-size: 12px; color: #ccc;">Карантин новорегов:</label>
-                        <input type="number" id="timer-quarantine" class="search-input" style="width: 70px; padding: 4px;" value="120">
-                    </div>
-                </div>
+        <!-- 🛡 Словарь автомодератора -->
+        <div class="panel-block set-card" id="set-dict">
+            <div class="set-head">
+                <div class="set-ic">🛡</div>
+                <div class="set-title"><h3>Словарь автомодератора</h3><p>Слова-триггеры. Начинают работать сразу. 🔤 — ловит и склонения, 🎯 — только точное слово.</p></div>
             </div>
-            <button class="form-btn" style="background: #ffb74d; color: #121212; width: 100%; font-weight: bold; font-size: 15px; margin-top: 15px;" onclick="saveModSettings()">💾 Сохранить таймеры</button>
-        </div>
-<div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #bb86fc; padding: 20px; border-radius: 10px; max-width: 1000px; box-shadow: 0 0 15px rgba(187, 134, 252, 0.05);">
-            <h3 style="color: #bb86fc; margin-bottom: 10px; font-size: 18px;">🤖 Рубильники ИИ-Модерации</h3>
-            <p style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Глобальное отключение модулей (если ИИ сошел с ума или тупит).</p>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; background: #252525; padding: 12px; border-radius: 8px;">
-                    <span style="color: #fff; font-size: 14px;">📡 <b>Радар твинков</b></span>
-                    <label class="toggle-switch"><input type="checkbox" id="toggle-radar" onchange="saveModSettings()"><span class="slider"></span></label>
+            <div class="dict-grid">
+                <div class="dict-zone z-red">
+                    <div class="dz-head"><span class="dz-dot"></span><b>Красная зона</b><span class="dz-act">глобальный бан</span><span class="dz-n" id="dict-red-n">0</span></div>
+                    <div class="dz-list" id="dict-red-list"></div>
+                    <div class="dz-add">
+                        <input type="text" id="dict-red-input" placeholder="Например: меф" onkeydown="if(event.key==='Enter')addDictWord('red')">
+                        <label class="dz-exact" title="Только точное совпадение, без склонений"><input type="checkbox" id="dict-red-exact">🎯</label>
+                        <button class="btn sm" onclick="addDictWord('red')">Добавить</button>
+                    </div>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; background: #252525; padding: 12px; border-radius: 8px;">
-                    <span style="color: #fff; font-size: 14px;">🖼 <b>Анти-баян (Фото)</b></span>
-                    <label class="toggle-switch"><input type="checkbox" id="toggle-antibayan-photo" onchange="saveModSettings()"><span class="slider"></span></label>
+                <div class="dict-zone z-yellow">
+                    <div class="dz-head"><span class="dz-dot"></span><b>Жёлтая зона</b><span class="dz-act">мут за коммерцию</span><span class="dz-n" id="dict-yellow-n">0</span></div>
+                    <div class="dz-list" id="dict-yellow-list"></div>
+                    <div class="dz-add">
+                        <input type="text" id="dict-yellow-input" placeholder="Например: прайс" onkeydown="if(event.key==='Enter')addDictWord('yellow')">
+                        <label class="dz-exact" title="Только точное совпадение, без склонений"><input type="checkbox" id="dict-yellow-exact">🎯</label>
+                        <button class="btn sm" onclick="addDictWord('yellow')">Добавить</button>
+                    </div>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; background: #252525; padding: 12px; border-radius: 8px;">
-                    <span style="color: #fff; font-size: 14px;">📝 <b>Анти-копипаст (Текст)</b></span>
-                    <label class="toggle-switch"><input type="checkbox" id="toggle-antibayan-text" onchange="saveModSettings()"><span class="slider"></span></label>
+                <div class="dict-zone z-black">
+                    <div class="dz-head"><span class="dz-dot"></span><b>Чёрная зона</b><span class="dz-act">запрет в рекламе</span><span class="dz-n" id="dict-black-n">0</span></div>
+                    <div class="dz-list" id="dict-black-list"></div>
+                    <div class="dz-add">
+                        <input type="text" id="dict-black-input" placeholder="Например: вирт" onkeydown="if(event.key==='Enter')addDictWord('black')">
+                        <label class="dz-exact" title="Только точное совпадение, без склонений"><input type="checkbox" id="dict-black-exact">🎯</label>
+                        <button class="btn sm" onclick="addDictWord('black')">Добавить</button>
+                    </div>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; background: #252525; padding: 12px; border-radius: 8px;">
-                    <span style="color: #fff; font-size: 14px;">⏳ <b>Умный антифлуд</b></span>
-                    <label class="toggle-switch"><input type="checkbox" id="toggle-antiflood" onchange="saveModSettings()"><span class="slider"></span></label>
+                <div class="dict-zone z-soft">
+                    <div class="dz-head"><span class="dz-dot"></span><b>Сленг под проверку ИИ</b><span class="dz-act">решает Шпион</span><span class="dz-n" id="dict-soft_red-n">0</span></div>
+                    <div class="dz-note">Не банит сразу: ИИ решает по смыслу («угощу 🐻» — бан, «ищу пухлого 🐻» — нет). Если ИИ недоступен — дело придёт вам.</div>
+                    <div class="dz-list" id="dict-soft_red-list"></div>
+                    <div class="dz-add">
+                        <input type="text" id="dict-soft_red-input" placeholder="Например: 🍭 или клад" onkeydown="if(event.key==='Enter')addDictWord('soft_red')">
+                        <label class="dz-exact" title="Только точное совпадение (для слов)"><input type="checkbox" id="dict-soft_red-exact">🎯</label>
+                        <button class="btn sm" onclick="addDictWord('soft_red')">Добавить</button>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #333; padding: 20px; border-radius: 10px; max-width: 1000px;">
-            <h3 style="color: #cf6679; margin-bottom: 10px; font-size: 18px;">🛡️ Словарь Автомодератора (Живые фильтры)</h3>
-            <p style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Добавляйте слова-триггеры. Бот начнет удалять их без перезагрузки сервера.</p>
-            
-            <div style="display: flex; gap: 20px;">
-                <div style="flex: 1; border: 1px solid #cf6679; padding: 15px; border-radius: 8px; background: rgba(207, 102, 121, 0.05);">
-                    <h4 style="color: #cf6679; margin-top: 0;">🔴 Красная зона (Глобал Бан)</h4>
-                    <div id="dict-red-list" style="margin-bottom: 15px; min-height: 50px; display: flex; flex-wrap: wrap; gap: 5px;"></div>
-                    <input type="text" id="dict-red-input" class="form-control" placeholder="Например: меф" style="width: 100%; margin-bottom: 10px; background: #222; color: #fff; border: 1px solid #555; padding: 8px; box-sizing: border-box;">
-                    <label style="font-size: 12px; color: #aaa; display: flex; align-items: center; gap: 5px; margin-bottom: 10px;">
-                        <input type="checkbox" id="dict-red-exact"> Точное совпадение (без склонений)
-                    </label>
-                    <button onclick="addDictWord('red')" class="btn btn-sm" style="background: #cf6679; color: #fff; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; width: 100%;">➕ Добавить в Бан-лист</button>
-                </div>
-
-                <div style="flex: 1; border: 1px solid #ffb74d; padding: 15px; border-radius: 8px; background: rgba(255, 183, 77, 0.05);">
-                    <h4 style="color: #ffb74d; margin-top: 0;">🟡 Желтая зона (Мут коммерции)</h4>
-                    <div id="dict-yellow-list" style="margin-bottom: 15px; min-height: 50px; display: flex; flex-wrap: wrap; gap: 5px;"></div>
-                    <input type="text" id="dict-yellow-input" class="form-control" placeholder="Например: прайс" style="width: 100%; margin-bottom: 10px; background: #222; color: #fff; border: 1px solid #555; padding: 8px; box-sizing: border-box;">
-                    <label style="font-size: 12px; color: #aaa; display: flex; align-items: center; gap: 5px; margin-bottom: 10px;">
-                        <input type="checkbox" id="dict-yellow-exact"> Точное совпадение (без склонений)
-                    </label>
-                    <button onclick="addDictWord('yellow')" class="btn btn-sm" style="background: #ffb74d; color: #121212; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%;">➕ Добавить в Мут-лист</button>
-                </div>
-<div style="flex: 1; border: 1px solid #bb86fc; padding: 15px; border-radius: 8px; background: rgba(187, 134, 252, 0.05);">
-                    <h4 style="color: #bb86fc; margin-top: 0;">⚫ Черная зона (Реклама)</h4>
-                    <div id="dict-black-list" style="margin-bottom: 15px; min-height: 50px; display: flex; flex-wrap: wrap; gap: 5px;"></div>
-                    <input type="text" id="dict-black-input" class="form-control" placeholder="Например: вирт" style="width: 100%; margin-bottom: 10px; background: #222; color: #fff; border: 1px solid #555; padding: 8px; box-sizing: border-box;">
-                    <label style="font-size: 12px; color: #aaa; display: flex; align-items: center; gap: 5px; margin-bottom: 10px;">
-                        <input type="checkbox" id="dict-black-exact"> Точное совпадение
-                    </label>
-                    <button onclick="addDictWord('black')" class="btn btn-sm" style="background: #bb86fc; color: #121212; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%;">➕ Блокировать в рекламе</button>
-                </div>
+        <!-- ✍️ Тексты предупреждений Скайнета -->
+        <div class="panel-block set-card" id="set-texts">
+            <div class="set-head">
+                <div class="set-ic">✍️</div>
+                <div class="set-title"><h3>Предупреждения Скайнета в чатах</h3><p>Что бот пишет нарушителю. <code>{user_link}</code> — имя нарушителя ссылкой; остальные переменные — кнопками под полем.</p></div>
+                <button class="btn primary sm set-save" onclick="saveSystemTexts()">Сохранить</button>
             </div>
-            <div style="margin-top: 20px; border: 1px solid #ff8a65; padding: 15px; border-radius: 8px; background: rgba(255, 138, 101, 0.05);">
-                <h4 style="color: #ff8a65; margin-top: 0;">🕵️ Сленг и эмодзи под проверку ИИ (Шпион)</h4>
-                <p style="color: #aaa; font-size: 12px; margin: 0 0 10px;">Не банит сразу: Сканер отдаёт сообщение ИИ, тот решает по смыслу («угощу 🐻» — бан, «ищу пухлого 🐻» — нет). Если ИИ недоступен — дело придёт вам на ручное решение.</p>
-                <div id="dict-soft_red-list" style="margin-bottom: 15px; min-height: 30px; display: flex; flex-wrap: wrap; gap: 5px;"></div>
-                <input type="text" id="dict-soft_red-input" class="form-control" placeholder="Например: 🍭 или клад" style="width: 100%; margin-bottom: 10px; background: #222; color: #fff; border: 1px solid #555; padding: 8px; box-sizing: border-box;">
-                <label style="font-size: 12px; color: #aaa; display: flex; align-items: center; gap: 5px; margin-bottom: 10px;">
-                    <input type="checkbox" id="dict-soft_red-exact"> Точное совпадение (для слов)
-                </label>
-                <button onclick="addDictWord('soft_red')" class="btn btn-sm" style="background: #ff8a65; color: #121212; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%;">➕ Добавить на проверку ИИ</button>
+            <div class="txt-field">
+                <label for="text-quarantine">🥷 Карантин новорегов</label>
+                <textarea id="text-quarantine" rows="4"></textarea>
+                <div class="var-chips" data-for="text-quarantine"></div>
+            </div>
+            <div class="txt-field">
+                <label for="text-may1">📏 Операция «1 мая» — неправильный формат параметров</label>
+                <textarea id="text-may1" rows="8"></textarea>
+                <div class="var-chips" data-for="text-may1"></div>
+            </div>
+            <div class="txt-field">
+                <label for="text-minor">🔞 Фильтр 18+ (оранжевая зона)</label>
+                <textarea id="text-minor" rows="3"></textarea>
+                <div class="var-chips" data-for="text-minor"></div>
             </div>
         </div>
-        <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #03dac6; padding: 20px; border-radius: 10px; max-width: 1000px; box-shadow: 0 0 15px rgba(3, 218, 198, 0.05);">
-            <h3 style="color: #03dac6; margin-bottom: 10px; font-size: 18px; display: flex; align-items: center; gap: 8px;">
-                🧠 База Знаний ИИ (Системный Промпт)
-            </h3>
-            <p style="color: #aaa; font-size: 13px; margin-bottom: 15px;">Редактируйте инструкции для нейросети напрямую. Изменения вступают в силу мгновенно, перезагрузка сервера не требуется.</p>
-            
-            <textarea id="ai-system-prompt" class="form-control" style="width: 100%; height: 250px; background: #121212; color: #03dac6; border: 1px solid #333; padding: 15px; margin-bottom: 15px; border-radius: 5px; font-family: monospace; font-size: 13px; resize: vertical; box-sizing: border-box;" placeholder="Здесь живут инструкции для ИИ..."></textarea>
-            
-            <button class="form-btn" style="background: #03dac6; color: #121212; width: 100%; font-weight: bold; font-size: 16px;" onclick="saveAIPrompt()">💾 Обновить нейронную сеть</button>
-        </div>
 
-        <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #333; padding: 20px; border-radius: 10px; max-width: 1000px;">
-            <h3 style="color: #bb86fc; margin-bottom: 10px; font-size: 18px;">📝 Редактор Системных Шаблонов Бота</h3>
-            <p style="color: #aaa; font-size: 13px; margin-bottom: 15px;">Управление текстами меню, прайс-листами и системными ответами.</p>
-            
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <select id="template-selector" class="form-control" style="flex: 1; background: #222; color: #fff; border: 1px solid #555; padding: 10px; border-radius: 5px;" onchange="loadSelectedTemplate()">
-                    <option value="" disabled selected>-- Выберите шаблон для редактирования --</option>
-                    <option value="ai_system_prompt" style="color: #03dac6; font-weight: bold;">🧠 Базовый Промпт ИИ (Инструкция)</option>
-                    <option value="network_links" style="color: #bb86fc; font-weight: bold;">📍 Системные ссылки на чаты (NETWORK_LINKS)</option>
-                    <option value="tpl_18">🛑 18+: Проверка возраста</option>
-                    <option value="tpl_nark_react">⛔️ Наркотики: Реакция на сообщение</option>
-                    <option value="tpl_verif">🛡 Верификация: Сработала система (Кружок)</option>
-                    <option value="tpl_mp">💰 Коммерция: Ограничение МП</option>
-                    <option value="tpl_sponsor">💎 Спонсор: Предложение спонсорства</option>
-                    <option value="tpl_nark">⛔️ Наркотики: Упоминание веществ</option>
-                    <option value="tpl_flood">🔇 Флуд: Ограничение сообщений</option>
-                    <option value="tpl_vip">🤖 VIP: Блокировка бота</option>
-                    <option value="tpl_bio">🔗 БИО: Ссылка в профиле</option>
-                    <option value="tpl_minor">👶 18-: Реакция на несовершеннолетнего</option>
-                </select>
+        <!-- 🗂 Тексты Секретаря -->
+        <div class="panel-block set-card" id="set-templates">
+            <div class="set-head">
+                <div class="set-ic">🗂</div>
+                <div class="set-title"><h3>Ответы Секретаря</h3><p>Тексты, которые Секретарь (@FAQMKBOT) отправляет в поддержке. Хранятся в общей базе — Секретарь берёт их оттуда.</p></div>
             </div>
-            
-            <textarea id="template-editor-text" class="form-control" style="width: 100%; height: 200px; background: #222; color: #fff; border: 1px solid #555; padding: 15px; margin-bottom: 15px; border-radius: 5px; font-family: sans-serif; font-size: 14px; resize: vertical; box-sizing: border-box;" disabled placeholder="Выберите шаблон в выпадающем списке..."></textarea>
-            <div class="var-chips" data-for="template-editor-text"></div>
-            
-            <button id="save-template-btn" class="form-btn" style="background: #bb86fc; color: #121212; width: 100%; font-weight: bold; font-size: 16px; opacity: 0.5;" disabled onclick="saveSelectedTemplate()">💾 Сохранить шаблон</button>
+            <div class="tpl-picker" id="tpl-picker">
+                <button class="tpl-opt" data-tpl="network_links">📍 Ссылки на чаты</button>
+                <button class="tpl-opt" data-tpl="tpl_18">🛑 Проверка возраста</button>
+                <button class="tpl-opt" data-tpl="tpl_minor">👶 Реакция на несовершеннолетнего</button>
+                <button class="tpl-opt" data-tpl="tpl_nark">⛔️ Наркотики: упоминание</button>
+                <button class="tpl-opt" data-tpl="tpl_nark_react">⛔️ Наркотики: реакция</button>
+                <button class="tpl-opt" data-tpl="tpl_verif">🛡 Верификация кружком</button>
+                <button class="tpl-opt" data-tpl="tpl_mp">💰 Коммерция (МП)</button>
+                <button class="tpl-opt" data-tpl="tpl_sponsor">💎 Спонсорство</button>
+                <button class="tpl-opt" data-tpl="tpl_flood">🔇 Флуд</button>
+                <button class="tpl-opt" data-tpl="tpl_vip">🤖 Блок VIP-бота</button>
+                <button class="tpl-opt" data-tpl="tpl_bio">🔗 Ссылка в БИО</button>
+            </div>
+            <select id="template-selector" hidden></select>
+            <div class="tpl-editor">
+                <textarea id="template-editor-text" rows="9" disabled placeholder="Выберите текст выше…"></textarea>
+                <div class="var-chips" data-for="template-editor-text"></div>
+                <div class="tpl-foot"><span class="muted" id="tpl-status"></span><button id="save-template-btn" class="btn primary sm" disabled onclick="saveSelectedTemplate()">Сохранить текст</button></div>
+            </div>
         </div>
 
-        <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #333; padding: 20px; border-radius: 10px; max-width: 1000px;">
-            <h3 style="color: #bb86fc; margin-bottom: 10px; font-size: 18px;">📝 Конструктор Правил и Приветствий</h3>
-            <p style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Редактируйте системные сообщения Скайнета. Используйте тег <code>{user_link}</code>, чтобы бот обращался к нарушителю по имени.</p>
-
-            <label style="color: #ffb74d; font-weight: bold; display: block; margin-bottom: 5px;">🥷 Текст карантина новорегов:</label>
-            <textarea id="text-quarantine" class="form-control" style="width: 100%; height: 80px; background: #222; color: #fff; border: 1px solid #555; padding: 10px; margin-bottom: 15px; border-radius: 5px;"></textarea>
-            <div class="var-chips" data-for="text-quarantine"></div>
-
-            <label style="color: #03dac6; font-weight: bold; display: block; margin-bottom: 5px;">📏 Текст операции «1 Мая» (Параметры):</label>
-            <textarea id="text-may1" class="form-control" style="width: 100%; height: 200px; background: #222; color: #fff; border: 1px solid #555; padding: 10px; margin-bottom: 15px; border-radius: 5px;"></textarea>
-            <div class="var-chips" data-for="text-may1"></div>
-
-            <label style="color: #cf6679; font-weight: bold; display: block; margin-bottom: 5px;">🔞 Текст для фильтра 18+ (Оранжевая зона):</label>
-            <textarea id="text-minor" class="form-control" style="width: 100%; height: 80px; background: #222; color: #fff; border: 1px solid #555; padding: 10px; margin-bottom: 15px; border-radius: 5px;"></textarea>
-            <div class="var-chips" data-for="text-minor"></div>
-
-            <button class="form-btn" style="background: #bb86fc; color: #121212; width: 100%; font-weight: bold; font-size: 16px;" onclick="saveSystemTexts()">💾 Сохранить тексты в сеть</button>
+        <!-- 🧠 Промпт ИИ поддержки -->
+        <div class="panel-block set-card" id="set-ai">
+            <div class="set-head">
+                <div class="set-ic">🧠</div>
+                <div class="set-title"><h3>Инструкция ИИ поддержки</h3><p>Системный промпт нейросети, которая отвечает людям в Секретаре. Меняется сразу.</p></div>
+                <button class="btn primary sm set-save" onclick="saveAIPrompt()">Сохранить</button>
+            </div>
+            <textarea id="ai-system-prompt" class="mono-area" rows="12" placeholder="Здесь живут инструкции для ИИ…"></textarea>
         </div>
+
+        {% if is_owner %}
+        <div class="owner-divider"><span>👑 Только для владельца</span></div>
+
+        <!-- 💰 Тарифы -->
+        <div class="panel-block set-card" id="set-prices">
+            <div class="set-head">
+                <div class="set-ic">💰</div>
+                <div class="set-title"><h3>Тарифы VIP, BEYOND и рекламы</h3><p>Цены в звёздах. Действуют для всех ботов сразу. В рублях — по курсу сети <b id="rate-label">2</b> ₽ за ⭐️.</p></div>
+                <button class="btn primary sm set-save" id="prices-save-btn" onclick="saveNetworkPrices()" disabled>Сохранить</button>
+            </div>
+            <div class="price-grid">
+                <div class="price-card pc-vip">
+                    <div class="pc-name">👑 VIP-доступ</div>
+                    <div class="pc-row"><span>Вступление</span><div class="star-in"><input type="number" min="1" id="price-vip"><i>⭐️</i></div></div>
+                </div>
+                <div class="price-card pc-beyond">
+                    <div class="pc-name">🏳️‍🌈 BEYOND-доступ</div>
+                    <div class="pc-row"><span>Вступление</span><div class="star-in"><input type="number" min="1" id="price-beyond"><i>⭐️</i></div></div>
+                </div>
+                <div class="price-card pc-big">
+                    <div class="pc-name">🎪 Биг-чаты сети</div>
+                    <div class="pc-row"><span>1 день</span><div class="star-in"><input type="number" min="1" id="price-bigchat-1"><i>⭐️</i></div></div>
+                    <div class="pc-row"><span>7 дней</span><div class="star-in"><input type="number" min="1" id="price-bigchat-7"><i>⭐️</i></div></div>
+                </div>
+                <div class="price-card pc-sm">
+                    <div class="pc-name">🧩 Реклама: чаты до 1000</div>
+                    <div class="pc-row"><span>1 день</span><div class="star-in"><input type="number" min="1" id="price-sm-1"><i>⭐️</i></div></div>
+                    <div class="pc-row"><span>7 дней</span><div class="star-in"><input type="number" min="1" id="price-sm-7"><i>⭐️</i></div></div>
+                    <div class="pc-row"><span>15 дней</span><div class="star-in"><input type="number" min="1" id="price-sm-15"><i>⭐️</i></div></div>
+                    <div class="pc-row"><span>30 дней</span><div class="star-in"><input type="number" min="1" id="price-sm-30"><i>⭐️</i></div></div>
+                </div>
+                <div class="price-card pc-bg">
+                    <div class="pc-name">📢 Реклама: чаты от 1000</div>
+                    <div class="pc-row"><span>1 день</span><div class="star-in"><input type="number" min="1" id="price-bg-1"><i>⭐️</i></div></div>
+                    <div class="pc-row"><span>7 дней</span><div class="star-in"><input type="number" min="1" id="price-bg-7"><i>⭐️</i></div></div>
+                    <div class="pc-row"><span>15 дней</span><div class="star-in"><input type="number" min="1" id="price-bg-15"><i>⭐️</i></div></div>
+                    <div class="pc-row"><span>30 дней</span><div class="star-in"><input type="number" min="1" id="price-bg-30"><i>⭐️</i></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 💵 Касса владельца -->
+        <div class="panel-block set-card" id="owner-card">
+            <div class="set-head">
+                <div class="set-ic">💵</div>
+                <div class="set-title"><h3>Касса сети</h3><p>Деньги за сегодня и динамика по источникам. Видно только вам — другим админам раздел не отдаётся даже по прямой ссылке.</p></div>
+                <button class="btn sm ghost" onclick="loadOwnerBlock()">↻ Обновить</button>
+            </div>
+            <div class="cash-kpis">
+                <div class="cash-kpi"><div class="eyebrow">Звёзды сегодня</div><div class="v"><span id="root-finance-total">—</span> ⭐️</div></div>
+                <div class="cash-kpi"><div class="eyebrow">≈ в рублях</div><div class="v"><span id="root-finance-rubles">—</span> ₽</div><div class="sub" id="root-finance-note"></div></div>
+                <div class="cash-kpi"><div class="eyebrow">Оплаты очками и кэшбэком</div><div class="v" id="root-finance-internal">—</div><div class="sub">не деньги, для справки</div></div>
+            </div>
+            <div class="rev-head">
+                <div class="set-sub" style="margin:0">Доход по источникам</div>
+                <div class="seg">
+                    <button class="seg-btn active" id="btn-period-week" onclick="loadRootRevenue('week')">Неделя</button>
+                    <button class="seg-btn" id="btn-period-month" onclick="loadRootRevenue('month')">Месяц</button>
+                    <button class="seg-btn" id="btn-period-all" onclick="loadRootRevenue('all')">Всё время</button>
+                </div>
+            </div>
+            <div class="rev-chart"><canvas id="revenueChart"></canvas><div class="set-empty" id="rev-empty" hidden>За этот период доходов нет.</div></div>
+            <details class="pay-log">
+                <summary>Оплаты штрафов сегодня <span class="chip" id="root-finance-count">0</span></summary>
+                <div id="root-finance-list" class="pay-list"></div>
+            </details>
+        </div>
+
+        <!-- 🔘 Кнопки подписки -->
+        <div class="panel-block set-card" id="root-panel">
+            <div class="set-head">
+                <div class="set-ic">🔘</div>
+                <div class="set-title"><h3>Кнопки подписки для новорегов</h3><p>Скайнет показывает их под предупреждением «чтобы писать в чате, подпишитесь на канал». Цвет и премиум-эмодзи — по желанию.</p></div>
+                <button class="btn primary sm set-save" onclick="saveRootButtons()">Сохранить</button>
+            </div>
+            <div class="btn-preview" id="btn-preview"></div>
+            <div id="buttons-container" class="btnc-list"></div>
+            <button class="btn sm ghost" onclick="addButtonRow('', '')">＋ Добавить кнопку</button>
+        </div>
+        {% endif %}
     </div> <!-- 🔥 ЗАКРЫВАЕМ ВКЛАДКУ СИСТЕМЫ 🔥 -->
 
     <!-- 👇 ОТКРЫВАЕМ ВКЛАДКУ КАССЫ И НАГРАД 👇 -->
@@ -1915,78 +2076,78 @@
     </div>
 
 <div id="tab-infrastructure" class="tab-content">
-        <div class="panel-block" style="max-width: 1000px; display: flex; gap: 20px; padding: 0; background: transparent; box-shadow: none;">
-            
-            <div style="flex: 1; background: #1a1a1a; padding: 20px; border-radius: 10px; border: 1px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
-                <h3 style="color: #03dac6; margin-top: 0;">🏙 Список Городов (Анкеты)</h3>
-                <p style="font-size: 11px; color: #aaa;">Вводите через запятую. Этот список пойдет в кнопки бота публикаций.</p>
-                <textarea id="infra-cities" class="form-control" style="width: 100%; height: 120px; background: #222; color: #fff; border: 1px solid #555; padding: 10px; border-radius: 5px; box-sizing: border-box;"></textarea>
-            </div>
-            
-            <div style="flex: 1; background: #1a1a1a; padding: 20px; border-radius: 10px; border: 1px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
-                <h3 style="color: #bb86fc; margin-top: 0;">🔗 Глобальные ссылки</h3>
-                <label style="font-size: 11px; color: #aaa;">Главный канал сети (MAIN_CHANNEL_LINK):</label>
-                <input type="text" id="infra-link-main" class="form-control" placeholder="https://t.me/..." style="width: 100%; margin-bottom: 15px; background: #222; color: #fff; border: 1px solid #555; padding: 8px; border-radius: 5px; box-sizing: border-box;">
-                
-                <label style="font-size: 11px; color: #aaa;">FAQ / Бот верификации:</label>
-                <input type="text" id="infra-link-faq" class="form-control" placeholder="https://t.me/FAQMKBOT" style="width: 100%; background: #222; color: #fff; border: 1px solid #555; padding: 8px; border-radius: 5px; box-sizing: border-box;">
-            </div>
-
+        <div class="sec-head" style="margin-top:0;">
+            <div><h2>Инфраструктура</h2><p>Чаты сети под охраной Скайнета и чужие чаты, которые слушает Шпион. Изменения подхватываются на лету.</p></div>
         </div>
 
-        <div class="panel-block" style="max-width: 1000px; margin-top: 20px; border-left: 4px solid #ffb74d;">
-            <h3 style="color: #ffb74d; margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
-                <span>🌐 Диспетчер Чатов (Сети Империи)</span>
-                <button onclick="pingNetworks()" class="btn" style="background: #3390ec; color: #fff; font-size: 13px; padding: 6px 15px; border: none; border-radius: 5px; cursor: pointer; transition: 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">📡 ПИНГ (Health Check)</button>
-            </h3>
-            <p style="font-size: 12px; color: #aaa;">Добавьте чат сюда, и Скайнет мгновенно возьмет его под охрану.</p>
-            
-            <div style="display: flex; gap: 10px; margin-bottom: 15px; background: #252525; padding: 15px; border-radius: 8px; align-items: center;">
-                <input type="text" id="new-chat-name" placeholder="Название (напр. МК Казань)" class="form-control" style="flex: 1; background: #111; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 4px;">
-                <input type="text" id="new-chat-id" placeholder="ID чата (-100...)" class="form-control" style="flex: 1; background: #111; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 4px;">
-                <select id="new-chat-net" class="form-control" style="background: #111; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 4px;">
-                    <option value="parni">ПАРНИ 18+</option>
-                    <option value="mk">МК</option>
-                    <option value="ns">НС</option>
-                    <option value="rainbow">Радуга</option>
-                    <option value="gayznak">Гей Знакомства</option>
+        <div class="infra-kpis" id="infra-kpis"></div>
+
+        <!-- 🌐 Чаты сети -->
+        <div class="panel-block set-card" id="infra-chats">
+            <div class="set-head">
+                <div class="set-ic">🌐</div>
+                <div class="set-title"><h3>Чаты сети</h3><p>Отсюда берут список чатов Скайнет, мини-приложение публикации и рассылки. Города в мини-приложении — это названия чатов.</p></div>
+                <div class="ping-box">
+                    <span class="muted" id="ping-when"></span>
+                    <button class="btn sm" id="ping-btn" onclick="pingNetworks()">📡 Проверить права ботов</button>
+                </div>
+            </div>
+
+            <div class="chat-add">
+                <input type="text" id="new-chat-name" placeholder="Название, напр. Казань" autocomplete="off">
+                <input type="text" id="new-chat-id" placeholder="ID чата: -100…" inputmode="numeric" autocomplete="off">
+                <select id="new-chat-net">
+                    <option value="mk">МК</option><option value="parni">ПАРНИ 18+</option><option value="ns">НС</option><option value="rainbow">Радуга</option><option value="gayznak">Гей Знакомства</option>
                 </select>
-                <button onclick="addInfraChat()" class="btn" style="background: #03dac6; color: #121212; font-weight: bold; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer;">➕ Добавить</button>
+                <button class="btn primary" onclick="addInfraChat()">＋ Добавить чат</button>
             </div>
 
-            <table class="admin-table">
-                <thead><tr><th>Название</th><th>Telegram ID</th><th>Сеть</th><th>Health Check (Статус)</th><th>Действие</th></tr></thead>
-                <tbody id="infra-chats-tbody">
-                    <tr><td colspan="5" style="text-align: center; color: #888;">Загрузка матрицы...</td></tr>
-                </tbody>
-            </table>
+            <div class="chat-filter">
+                <input type="search" id="infra-q" placeholder="🔎 Город или ID" oninput="renderInfraChats()" autocomplete="off">
+                <div class="seg" id="infra-net-seg"></div>
+                <label class="chip chk"><input type="checkbox" id="infra-bad" onchange="renderInfraChats()"> Только с проблемами</label>
+            </div>
+            <div id="infra-chats-list" class="net-list"><div class="set-empty">Загрузка…</div></div>
         </div>
 
-        <div class="panel-block" style="max-width: 1000px; margin-top: 20px; border-left: 4px solid #cf6679; background: rgba(207, 102, 121, 0.05);">
-            <h3 style="color: #cf6679; margin-top: 0;">🎯 Внешний мониторинг (Сторонние чаты)</h3>
-            <p style="font-size: 12px; color: #aaa;">Добавьте ID чатов или юзернеймы конкурентов. Сканер будет прочесывать их автономно.</p>
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <input type="text" id="new-enemy-id" placeholder="@username или -100..." class="form-control" style="flex: 1; background: #111; color: #fff; border: 1px solid #cf6679; padding: 8px; border-radius: 4px;">
-                <button onclick="addInfraEnemy()" class="btn" style="background: #cf6679; color: #fff; font-weight: bold; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer;">➕ Добавить в мониторинг</button>
+        <!-- 🔗 Главный канал -->
+        <div class="panel-block set-card" id="infra-links">
+            <div class="set-head">
+                <div class="set-ic">🔗</div>
+                <div class="set-title"><h3>Главный канал сети</h3><p>Ссылка, которую Скайнет даёт в предупреждениях и сообщениях о подписке.</p></div>
             </div>
-            <div id="infra-enemies-list" style="display: flex; flex-wrap: wrap; gap: 10px; min-height: 40px;"></div>
-        </div>
-<div class="panel-block" style="max-width: 1000px; margin-top: 20px; border-left: 4px solid #ff4d4d; background: rgba(255, 77, 77, 0.05);">
-            <h3 style="color: #ff4d4d; margin-top: 0;">🛡️ Внешний мониторинг РО (Русская Община)</h3>
-            <p style="font-size: 12px; color: #aaa;">Вставьте список ID чатов или юзернеймов конкурентов (в столбик, через запятую или пробел). <b>Можно вставить хоть 500 штук за раз.</b> Андрюшенька будет отправлять в пермач любого, кто там напишет.</p>
-            
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <textarea id="new-ro-enemy-id" placeholder="-100123456789&#10;@ro_region&#10;-100987654321" class="form-control" style="flex: 1; height: 60px; background: #111; color: #fff; border: 1px solid #ff4d4d; padding: 8px; border-radius: 4px; resize: vertical;"></textarea>
-                <button onclick="addInfraROEnemy()" class="btn" style="background: #ff4d4d; color: #fff; font-weight: bold; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer;">⚡ Загрузить список</button>
+            <div class="chat-add">
+                <input type="url" id="infra-link-main" placeholder="https://t.me/clubofrm">
+                <button class="btn" onclick="saveInfrastructure(true)">Сохранить</button>
             </div>
-            
-            <div id="infra-ro-enemies-list" style="display: flex; flex-wrap: wrap; gap: 10px; min-height: 40px; max-height: 350px; overflow-y: auto; padding-right: 5px;"></div>
         </div>
 
-        
-<div style="display: flex; gap: 15px; margin-top: 20px;">
-            <button onclick="saveInfrastructure()" class="form-btn" style="flex: 2; background: #4caf50; color: #fff; font-size: 16px; font-weight: bold; padding: 15px;">💾 СОХРАНИТЬ ИЗМЕНЕНИЯ В MONGODB</button>
-            <button onclick="runMigration()" class="form-btn" style="flex: 1; background: #ffb74d; color: #121212; font-size: 14px; font-weight: bold; padding: 15px;">🔄 Вытянуть базы из config.py</button>
+        <!-- 🎯 Конкуренты -->
+        <div class="panel-block set-card" id="infra-spy">
+            <div class="set-head">
+                <div class="set-ic">🎯</div>
+                <div class="set-title"><h3>Чужие чаты под наблюдением</h3><p>Шпион Андрюшенька сидит в этих чатах и ищет нарушителей нашей сети. Статус обновляет сам Шпион.</p></div>
+            </div>
+            <div class="chat-add">
+                <input type="text" id="new-enemy-id" placeholder="@username или -100…" onkeydown="if(event.key==='Enter')addInfraEnemy()">
+                <button class="btn" onclick="addInfraEnemy()">＋ Добавить</button>
+            </div>
+            <div id="infra-enemies-list" class="target-grid"></div>
+        </div>
+
+        <!-- 💀 РО -->
+        <div class="panel-block set-card danger-card" id="infra-ro">
+            <div class="set-head">
+                <div class="set-ic">💀</div>
+                <div class="set-title"><h3>Чаты РО</h3><p>Кто напишет в этих чатах — получает пермач по всей сети. Можно вставить сразу сотни: в столбик, через запятую или пробел.</p></div>
+                <span class="chip red" id="ro-count">0</span>
+            </div>
+            <div class="chat-add">
+                <textarea id="new-ro-enemy-id" rows="2" placeholder="-100123456789&#10;@ro_region"></textarea>
+                <button class="btn danger" onclick="addInfraROEnemy()">⚡ Загрузить список</button>
+            </div>
+            <input type="search" id="ro-q" class="ro-search" placeholder="🔎 Найти среди целей" oninput="renderROList()" autocomplete="off">
+            <div id="infra-ro-enemies-list" class="target-grid scroll"></div>
         </div>
     </div>
 {% if is_owner %}
@@ -2055,16 +2216,16 @@
             box.innerHTML = '';
             groups.forEach(g => {
                 const sec = document.createElement('div');
-                sec.style.cssText = 'background:#1a1a1a; border:1px solid #2a2a2a; border-radius:10px; padding:16px;';
-                const h = document.createElement('h4'); h.textContent = g.group; h.style.cssText = 'margin:0 0 12px 0; color:#fff;'; sec.appendChild(h);
+                sec.className = 'ctl-group';
+                const h = document.createElement('h4'); h.textContent = g.group; h.className = 'ctl-gh'; sec.appendChild(h);
                 g.items.forEach(it => {
                     controlLabels[it.key] = it.label;
                     const row = document.createElement('div');
-                    row.style.cssText = 'display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; padding:10px 0; border-top:1px solid #252525;';
-                    const left = document.createElement('div'); left.style.cssText = 'flex:1 1 280px; min-width:0;';
-                    const lab = document.createElement('label'); lab.htmlFor = 'cfg-' + it.key; lab.textContent = it.label; lab.style.cssText = 'display:block; color:#fff; font-size:14px;';
-                    const meta = document.createElement('div'); meta.style.cssText = 'color:#888; font-size:12px; margin-top:3px;';
-                    meta.textContent = (it.help ? it.help + ' ' : '') + '· ' + it.bots + ' · по умолчанию: ' + it.default;
+                    row.className = 'set-row ctl-row';
+                    const left = document.createElement('div'); left.className = 'set-txt';
+                    const lab = document.createElement('label'); lab.htmlFor = 'cfg-' + it.key; lab.textContent = it.label; lab.className = 'set-lbl';
+                    const meta = document.createElement('div'); meta.className = 'set-hint';
+                    meta.textContent = (it.help ? it.help + ' ' : '') + '· ' + it.bots + ' · по умолчанию: ' + (it.type === 'bool' ? (it.default ? 'вкл' : 'выкл') : String(it.default).length > 40 ? 'длинный текст' : it.default);
                     left.appendChild(lab); left.appendChild(meta);
                     const inp = document.createElement(it.type === 'textarea' ? 'textarea' : it.type === 'bool' ? 'select' : 'input');
                     inp.id = 'cfg-' + it.key; inp.className = 'search-input';
@@ -2074,8 +2235,8 @@
                     if (it.min !== null && it.min !== undefined) inp.min = it.min;
                     if (it.max !== null && it.max !== undefined) inp.max = it.max;
                     inp.value = it.type === 'bool' ? String(!!it.value) : it.value;
-                    inp.style.cssText = (it.type === 'textarea' ? 'flex:1 1 100%; min-height:90px; resize:vertical; font-size:13px;' : 'flex:0 1 260px; min-width:120px;') + ' padding:8px; box-sizing:border-box;' + (it.changed ? 'border-color:#ffb74d;' : '');
-                    inp.addEventListener(it.type === 'bool' ? 'change' : 'input', () => { controlDirty[it.key] = inp.value; inp.style.borderColor = '#03dac6'; document.body.classList.add('ctl-dirty'); });
+                    inp.classList.add(it.type === 'textarea' ? 'ctl-ta' : 'ctl-in'); if (it.changed) { inp.classList.add('changed'); inp.title = 'Изменено, по умолчанию: ' + it.default; }
+                    inp.addEventListener(it.type === 'bool' ? 'change' : 'input', () => { controlDirty[it.key] = inp.value; inp.classList.add('dirty'); document.body.classList.add('ctl-dirty'); });
                     row.appendChild(left); row.appendChild(inp); sec.appendChild(row);
                 });
                 box.appendChild(sec);
@@ -2201,6 +2362,7 @@
             if (!_settingsLoaded) {
                 loadDictionary(); loadSystemTexts(); loadSystemSettings(); loadNetworkPrices();
                 loadAIPrompt(); loadModSettings();
+                if (IS_OWNER) loadOwnerBlock();
                 _settingsLoaded = true;
             }
             setTimeout(buildSettingsJumps, 600);
@@ -2217,21 +2379,28 @@
 
     // ===== 🔥 ЧТО ГОРИТ =====
     function _esc2(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-    function _ago(sec) {
+    // Пульс: раньше функция называлась _ago, и такая же _ago ниже (для «Входящих», ждёт дату)
+    // перебивала её — секунды «назад» превращались в дату 01.01.1970. Отсюда «01.01» у всех ботов.
+    let _pulseData = [], _pulseAt = 0;
+    function _pulseAgo(sec) {
         if (sec == null) return 'нет сигнала';
-        if (sec < 90) return 'сейчас';
-        if (sec < 3600) return Math.round(sec / 60) + ' мин';
-        if (sec < 86400) return Math.round(sec / 3600) + ' ч';
-        return Math.round(sec / 86400) + ' дн';
+        if (sec < 60) return Math.floor(sec) + ' с';
+        if (sec < 3600) return Math.floor(sec / 60) + ' мин';
+        if (sec < 86400) return Math.floor(sec / 3600) + ' ч';
+        return Math.floor(sec / 86400) + ' дн';
     }
     function renderPulse(pulses) {
+        if (pulses) { _pulseData = pulses; _pulseAt = Date.now(); }
         const box = document.getElementById('pulse-list');
-        if (!box) return;
-        box.innerHTML = pulses.map(p => {
-            const cls = p.ago == null ? '' : (p.ago < 180 ? 'ok' : (p.ago < 900 ? 'late' : 'dead'));
-            return `<div class="pulse-row" title="${p.ago == null ? 'Бот ни разу не отмечался' : 'Последний сигнал ' + _ago(p.ago) + ' назад'}"><span class="dot ${cls}"></span>${_esc2(p.bot)}<span class="when">${_ago(p.ago)}</span></div>`;
+        if (!box || !_pulseData.length) return;
+        const extra = (Date.now() - _pulseAt) / 1000;
+        box.innerHTML = _pulseData.map(p => {
+            const ago = p.ago == null ? null : p.ago + extra;
+            const cls = ago == null ? '' : (ago < 180 ? 'ok' : (ago < 900 ? 'late' : 'dead'));
+            return `<div class="pulse-row" title="${ago == null ? 'Бот ни разу не отмечался' : 'Последний сигнал ' + _pulseAgo(ago) + ' назад'}"><span class="dot ${cls}"></span>${_esc2(p.bot)}<span class="when">${_pulseAgo(ago)}</span></div>`;
         }).join('');
     }
+    setInterval(() => renderPulse(), 1000);   // секунды тикают между опросами сервера
     function setBadge(id, n) {
         const b = document.getElementById(id);
         if (!b) return;
@@ -2336,7 +2505,7 @@
         };
         _settingsBlocks().forEach(blk => {
             // строки внутри блока: строки «Управления», тумблеры, карточки цен
-            const rows = blk.querySelectorAll('#control-groups > div > div, #toggles-container > div');
+            const rows = blk.querySelectorAll('.set-row, .dict-zone, .price-card, .txt-field');
             let blockHit = !q || textOf(blk.querySelector('h3, h4') || blk).includes(q);
             if (rows.length) {
                 let any = false;
@@ -2424,74 +2593,8 @@
         }
 
         // --- НОВЫЕ ФУНКЦИИ СИСТЕМЫ И КАРАНТИНА ---
-        function toggleSetting(settingName) {
-            const formData = new FormData(); formData.append('setting', settingName);
-            fetch('/glaz/toggle_setting', { method: 'POST', body: formData })
-            .then(res => res.json()).then(data => { if(data.success) showToast(`⚙️ Тумблер переключен!`); });
-        }
 
-        function loadSystemSettings() {
-    const container = document.getElementById('toggles-container');
-    if (!container) return;
-    
-    container.innerHTML = '<div style="color: #aaa; padding: 20px;">📡 Подключение к ядру Скайнета...</div>';
-    
-    fetch('/glaz/api/system_settings')
-    .then(res => res.json())
-    .then(settings => {
-        let html = '';
-        const labels = {
-            "skynet_enabled": "🔴 ПОЛНЫЙ СКАЙНЕТ (Главный рубильник модерации)",
-            "red_zone": "☢️ Красная зона (Фильтр: Наркотики, CP, тяжелые нарушения)",
-            "yellow_commerce": "💰 Желтая зона (Фильтр: Коммерция, папики, спонсоры, реклама)",
-            "twin_radar": "👥 Радар Твинков (Автопоиск и бан клонов)",
-            "autoban_on_block": "🚫 Автобан за блок бота (Блокировка отписавшихся)",
-            "vip_sniper": "⏱ Тайм-аут заявок (Удаление брошенных верификаций)",
-            "bio_hardcheck": "🔍 Жесткая проверка БИО (Контроль возраста и ссылок на входе)",
-            "auto_corpse_removal": "🗑️ Автоочистка удаленных профилей (Удаление Deleted Accounts из 85+ чатов)",
-            "proxy_system": "🕵️ Черный Ящик (Включение/выключение анонимных чатов Прокси)",
-            "referral_system": "🔗 Реферальная VIP-система (Начисление бонусов за друзей)",
-            "parni_autounmute": "🕊️ Локальная амнистия (Авторазмут в сети ПАРНИ 18+ при входе)",
-            "radar_logging": "📡 Живой Радар (Трансляция событий в хакерский терминал)",
-            "quarantine_active": "🥷 Карантин новорегов (срок задаётся в настройках модерации)",
-            "may_1_active": "📏 Операция \"1 Мая\" (Строгий контроль формата параметров)",
-            "clean_service_messages": "🧹 Чистка служебных сообщений (Удалять плашки «вступил/вышел» в чатах)"
-        };
 
-        Object.keys(labels).forEach(key => {
-            const isOn = settings[key] !== false;
-            html += `
-            <div class="info-row" style="padding: 18px; background: #1a1a1a; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #252525; transition: all 0.3s;">
-                <div style="flex: 1; padding-right: 15px;">
-                    <div style="font-size: 14px; font-weight: 500; color: #fff;">${labels[key]}</div>
-                    <div style="font-size: 11px; color: ${isOn ? '#03dac6' : '#ff0055'}; margin-top: 3px;">
-                        Статус: ${isOn ? 'АКТИВЕН' : 'ОТКЛЮЧЕН'}
-                    </div>
-                </div>
-                <label class="toggle-switch" style="position: relative; display: inline-block; width: 46px; height: 24px;">
-                    <input type="checkbox" ${isOn ? 'checked' : ''} onchange="toggleSetting('${key}')" style="opacity: 0; width: 0; height: 0;">
-                    <span class="slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; transition: .4s; border-radius: 24px;"></span>
-                </label>
-            </div>`;
-        });
-        container.innerHTML = html;
-    });
-}
-
-function toggleSetting(key) {
-    const formData = new FormData();
-    formData.append('setting', key);
-    
-    fetch('/glaz/toggle_setting', { method: 'POST', body: formData })
-    .then(res => res.json())
-    .then(data => {
-        if(data.success) {
-            showToast(`⚙️ ${key} → ${data.state ? 'ВКЛ' : 'ВЫКЛ'}`);
-            loadSystemSettings(); // обновляем цвета и статусы
-        }
-    })
-    .catch(() => showToast("❌ Ошибка связи"));
-}
 
         let quarantineTimerInterval = null;
 
@@ -2659,200 +2762,20 @@ function toggleSetting(key) {
             openTab(document.getElementById(savedTab) ? savedTab : 'tab-home');
         }
 
-let sessionPin = "";
 
-// Вход владельца в кассу/ROOT: открыть «Настройки», подвести к Пульту и при первом входе спросить ROOT-пароль
-function openRoot() {
-    openTab('tab-control');
-    setTimeout(() => {
-        const sys = document.getElementById('tab-system');
-        const head = sys && sys.querySelector('h3');
-        if (head) head.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        if (!sessionPin) unlockRoot();
-    }, 120);
-}
 
 // 1. Функция запроса пароля
-function unlockRoot() {
-    const pin = prompt("Введите ROOT-пароль (Скайнет):");
-    if (!pin) return;
-    
-    fetch('/glaz/api/root/buttons', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({pin: pin})
-    })
-    .then(res => {
-        if (!res.ok) throw new Error("Неверный пароль!");
-        return res.json();
-    })
-    .then(data => {
-        sessionPin = pin; 
-        document.getElementById('root-panel').style.display = 'block'; 
-        document.getElementById('buttons-container').innerHTML = ''; 
-        
-        // 👇 ДОБАВЛЯЕМ ЭТУ СТРОЧКУ ДЛЯ ПОЯВЛЕНИЯ КНОПКИ ФИНАНСОВ 👇
-        const _fb = document.getElementById('btn-secret-finance');
-        if (_fb) { _fb.style.display = 'flex'; showToast("🔓 Секретный раздел Live-Финансов разблокирован!"); }
-        
-        // Подтягиваем цвета и эмодзи из базы
-        data.buttons.forEach(b => addButtonRow(b.text, b.url, b.style || 'default', b.emoji_id || ''));
-        if(data.buttons.length === 0) addButtonRow('', '', 'default', '');
-
-        // 👇 ВЫЗЫВАЕМ ЗАГРУЗКУ КАССЫ И ГРАФИКА 👇
-        loadRootFinance(pin);
-        loadRootRevenue(pin); 
-    })
-    .catch(err => alert("⛔️ " + err.message));
-}
 
 // 1.5. Секретная функция загрузки Кассы
-function loadRootFinance(pin) {
-    if (!document.getElementById('root-finance-total')) return;  // не владелец
-    fetch('/glaz/api/root/finance', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({pin: pin})
-    })
-    .then(res => res.json())
-    .then(data => {
-        if(!data.error) {
-            const totalStars = parseInt(data.total_today) || 0;
-            // звёзды → рубли по курсу 1.6 + живые рубли с крипты (раньше крипта считалась «звёздами»)
-            const totalRubles = Math.floor(totalStars * 1.6) + (parseInt(data.crypto_rub_today) || 0);
-            
-            // Красивый вывод с пробелами (например: 10 500)
-            document.getElementById('root-finance-total').innerText = totalStars.toLocaleString('ru-RU');
-            document.getElementById('root-finance-rubles').innerText = totalRubles.toLocaleString('ru-RU');
-            
-            let html = '';
-            data.payments.forEach(p => {
-                const rubEquivalent = Math.floor(parseInt(p.amount) * 1.6);
-                html += `<div style="padding: 6px 0; border-bottom: 1px solid #222; display: flex; justify-content: space-between;">
-                            <span>⏱ ${p.time} | Юзер: <code>${p.uid}</code></span>
-                            <span><span style="color:#03dac6; font-weight:bold;">${p.amount} ⭐️</span> <span style="color:#888; font-size:10px;">(≈ ${rubEquivalent} ₽)</span></span>
-                         </div>`;
-            });
-            if(data.payments.length === 0) html = '🛸 Сегодня оплат пока не поступало.';
-            document.getElementById('root-finance-list').innerHTML = html;
-        }
-    });
-}
 
 // 2. Рисуем строчку для новой кнопки (ТЕПЕРЬ С ЦВЕТАМИ И ЭМОДЗИ)
-function addButtonRow(text, url, style = 'default', emojiId = '') {
-    const row = document.createElement('div');
-    row.style.cssText = "display:flex; gap:10px; margin-bottom:10px;";
-    row.className = "btn-row";
-    row.innerHTML = `
-        <input type="text" placeholder="Текст" value="${text}" class="form-control" style="width: 25%; background: #222; color: #fff; border: 1px solid #444;">
-        <input type="text" placeholder="Ссылка" value="${url}" class="form-control" style="width: 30%; background: #222; color: #fff; border: 1px solid #444;">
-        <select class="form-control" style="width: 20%; background: #222; color: #fff; border: 1px solid #444;">
-            <option value="default" ${style==='default'?'selected':''}>Обычный</option>
-            <option value="primary" ${style==='primary'?'selected':''}>Синий</option>
-            <option value="success" ${style==='success'?'selected':''}>Зеленый</option>
-            <option value="danger" ${style==='danger'?'selected':''}>Красный</option>
-        </select>
-        <input type="text" placeholder="ID Эмодзи" value="${emojiId}" class="form-control" style="width: 20%; background: #222; color: #fff; border: 1px solid #444;">
-        <button onclick="this.parentElement.remove()" class="btn btn-danger">❌</button>
-    `;
-    document.getElementById('buttons-container').appendChild(row);
-}
 
 // 3. Собираем всё и пуляем в базу
-function saveRootButtons() {
-    const rows = document.querySelectorAll('#buttons-container .btn-row');
-    const buttons = [];
-    
-    rows.forEach(row => {
-        const inputs = row.querySelectorAll('input');
-        const select = row.querySelector('select');
-        
-        const text = inputs[0].value.trim();
-        const url = inputs[1].value.trim();
-        const style = select.value; // Берем цвет
-        const emojiId = inputs[2].value.trim(); // Берем ID эмодзи
-        
-        if(text && url) buttons.push({text: text, url: url, style: style, emoji_id: emojiId});
-    });
-
-    fetch('/glaz/api/root/save_buttons', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({pin: sessionPin, buttons: buttons})
-    })
-    .then(res => res.json())
-.then(data => {
-        if(data.status === 'ok') alert("✅ Цвета и премиум-эмодзи успешно вшиты в Скайнет!");
-    });
-}
 
 // === СЛОВАРЬ ИНКВИЗИТОРА ===
-function loadDictionary() {
-    fetch('/glaz/api/dictionary')
-    .then(res => res.json())
-    .then(data => {
-        renderDictList('red', data.red || []);
-        renderDictList('yellow', data.yellow || []);
-        renderDictList('black', data.black || []); // <--- Учим загружать Черную зону
-        renderDictList('soft_red', data.soft_red || []);
-    });
-}
 
-function renderDictList(zone, words) {
-    const container = document.getElementById(`dict-${zone}-list`);
-    if(!container) return;
-    
-    let html = '';
-    // Выбираем цвет в зависимости от зоны
-    let color = '#ffb74d'; // по умолчанию желтый
-    if (zone === 'red') color = '#cf6679'; // красный
-    if (zone === 'black') color = '#bb86fc'; // фиолетовый для рекламы
-    if (zone === 'soft_red') color = '#ff8a65'; // сленг под проверку ИИ Шпиона
 
-    words.forEach(item => {
-        const exactIcon = item.exact ? '🎯' : '🔤';
-        html += `<div style="background: #2d2d2d; border: 1px solid ${color}; padding: 3px 8px; border-radius: 15px; font-size: 12px; display: flex; align-items: center; gap: 5px;">
-            ${exactIcon} ${item.word} 
-            <span onclick="removeDictWord('${item.word}', '${zone}')" style="cursor: pointer; color: #aaa; margin-left: 5px;">✖</span>
-        </div>`;
-    });
-    if(words.length === 0) html = '<span style="color: #666; font-size: 12px;">Список пуст...</span>';
-    container.innerHTML = html;
-}
 
-function addDictWord(zone) {
-    const input = document.getElementById(`dict-${zone}-input`);
-    const exact = document.getElementById(`dict-${zone}-exact`).checked;
-    const word = input.value.trim();
-    if(!word) return;
-
-    fetch('/glaz/api/dictionary/add', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({word: word, zone: zone, exact: exact})
-    })
-    .then(res => res.json())
-    .then(data => {
-        if(data.success) {
-            input.value = '';
-            showToast(data.message);
-            loadDictionary(); // Перезагружаем список
-        } else {
-            showToast("❌ Ошибка: " + data.error);
-        }
-    });
-}
-
-function removeDictWord(word, zone) {
-    fetch('/glaz/api/dictionary/remove', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({word: word, zone: zone})
-    })
-    .then(res => res.json())
-    .then(data => { if(data.success) loadDictionary(); });
-}
 
 // === ГОЛОС САУРОНА (Связь с юзером) ===
 function sendSauronMessage(uid) {
@@ -2904,172 +2827,16 @@ function saveSystemTexts() {
     }).catch(() => showToast("❌ Ошибка связи с сервером"));
 }
 
-let revenueChartInstance = null;
 
 // Теперь функция принимает второй параметр - период (по умолчанию 'week')
-function loadRootRevenue(pin, period = 'week') {
-    if (!document.getElementById('revenueChart')) return;  // не владелец
-    
-    // Переключаем активную кнопку (подсветка фиолетовым)
-    document.querySelectorAll('[id^="btn-period-"]').forEach(btn => btn.classList.remove('active'));
-    const activeBtn = document.getElementById('btn-period-' + period);
-    if(activeBtn) activeBtn.classList.add('active');
 
-    // Отправляем на сервер пароль + выбранный период
-    fetch('/glaz/api/analytics/revenue', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({pin: pin, period: period})
-    })
-    .then(res => res.json())
-    .then(data => {
-        const dates = [...new Set(data.map(item => item._id.date))];
-        const types = ['fine', 'ads', 'vip', 'donation'];
-        
-        const datasets = types.map(type => {
-            return {
-                label: type === 'fine' ? 'Штрафы' : type === 'ads' ? 'Реклама' : type === 'vip' ? 'VIP' : 'Донаты',
-                data: dates.map(date => {
-                    const found = data.find(item => item._id.date === date && item._id.type === type);
-                    return found ? found.total : 0;
-                }),
-                borderColor: type === 'fine' ? '#cf6679' : type === 'ads' ? '#03dac6' : type === 'vip' ? '#ffb74d' : '#bb86fc',
-                backgroundColor: 'transparent',
-                tension: 0.4,
-                borderWidth: 3
-            };
-        });
 
-        const ctx = document.getElementById('revenueChart').getContext('2d');
-        if(revenueChartInstance) revenueChartInstance.destroy();
-        
-        revenueChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: { labels: dates, datasets: datasets },
-            options: {
-                responsive: false,
-                plugins: { legend: { labels: { color: '#fff' } } },
-                scales: {
-                    y: { beginAtZero: true, ticks: { color: '#fff' }, grid: { color: '#333' } },
-                    x: { ticks: { color: '#fff' }, grid: { color: '#333' } }
-                }
-            }
-        });
-    });
-}
-
-        function loadNetworkPrices() {
-            if (!document.getElementById('price-vip')) return;  // блок тарифов виден только владельцу
-            fetch('/glaz/api/get_prices')
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById('price-vip').value = data.vip_price || 250;
-                document.getElementById('price-beyond').value = data.beyond_price || 250; // <--- ДОБАВЛЕНО
-                document.getElementById('price-sm-1').value = data.reg_small_1 || 105;
-                document.getElementById('price-sm-7').value = data.reg_small_7 || 490;
-                document.getElementById('price-sm-15').value = data.reg_small_15 || 720;
-                document.getElementById('price-sm-30').value = data.reg_small_30 || 938;
-                
-                document.getElementById('price-bg-1').value = data.reg_big_1 || 105;
-                document.getElementById('price-bg-7').value = data.reg_big_7 || 656;
-                document.getElementById('price-bg-15').value = data.reg_big_15 || 1288;
-                document.getElementById('price-bg-30').value = data.reg_big_30 || 1563;
-                
-                document.getElementById('price-bigchat-1').value = data.vip_big_chat_1 || 1095;
-                document.getElementById('price-bigchat-7').value = data.vip_big_chat_7 || 7656;
-            });
-        }
-
-        function saveNetworkPrices() {
-            const payload = {
-                vip_price: parseInt(document.getElementById('price-vip').value),
-                beyond_price: parseInt(document.getElementById('price-beyond').value), // <--- ДОБАВЛЕНО
-                reg_small_1: parseInt(document.getElementById('price-sm-1').value),
-                reg_small_7: parseInt(document.getElementById('price-sm-7').value),
-                reg_small_15: parseInt(document.getElementById('price-sm-15').value),
-                reg_small_30: parseInt(document.getElementById('price-sm-30').value),
-                
-                reg_big_1: parseInt(document.getElementById('price-bg-1').value),
-                reg_big_7: parseInt(document.getElementById('price-bg-7').value),
-                reg_big_15: parseInt(document.getElementById('price-bg-15').value),
-                reg_big_30: parseInt(document.getElementById('price-bg-30').value),
-                
-                vip_big_chat_1: parseInt(document.getElementById('price-bigchat-1').value),
-                vip_big_chat_7: parseInt(document.getElementById('price-bigchat-7').value)
-            };
-
-            fetch('/glaz/api/save_prices', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
-            })
-            .then(res => res.json())
-            .then(data => {
-                if(data.success) showToast(data.message);
-                else showToast("❌ Ошибка: " + data.error);
-            });
-        }
 
         // === ЛОГИКА ДЛЯ МОЗГА СКАЙНЕТА (ПРОМПТ ИИ) ===
-        function loadAIPrompt() {
-            fetch('/glaz/api/ai_prompt')
-            .then(res => res.json())
-            .then(data => {
-                if(data.prompt) document.getElementById('ai-system-prompt').value = data.prompt;
-            });
-        }
 
-        function saveAIPrompt() {
-            const promptText = document.getElementById('ai-system-prompt').value.trim();
-            if(!promptText) { showToast("⚠️ Промпт не может быть пустым!"); return; }
-
-            fetch('/glaz/api/ai_prompt/save', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ prompt: promptText })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if(data.success) showToast("🧠 База знаний ИИ успешно обновлена!");
-                else showToast("❌ Ошибка сохранения промпта");
-            });
-        }
 
         // === ЛОГИКА ДЛЯ РЕДАКТОРА ШАБЛОНОВ ===
-        function loadSelectedTemplate() {
-            const tplName = document.getElementById('template-selector').value;
-            if(!tplName) return;
-            
-            document.getElementById('template-editor-text').value = "Загрузка данных из базы...";
-            
-            fetch('/glaz/api/get_bot_template?name=' + tplName)
-            .then(res => res.json())
-            .then(data => {
-                const editor = document.getElementById('template-editor-text');
-                const btn = document.getElementById('save-template-btn');
-                
-                editor.value = data.text || '';
-                editor.disabled = false;
-                btn.disabled = false;
-                btn.style.opacity = '1';
-            });
-        }
 
-        function saveSelectedTemplate() {
-            const tplName = document.getElementById('template-selector').value;
-            const tplText = document.getElementById('template-editor-text').value;
-            
-            fetch('/glaz/api/save_bot_template', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ name: tplName, text: tplText })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if(data.success) showToast("✅ Шаблон успешно сохранен в базе!");
-                else showToast("❌ Ошибка: " + (data.error || "Сбой сохранения"));
-            });
-        }
 
         // === ФУНКЦИИ УПРАВЛЕНИЯ ПАРАМЕТРАМИ ДОСЬЕ ПОЛЬЗОВАТЕЛЯ ===
         function saveInventory(uid) {
@@ -3170,296 +2937,29 @@ function scanNetworks(uid) {
         }
 
 // === ЛИМИТЫ МОДЕРАЦИИ И ТАЙМЕРЫ ===
-        function loadModSettings() {
-            fetch('/glaz/api/moderation')
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById('sim-norm').value = data.sim_normal || 85;
-                document.getElementById('val-sim-norm').innerText = data.sim_normal || 85;
-                document.getElementById('sim-new').value = data.sim_newbie || 75;
-                document.getElementById('val-sim-new').innerText = data.sim_newbie || 75;
-                
-                document.getElementById('timer-strike').value = data.strike_hours || 72;
-                document.getElementById('timer-flood-norm').value = data.flood_norm_hours || 6;
-                document.getElementById('timer-flood-hard').value = data.flood_hard_hours || 120;
-                document.getElementById('timer-quarantine').value = data.quaran_hours || 120;
 
-                // 👇 ДОБАВИЛИ ЧТЕНИЕ ТУМБЛЕРОВ ИИ 👇
-                document.getElementById('toggle-radar').checked = data.radar_active !== false;
-                document.getElementById('toggle-antibayan-photo').checked = data.antibayan_photo_active !== false;
-                document.getElementById('toggle-antibayan-text').checked = data.antibayan_text_active !== false;
-                document.getElementById('toggle-antiflood').checked = data.antiflood_active !== false;
-            }).catch(e => console.log('Таймеры еще не настроены'));
-        }
-
-        function saveModSettings() {
-            const payload = {
-                sim_normal: parseInt(document.getElementById('sim-norm').value),
-                sim_newbie: parseInt(document.getElementById('sim-new').value),
-                strike_hours: parseInt(document.getElementById('timer-strike').value),
-                flood_norm_hours: parseInt(document.getElementById('timer-flood-norm').value),
-                flood_hard_hours: parseInt(document.getElementById('timer-flood-hard').value),
-                quaran_hours: parseInt(document.getElementById('timer-quarantine').value),
-
-                // 👇 Просто дописываем сюда сбор данных с новых кнопок ИИ 👇
-                radar_active: document.getElementById('toggle-radar').checked,
-                antibayan_photo_active: document.getElementById('toggle-antibayan-photo').checked,
-                antibayan_text_active: document.getElementById('toggle-antibayan-text').checked,
-                antiflood_active: document.getElementById('toggle-antiflood').checked
-            };
-
-            fetch('/glaz/api/moderation/save', {
-                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
-            }).then(res => res.json()).then(data => {
-                if(data.success) showToast("✅ Настройки радаров и таймеров обновлены!");
-            });
-        }
 
 // === ЛОГИКА ИНФРАСТРУКТУРЫ И СЕТЕЙ + МОНИТОРИНГ ===
-        let currentInfraData = {
-            cities: "", global_links: { main_channel: "", faq: "" },
-            networks: { parni: [], mk: [], ns: [], rainbow: [], gayznak: [] },
-            competitors: []
-        };
+        
 
-        const networkNames = { parni: "ПАРНИ 18+", mk: "МК", ns: "НС", rainbow: "Радуга", gayznak: "ГейЗнакомства" };
-        let pingInterval = null;
 
-        function loadInfrastructure() {
-            fetch('/glaz/api/infrastructure').then(res => res.json()).then(data => {
-                if(data) currentInfraData = data;
-                
-                if(!currentInfraData.networks) currentInfraData.networks = { parni: [], mk: [], ns: [], rainbow: [], gayznak: [] };
-                if(!currentInfraData.competitors) currentInfraData.competitors = [];
-                if(!currentInfraData.global_links) currentInfraData.global_links = { main_channel: "", faq: "" };
 
-                document.getElementById('infra-cities').value = currentInfraData.cities || "";
-                document.getElementById('infra-link-main').value = currentInfraData.global_links.main_channel || "";
-                document.getElementById('infra-link-faq').value = currentInfraData.global_links.faq || "";
 
-                renderInfraChats();
-                renderInfraEnemies();
-                renderInfraROEnemies(); // <--- 🔥 ДОБАВИЛИ СЮДА
-                startAutoPing(); // Запускаем пинг чатов
-            });
-        }
 
-        function renderInfraChats() {
-            let html = '';
-            for (const [netKey, chats] of Object.entries(currentInfraData.networks)) {
-                chats.forEach((chat, idx) => {
-                    html += `<tr>
-                        <td><strong>${chat.name}</strong></td>
-                        <td><code>${chat.id}</code></td>
-                        <td><span class="badge yes" style="background: #444; color: #fff;">${networkNames[netKey] || netKey}</span></td>
-                        <td><span id="health-${chat.id}" style="color: #aaa; font-weight: bold; font-size: 11px; padding: 6px 10px; border-radius: 5px; background: #252525; display: inline-block; line-height: 1.6; text-align: left; min-width: 100px;">🟡 Ждем пинга...</span></td>
-                        <td><button onclick="removeInfraChat('${netKey}', ${idx})" class="act-btn ban" style="padding: 4px 8px; width: auto; font-size: 10px;">❌</button></td>
-                    </tr>`;
-                });
-            }
-            if(html === '') html = '<tr><td colspan="5" style="text-align: center; color: #888;">Чаты не добавлены</td></tr>';
-            document.getElementById('infra-chats-tbody').innerHTML = html;
-        }
 
-        function pingNetworks() {
-            document.querySelectorAll('[id^="health-"]').forEach(el => {
-                el.innerHTML = "⏳ Проверка...";
-                el.style.color = "#aaa";
-            });
-
-            fetch('/glaz/api/infrastructure/ping')
-            .then(res => res.json())
-            .then(statuses => {
-                for (const [netKey, chats] of Object.entries(currentInfraData.networks)) {
-                    chats.forEach(chat => {
-                        const statusData = statuses[chat.id] || {code: 'error', text: '🔴 Неизвестно'};
-                        const el = document.getElementById(`health-${chat.id}`);
-                        if(el) {
-                            let color = statusData.code === 'ok' ? '#03dac6' : statusData.code === 'warn' ? '#ffb74d' : '#cf6679';
-                            let bg = statusData.code === 'ok' ? 'rgba(3, 218, 198, 0.1)' : statusData.code === 'warn' ? 'rgba(255, 183, 77, 0.1)' : 'rgba(207, 102, 121, 0.1)';
-                            el.innerHTML = statusData.text;
-                            el.style.color = color;
-                            el.style.background = bg;
-                        }
-                    });
-                }
-            });
-        }
-
-        function startAutoPing() {
-            if(pingInterval) clearInterval(pingInterval);
-            pingNetworks(); // <-- При открытии вкладки пингуем 1 раз
-            renderInfraEnemies(); 
-            renderInfraROEnemies(); // <--- 🔥 ДОБАВИЛИ СЮДА
-            
-            pingInterval = setInterval(() => {
-                if(document.getElementById('tab-infrastructure').classList.contains('active')) {
-                    renderInfraEnemies(); // А шпион пусть обновляется, он БД не грузит
-                    renderInfraROEnemies(); // <--- 🔥 И ДОБАВИЛИ СЮДА
-                }
-            }, 25000);
-        }
-
-        function addInfraChat() {
-            const name = document.getElementById('new-chat-name').value.trim();
-            const id = document.getElementById('new-chat-id').value.trim();
-            const net = document.getElementById('new-chat-net').value;
-            if(!name || !id) { showToast("⚠️ Введите название и ID чата!"); return; }
-            if(!currentInfraData.networks[net]) currentInfraData.networks[net] = [];
-            currentInfraData.networks[net].push({ name: name, id: id });
-            document.getElementById('new-chat-name').value = '';
-            document.getElementById('new-chat-id').value = '';
-            renderInfraChats();
-            pingNetworks();
-            saveInfrastructure(); // 🔥 ДОБАВЛЕНО: АВТОСОХРАНЕНИЕ
-        }
-
-        function removeInfraChat(netKey, idx) {
-            currentInfraData.networks[netKey].splice(idx, 1);
-            renderInfraChats();
-            saveInfrastructure(); // 🔥 ДОБАВЛЕНО: АВТОСОХРАНЕНИЕ
-        }
 
         // 👇 КРАСИВЫЕ КАРТОЧКИ ЦЕЛЕЙ ШПИОНА 👇
-        function renderInfraEnemies() {
-            fetch('/glaz/api/spy')
-            .then(res => res.json())
-            .then(chats => {
-                const container = document.getElementById('infra-enemies-list');
-                let html = '';
-                chats.forEach(chat => {
-                    const chatStr = typeof chat.id === 'string' ? chat.id.replace(/'/g, "\\'") : chat.id;
-                    let color = chat.status.includes('🟢') ? '#03dac6' : (chat.status.includes('🔴') ? '#cf6679' : '#ffb74d');
-                    
-                    html += `<div style="background: #252525; border: 1px solid ${color}; padding: 10px 15px; border-radius: 8px; font-size: 13px; display: flex; flex-direction: column; gap: 6px; min-width: 220px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <strong style="color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;" title="${chat.title}">🎯 ${chat.title}</strong>
-                            <span onclick="removeInfraEnemy('${chatStr}')" style="cursor: pointer; color: #cf6679; font-weight: bold; font-size: 14px;">✖</span>
-                        </div>
-                        <div style="font-size: 11px; color: #888;">ID: <code>${chat.id}</code></div>
-                        <div style="font-size: 11px; color: ${color}; font-weight: bold;">${chat.status}</div>
-                    </div>`;
-                });
-                if(html === '') html = '<span style="color: #666; font-size: 12px;">Цели не назначены...</span>';
-                container.innerHTML = html;
-            });
-        }
 
-        function addInfraEnemy() {
-            const val = document.getElementById('new-enemy-id').value.trim();
-            if(!val) return;
-            fetch('/glaz/api/spy/add', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({chat: val})
-            }).then(res => res.json()).then(data => {
-                if(data.success) {
-                    document.getElementById('new-enemy-id').value = '';
-                    renderInfraEnemies(); // Сразу перерисовываем список
-                    showToast("🎯 Цель добавлена!");
-                }
-            });
-        }
 
-        function removeInfraEnemy(chatStr) {
-            fetch('/glaz/api/spy/del', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({chat: chatStr})
-            }).then(res => res.json()).then(data => {
-                if(data.success) {
-                    renderInfraEnemies(); // Сразу перерисовываем список
-                    showToast("🗑 Цель удалена!");
-                }
-            });
-        }
         // 👆 ======================================== 👆
 
-        function saveInfrastructure() {
-            currentInfraData.cities = document.getElementById('infra-cities').value.trim();
-            currentInfraData.global_links.main_channel = document.getElementById('infra-link-main').value.trim();
-            currentInfraData.global_links.faq = document.getElementById('infra-link-faq').value.trim();
 
-            fetch('/glaz/api/infrastructure/save', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(currentInfraData)
-            }).then(res => res.json()).then(data => {
-                if(data.success) showToast(data.message);
-            });
-        }
-
-        function runMigration() {
-            showToast("⏳ Запускаю перенос данных из конфига...");
-            fetch('/glaz/api/infrastructure/migrate')
-            .then(res => res.text())
-            .then(text => {
-                showToast(text);
-                setTimeout(() => window.location.reload(), 1500); 
-            });
-        }
 
         // 👇 СКРИПТ ДЛЯ ЛАМПОЧЕК ОНЛАЙН/ОФФЛАЙН (ПУЛЬС СИСТЕМ) 👇
 // 👇 КРАСИВЫЕ КАРТОЧКИ ЦЕЛЕЙ РУССКОЙ ОБЩИНЫ (РО) 👇
-        function renderInfraROEnemies() {
-            fetch('/glaz/api/spy_ro')
-            .then(res => res.json())
-            .then(chats => {
-                const container = document.getElementById('infra-ro-enemies-list');
-                let html = '';
-                chats.forEach(chat => {
-                    const chatStr = typeof chat.id === 'string' ? chat.id.replace(/'/g, "\\'") : chat.id;
-                    let color = chat.status.includes('🟢') ? '#03dac6' : (chat.status.includes('🔴') ? '#cf6679' : '#ffb74d');
-                    
-                    html += `<div style="background: #252525; border: 1px solid ${color}; border-top: 3px solid #ff4d4d; padding: 10px 15px; border-radius: 8px; font-size: 13px; display: flex; flex-direction: column; gap: 6px; min-width: 220px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <strong style="color: #ff4d4d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;" title="${chat.title}">💀 ${chat.title}</strong>
-                            <span onclick="removeInfraROEnemy('${chatStr}')" style="cursor: pointer; color: #cf6679; font-weight: bold; font-size: 14px;">✖</span>
-                        </div>
-                        <div style="font-size: 11px; color: #888;">ID: <code>${chat.id}</code></div>
-                        <div style="font-size: 11px; color: ${color}; font-weight: bold;">${chat.status}</div>
-                    </div>`;
-                });
-                if(html === '') html = '<span style="color: #666; font-size: 12px;">База целей РО пуста...</span>';
-                container.innerHTML = html;
-            });
-        }
 
         // Массовый парсер для загрузки 200+ чатов
-        function addInfraROEnemy() {
-            const val = document.getElementById('new-ro-enemy-id').value.trim();
-            if(!val) return;
-            
-            // Разбиваем текст по запятой, пробелу или переносу строки (очищаем от мусора)
-            const chats = val.split(/[\n, ]+/).map(c => c.trim()).filter(c => c);
-            if(chats.length === 0) return;
-            
-            document.getElementById('new-ro-enemy-id').value = '⏳ Идёт обработка списка...';
-            
-            fetch('/glaz/api/spy_ro/add_mass', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({chats: chats})
-            }).then(res => res.json()).then(data => {
-                if(data.success) {
-                    document.getElementById('new-ro-enemy-id').value = '';
-                    renderInfraROEnemies(); 
-                    showToast(`💀 База обновлена! Успешно загружено целей: ${data.added}`);
-                }
-            });
-        }
 
-        function removeInfraROEnemy(chatStr) {
-            fetch('/glaz/api/spy_ro/del', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({chat: chatStr})
-            }).then(res => res.json()).then(data => {
-                if(data.success) {
-                    renderInfraROEnemies();
-                    showToast("🗑 Цель РО удалена!");
-                }
-            });
-        }
 
 function manageTag(uid, action) {
             const formData = new FormData();
@@ -4766,6 +4266,521 @@ function manageAd(sub_id, action) {
     } else if (!confirm('Отключить рекламную подписку прямо сейчас? Потом её можно будет продлить заново.')) return;
     fetch('/glaz/api/ads/manage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     .then(r => r.json()).then(d => { showToast(d.success ? (action === 'extend' ? '✅ Продлено' : '⛔ Отключено') : '❌ ' + (d.error || 'Ошибка')); if (d.success) loadAds(); });
+}
+</script>
+<script>
+// =====================================================================
+// ⚙️ НАСТРОЙКИ: модули, таймеры, словарь, тексты, шаблоны Секретаря, касса владельца
+// =====================================================================
+const IS_OWNER = {{ 'true' if is_owner else 'false' }};
+function _h(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function _post(url, body) {
+    return fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body || {})})
+        .then(r => r.json().catch(() => ({})).then(d => (r.ok ? d : Object.assign({error: d.error || ('HTTP ' + r.status)}, d))));
+}
+let NET_RATE = 2;   // ₽ за ⭐️ — подтягивается из «Управления ботами»
+
+// ---------- 🎛 Модули ----------
+const SK_MODULES = [
+    {g: 'Фильтры в чатах', items: [
+        {k: 'red_zone', l: 'Красная зона', h: 'Наркотики, CP и другие тяжёлые нарушения → глобальный бан.'},
+        {k: 'yellow_commerce', l: 'Жёлтая зона', h: 'Коммерция, папики, спонсоры, реклама → мут.'},
+        {k: 'twin_radar', l: 'Радар твинков', h: 'Ищет и банит клонов забаненных. Пороги — в «Таймерах» ниже.'},
+        {k: 'antibayan_photo_active', src: 'mod', l: 'Анти-баян: фото', h: 'Страйки за повтор старых фотографий.'},
+        {k: 'antibayan_text_active', src: 'mod', l: 'Анти-копипаст: текст', h: 'Страйки за одну и ту же анкету раз за разом.'},
+        {k: 'antiflood_active', src: 'mod', l: 'Умный антифлуд', h: 'Мут за однотипные сообщения подряд.'},
+        {k: 'may_1_active', l: 'Операция «1 мая»', h: 'Строгий формат параметров в досках объявлений.'},
+        {k: 'bio_hardcheck', l: 'Жёсткая проверка БИО', h: 'Возраст и ссылки в профиле при входе.'},
+        {k: 'quarantine_active', l: 'Карантин новорегов', h: 'Свежие аккаунты молчат первые часы. Срок — в «Таймерах».'},
+    ]},
+    {g: 'Уборка', items: [
+        {k: 'auto_corpse_removal', l: 'Вынос удалённых аккаунтов', h: 'Убирает Deleted Account из чатов сети. Отчёт — в «Диагностике».'},
+        {k: 'clean_service_messages', l: 'Чистка служебных плашек', h: 'Удаляет «вступил в группу / вышел из группы».'},
+    ]},
+    {g: 'Сервисы', items: [
+        {k: 'proxy_system', l: 'Чёрный ящик', h: 'Анонимные прокси-чаты между участниками.'},
+        {k: 'referral_system', l: 'Реферальная VIP-система', h: 'Бонусы за приглашённых друзей.'},
+        {k: 'vip_sniper', l: 'Тайм-аут VIP-заявок', h: 'Напоминает и банит застрявших. Сроки — в «Управлении ботами → VIP-воронка».'},
+        {k: 'autoban_on_block', l: 'Автобан за блок бота', h: 'Бан тем, кто заблокировал бота посреди диалога.'},
+        {k: 'parni_autounmute', l: 'Амнистия в ПАРНИ 18+', h: 'Снимает мут при входе в сеть ПАРНИ.'},
+        {k: 'radar_logging', l: 'Живой радар', h: 'Пишет события в «Радар и списки».'},
+    ]},
+];
+const SK = {sk: {}, mod: {}};
+
+function _swRow(it, on) {
+    return `<div class="set-row tgl ${on ? 'on' : ''}" data-k="${it.k}">
+        <div class="set-txt"><div class="set-lbl">${_h(it.l)}</div><div class="set-hint">${_h(it.h)}</div></div>
+        <label class="sw"><input type="checkbox" ${on ? 'checked' : ''} onchange="setModule('${it.k}', this.checked, this)"><span></span></label>
+    </div>`;
+}
+function _modOn(k) {
+    const it = SK_MODULES.flatMap(g => g.items).find(i => i.k === k);
+    if (it && it.src === 'mod') return SK.mod[k] !== false;
+    if (k === 'twin_radar') return SK.sk.twin_radar !== false && SK.mod.radar_active !== false;   // радар работает, только если включены оба старых рубильника
+    return SK.sk[k] !== false;
+}
+function renderModules() {
+    const master = SK.sk.skynet_enabled !== false;
+    document.getElementById('sk-master').innerHTML = `
+        <div class="master ${master ? 'on' : 'off'}">
+            <div class="set-txt">
+                <div class="set-lbl">${master ? '🟢 Скайнет модерирует чаты' : '🔴 Скайнет выключен — чаты без модерации'}</div>
+                <div class="set-hint">Главный рубильник. Выключает все фильтры ниже разом; сами настройки при этом сохраняются.</div>
+            </div>
+            <label class="sw big"><input type="checkbox" ${master ? 'checked' : ''} onchange="setModule('skynet_enabled', this.checked, this)"><span></span></label>
+        </div>`;
+    document.getElementById('toggles-container').innerHTML = SK_MODULES.map(g => {
+        const on = g.items.filter(i => _modOn(i.k)).length;
+        return `<div class="set-group ${master ? '' : 'dimmed'}"><div class="set-sub">${g.g} <span class="cnt">${on} из ${g.items.length} включено</span></div>${g.items.map(i => _swRow(i, _modOn(i.k))).join('')}</div>`;
+    }).join('');
+}
+function loadSystemSettings() {
+    return Promise.all([
+        fetch('/glaz/api/system_settings').then(r => r.json()),
+        fetch('/glaz/api/moderation').then(r => r.json()).catch(() => ({}))
+    ]).then(([sk, mod]) => {
+        SK.sk = sk || {}; SK.mod = mod || {};
+        renderModules();
+        _fillTimers();
+    }).catch(() => { document.getElementById('toggles-container').innerHTML = '<div class="set-empty">Не удалось загрузить — обновите страницу.</div>'; });
+}
+function setModule(k, on, el) {
+    const it = SK_MODULES.flatMap(g => g.items).find(i => i.k === k) || {l: 'Главный рубильник'};
+    if (k === 'skynet_enabled' && !on && !confirm('Выключить Скайнет целиком? Чаты останутся без модерации.')) { el.checked = true; return; }
+    const row = el.closest('.set-row, .master'); if (row) row.classList.add('busy');
+    let p;
+    if (it.src === 'mod') {
+        p = _post('/glaz/api/moderation/save', {[k]: on}).then(d => { if (!d.success) throw d; SK.mod[k] = on; });
+    } else {
+        const fd = new FormData(); fd.append('setting', k); fd.append('value', on ? 'true' : 'false');
+        p = fetch('/glaz/toggle_setting', {method: 'POST', body: fd}).then(r => r.json()).then(d => { if (!d.success) throw d; SK.sk[k] = d.state; });
+        if (k === 'twin_radar' && on && SK.mod.radar_active === false)   // старый второй рубильник радара — включаем заодно
+            p = p.then(() => _post('/glaz/api/moderation/save', {radar_active: true})).then(() => { SK.mod.radar_active = true; });
+    }
+    p.then(() => { renderModules(); showToast((on ? '✅ Включено: ' : '⏸ Выключено: ') + it.l); })
+     .catch(e => { el.checked = !on; if (row) row.classList.remove('busy'); showToast('❌ Не сохранилось' + (e && e.error ? ': ' + e.error : '')); });
+}
+// старое имя — на случай вызова из других мест
+function toggleSetting(key) { const el = document.querySelector(`.set-row[data-k="${key}"] input`); if (el) { el.checked = !el.checked; setModule(key, el.checked, el); } }
+
+// ---------- ⏱ Таймеры ----------
+const TIMER_FIELDS = {sim_normal: 'sim-norm', sim_newbie: 'sim-new', strike_hours: 'timer-strike', flood_norm_hours: 'timer-flood-norm', flood_hard_hours: 'timer-flood-hard', quaran_hours: 'timer-quarantine'};
+const TIMER_DEF = {sim_normal: 85, sim_newbie: 75, strike_hours: 72, flood_norm_hours: 6, flood_hard_hours: 120, quaran_hours: 120};
+function _fillTimers() {
+    Object.entries(TIMER_FIELDS).forEach(([k, id]) => {
+        const el = document.getElementById(id); if (!el) return;
+        el.value = SK.mod[k] != null ? SK.mod[k] : TIMER_DEF[k];
+        el.classList.remove('dirty');
+    });
+    ['sim-norm', 'sim-new'].forEach(id => { document.getElementById('val-' + id).textContent = document.getElementById(id).value; });
+    document.getElementById('mod-save-btn').disabled = true;
+}
+function loadModSettings() { /* загружается вместе с модулями */ }
+function saveModSettings() {
+    const payload = {};
+    Object.entries(TIMER_FIELDS).forEach(([k, id]) => { payload[k] = parseInt(document.getElementById(id).value, 10); });
+    if (Object.values(payload).some(v => isNaN(v) || v < 0)) { showToast('⚠️ Везде нужны целые числа от 0'); return; }
+    _post('/glaz/api/moderation/save', payload).then(d => {
+        if (!d.success) { showToast('❌ ' + (d.error || 'Не сохранилось')); return; }
+        Object.assign(SK.mod, payload); _fillTimers(); showToast('✅ Таймеры сохранены');
+    });
+}
+document.addEventListener('input', e => {
+    const id = e.target && e.target.id;
+    if (Object.values(TIMER_FIELDS).includes(id)) {
+        e.target.classList.add('dirty');
+        if (id === 'sim-norm' || id === 'sim-new') document.getElementById('val-' + id).textContent = e.target.value;
+        document.getElementById('mod-save-btn').disabled = false;
+    }
+    if (id && id.startsWith('price-')) {
+        e.target.classList.add('dirty'); _priceRub(e.target);
+        const b = document.getElementById('prices-save-btn'); if (b) b.disabled = false;
+    }
+});
+
+// ---------- 🛡 Словарь ----------
+function loadDictionary() {
+    fetch('/glaz/api/dictionary').then(r => r.json()).then(d => {
+        ['red', 'yellow', 'black', 'soft_red'].forEach(z => renderDictList(z, d[z] || []));
+    });
+}
+function renderDictList(zone, words) {
+    const box = document.getElementById(`dict-${zone}-list`); if (!box) return;
+    const n = document.getElementById(`dict-${zone}-n`); if (n) n.textContent = words.length;
+    box.innerHTML = words.length ? words.map(w => `<span class="wchip" title="${w.exact ? 'Только точное слово' : 'Слово и его формы'}">${w.exact ? '🎯' : '🔤'} ${_h(w.word)}<button type="button" aria-label="Убрать" data-w="${_h(w.word)}" data-z="${zone}" onclick="removeDictWord(this.dataset.w, this.dataset.z)">×</button></span>`).join('')
+        : '<span class="set-empty sm">Пусто</span>';
+}
+function addDictWord(zone) {
+    const input = document.getElementById(`dict-${zone}-input`), word = input.value.trim();
+    if (!word) { input.focus(); return; }
+    _post('/glaz/api/dictionary/add', {word, zone, exact: document.getElementById(`dict-${zone}-exact`).checked}).then(d => {
+        if (d.success) { input.value = ''; showToast('✅ Добавлено: ' + word); loadDictionary(); }
+        else showToast('❌ ' + (d.error || 'Не получилось'));
+    });
+}
+function removeDictWord(word, zone) {
+    if (!confirm(`Убрать «${word}» из словаря?`)) return;
+    _post('/glaz/api/dictionary/remove', {word, zone}).then(d => { if (d.success) { showToast('🗑 Убрано: ' + word); loadDictionary(); } });
+}
+
+// ---------- 🗂 Тексты Секретаря ----------
+let _tplCur = '', _tplOrig = '';
+function loadSelectedTemplate(name) {
+    if (name && _tplCur && _tplCur !== name && document.getElementById('template-editor-text').value !== _tplOrig && !confirm('Текст изменён и не сохранён. Переключиться без сохранения?')) return;
+    _tplCur = name || _tplCur; if (!_tplCur) return;
+    document.querySelectorAll('.tpl-opt').forEach(b => b.classList.toggle('active', b.dataset.tpl === _tplCur));
+    const ed = document.getElementById('template-editor-text'), btn = document.getElementById('save-template-btn');
+    ed.disabled = true; ed.value = 'Загрузка…'; btn.disabled = true;
+    fetch('/glaz/api/get_bot_template?name=' + encodeURIComponent(_tplCur)).then(r => r.json()).then(d => {
+        ed.value = _tplOrig = d.text || ''; ed.disabled = false;
+        document.getElementById('tpl-status').textContent = '';
+    });
+}
+function saveSelectedTemplate() {
+    const text = document.getElementById('template-editor-text').value;
+    if (!_tplCur || !text.trim()) { showToast('⚠️ Текст пустой'); return; }
+    _post('/glaz/api/save_bot_template', {name: _tplCur, text}).then(d => {
+        if (d.success) { _tplOrig = text; document.getElementById('save-template-btn').disabled = true; document.getElementById('tpl-status').textContent = '✓ Сохранено'; showToast('✅ Текст сохранён'); }
+        else showToast('❌ ' + (d.error || 'Не сохранилось'));
+    });
+}
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('.tpl-opt'); if (b) loadSelectedTemplate(b.dataset.tpl); });
+document.addEventListener('input', e => {
+    if (e.target && e.target.id === 'template-editor-text') {
+        const ch = e.target.value !== _tplOrig;
+        document.getElementById('save-template-btn').disabled = !ch;
+        document.getElementById('tpl-status').textContent = ch ? '● есть несохранённые изменения' : '';
+    }
+});
+
+// ---------- 🧠 Промпт ИИ ----------
+function loadAIPrompt() {
+    fetch('/glaz/api/ai_prompt').then(r => r.json()).then(d => { document.getElementById('ai-system-prompt').value = d.prompt || ''; });
+}
+function saveAIPrompt() {
+    const prompt = document.getElementById('ai-system-prompt').value.trim();
+    if (!prompt) { showToast('⚠️ Инструкция не может быть пустой'); return; }
+    _post('/glaz/api/ai_prompt/save', {prompt}).then(d => showToast(d.success ? '🧠 Инструкция ИИ обновлена' : '❌ Не сохранилось'));
+}
+
+// ---------- 💰 Тарифы (владелец) ----------
+const PRICE_IDS = {vip_price: 'price-vip', beyond_price: 'price-beyond', reg_small_1: 'price-sm-1', reg_small_7: 'price-sm-7', reg_small_15: 'price-sm-15', reg_small_30: 'price-sm-30',
+    reg_big_1: 'price-bg-1', reg_big_7: 'price-bg-7', reg_big_15: 'price-bg-15', reg_big_30: 'price-bg-30', vip_big_chat_1: 'price-bigchat-1', vip_big_chat_7: 'price-bigchat-7'};
+const PRICE_DEF = {vip_price: 250, beyond_price: 250, reg_small_1: 105, reg_small_7: 490, reg_small_15: 720, reg_small_30: 938, reg_big_1: 105, reg_big_7: 656, reg_big_15: 1288, reg_big_30: 1563, vip_big_chat_1: 1095, vip_big_chat_7: 7656};
+function _priceRub(inp) {
+    let s = inp.parentElement.nextElementSibling;
+    if (!s || !s.classList.contains('rub')) { s = document.createElement('span'); s.className = 'rub'; inp.parentElement.after(s); }
+    const v = parseInt(inp.value, 10);
+    s.textContent = v > 0 ? '≈ ' + Math.round(v * NET_RATE).toLocaleString('ru-RU') + ' ₽' : '';
+}
+function loadNetworkPrices() {
+    if (!document.getElementById('price-vip')) return;
+    fetch('/glaz/api/get_prices').then(r => r.json()).then(d => {
+        Object.entries(PRICE_IDS).forEach(([k, id]) => { const el = document.getElementById(id); el.value = d[k] || PRICE_DEF[k]; el.classList.remove('dirty'); _priceRub(el); });
+        document.getElementById('prices-save-btn').disabled = true;
+    });
+}
+function saveNetworkPrices() {
+    const p = {};
+    for (const [k, id] of Object.entries(PRICE_IDS)) {
+        const v = parseInt(document.getElementById(id).value, 10);
+        if (!(v > 0)) { showToast('⚠️ Цена должна быть больше нуля'); document.getElementById(id).focus(); return; }
+        p[k] = v;
+    }
+    _post('/glaz/api/save_prices', p).then(d => {
+        if (d.success) { showToast('✅ Тарифы сохранены'); loadNetworkPrices(); } else showToast('❌ ' + (d.error || 'Не сохранилось'));
+    });
+}
+
+// ---------- 💵 Касса и 🔘 кнопки (владелец) ----------
+let revenueChartInstance = null, _revPeriod = 'week';
+function loadOwnerBlock() { if (!IS_OWNER) return; loadRootFinance(); loadRootRevenue(_revPeriod); loadRootButtons(); }
+function loadRootFinance() {
+    _post('/glaz/api/root/finance', {}).then(d => {
+        if (d.error) return;
+        NET_RATE = d.rub_per_star || NET_RATE;
+        const rl = document.getElementById('rate-label'); if (rl) rl.textContent = String(NET_RATE).replace('.', ',');
+        document.querySelectorAll('[id^="price-"]').forEach(_priceRub);
+        const stars = parseInt(d.total_today) || 0, crypto = parseInt(d.crypto_rub_today) || 0;
+        document.getElementById('root-finance-total').textContent = stars.toLocaleString('ru-RU');
+        document.getElementById('root-finance-rubles').textContent = Math.round(stars * NET_RATE + crypto).toLocaleString('ru-RU');
+        document.getElementById('root-finance-note').textContent = `звёзды × ${String(NET_RATE).replace('.', ',')} ₽` + (crypto ? ` + ${crypto.toLocaleString('ru-RU')} ₽ с крипты` : '');
+        document.getElementById('root-finance-internal').textContent = (parseInt(d.internal_today) || 0).toLocaleString('ru-RU');
+        const pays = d.payments || [];
+        document.getElementById('root-finance-count').textContent = pays.length;
+        document.getElementById('root-finance-list').innerHTML = pays.length ? pays.map(p =>
+            `<div class="pay-row"><span class="mono muted">${_h(p.time)}</span><a href="/glaz?search_id=${encodeURIComponent(p.uid)}" class="mono">${_h(p.uid)}</a><b>${_h(p.amount)} ⭐️</b><span class="muted">≈ ${Math.round(p.amount * NET_RATE).toLocaleString('ru-RU')} ₽</span></div>`).join('')
+            : '<div class="set-empty sm">Сегодня оплат штрафов не было.</div>';
+    });
+}
+function loadRootRevenue(period) {
+    if (typeof period !== 'string') period = arguments[1] || 'week';   // старый вызов (pin, period)
+    _revPeriod = period;
+    if (!document.getElementById('revenueChart')) return;
+    document.querySelectorAll('[id^="btn-period-"]').forEach(b => b.classList.toggle('active', b.id === 'btn-period-' + period));
+    _post('/glaz/api/analytics/revenue', {period}).then(data => {
+        if (!Array.isArray(data)) return;
+        const dates = [...new Set(data.map(i => i._id.date))];
+        document.getElementById('rev-empty').hidden = dates.length > 0;
+        const T = [['vip', 'VIP', '#ffb74d'], ['ads', 'Реклама', '#03dac6'], ['fine', 'Штрафы', '#ef6f86'], ['donation', 'Донаты', '#bb86fc']];
+        const datasets = T.map(([t, label, color]) => ({
+            label, borderColor: color, backgroundColor: color, pointRadius: dates.length > 20 ? 0 : 3, tension: .35, borderWidth: 2,
+            data: dates.map(dt => { const f = data.find(i => i._id.date === dt && i._id.type === t); return f ? f.total : 0; })
+        })).filter(ds => ds.data.some(v => v));
+        if (revenueChartInstance) revenueChartInstance.destroy();
+        if (typeof Chart === 'undefined') return;
+        revenueChartInstance = new Chart(document.getElementById('revenueChart').getContext('2d'), {
+            type: 'line', data: {labels: dates.map(d => d.slice(0, 5)), datasets},
+            options: {
+                responsive: true, maintainAspectRatio: false, interaction: {mode: 'index', intersect: false},
+                plugins: {legend: {position: 'bottom', labels: {color: '#c5c8cf', boxWidth: 10, boxHeight: 10, usePointStyle: true}},
+                          tooltip: {callbacks: {label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('ru-RU')}`}}},
+                scales: {y: {beginAtZero: true, ticks: {color: '#8b909a'}, grid: {color: '#22252b'}}, x: {ticks: {color: '#8b909a', maxRotation: 0, autoSkip: true}, grid: {display: false}}}
+            }
+        });
+    });
+}
+function loadRootButtons() {
+    fetch('/glaz/api/root/buttons').then(r => r.json()).then(d => {
+        const box = document.getElementById('buttons-container'); if (!box || d.error) return;
+        box.innerHTML = '';
+        (d.buttons || []).forEach(b => addButtonRow(b.text, b.url, b.style || 'default', b.emoji_id || ''));
+        if (!(d.buttons || []).length) addButtonRow('', '');
+        _btnPreview();
+    });
+}
+function addButtonRow(text, url, style = 'default', emojiId = '') {
+    const row = document.createElement('div');
+    row.className = 'btnc-row';
+    row.innerHTML = `
+        <input type="text" class="bc-text" placeholder="Текст кнопки" maxlength="64" aria-label="Текст кнопки">
+        <input type="url" class="bc-url" placeholder="https://t.me/..." aria-label="Ссылка">
+        <select class="bc-style" aria-label="Цвет">
+            <option value="default">Обычная</option><option value="primary">Синяя</option><option value="success">Зелёная</option><option value="danger">Красная</option>
+        </select>
+        <input type="text" class="bc-emoji" placeholder="ID эмодзи" inputmode="numeric" aria-label="ID премиум-эмодзи">
+        <button type="button" class="btn sm danger" title="Убрать" onclick="this.parentElement.remove(); _btnPreview()">×</button>`;
+    row.querySelector('.bc-text').value = text || '';
+    row.querySelector('.bc-url').value = url || '';
+    row.querySelector('.bc-style').value = ['primary', 'success', 'danger'].includes(style) ? style : 'default';
+    row.querySelector('.bc-emoji').value = emojiId || '';
+    row.addEventListener('input', _btnPreview);
+    document.getElementById('buttons-container').appendChild(row);
+}
+function _btnPreview() {
+    const rows = [...document.querySelectorAll('#buttons-container .btnc-row')];
+    document.getElementById('btn-preview').innerHTML = `<div class="tg-msg">❗ Внимание, чтобы писать в чате вам необходимо подписаться на наш основной канал…</div>` +
+        rows.map(r => { const t = r.querySelector('.bc-text').value.trim(); return t ? `<div class="tg-btn ${r.querySelector('.bc-style').value}">${_h(t)}</div>` : ''; }).join('');
+}
+function saveRootButtons() {
+    const buttons = [];
+    for (const r of document.querySelectorAll('#buttons-container .btnc-row')) {
+        const text = r.querySelector('.bc-text').value.trim(), url = r.querySelector('.bc-url').value.trim();
+        if (!text && !url) continue;
+        if (!text || !/^(https?:\/\/|tg:\/\/)/.test(url)) { showToast('⚠️ У каждой кнопки нужен текст и ссылка https://…'); r.querySelector(text ? '.bc-url' : '.bc-text').focus(); return; }
+        buttons.push({text, url, style: r.querySelector('.bc-style').value, emoji_id: r.querySelector('.bc-emoji').value.trim()});
+    }
+    _post('/glaz/api/root/save_buttons', {buttons}).then(d => showToast(d.status === 'ok' ? `✅ Кнопки сохранены (${d.saved ?? buttons.length})` : '❌ ' + (d.error || 'Не сохранилось')));
+}
+// Пункт меню «Касса владельца»: открыть настройки и прокрутить к кассе
+function openRoot() {
+    openTab('tab-control');
+    setTimeout(() => { const c = document.getElementById('owner-card'); if (c) window.scrollTo({top: c.getBoundingClientRect().top + window.scrollY - 130, behavior: 'smooth'}); }, 150);
+}
+</script>
+<script>
+// =====================================================================
+// 🗺 ИНФРАСТРУКТУРА
+// =====================================================================
+const NETS = [['mk', 'МК'], ['parni', 'ПАРНИ 18+'], ['ns', 'НС'], ['rainbow', 'Радуга'], ['gayznak', 'Гей Знакомства']];
+const networkNames = Object.fromEntries(NETS);
+const NON_CITIES = ['БЕЗ ПРЕДРАССУДКОВ', 'RAINBOW MAN', 'Мужской Чат', 'Фетиши', 'Аренда Жилья', 'Секс Туризм', 'Галерея', 'Тестовая группа 🛠️'];
+let currentInfraData = {networks: {}, global_links: {}};
+const INFRA = {net: 'all', ping: {statuses: {}, ts: null, running: false}, pollT: null, spyT: null, ro: []};
+
+function loadInfrastructure() {
+    fetch('/glaz/api/infrastructure').then(r => r.json()).then(d => {
+        currentInfraData = d && !d.error ? d : {};
+        currentInfraData.networks = currentInfraData.networks || {};
+        currentInfraData.global_links = currentInfraData.global_links || {};
+        NETS.forEach(([k]) => { currentInfraData.networks[k] = currentInfraData.networks[k] || []; });
+        document.getElementById('infra-link-main').value = currentInfraData.global_links.main_channel || '';
+        renderInfraSeg(); renderInfraChats();
+        loadPingStatus();
+    });
+    renderInfraEnemies(); renderInfraROEnemies();
+    clearInterval(INFRA.spyT);
+    INFRA.spyT = setInterval(() => {
+        if (!document.getElementById('tab-infrastructure').classList.contains('active')) return;
+        renderInfraEnemies(); renderInfraROEnemies();
+    }, 30000);
+}
+function _allChats() { return NETS.flatMap(([k]) => (currentInfraData.networks[k] || []).map((c, i) => ({...c, net: k, idx: i}))); }
+function _st(id) { return INFRA.ping.statuses[String(id)]; }
+function renderInfraKpis() {
+    const all = _allChats();
+    const cities = new Set(all.map(c => (c.name || '').replace(/\s*\d+$/, '').trim()).filter(n => n && !NON_CITIES.includes(n)));
+    const checked = all.filter(c => _st(c.id)), bad = checked.filter(c => _st(c.id).code !== 'ok');
+    const k = [
+        ['Чатов в сети', all.length, ''],
+        ['Городов', cities.size, ''],
+        ['С проблемами', INFRA.ping.ts ? bad.length : '—', bad.length ? 'bad' : (INFRA.ping.ts ? 'good' : '')],
+        ['Последняя проверка', INFRA.ping.ts ? _infraAgo(INFRA.ping.ts) : 'не было', ''],
+    ];
+    document.getElementById('infra-kpis').innerHTML = k.map(([l, v, cls]) => `<div class="kpi ${cls}"><div class="eyebrow">${l}</div><div class="v">${v}</div></div>`).join('');
+}
+function _infraAgo(ts) {
+    const s = Math.max(0, Date.now() / 1000 - ts);
+    if (s < 90) return 'только что';
+    if (s < 3600) return Math.round(s / 60) + ' мин назад';
+    if (s < 86400) return Math.round(s / 3600) + ' ч назад';
+    return Math.round(s / 86400) + ' дн назад';
+}
+function renderInfraSeg() {
+    const cnt = k => (currentInfraData.networks[k] || []).length;
+    document.getElementById('infra-net-seg').innerHTML = [['all', 'Все', _allChats().length], ...NETS.map(([k, n]) => [k, n, cnt(k)])]
+        .map(([k, n, c]) => `<button class="seg-btn ${INFRA.net === k ? 'active' : ''}" onclick="INFRA.net='${k}'; renderInfraSeg(); renderInfraChats()">${n} <span class="muted">${c}</span></button>`).join('');
+}
+function _chatRow(c) {
+    const st = _st(c.id);
+    const code = st ? st.code : (INFRA.ping.running ? 'wait' : 'none');
+    let detail = '';
+    if (st && st.err) detail = `<span class="ch-err">${_h(st.err)}</span>`;
+    else if (st && st.bots) detail = Object.entries(st.bots).map(([b, ok]) => `<span class="bb ${ok ? 'ok' : 'no'}" title="${ok ? b + ' — админ' : b + ' — не админ'}">${ok ? '✓' : '✕'} ${_h(b)}</span>`).join('');
+    else detail = `<span class="muted">${INFRA.ping.running ? 'проверяется…' : 'не проверялся'}</span>`;
+    return `<div class="ch-row" data-code="${code}">
+        <span class="dot ${code === 'ok' ? 'ok' : code === 'warn' ? 'late' : code === 'err' ? 'dead' : ''}"></span>
+        <div class="ch-main"><div class="ch-name">${_h(c.name)}</div><div class="ch-id mono" title="Скопировать ID" onclick="navigator.clipboard && navigator.clipboard.writeText('${_h(c.id)}'); showToast('📋 ID скопирован')">${_h(c.id)}</div></div>
+        <div class="ch-bots">${detail}</div>
+        <div class="ch-act">
+            <button class="icon-btn" title="Переименовать" onclick="renameInfraChat('${c.net}', ${c.idx})">✎</button>
+            <button class="icon-btn del" title="Убрать из сети" onclick="removeInfraChat('${c.net}', ${c.idx})">×</button>
+        </div>
+    </div>`;
+}
+function renderInfraChats() {
+    renderInfraKpis();
+    const q = (document.getElementById('infra-q').value || '').trim().toLowerCase();
+    const onlyBad = document.getElementById('infra-bad').checked;
+    const box = document.getElementById('infra-chats-list');
+    const nets = INFRA.net === 'all' ? NETS : NETS.filter(([k]) => k === INFRA.net);
+    let html = '', shown = 0;
+    nets.forEach(([k, n]) => {
+        const list = (currentInfraData.networks[k] || []).map((c, i) => ({...c, net: k, idx: i}))
+            .filter(c => !q || (c.name || '').toLowerCase().includes(q) || String(c.id).includes(q))
+            .filter(c => !onlyBad || (_st(c.id) && _st(c.id).code !== 'ok'))
+            .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ru'));
+        if (!list.length) return;
+        shown += list.length;
+        const bad = list.filter(c => _st(c.id) && _st(c.id).code !== 'ok').length;
+        html += `<details class="net-group" ${INFRA.net !== 'all' || q || onlyBad ? 'open' : ''}>
+            <summary><b>${n}</b><span class="muted">${list.length} чат${_plural(list.length)}</span>${bad ? `<span class="chip red">${bad} с проблемами</span>` : ''}</summary>
+            <div class="ch-list">${list.map(_chatRow).join('')}</div></details>`;
+    });
+    box.innerHTML = shown ? html : `<div class="set-empty">${q || onlyBad ? 'Ничего не нашлось.' : 'Чатов пока нет — добавьте первый выше.'}</div>`;
+}
+function _plural(n) { const a = n % 10, b = n % 100; return a === 1 && b !== 11 ? '' : (a >= 2 && a <= 4 && (b < 10 || b >= 20) ? 'а' : 'ов'); }
+
+function loadPingStatus() {
+    return fetch('/glaz/api/infrastructure/ping').then(r => r.json()).then(_applyPing).catch(() => {});
+}
+function _applyPing(d) {
+    if (!d || d.error) return;
+    INFRA.ping = {statuses: d.statuses || {}, ts: d.ts, running: !!d.running};
+    const btn = document.getElementById('ping-btn');
+    btn.disabled = INFRA.ping.running;
+    btn.textContent = INFRA.ping.running ? '⏳ Проверяю… (до минуты)' : '📡 Проверить права ботов';
+    document.getElementById('ping-when').textContent = INFRA.ping.ts && !INFRA.ping.running ? 'проверено ' + _infraAgo(INFRA.ping.ts) : '';
+    renderInfraChats();
+    clearTimeout(INFRA.pollT);
+    if (INFRA.ping.running) INFRA.pollT = setTimeout(loadPingStatus, 3000);
+}
+function pingNetworks() {
+    fetch('/glaz/api/infrastructure/ping', {method: 'POST'}).then(r => r.json()).then(d => { _applyPing(d); showToast('📡 Проверка запущена — результат появится сам'); });
+}
+
+function saveInfrastructure(withLink) {
+    const body = {networks: currentInfraData.networks};
+    if (withLink) {
+        const v = document.getElementById('infra-link-main').value.trim();
+        if (v && !/^https?:\/\//.test(v)) { showToast('⚠️ Ссылка должна начинаться с https://'); return Promise.resolve(); }
+        body.global_links = Object.assign({}, currentInfraData.global_links, {main_channel: v});
+    }
+    return _post('/glaz/api/infrastructure/save', body).then(d => {
+        if (d.success) { if (body.global_links) currentInfraData.global_links = body.global_links; showToast('✅ Сохранено'); }
+        else { showToast('❌ ' + (d.error || 'Не сохранилось')); loadInfrastructure(); }
+    });
+}
+function addInfraChat() {
+    const name = document.getElementById('new-chat-name').value.trim();
+    const id = document.getElementById('new-chat-id').value.trim().replace(/\s/g, '');
+    const net = document.getElementById('new-chat-net').value;
+    if (!name) { showToast('⚠️ Введите название'); document.getElementById('new-chat-name').focus(); return; }
+    if (!/^-?\d{5,20}$/.test(id)) { showToast('⚠️ ID чата — число вида -100…'); document.getElementById('new-chat-id').focus(); return; }
+    const dup = _allChats().find(c => String(c.id) === id);
+    if (dup) { showToast(`⚠️ Этот чат уже есть: ${dup.name} (${networkNames[dup.net]})`); return; }
+    currentInfraData.networks[net].push({name, id});
+    document.getElementById('new-chat-name').value = ''; document.getElementById('new-chat-id').value = '';
+    INFRA.net = net; renderInfraSeg(); renderInfraChats();
+    saveInfrastructure();
+}
+function renameInfraChat(net, idx) {
+    const c = currentInfraData.networks[net][idx]; if (!c) return;
+    const n = prompt('Новое название чата (для мини-приложения это название города):', c.name);
+    if (n == null || !n.trim() || n.trim() === c.name) return;
+    c.name = n.trim(); renderInfraChats(); saveInfrastructure();
+}
+function removeInfraChat(net, idx) {
+    const c = currentInfraData.networks[net][idx]; if (!c) return;
+    if (!confirm(`Убрать «${c.name}» (${networkNames[net]}) из сети?\nСкайнет перестанет его охранять, а мини-приложение — публиковать туда.`)) return;
+    currentInfraData.networks[net].splice(idx, 1);
+    renderInfraSeg(); renderInfraChats(); saveInfrastructure();
+}
+
+// ---- Шпион: чужие чаты и РО ----
+function _targetCard(chat, kind) {
+    const s = String(chat.status || ''), code = s.includes('🟢') ? 'ok' : s.includes('🔴') ? 'err' : 'warn';
+    return `<div class="target ${code}">
+        <div class="t-top"><span class="dot ${code === 'ok' ? 'ok' : code === 'err' ? 'dead' : 'late'}"></span><b title="${_h(chat.title)}">${_h(chat.title)}</b>
+        <button class="icon-btn del" title="Убрать" data-id="${_h(chat.id)}" onclick="${kind === 'ro' ? 'removeInfraROEnemy' : 'removeInfraEnemy'}(this.dataset.id)">×</button></div>
+        <div class="t-id mono">${_h(chat.id)}</div>
+        <div class="t-st">${_h(s.replace(/^[🟢🔴🟡]\s*/u, ''))}</div>
+    </div>`;
+}
+function renderInfraEnemies() {
+    fetch('/glaz/api/spy').then(r => r.json()).then(list => {
+        document.getElementById('infra-enemies-list').innerHTML = (list || []).length ? list.map(c => _targetCard(c, 'spy')).join('') : '<div class="set-empty">Чужих чатов пока нет.</div>';
+    });
+}
+function addInfraEnemy() {
+    const inp = document.getElementById('new-enemy-id'), val = inp.value.trim();
+    if (!val) { inp.focus(); return; }
+    _post('/glaz/api/spy/add', {chat: val}).then(d => { if (d.success) { inp.value = ''; renderInfraEnemies(); showToast('🎯 Чат добавлен — Шпион подхватит его сам'); } });
+}
+function removeInfraEnemy(id) {
+    if (!confirm('Убрать чат из наблюдения?')) return;
+    _post('/glaz/api/spy/del', {chat: id}).then(d => { if (d.success) { renderInfraEnemies(); showToast('🗑 Убрано'); } });
+}
+function renderInfraROEnemies() {
+    fetch('/glaz/api/spy_ro').then(r => r.json()).then(list => { INFRA.ro = list || []; renderROList(); });
+}
+function renderROList() {
+    const q = (document.getElementById('ro-q').value || '').trim().toLowerCase();
+    const list = INFRA.ro.filter(c => !q || String(c.title).toLowerCase().includes(q) || String(c.id).toLowerCase().includes(q));
+    document.getElementById('ro-count').textContent = INFRA.ro.length + ' целей';
+    document.getElementById('infra-ro-enemies-list').innerHTML = list.length ? list.map(c => _targetCard(c, 'ro')).join('')
+        : `<div class="set-empty">${q ? 'Ничего не нашлось.' : 'Список РО пуст.'}</div>`;
+}
+function addInfraROEnemy() {
+    const ta = document.getElementById('new-ro-enemy-id');
+    const chats = ta.value.split(/[\n, ]+/).map(c => c.trim()).filter(Boolean);
+    if (!chats.length) { ta.focus(); return; }
+    _post('/glaz/api/spy_ro/add_mass', {chats}).then(d => { if (d.success) { ta.value = ''; renderInfraROEnemies(); showToast(`💀 Загружено целей: ${d.added}`); } });
+}
+function removeInfraROEnemy(id) {
+    if (!confirm('Убрать чат из списка РО?')) return;
+    _post('/glaz/api/spy_ro/del', {chat: id}).then(d => { if (d.success) { renderInfraROEnemies(); showToast('🗑 Убрано'); } });
 }
 </script>
 </body>
