@@ -1990,6 +1990,10 @@ from web.stats import register_stats_routes
 register_control_routes(app, add_radar_log)
 register_home_routes(app, add_radar_log)
 register_stats_routes(app)
+from web.ops import register_ops_routes
+from web_auth import ALLOWED_ADMINS as _WEB_ADMINS
+register_ops_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user_everywhere, unban_user_everywhere, unmute_user_everywhere,
+                    lambda: [OWNER_ID, *ADMIN_CHAT_IDS, *_WEB_ADMINS.keys()])
 
 if __name__ == '__main__':
     print("Бот запущен — мягкая версия с приветствием и удалением сообщений (кроме сети ПАРНИ)")

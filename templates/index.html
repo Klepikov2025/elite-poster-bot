@@ -476,6 +476,58 @@
 
 
 
+
+        /* =================== 📡 РАДАР / 🕵️ ЯЩИК / 💥 РЕПРЕССИИ 2.0 =================== */
+        .rd { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+        .rd-feed { margin-bottom: 0; }
+        .rd-tools { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+        .rd-tools-r { display: flex; gap: 8px; align-items: center; }
+        .rd-tools-r .ib-search { width: 200px; }
+        .rd-kinds { display: flex; gap: 6px; flex-wrap: wrap; }
+        .rd-k { border: 1px solid var(--line-2); background: var(--surface-2); color: #c5c8cf; border-radius: 999px; font: 600 12px var(--sans); padding: 5px 10px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+        .rd-k:hover { color: var(--text); border-color: var(--muted); }
+        .rd-k.active { background: var(--surface-3); color: var(--text); border-color: var(--accent); }
+        .rd-k i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .rd-k small { color: var(--dim); font-weight: 500; }
+        .rd-list { max-height: calc(100vh - 290px); min-height: 360px; overflow-y: auto; border-top: 1px solid var(--line); }
+        .rd-row { display: grid; grid-template-columns: 58px 10px minmax(0, 1fr); gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--line); font-size: 13px; line-height: 1.45; }
+        .rd-row:hover { background: var(--surface-2); }
+        .rd-row.new { animation: rdNew 2.4s ease-out; }
+        @keyframes rdNew { from { background: rgba(187,134,252,.14); } to { background: transparent; } }
+        .rd-time { font: 500 11.5px var(--mono); color: var(--dim); padding-top: 2px; }
+        .rd-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; }
+        .rd-txt { color: #d6d8dd; word-wrap: break-word; }
+        .rd-txt a { color: #b9a2ff; text-decoration: none; border-bottom: 1px dotted #6d5a9e; }
+        .rd-who { display: inline-block; font: 600 10.5px var(--mono); color: #d9bcff; background: rgba(187,134,252,.12); border: 1px solid rgba(187,134,252,.35); border-radius: 6px; padding: 0 5px; margin-right: 6px; }
+        .rd-day { font: 600 11px var(--mono); color: var(--muted); padding: 10px 4px 4px; text-transform: uppercase; letter-spacing: .08em; }
+        .rd-more { text-align: center; padding-top: 10px; }
+        .rd-lists { margin-bottom: 0; }
+        .seg-btn b { color: var(--dim); font-weight: 600; margin-left: 2px; }
+        .ls-meta { font-size: 12px; margin: 8px 0; min-height: 16px; }
+        .ls-table { max-height: calc(100vh - 360px); min-height: 300px; overflow-y: auto; border-top: 1px solid var(--line); }
+        .ls-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 9px 4px; border-bottom: 1px solid var(--line); font-size: 13px; }
+        .ls-row:hover { background: var(--surface-2); }
+        .ls-row .nm { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ls-row .nm a { color: var(--text); text-decoration: none; }
+        .ls-row .nm a:hover { color: #b9a2ff; }
+        .ls-row .id { font: 500 11.5px var(--mono); color: var(--dim); text-align: right; }
+        .ls-row .inf { grid-column: 1 / -1; color: var(--muted); font-size: 12.5px; }
+        .ms-ids { width: 100%; box-sizing: border-box; min-height: 160px; resize: vertical; background: var(--bg); color: var(--text); border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; font: 13px/1.5 var(--mono); }
+        .ms-ids:focus, .ms-sel:focus { outline: none; border-color: var(--accent); }
+        .ms-sel { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--line-2); border-radius: 10px; padding: 9px 12px; font: 13.5px var(--sans); }
+        .ms-sum { margin-top: 10px; font-size: 13px; line-height: 1.7; color: #c5c8cf; }
+        .ms-sum b { color: var(--text); }
+        .ms-sum .warn { color: var(--warn); }
+        .ms-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+        .ms-acts .btn { flex: 1 1 180px; }
+        .bb-pair { font-size: 13px; }
+        .bb-pair .v { color: #d9bcff; }
+        @media (max-width: 1100px) { .rd { grid-template-columns: 1fr; } .rd-list, .ls-table { max-height: 560px; } }
+        @media (max-width: 860px) {
+            .rd-tools-r { width: 100%; } .rd-tools-r .ib-search { flex: 1; width: auto; }
+            .ib.chat-open .ib-list { display: none; }
+        }
+
         /* =================== 📩 ВХОДЯЩИЕ 2.0 =================== */
         .ib-tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         .ib-tools .seg-btn b { font-weight: 700; color: var(--danger); margin-left: 2px; }
@@ -1014,13 +1066,35 @@
         <div class="st-tip" id="st-tip" role="tooltip"></div>
     </div>
     <div id="tab-radar" class="tab-content">
-        <div class="charts-container" style="align-items: flex-start;">
-            <div class="chart-block" style="width: 500px;"><h3 style="color: #03dac6;">🔴 Живой Радар (Web-Логи)</h3><div class="radar-box" id="radar-box"><div style="color: #888;">Загрузка канала связи...</div></div></div>
-            <div class="chart-block" style="width: 500px;"><h3 style="color: #bb86fc;">📋 Умные Списки</h3>
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;"><button class="form-btn" style="flex: 1;" onclick="fetchList('vip')">👑 VIP</button><button class="form-btn" style="flex: 1; background: #f6a5c0;" onclick="fetchList('queer')">🏳️‍🌈 QUEER</button><button class="form-btn" style="flex: 1; background: #cf6679; color: #fff;" onclick="fetchList('banned')">🔨 ЧС</button></div>
-                <button id="download-csv-btn" class="form-btn" style="width: 100%; display: none; background: #03dac6; margin-bottom: 15px;" onclick="downloadCSV()">⬇️ Скачать Excel (CSV)</button>
-                <div style="height: 250px; overflow-y: auto; background: #121212; border-radius: 5px; padding: 10px;"><table class="admin-table" style="margin-top: 0;"><thead><tr><th>ID</th><th>Инфо / Причина</th><th>Тег</th></tr></thead><tbody id="list-tbody"><tr><td colspan="3" style="text-align: center; color: #888;">Выберите категорию</td></tr></tbody></table></div>
-            </div>
+        <div class="sec-head">
+            <div><h2>Радар и списки</h2><p>Всё, что происходит в сети: наказания, оплаты, действия админов. Обновляется само, пока вкладка открыта.</p></div>
+        </div>
+        <div class="rd">
+            <section class="bc-card rd-feed">
+                <div class="rd-tools">
+                    <div class="rd-kinds" id="rd-kinds" role="tablist" aria-label="Тип событий"></div>
+                    <div class="rd-tools-r">
+                        <input id="rd-q" class="ib-search" type="search" placeholder="Поиск: ID, слово, админ" oninput="rdSearchSoon()">
+                        <button class="btn sm" id="rd-pause" onclick="rdTogglePause()" title="Остановить автообновление, чтобы спокойно читать">⏸ Пауза</button>
+                    </div>
+                </div>
+                <div class="rd-list" id="radar-box"><div class="ib-empty">Загрузка…</div></div>
+                <div class="rd-more"><button class="btn sm ghost" id="rd-more" onclick="loadRadar('more')">Показать ещё</button></div>
+            </section>
+            <section class="bc-card rd-lists">
+                <div class="bc-head" style="margin-bottom:10px">
+                    <div class="bc-step" style="margin:0"><span>📋</span>Списки</div>
+                    <button class="btn sm" id="download-csv-btn" onclick="downloadCSV()" hidden>⬇ CSV для Excel</button>
+                </div>
+                <div class="seg" style="margin-bottom:10px">
+                    <button class="seg-btn active" data-l="vip" onclick="fetchList('vip')">👑 VIP <b id="ls-n-vip"></b></button>
+                    <button class="seg-btn" data-l="queer" onclick="fetchList('queer')">🏳️‍🌈 BEYOND <b id="ls-n-queer"></b></button>
+                    <button class="seg-btn" data-l="banned" onclick="fetchList('banned')">🔨 ЧС <b id="ls-n-banned"></b></button>
+                </div>
+                <input id="ls-q" class="ib-search" style="width:100%;box-sizing:border-box" type="search" placeholder="Поиск: ID, имя, @ник, город / причина" oninput="lsSearchSoon()">
+                <div class="ls-meta muted" id="ls-meta"></div>
+                <div class="ls-table" id="list-tbody"><div class="ib-empty">Выберите список</div></div>
+            </section>
         </div>
     </div>
 
@@ -1072,11 +1146,22 @@
     </div>
 
     <div id="tab-blackbox" class="tab-content">
-        <div class="panel-block" style="max-width: 1000px; padding: 0; background: transparent; box-shadow: none;">
-            <div class="chat-app">
-                <div class="chat-sidebar"><div style="padding: 15px; background: #252525; border-bottom: 1px solid #333; font-weight: bold; color: #03dac6; text-align: center;">Анонимные сессии <button style="background: none; border:none; cursor:pointer;" onclick="loadProxySessions()">🔄</button></div><div id="proxy-list-container"><div style="padding: 20px; text-align: center; color: #888;">Загрузка архивов...</div></div></div>
-                <div class="chat-main"><div class="chat-header" id="chat-header">Выберите диалог из списка слева</div><div class="chat-messages" id="chat-box"><div style="color: #888; text-align: center; margin-top: 40px;">Терминал перехвата связи готов.</div></div></div>
+        <div class="sec-head">
+            <div><h2>Чёрный ящик</h2><p>Анонимные переписки VIP с гостями через бота (кнопка «Написать» под анкетой). Только чтение — для разбора жалоб.</p></div>
+            <div class="ib-tools">
+                <div class="seg">
+                    <button class="seg-btn active" data-a="0" onclick="bbSetActive(0)">Все</button>
+                    <button class="seg-btn" data-a="1" onclick="bbSetActive(1)">🟢 Идут сейчас</button>
+                </div>
+                <input id="bb-q" class="ib-search" type="search" placeholder="ID участника" inputmode="numeric" oninput="bbSearchSoon()">
             </div>
+        </div>
+        <div class="ib" id="bb">
+            <aside class="ib-list"><div class="ib-items" id="proxy-list-container"><div class="ib-empty">Загрузка…</div></div></aside>
+            <section class="ib-chat">
+                <header class="ib-head" id="chat-header"><div class="ib-head-empty">Выберите переписку слева</div></header>
+                <div class="ib-msgs" id="chat-box"><div class="ib-placeholder"><div class="ib-ph-ico">🕵️</div><div>Здесь появится переписка.</div></div></div>
+            </section>
         </div>
     </div>
 
@@ -1193,33 +1278,46 @@
         </div>
     </div>
     <div id="tab-mass" class="tab-content">
-        <div class="panel-block" style="max-width: 800px;">
-            <h3 style="color: #cf6679;">💥 Оружие Массового Поражения</h3>
-            <p style="color: #aaa; margin-bottom: 15px;">Вставьте список Telegram ID в столбик или через запятую.</p>
-            
-            <textarea id="mass-ids" class="mass-textarea" placeholder="123456789&#10;987654321&#10;..."></textarea>
-            
-            <div style="margin-bottom: 20px; text-align: left;">
-                <label style="color: #aaa; font-size: 14px; display:block; margin-bottom:8px;">⚖️ Выберите официальный вердикт:</label>
-                <select id="mass-reason" class="form-input" style="width: 100%; box-sizing: border-box;">
-                    <option value="Массовая репрессия (Web)">💀 Глобальная чистка Скайнета (По умолчанию)</option>
-                    <option value="Несогласованная реклама / Спам сетей">📺 Спам / Реклама каналов и услуг</option>
-                    <option value="Несовершеннолетний аккаунт (<18)">🔞 Нарушение возрастного ценза (&lt;18)</option>
-                    <option value="Коммерция / Платные услуги">💸 Коммерческая анкета / Поиск спонсора</option>
-                    <option value="Блокировка ВИП бота">💀 Глобальная чистка Скайнета (ВИП БОТ)</option>
-                    <option value="Блокировка ТРАНС бота">💀 Глобальная чистка Скайнета (ТРАНС БОТ)</option>
-                    <option value="Вредоносный твинк / Налёт на чаты">🥷 Обход банов / Твинк нарушителя</option>
-    
-                    <option value="Не оплатил ВИП, тянул время">⏱ Не оплатил ВИП, тянул время</option>
-                    <option value="Не оплатил ТРАНС, тянул время">⏱ Не оплатил ТРАНС, тянул время</option>
-                </select>
+        <div class="sec-head">
+            <div><h2>Репрессии</h2><p>Бан, мут или амнистия сразу для списка людей. Перед запуском панель покажет, кого это реально затронет.</p></div>
+        </div>
+        <div class="bc">
+            <div class="bc-main">
+                <div class="bc-card">
+                    <div class="bc-step"><span>1</span>Список Telegram ID</div>
+                    <textarea id="mass-ids" class="ms-ids" placeholder="123456789&#10;987654321&#10;…можно через запятую или пробел" oninput="msPreviewSoon()"></textarea>
+                    <div class="ms-sum" id="ms-sum"><span class="muted">Вставьте ID — здесь появится разбор списка.</span></div>
+                </div>
+                <div class="bc-card">
+                    <div class="bc-step"><span>2</span>Причина</div>
+                    <select id="mass-reason" class="ms-sel">
+                        <option value="Массовая репрессия (Web)">💀 Глобальная чистка Скайнета</option>
+                        <option value="Несогласованная реклама / Спам сетей">📺 Спам / реклама каналов и услуг</option>
+                        <option value="Несовершеннолетний аккаунт (<18)">🔞 Нарушение возрастного ценза (&lt;18)</option>
+                        <option value="Коммерция / Платные услуги">💸 Коммерческая анкета / поиск спонсора</option>
+                        <option value="Блокировка ВИП бота">💀 Чистка (VIP-бот)</option>
+                        <option value="Блокировка ТРАНС бота">💀 Чистка (ТРАНС-бот)</option>
+                        <option value="Вредоносный твинк / Налёт на чаты">🥷 Обход банов / твинк нарушителя</option>
+                        <option value="Не оплатил ВИП, тянул время">⏱ Не оплатил VIP, тянул время</option>
+                        <option value="Не оплатил ТРАНС, тянул время">⏱ Не оплатил ТРАНС, тянул время</option>
+                        <option value="__custom">✏️ Своя причина…</option>
+                    </select>
+                    <input id="ms-custom" class="ms-sel" placeholder="Напишите причину — её увидят в журнале и в сообщении человеку" hidden style="margin-top:8px">
+                    <div class="bc-step" style="margin-top:16px"><span>3</span>Действие</div>
+                    <div class="ms-acts">
+                        <button class="btn danger" onclick="fireMassAction('ban')">🔨 Забанить везде</button>
+                        <button class="btn warn" onclick="fireMassAction('mute')">🤐 Замутить везде</button>
+                        <button class="btn ok" onclick="fireMassAction('unban')">🕊 Амнистия (снять бан и мут)</button>
+                    </div>
+                    <p class="bc-note">Обработка идёт в фоне, ~2 человека в секунду. Админов сети панель не трогает. VIP и BEYOND защищены статусом — бан на них не пройдёт, админам придёт запрос.</p>
+                </div>
             </div>
-
-            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                <button type="button" class="form-btn" style="flex: 1; background: #cf6679; color: #fff; font-size: 16px;" onclick="fireMassAction('ban')">🔨 МАССОВЫЙ БАН</button>
-                <button type="button" class="form-btn" style="flex: 1; background: #ffb74d; color: #121212; font-size: 16px;" onclick="fireMassAction('mute')">🤐 МАССОВЫЙ МУТ</button>
-                <button type="button" class="form-btn" style="flex: 1; background: #03dac6; color: #121212; font-size: 16px;" onclick="fireMassAction('unban')">🕊️ АМНИСТИЯ ВСЕХ</button>
-            </div>
+            <aside class="bc-side">
+                <div class="bc-card bc-sticky">
+                    <div class="bc-step" style="margin-top:0"><span>📊</span>Задания</div>
+                    <div class="bc-list" id="ms-jobs"><div class="ib-empty">Загрузка…</div></div>
+                </div>
+            </aside>
         </div>
     </div>
 
@@ -1852,8 +1950,6 @@
 
     <script>
         let statusChart, cityChart;
-        let currentListData = [];
-        let activeProxySession = null;
 
 
 
@@ -2001,7 +2097,9 @@
 
         if (tabId === 'tab-home') loadHome();
         if (tabId === 'tab-diag') loadDiag();
-        if (tabId === 'tab-blackbox') loadProxySessions();
+        if (tabId === 'tab-blackbox') bbStart();
+        if (tabId === 'tab-radar') rdStart();
+        if (tabId === 'tab-mass') msStart();
         if (tabId === 'tab-quarantine') loadQuarantine();
         if (tabId === 'tab-verif') loadVerifList();
         if (tabId === 'tab-infrastructure') loadInfrastructure();
@@ -2234,84 +2332,6 @@
             .catch(() => showToast("❌ Сбой"));
         }
 
-        function fireMassAction(actionName) {
-            const ids = document.getElementById('mass-ids').value;
-            const reason = document.getElementById('mass-reason').value; // Забираем вердикт
-            if(!ids.trim()) { showToast("⚠️ Вставьте список ID!"); return; }
-            
-            const formData = new FormData();
-            formData.append('uids', ids); 
-            formData.append('action', actionName);
-            formData.append('reason', reason); // Отправляем Питону
-
-            fetch('/glaz/mass_action', { method: 'POST', body: formData })
-            .then(res => res.json()).then(data => {
-                if(data.success) { showToast(data.message); document.getElementById('mass-ids').value = ''; } 
-                else showToast("❌ Ошибка: " + data.message);
-            }).catch(() => showToast("❌ Ошибка связи с сервером"));
-        }
-
-        function fetchList(type) {
-            document.getElementById('list-tbody').innerHTML = '<tr><td colspan="3" style="text-align: center;">Загрузка...</td></tr>';
-            fetch('/glaz/api/get_list?type=' + type)
-            .then(res => res.json()).then(data => {
-                currentListData = data; let html = '';
-                data.forEach(item => { html += `<tr><td><code>${item.id}</code></td><td>${item.info}</td><td><span class="badge yes">${item.tag}</span></td></tr>`; });
-                if(data.length === 0) html = '<tr><td colspan="3" style="text-align: center;">Пусто</td></tr>';
-                document.getElementById('list-tbody').innerHTML = html;
-                document.getElementById('download-csv-btn').style.display = data.length > 0 ? 'block' : 'none';
-            });
-        }
-
-        function downloadCSV() {
-            let csv = 'Telegram ID,Info,Tag\\n';
-            currentListData.forEach(row => { csv += `${row.id},"${row.info}",${row.tag}\\n`; });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = 'skynet_export.csv'; a.click();
-        }
-
-        function loadProxySessions() {
-            fetch('/glaz/api/proxy_sessions').then(res => res.json()).then(data => {
-                let html = '';
-                data.forEach(s => {
-                    const statusBadge = s.is_active ? '<span style="color:#03dac6; font-size:10px;">🟢 АКТИВНА</span>' : '<span style="color:#cf6679; font-size:10px;">🔴 ЗАКРЫТА</span>';
-                    html += `<div class="session-item" id="ses-${s.id}" onclick="loadProxyChat('${s.id}')">
-                                <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px;">VIP: ${s.vip_id}</div>
-                                <div style="font-size: 12px; color: #aaa;">Гость: ${s.guest_id}</div>
-                                <div style="display:flex; justify-content:space-between; margin-top:5px;">${statusBadge} <span style="font-size:10px; color:#888;">${s.msg_count} сообщ.</span></div>
-                             </div>`;
-                });
-                if(data.length === 0) html = '<div style="padding: 20px; text-align: center; color: #888;">Нет данных в базе</div>';
-                document.getElementById('proxy-list-container').innerHTML = html;
-            });
-        }
-
-        function loadProxyChat(sessionId) {
-            activeProxySession = sessionId;
-            document.querySelectorAll('.session-item').forEach(el => el.classList.remove('active'));
-            document.getElementById('ses-' + sessionId).classList.add('active');
-            
-            fetch('/glaz/api/proxy_chat?session_id=' + sessionId).then(res => res.json()).then(data => {
-                const statusTxt = data.is_active ? '🟢 Диалог активен' : '🔴 Диалог завершен';
-                document.getElementById('chat-header').innerHTML = `Перехват связи: VIP [${data.vip_id}] ↔ Гость [${data.guest_id}] <span style="float:right; font-size:12px; font-weight:normal;">${statusTxt}</span>`;
-                
-                let html = '';
-                data.history.forEach(msg => {
-                    const isVip = msg.sender === data.vip_id;
-                    const cssClass = isVip ? 'msg-vip' : 'msg-guest';
-                    const senderLabel = isVip ? '👑 VIP' : '👤 Гость';
-                    const mediaTag = msg.is_media ? '<span class="msg-media-tag">📎 [ВЛОЖЕНИЕ / МЕДИА]</span>' : '';
-                    html += `<div class="msg-box ${cssClass}"><div style="font-size:11px; color:#bb86fc; font-weight:bold; margin-bottom:3px;">${senderLabel} (ID: ${msg.sender})</div>${mediaTag}${msg.text}<div class="msg-meta">${msg.time}</div></div>`;
-                });
-                if(data.history.length === 0) html = '<div style="color:#888; text-align:center; margin-top:50px;">Переписка пуста</div>';
-                const box = document.getElementById('chat-box');
-                box.innerHTML = html;
-                box.scrollTop = box.scrollHeight;
-            });
-        }
-
         // --- НОВЫЕ ФУНКЦИИ СИСТЕМЫ И КАРАНТИНА ---
         function toggleSetting(settingName) {
             const formData = new FormData(); formData.append('setting', settingName);
@@ -2502,22 +2522,9 @@ function toggleSetting(key) {
             // Радар гнева — только пока открыта поддержка (раньше раз в 5 сек перерисовывались и «Оценки», отсюда дёрганье)
             if (document.getElementById('tab-support').classList.contains('active')) updateRatingsPanel();
 
-            // 2. Обновляем Живой Радар (Web-Логи)
-            fetch('/glaz/api/radar').then(res => res.json()).then(data => {
-                const box = document.getElementById('radar-box');
-                // Обновляем только если вкладка открыта (экономим ресурсы браузера)
-                if(box && document.getElementById('tab-radar').classList.contains('active')) {
-                    let html = '';
-                    data.forEach(line => { html += `<div class="radar-line">${line}</div>`; });
-                    if(data.length === 0) html = '<div style="color: #888;">Радар пуст. Ждем событий...</div>';
-                    box.innerHTML = html;
-                }
-            });
-
-            // 3. Обновляем Черный ящик
-            if(activeProxySession && document.getElementById('tab-blackbox').classList.contains('active')) { 
-                loadProxyChat(activeProxySession); 
-            }
+            // 2. Радар, Чёрный ящик — обновляем только пока их вкладка открыта
+            if (document.getElementById('tab-radar').classList.contains('active')) loadRadar();
+            if (document.getElementById('tab-blackbox').classList.contains('active')) loadProxySessions();
 
             // 👇 ДОБАВЛЯЕМ АВТООБНОВЛЕНИЕ ДЛЯ ШОУ НА ВЫЖИВАНИЕ 👇
             if(document.getElementById('tab-verif').classList.contains('active')) {
@@ -4432,5 +4439,229 @@ function bcStart() {
     bcLoadAudience(); loadBroadcastStats(); loadTemplates(); bcPreview();
 }
 </script>
+<script>
+// =================== 📡 РАДАР ===================
+const RD = { kind: '', q: '', paused: false, items: [], lastTop: 0, kinds: [], counts: {}, oldest: null };
+const RD_COL = { punish: '#ef6f86', amnesty: '#4cd6a0', money: '#ffb74d', status: '#bb86fc', comms: '#3d9be8', security: '#f0b37e', system: '#7d828c', other: '#5d626c' };
+function _linkIds(escaped) { return escaped.replace(/\b(\d{6,12})\b/g, '<a href="/glaz?search_id=$1" title="Открыть досье">$1</a>'); }
+function rdTogglePause() {
+    RD.paused = !RD.paused;
+    const b = document.getElementById('rd-pause');
+    b.textContent = RD.paused ? '▶ Продолжить' : '⏸ Пауза'; b.classList.toggle('warn', RD.paused);
+    if (!RD.paused) loadRadar();
+}
+let _rdT = null;
+function rdSearchSoon() { clearTimeout(_rdT); _rdT = setTimeout(() => { RD.q = document.getElementById('rd-q').value.trim(); loadRadar(true); }, 300); }
+function rdSetKind(k) { RD.kind = k; loadRadar(true); }
+function rdRenderKinds() {
+    const all = Object.values(RD.counts).reduce((a, b) => a + b, 0);
+    document.getElementById('rd-kinds').innerHTML = [`<button class="rd-k${RD.kind === '' ? ' active' : ''}" onclick="rdSetKind('')">Все <small>${all || ''}</small></button>`]
+        .concat(RD.kinds.filter(k => k.key === RD.kind || RD.counts[k.key]).map(k =>
+            `<button class="rd-k${RD.kind === k.key ? ' active' : ''}" onclick="rdSetKind('${k.key}')" title="За последние сутки"><i style="background:${RD_COL[k.key]}"></i>${_e(k.label)} <small>${RD.counts[k.key] || 0}</small></button>`)).join('');
+}
+function _rdRow(it, isNew) {
+    const d = new Date(it.ts * 1000);
+    const tm = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    return `<div class="rd-row${isNew ? ' new' : ''}"><span class="rd-time" title="${d.toLocaleString('ru-RU')}">${tm}</span><i class="rd-dot" style="background:${RD_COL[it.kind] || RD_COL.other}"></i>
+        <span class="rd-txt">${it.who ? `<span class="rd-who">${_e(it.who)}</span>` : ''}${_linkIds(_e(it.text))}</span></div>`;
+}
+function _rdRender(items, newer) {
+    let html = '', lastDay = '';
+    items.forEach(it => {
+        const day = new Date(it.ts * 1000).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'short' });
+        if (day !== lastDay) { html += `<div class="rd-day">${day}</div>`; lastDay = day; }
+        html += _rdRow(it, newer && it.ts > newer);
+    });
+    return html || '<div class="ib-empty">Событий нет</div>';
+}
+function loadRadar(force, more) {
+    if (!force && !more && RD.paused) return;
+    const p = new URLSearchParams({ limit: 150 });
+    if (RD.kind) p.set('kind', RD.kind);
+    if (RD.q) p.set('q', RD.q);
+    if (more && RD.oldest) p.set('before', RD.oldest);
+    return fetch('/glaz/api/radar2?' + p).then(r => r.json()).then(d => {
+        if (!d.items) return;
+        RD.kinds = d.kinds; RD.counts = d.counts_24h || {}; rdRenderKinds();
+        const box = document.getElementById('radar-box');
+        if (more) {
+            RD.items = RD.items.concat(d.items);
+            box.innerHTML = _rdRender(RD.items, 0);
+        } else {
+            const sig = d.items.length ? d.items[0].ts + ':' + d.items.length : '0';
+            if (!force && sig === RD._sig) { document.getElementById('rd-more').hidden = d.items.length < 150; return; }
+            RD._sig = sig;
+            const keep = box.scrollTop;
+            RD.items = d.items;
+            box.innerHTML = _rdRender(RD.items, force ? 0 : RD.lastTop);
+            box.scrollTop = force ? 0 : keep;
+            RD.lastTop = RD.items.length ? RD.items[0].ts : 0;
+        }
+        RD.oldest = RD.items.length ? RD.items[RD.items.length - 1].ts : null;
+        document.getElementById('rd-more').hidden = d.items.length < 150;
+    }).catch(() => {});
+}
+
+// Списки VIP / BEYOND / ЧС
+let currentListData = [];
+let LS = { type: 'vip', q: '' };
+let _lsT = null;
+function lsSearchSoon() { clearTimeout(_lsT); _lsT = setTimeout(() => { LS.q = document.getElementById('ls-q').value.trim(); fetchList(LS.type); }, 300); }
+function fetchList(type) {
+    LS.type = type;
+    document.querySelectorAll('#tab-radar .seg-btn[data-l]').forEach(b => b.classList.toggle('active', b.dataset.l === type));
+    const box = document.getElementById('list-tbody');
+    box.style.opacity = .5;
+    fetch('/glaz/api/lists?type=' + type + (LS.q ? '&q=' + encodeURIComponent(LS.q) : '')).then(r => r.json()).then(d => {
+        box.style.opacity = 1;
+        if (!d.rows) return;
+        currentListData = d.rows;
+        const nb = document.getElementById('ls-n-' + type); if (nb) nb.textContent = _fmtN(d.total);
+        document.getElementById('ls-meta').textContent = LS.q ? `Найдено: ${_fmtN(d.shown)}` : (d.shown < d.total ? `Показаны последние ${_fmtN(d.shown)} из ${_fmtN(d.total)} — уточните поиском` : `Всего: ${_fmtN(d.total)}`);
+        box.innerHTML = d.rows.length ? d.rows.map(r => {
+            const nm = r.name || (r.username ? '@' + r.username : 'Без имени');
+            return `<div class="ls-row"><span class="nm"><a href="/glaz?search_id=${r.id}">${_e(nm)}</a>${r.username && r.name ? ` <span class="muted">@${_e(r.username)}</span>` : ''}${r.deleted ? ' <span class="chip">удалён</span>' : ''}</span>
+                <span class="id">${r.id}</span>${(r.info || r.tag) ? `<span class="inf">${_e(r.info)}${r.tag ? ` · ${_e(r.tag)}` : ''}</span>` : ''}</div>`;
+        }).join('') : '<div class="ib-empty">Пусто</div>';
+        document.getElementById('download-csv-btn').hidden = !d.rows.length;
+    });
+}
+function downloadCSV() {
+    // Имя вида «=HYPERLINK(...)» Excel выполнил бы как формулу — гасим апострофом
+    const q = v => { let t = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(t)) t = "'" + t; return '"' + t.replace(/"/g, '""') + '"'; };
+    const rows = [['Telegram ID', 'Имя', 'Username', 'Город / причина', 'Тег / дата']].concat(currentListData.map(r => [r.id, r.name, r.username, r.info, r.tag]));
+    const csv = '﻿' + rows.map(r => r.map(q).join(';')).join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = `skynet_${LS.type}_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+}
+function rdStart() { loadRadar(true); fetchList(LS.type); }
+
+// =================== 🕵️ ЧЁРНЫЙ ЯЩИК ===================
+let activeProxySession = null;
+const BB = { active: 0, q: '', lastSig: '', names: {} };
+let _bbT = null;
+function bbSetActive(a) {
+    BB.active = a;
+    document.querySelectorAll('#tab-blackbox .seg-btn[data-a]').forEach(b => b.classList.toggle('active', +b.dataset.a === a));
+    loadProxySessions(true);
+}
+function bbSearchSoon() { clearTimeout(_bbT); _bbT = setTimeout(() => { BB.q = document.getElementById('bb-q').value.trim(); loadProxySessions(true); }, 300); }
+function loadProxySessions(force) {
+    const p = new URLSearchParams();
+    if (BB.q) p.set('q', BB.q); else if (BB.active) p.set('active', '1');
+    return fetch('/glaz/api/proxy2/sessions?' + p).then(r => r.json()).then(data => {
+        if (!Array.isArray(data)) return;
+        data.forEach(s => { if (s.vip_name) BB.names[s.vip_id] = s.vip_name; if (s.guest_name) BB.names[s.guest_id] = s.guest_name; });
+        const sig = JSON.stringify(data.map(s => [s.id, s.count, s.is_active]));
+        if (!force && sig === BB.lastSig) return;
+        BB.lastSig = sig;
+        const box = document.getElementById('proxy-list-container');
+        box.innerHTML = data.length ? data.map(s => {
+            const vn = s.vip_name || ('ID ' + s.vip_id), gn = s.guest_name || ('ID ' + s.guest_id);
+            return `<div class="ib-item${s.id === activeProxySession ? ' active' : ''}" data-sid="${_e(s.id)}" tabindex="0" role="button">
+                <div class="ib-ava" style="background:${s.is_active ? '#1ca58b' : '#565b64'}">${s.is_active ? '🟢' : '🗄'}</div>
+                <div class="ib-name">👑 ${_e(vn)} ↔ ${_e(gn)}</div>
+                <div class="ib-time">${_e(s.last_time || '')}</div>
+                <div class="ib-snip">${s.last_text ? (s.last_from_vip ? '👑 ' : '👤 ') + _e(s.last_text) : 'нет сообщений'}</div>
+                <div class="ib-done">${s.count} сообщ.</div></div>`;
+        }).join('') : `<div class="ib-empty">${BB.q ? 'Ничего не найдено' : (BB.active ? 'Нет активных диалогов' : 'Переписок пока нет')}</div>`;
+        box.querySelectorAll('.ib-item').forEach(el => {
+            const go = () => loadProxyChat(el.dataset.sid);
+            el.onclick = go; el.onkeydown = e => { if (e.key === 'Enter') go(); };
+        });
+    }).catch(() => {});
+}
+function loadProxyChat(sessionId) {
+    activeProxySession = sessionId;
+    document.getElementById('bb').classList.add('chat-open');
+    document.querySelectorAll('#proxy-list-container .ib-item').forEach(el => el.classList.toggle('active', el.dataset.sid === sessionId));
+    fetch('/glaz/api/proxy_chat?session_id=' + encodeURIComponent(sessionId)).then(r => r.json()).then(d => {
+        if (d.error) return;
+        document.getElementById('chat-header').innerHTML = `
+            <button class="btn sm ghost ib-back" onclick="document.getElementById('bb').classList.remove('chat-open')">←</button>
+            <div class="who"><b>👑 ${_e(BB.names[d.vip_id] || d.vip_id)} ↔ 👤 ${_e(BB.names[d.guest_id] || d.guest_id)}</b><div class="muted">${d.is_active ? '🟢 диалог идёт' : '🔴 завершён'}</div></div>
+            <div class="acts"><a class="btn sm" href="/glaz?search_id=${d.guest_id}">🗂 Досье гостя</a></div>`;
+        const box = document.getElementById('chat-box');
+        box.innerHTML = (d.history && d.history.length) ? d.history.map(m => {
+            const vip = m.sender === d.vip_id;
+            return `<div class="ib-msg ${vip ? 'admin' : 'user'}">${m.is_media ? '📎 [вложение] ' : ''}${_e(m.text)}<span class="meta">${vip ? '👑 VIP' : '👤 Гость'} · ${_e(m.time || '')}</span></div>`;
+        }).join('') : '<div class="ib-placeholder">Переписка пуста</div>';
+        box.scrollTop = box.scrollHeight;
+    });
+}
+function bbStart() { loadProxySessions(true); }
+
+// =================== 💥 РЕПРЕССИИ ===================
+let _msT = null, MS_JOBS_T = null;
+function msReasonText() {
+    const sel = document.getElementById('mass-reason');
+    if (sel.value === '__custom') return document.getElementById('ms-custom').value.trim();
+    return sel.value;
+}
+document.addEventListener('change', e => {
+    if (e.target && e.target.id === 'mass-reason') {
+        document.getElementById('ms-custom').hidden = e.target.value !== '__custom';
+    }
+});
+function msPreviewSoon() { clearTimeout(_msT); _msT = setTimeout(msPreview, 400); }
+function msPreview() {
+    const ids = document.getElementById('mass-ids').value;
+    const sum = document.getElementById('ms-sum');
+    if (!ids.trim()) { sum.innerHTML = '<span class="muted">Вставьте ID — здесь появится разбор списка.</span>'; return; }
+    fetch('/glaz/api/mass/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uids: ids }) })
+    .then(r => r.json()).then(d => {
+        if (d.error) return;
+        let h = `Распознано ID: <b>${_fmtN(d.total)}</b>`;
+        if (d.banned) h += ` · уже в ЧС: <b>${_fmtN(d.banned)}</b>`;
+        if (d.unknown) h += ` · не в базе: <b>${_fmtN(d.unknown)}</b>`;
+        if (d.admins.length) h += `<br><span class="warn">🛡 Админов сети не трону: ${d.admins.length} (${d.admins.slice(0, 5).join(', ')}${d.admins.length > 5 ? '…' : ''})</span>`;
+        if (d.shielded.length) h += `<br><span class="warn">👑 Под защитой статуса (бан не пройдёт, придёт запрос): ${d.shielded.length}</span> — ` + d.shielded.slice(0, 6).map(s => `${_e(s.name || s.id)} (${s.status})`).join(', ');
+        sum.innerHTML = h;
+    });
+}
+function fireMassAction(action) {
+    const ids = document.getElementById('mass-ids').value;
+    if (!ids.trim()) { showToast('⚠️ Вставьте список ID'); return; }
+    const reason = msReasonText();
+    if (!reason) { showToast('⚠️ Укажите причину'); return; }
+    const names = { ban: 'ЗАБАНИТЬ', mute: 'ЗАМУТИТЬ', unban: 'АМНИСТИРОВАТЬ' };
+    if (!confirm(`${names[action]} этот список?\nПричина: ${reason}\nАдминов и защищённых статусом панель пропустит.`)) return;
+    fetch('/glaz/api/mass/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uids: ids, action, reason }) })
+    .then(r => r.json()).then(d => {
+        showToast(d.message || (d.success ? 'Запущено' : 'Ошибка'));
+        if (d.success) { document.getElementById('mass-ids').value = ''; msPreview(); loadMassJobs(); }
+    }).catch(() => showToast('❌ Нет связи с сервером'));
+}
+const MS_ST = { running: ['amber', '⏳ идёт'], stopping: ['amber', '⏸ останавливается'], done: ['green', '✓ завершено'], stopped: ['red', '⛔ остановлено'], interrupted: ['red', '⚠ прервано (перезапуск)'] };
+const MS_ACT = { ban: '🔨 Бан', mute: '🤐 Мут', unban: '🕊 Амнистия' };
+function loadMassJobs() {
+    return fetch('/glaz/api/mass/jobs').then(r => r.json()).then(list => {
+        if (!Array.isArray(list)) return;
+        let running = false;
+        const box = document.getElementById('ms-jobs');
+        box.innerHTML = list.length ? list.map(j => {
+            const st = MS_ST[j.status] || ['', j.status];
+            if (j.status === 'running' || j.status === 'stopping') running = true;
+            const pct = j.total ? Math.round(j.done / j.total * 100) : 0;
+            return `<div class="bc-row"><div class="bc-row-top"><span class="chip ${st[0]}">${st[1]}</span><span class="chip">${MS_ACT[j.action] || j.action}</span>
+                    <span class="when">${_e(j.started)}</span><span class="muted">· ${_e(j.admin)}</span><span class="sp"></span>
+                    ${j.status === 'running' ? `<button class="btn sm danger" onclick="stopMass('${_e(j.id)}')">Стоп</button>` : ''}</div>
+                <div class="bc-txt">${_e(j.reason)}</div>
+                <div class="bc-prog"><i style="width:${pct}%;background:#8f74e6"></i></div>
+                <div class="bc-nums"><span>обработано <b>${_fmtN(j.done)}</b> из ${_fmtN(j.total)}</span>${j.errors ? `<span class="fn-warn">ошибок <b>${_fmtN(j.errors)}</b></span>` : ''}</div></div>`;
+        }).join('') : '<div class="ib-empty">Массовых действий ещё не было</div>';
+        clearTimeout(MS_JOBS_T);
+        if (running) MS_JOBS_T = setTimeout(() => { if (document.getElementById('tab-mass').classList.contains('active')) loadMassJobs(); }, 3000);
+    });
+}
+function stopMass(id) {
+    if (!confirm('Остановить? Уже обработанные останутся как есть.')) return;
+    fetch('/glaz/api/mass/stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+    .then(r => r.json()).then(d => { showToast(d.success ? '⏸ Останавливаю…' : 'Уже завершилось'); loadMassJobs(); });
+}
+function msStart() { msPreview(); loadMassJobs(); }
+</script>
+
 </body>
 </html>

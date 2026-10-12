@@ -80,12 +80,13 @@ def get_network_data():
     # 👆 ======================================================== 👆
 
     networks = infra.get("networks", {})
+    # Группа без названия (недозаполненная строка в «Инфраструктуре») раньше роняла баны, /start и таможню
     
-    c_mk = {c["name"]: int(c["id"]) for c in networks.get("mk", []) if c.get("id")}
-    c_parni = {c["name"]: int(c["id"]) for c in networks.get("parni", []) if c.get("id")}
-    c_ns = {c["name"]: int(c["id"]) for c in networks.get("ns", []) if c.get("id")}
-    c_rainbow = {c["name"]: int(c["id"]) for c in networks.get("rainbow", []) if c.get("id")}
-    c_gay = {c["name"]: int(c["id"]) for c in networks.get("gayznak", []) if c.get("id")}
+    c_mk = {(c.get("name") or f"Чат {c['id']}"): int(c["id"]) for c in networks.get("mk", []) if c.get("id")}
+    c_parni = {(c.get("name") or f"Чат {c['id']}"): int(c["id"]) for c in networks.get("parni", []) if c.get("id")}
+    c_ns = {(c.get("name") or f"Чат {c['id']}"): int(c["id"]) for c in networks.get("ns", []) if c.get("id")}
+    c_rainbow = {(c.get("name") or f"Чат {c['id']}"): int(c["id"]) for c in networks.get("rainbow", []) if c.get("id")}
+    c_gay = {(c.get("name") or f"Чат {c['id']}"): int(c["id"]) for c in networks.get("gayznak", []) if c.get("id")}
     
     p_chats = list(c_parni.values())
     m_link = infra.get("global_links", {}).get("main_channel", "https://t.me/clubofrm")
