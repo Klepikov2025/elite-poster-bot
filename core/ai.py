@@ -26,34 +26,78 @@ def groq_model():
         return "openai/gpt-oss-120b"
 
 
-def groq_chat(prompt, max_tokens=400, temperature=0.0, timeout=12, where="ИИ"):
-    """-> текст ответа или None, если ни один ключ не сработал (ошибки пишутся в «Диагностику»)."""
+# Модель на «перерыве» после HTTP 429: (ключ, модель) -> до какого времени не трогать.
+# Лимиты Groq считаются на модель, поэтому при 429 на основной модели переходим на запасные —
+# у каждой свой отдельный лимит, а в «Диагностику» пишем один раз за перерыв, а не на каждое сообщение.
+_COOLDOWN = {}
+
+
+def groq_models(low_priority=False):
+    """Основная модель + запасные из панели. Для второстепенного (прожарки) — сначала запасные,
+    чтобы не тратить лимит основной модели, которая решает баны."""
+    main = groq_model()
+    try:
+        from core.cfg import cfg
+        extra = [m.strip() for m in str(cfg("groq_fallback_models") or "").split(",") if m.strip()]
+    except Exception:
+        extra = ["openai/gpt-oss-20b", "llama-3.1-8b-instant"]
+    models = [main] + [m for m in extra if m != main]
+    if low_priority and len(models) > 1:
+        models = models[1:] + models[:1]
+    return models
+
+
+def _retry_after(r):
+    try:
+        h = r.headers.get("retry-after")
+        if h:
+            return min(3600.0, float(h))
+    except Exception:
+        pass
+    m = re.search(r"try again in (?:(\d+)m)?([\d.]+)s", r.text or "")
+    if m:
+        return min(3600.0, int(m.group(1) or 0) * 60 + float(m.group(2)))
+    return 60.0
+
+
+def groq_chat(prompt, max_tokens=400, temperature=0.0, timeout=12, where="ИИ", low_priority=False):
+    """-> текст ответа или None, если ни один ключ и ни одна модель не ответили (ошибки — в «Диагностику»)."""
+    import time as _t
     from core.diag import log_error
     if not GROQ_API_KEYS:
         return None
-    model = groq_model()
-    body = {"model": model, "messages": [{"role": "user", "content": prompt}],
-            "temperature": temperature, "max_tokens": max_tokens}
-    if "gpt-oss" in model:
-        # gpt-oss сначала «думает», и эти мысли съедают лимит токенов: при 400 токенах ответ
-        # приходил пустым («пустой ответ» в Диагностике). Думать мало, мысли не присылать, запас токенов.
-        body.update({"reasoning_effort": "low", "include_reasoning": False, "max_tokens": max_tokens + 1200})
-    for i, key in enumerate(GROQ_API_KEYS, 1):
-        kname = f"GROQ_API_KEY{'' if i == 1 else '_' + str(i)}"
-        try:
-            r = requests.post(GROQ_URL, headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                              json=body, timeout=timeout)
-            if r.status_code == 200:
-                choice = r.json()["choices"][0]
-                text = (choice["message"].get("content") or "").strip()
-                if text:
-                    return text
-                why = "модель не успела ответить, кончился лимит токенов" if choice.get("finish_reason") == "length" else "пустой ответ"
-                log_error("Groq", f"{where}: {why} ({model}, ключ {kname})")
+    now = _t.time()
+    for model in groq_models(low_priority):
+        body = {"model": model, "messages": [{"role": "user", "content": prompt}],
+                "temperature": temperature, "max_tokens": max_tokens}
+        if "gpt-oss" in model:
+            # gpt-oss сначала «думает», и эти мысли съедают лимит токенов. Думать мало, мысли не присылать.
+            body.update({"reasoning_effort": "low", "include_reasoning": False, "max_tokens": max_tokens + 1200})
+        for i, key in enumerate(GROQ_API_KEYS, 1):
+            kname = f"GROQ_API_KEY{'' if i == 1 else '_' + str(i)}"
+            if _COOLDOWN.get((key, model), 0) > now:
                 continue
-            log_error("Groq", f"{where}: HTTP {r.status_code}, ключ {kname}: {r.text[:160]}")
-        except Exception as e:
-            log_error("Groq", f"{where}: ключ {kname}: {e}")
+            try:
+                r = requests.post(GROQ_URL, headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                                  json=body, timeout=timeout)
+                if r.status_code == 200:
+                    choice = r.json()["choices"][0]
+                    text = (choice["message"].get("content") or "").strip()
+                    if text:
+                        return text
+                    why = "модель не успела ответить, кончился лимит токенов" if choice.get("finish_reason") == "length" else "пустой ответ"
+                    log_error("Groq", f"{where}: {why} ({model}, ключ {kname})")
+                    continue
+                if r.status_code == 429:
+                    wait = _retry_after(r)
+                    _COOLDOWN[(key, model)] = now + wait
+                    log_error("Groq", f"лимит {model} ({kname}) исчерпан, пауза {int(wait)} сек — работаю на запасной модели")
+                    continue
+                if r.status_code in (400, 404) and "model" in (r.text or "").lower():
+                    _COOLDOWN[(key, model)] = now + 3600  # модель отключена/не существует — не долбим час
+                log_error("Groq", f"{where}: HTTP {r.status_code}, {model}, ключ {kname}: {r.text[:160]}")
+            except Exception as e:
+                log_error("Groq", f"{where}: {model}, ключ {kname}: {e}")
     return None
 
 
@@ -84,12 +128,24 @@ def ai_verdict(text, zone):
     }
     if zone not in prompts or not text:
         return True
+    # Кэш: одинаковый текст (копипаст-анкеты) не гоняем через ИИ повторно — экономим лимит Groq
+    import hashlib, time as _t
+    key = f"{zone}:{hashlib.sha1(str(text).strip().lower().encode('utf-8')).hexdigest()}"
+    try:
+        from database import db
+        hit = db['ai_cache'].find_one({"_id": key})
+        if hit and _t.time() - hit.get("ts", 0) < 7 * 86400:
+            return hit["v"]
+    except Exception:
+        db = None
     ans = groq_chat(prompts[zone].format(t=str(text)[:1500]), max_tokens=400, where=f"проверка зоны {zone}")
     if ans is None:
         return None
     ans = ans.upper()
-    if "BAN" in ans:
-        return True
-    if "SKIP" in ans:
-        return False
-    return None
+    verdict = True if "BAN" in ans else (False if "SKIP" in ans else None)
+    if verdict is not None and db is not None:
+        try:
+            db['ai_cache'].update_one({"_id": key}, {"$set": {"v": verdict, "ts": _t.time()}}, upsert=True)
+        except Exception:
+            pass
+    return verdict

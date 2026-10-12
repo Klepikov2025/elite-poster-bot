@@ -13,6 +13,7 @@ import random
 from telebot import types
 import telebot
 from core.cfg import cfg  # пороги и ссылки — в панели «🎛 Управление»
+from core.textvars import fill as fill_vars  # {переменные} в текстах из панели
 
 from config import (
     OWNER_ID, ADMIN_CHAT_IDS, VIP_CHAT_ID, BEYOND_CHAT_ID, PARNI_CHATS,
@@ -57,7 +58,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         mention = f'<a href="{_html.escape(url)}">{_html.escape(name)}</a>' if url else _html.escape(name)
         prompt = prompt_text.replace(user_link, "{USER}")
         from core.ai import groq_chat
-        text = groq_chat(prompt, max_tokens=700, temperature=0.8, where="прожарка")
+        text = groq_chat(prompt, max_tokens=700, temperature=0.8, where="прожарка", low_priority=True)
         if text and any(w in text.lower() for w in ["извините", "не могу", "как ии", "языковая модель", "запрограммирован", "оскорбительн", "токсичн", "цензур"]):
             text = None
         if text:
@@ -1019,9 +1020,13 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         except: pass
 
                     try:
+                        # Текст из панели («Конструктор правил»): раньше он нигде не использовался,
+                        # а бот слал зашитый текст с «120 часов» при любом сроке карантина
+                        _qt = (db['settings'].find_one({"_id": "skynet_texts"}) or {}).get("quarantine_warn") or \
+                              "🚨 **Защита от спама (Карантин)!**\n\nВаш аккаунт создан недавно. Для безопасности сети действует карантин {quarantine_hours} ч.\nВаши сообщения в чате временно отключены.\n\n🛠 Чтобы снять ограничения досрочно, пройдите быструю верификацию в [Службе Поддержки](https://t.me/MK_MensClubSUPPORT)."
                         bot.send_message(
                             user_id, 
-                            "🚨 **Защита от спама (Карантин)!**\n\nВаш аккаунт создан недавно. Для безопасности сети действует карантин 120 часов.\nВаши сообщения в чате временно отключены.\n\n🛠 Чтобы снять ограничения досрочно, пройдите быструю верификацию в [Службе Поддержки](https://t.me/MK_MensClubSUPPORT).",
+                            fill_vars(_qt).replace("{user_link}", escape_md(message.from_user.first_name or "Пользователь")),
                             parse_mode="Markdown",
                             disable_web_page_preview=True
                         )
@@ -1030,7 +1035,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             safe_name = escape_md(message.from_user.first_name or "Пользователь")
                             ghost_msg = bot.send_message(
                                 chat_id,
-                                f"🚨 *{safe_name}*, сработала защита от спама!\nВаш аккаунт в карантине (120ч).\n🛠 Для досрочного снятия ограничений пройдите верификацию в [Службе Поддержки](https://t.me/MK_MensClubSUPPORT).",
+                                f"🚨 *{safe_name}*, сработала защита от спама!\nВаш аккаунт в карантине ({quarantine_sec // 3600}ч).\n🛠 Для досрочного снятия ограничений пройдите верификацию в [Службе Поддержки](https://t.me/MK_MensClubSUPPORT).",
                                 parse_mode="Markdown",
                                 disable_web_page_preview=True
                             )
@@ -1071,7 +1076,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
 
                         warning_msg = bot.send_message(
                             chat_id, 
-                            raw_text_may1.replace("{user_link}", user_link),
+                            fill_vars(raw_text_may1).replace("{user_link}", user_link),
                             reply_markup=markup, parse_mode="Markdown", disable_web_page_preview=True
                         )
                         schedule_delete(chat_id, warning_msg.message_id, 300)
@@ -1095,7 +1100,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     db_texts = db['settings'].find_one({"_id": "skynet_texts"}) or {}
                     raw_text_minor = db_texts.get("minor_warn", "🚨 {user_link}, **Внимание!**\nВаша анкета попала под автоматический фильтр безопасности сети. Пользователи до 21 года включительно проходят обязательную верификацию 🔞.")
                     
-                    warning_msg = bot.send_message(chat_id, raw_text_minor.replace("{user_link}", user_link), reply_markup=markup, parse_mode="Markdown", disable_web_page_preview=True)
+                    warning_msg = bot.send_message(chat_id, fill_vars(raw_text_minor).replace("{user_link}", user_link), reply_markup=markup, parse_mode="Markdown", disable_web_page_preview=True)
                     schedule_delete(chat_id, warning_msg.message_id, 300)
                     return
 

@@ -494,6 +494,14 @@
             .st-kpi .spark, .st-kpi .spark-area, .heat .c { animation: none; stroke-dashoffset: 0; opacity: 1; transform: none; }
         }
 
+
+        /* {переменные} в текстах */
+        .var-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 14px; }
+        .var-chips .vc { cursor: pointer; font: 500 11.5px var(--sans); padding: 3px 8px; border-radius: 999px; border: 1px dashed var(--line-2); color: var(--muted); background: transparent; }
+        .var-chips .vc:hover { border-color: var(--accent); color: var(--text); }
+        .var-chips .vc b { font-family: var(--mono); color: #d9bcff; font-weight: 500; }
+        .var-chips .vd { width: 100%; } .var-chips summary { cursor: pointer; font-size: 12px; color: var(--muted); padding: 2px 0; } .var-chips summary:hover { color: var(--text); }
+        .var-chips .vl { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
     </style>
 </head>
 <body>
@@ -1173,7 +1181,7 @@
                 <div style="background: #252525; padding: 15px; border-radius: 8px; border-left: 3px solid #cf6679;">
                     <h4 style="color: #cf6679; margin-top: 0;">⏱ Таймеры наказаний (Часы)</h4>
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                        <label style="font-size: 12px; color: #ccc;">Мут за 3 страйка:</label>
+                        <label style="font-size: 12px; color: #ccc;">Мут за страйки (баяны, копипаст), ч:</label>
                         <input type="number" id="timer-strike" class="search-input" style="width: 70px; padding: 4px;" value="72">
                     </div>
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
@@ -1295,6 +1303,7 @@
             </div>
             
             <textarea id="template-editor-text" class="form-control" style="width: 100%; height: 200px; background: #222; color: #fff; border: 1px solid #555; padding: 15px; margin-bottom: 15px; border-radius: 5px; font-family: sans-serif; font-size: 14px; resize: vertical; box-sizing: border-box;" disabled placeholder="Выберите шаблон в выпадающем списке..."></textarea>
+            <div class="var-chips" data-for="template-editor-text"></div>
             
             <button id="save-template-btn" class="form-btn" style="background: #bb86fc; color: #121212; width: 100%; font-weight: bold; font-size: 16px; opacity: 0.5;" disabled onclick="saveSelectedTemplate()">💾 Сохранить шаблон</button>
         </div>
@@ -1305,12 +1314,15 @@
 
             <label style="color: #ffb74d; font-weight: bold; display: block; margin-bottom: 5px;">🥷 Текст карантина новорегов:</label>
             <textarea id="text-quarantine" class="form-control" style="width: 100%; height: 80px; background: #222; color: #fff; border: 1px solid #555; padding: 10px; margin-bottom: 15px; border-radius: 5px;"></textarea>
+            <div class="var-chips" data-for="text-quarantine"></div>
 
             <label style="color: #03dac6; font-weight: bold; display: block; margin-bottom: 5px;">📏 Текст операции «1 Мая» (Параметры):</label>
             <textarea id="text-may1" class="form-control" style="width: 100%; height: 200px; background: #222; color: #fff; border: 1px solid #555; padding: 10px; margin-bottom: 15px; border-radius: 5px;"></textarea>
+            <div class="var-chips" data-for="text-may1"></div>
 
             <label style="color: #cf6679; font-weight: bold; display: block; margin-bottom: 5px;">🔞 Текст для фильтра 18+ (Оранжевая зона):</label>
             <textarea id="text-minor" class="form-control" style="width: 100%; height: 80px; background: #222; color: #fff; border: 1px solid #555; padding: 10px; margin-bottom: 15px; border-radius: 5px;"></textarea>
+            <div class="var-chips" data-for="text-minor"></div>
 
             <button class="form-btn" style="background: #bb86fc; color: #121212; width: 100%; font-weight: bold; font-size: 16px;" onclick="saveSystemTexts()">💾 Сохранить тексты в сеть</button>
         </div>
@@ -1726,6 +1738,7 @@
             const rows = (d.report || []).slice().sort((a, b) => (b.dead || 0) - (a.dead || 0));
             document.getElementById('corpse-report').innerHTML = rows.length ? rows.map(r => {
                 let note = r.error ? '⚠️ ' + r.error : (r.capped ? `⚠️ Telegram отдал только ${r.scanned} из ${r.members}` : '✓');
+                if (!r.error && r.history_checked) note += ` · по истории (${typeof _stNum === 'function' ? _stNum(r.history_checked) : r.history_checked} сообщ.) найдено ${r.dead_history || 0}`;
                 return `<tr><td>${_esc(r.title || r.chat_id)}</td><td>${r.members ?? '—'}</td><td>${r.scanned ?? 0}</td><td><b>${r.dead || 0}</b></td><td style="color:var(--muted)">${_esc(note)}</td></tr>`;
             }).join('') : '<tr><td colspan="5" style="color:var(--muted);">Отчёта пока нет — нажмите «Проверить группы сейчас».</td></tr>';
         }).catch(() => {});
@@ -1816,6 +1829,7 @@
                 _settingsLoaded = true;
             }
             setTimeout(buildSettingsJumps, 600);
+            loadTextVars();
         }
 
         const minimalToolbar = {
@@ -4150,6 +4164,33 @@ function loadVerifList() {
     if (typeof Chart !== 'undefined') {
         Chart.defaults.font.family = "'Inter', 'Segoe UI', system-ui, sans-serif";
         Chart.defaults.color = ST_COL.muted;
+    }
+</script>
+<script>
+    // ===== {переменные} в текстах: подсказки-кнопки под редакторами =====
+    function loadTextVars() {
+        fetch('/glaz/api/text_vars').then(r => r.json()).then(vars => {
+            if (!Array.isArray(vars)) return;
+            document.querySelectorAll('.var-chips').forEach(box => {
+                box.innerHTML = '<details class="vd"><summary>{ } Вставить цифру из настроек — текст будет обновляться сам</summary><div class="vl"></div></details>';
+                const list = box.querySelector('.vl');
+                vars.forEach(v => {
+                    const b = document.createElement('button'); b.type = 'button'; b.className = 'vc';
+                    b.title = 'Подставится текущее значение — сейчас ' + v.value + '. Поменяете в настройках — текст обновится сам.';
+                    b.innerHTML = '<b></b> ';
+                    b.querySelector('b').textContent = '{' + v.key + '}';
+                    b.appendChild(document.createTextNode(v.label + ' = ' + v.value));
+                    b.onclick = () => {
+                        const ta = document.getElementById(box.dataset.for); if (!ta) return;
+                        const tok = '{' + v.key + '}', st = ta.selectionStart ?? ta.value.length, en = ta.selectionEnd ?? st;
+                        ta.value = ta.value.slice(0, st) + tok + ta.value.slice(en);
+                        ta.focus(); ta.selectionStart = ta.selectionEnd = st + tok.length;
+                        ta.dispatchEvent(new Event('input'));
+                    };
+                    list.appendChild(b);
+                });
+            });
+        }).catch(() => {});
     }
 </script>
 </body>

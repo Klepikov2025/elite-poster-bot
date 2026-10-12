@@ -1945,6 +1945,8 @@ threading.Thread(target=heartbeat_skynet, daemon=True).start()
 from core.janitor import janitor_loop
 threading.Thread(target=janitor_loop, args=(bot,), daemon=True).start()
 threading.Thread(target=migrate_indulgence_flags, daemon=True).start()
+from core.textvars import migrate_texts_v1
+threading.Thread(target=migrate_texts_v1, daemon=True).start()
 # ==============================
 
 # ==================== WEBHOOK ====================
