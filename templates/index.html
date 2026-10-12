@@ -503,7 +503,7 @@
         .ad-left { font: 700 15px var(--sans); }
         @media (max-width: 860px) { .ks-grid { grid-template-columns: 1fr; } .ks-row, .ad-row { grid-template-columns: 1fr; } .ks-acts { justify-content: flex-start; } }
 
-        /* =================== 📡 РАДАР / 🕵️ ЯЩИК / 💥 РЕПРЕССИИ 2.0 =================== */
+        /* =================== 📡 РАДАР / 🕵️ ЯЩИК / 💥 Пакетная модерация 2.0 =================== */
         .rd { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 12px; align-items: start; }
         .rd-feed { margin-bottom: 0; }
         .rd-tools { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -768,7 +768,7 @@
       </div>
       <div class="nav-group">
         <div class="nav-group-title">Модерация</div>
-        <button class="nav-item" data-tab="tab-mass" onclick="openTab('tab-mass')"><span class="ico">💥</span><span class="lbl">Репрессии</span></button>
+        <button class="nav-item" data-tab="tab-mass" onclick="openTab('tab-mass')"><span class="ico">💥</span><span class="lbl">Пакетная модерация</span></button>
         <button class="nav-item" data-tab="tab-blackbox" onclick="openTab('tab-blackbox')"><span class="ico">🕵️</span><span class="lbl">Чёрный ящик</span></button>
       </div>
       <div class="nav-group">
@@ -1306,7 +1306,7 @@
     </div>
     <div id="tab-mass" class="tab-content">
         <div class="sec-head">
-            <div><h2>Репрессии</h2><p>Бан, мут или амнистия сразу для списка людей. Перед запуском панель покажет, кого это реально затронет.</p></div>
+            <div><h2>Пакетная модерация</h2><p>Бан, мут или амнистия сразу для списка людей. Перед запуском панель покажет, кого это реально затронет.</p></div>
         </div>
         <div class="bc">
             <div class="bc-main">
@@ -2098,7 +2098,7 @@
     const TAB_META = {
         'tab-home': ['Главное', 'Что горит'], 'tab-main': ['Главное', 'Статистика'], 'tab-radar': ['Главное', 'Радар и списки'],
         'tab-dossier': ['Люди', 'Досье'], 'tab-quarantine': ['Люди', 'Карантин'], 'tab-verif': ['Люди', 'Live-вериф'],
-        'tab-mass': ['Модерация', 'Репрессии'], 'tab-blackbox': ['Модерация', 'Чёрный ящик'],
+        'tab-mass': ['Модерация', 'Пакетная модерация'], 'tab-blackbox': ['Модерация', 'Чёрный ящик'],
         'tab-support': ['Связь', 'Входящие'], 'tab-broadcast': ['Связь', 'Рассылка'],
         'tab-withdrawals': ['Деньги', 'Касса и награды'], 'tab-promos': ['Деньги', 'Скидки'], 'ads-tab': ['Деньги', 'Биржа рекламы'],
         'tab-live-finance': ['Деньги', 'Live-финансы'],
