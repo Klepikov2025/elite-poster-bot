@@ -25,6 +25,12 @@ def _rate():
 
 
 def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
+    # 💎 Экономика очков (только владелец) — web/economy.py
+    try:
+        from web.economy import register_economy_routes
+        register_economy_routes(app)
+    except Exception as e:
+        print(f"economy routes error: {e}")
 
     # ================= 📡 LIVE ФИНАНСОВЫЙ ЦЕНТР СЕТИ =================
     @app.route('/glaz/api/live_finance', methods=['GET'])

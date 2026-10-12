@@ -592,6 +592,45 @@
             #tab-system .set-card, #tab-infrastructure .set-card { padding: 14px !important; }
         }
 
+        /* =================== 💎 ЭКОНОМИКА ОЧКОВ =================== */
+        #tab-economy .set-card { padding: 18px 20px !important; margin-top: 16px !important; max-width: none !important; margin-left: 0 !important; margin-right: 0 !important; }
+        .ec-table tr.more { display: none; } .ec-table.all tr.more { display: table-row; }
+        .ec-more { margin-top: 10px; }
+        .ec-hero { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 10px; }
+        .ec-big, .ec-kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+        .ec-big .v { font: 700 32px var(--mono); margin-top: 4px; letter-spacing: -.02em; }
+        .ec-kpi .v { font: 700 22px var(--mono); margin-top: 6px; }
+        .ec-big .sub, .ec-kpi .sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+        .up { color: var(--ok); } .down { color: #e6a35a; }
+        .ec-stack { display: flex; gap: 2px; height: 22px; border-radius: 6px; overflow: hidden; }
+        .ec-stack i { display: block; min-width: 3px; }
+        .ec-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px 20px; margin-top: 14px; }
+        .ec-legend > div { display: grid; grid-template-columns: 12px 1fr auto; gap: 2px 8px; align-items: center; font-size: 13px; }
+        .ec-legend .muted { grid-column: 2 / -1; font-size: 12px; }
+        .ec-legend .mono { font-weight: 700; }
+        .sw-dot { width: 10px; height: 10px; border-radius: 3px; }
+        .ec-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .ec-table th { text-align: left; font: 600 10.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 8px 6px; border-bottom: 1px solid var(--line); }
+        .ec-table td { padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+        .ec-table .r { text-align: right; }
+        .ec-table a { color: var(--text); text-decoration: none; } .ec-table a:hover { color: var(--accent); }
+        .sm { font-size: 11px; }
+        .ec-daily { position: relative; height: 240px; margin-bottom: 14px; }
+        .ec-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .ec-row { display: grid; grid-template-columns: minmax(0, 1.4fr) 1fr auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+        .ec-moves .ec-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+        .ec-lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ec-bar { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+        .ec-bar i { display: block; height: 100%; border-radius: 4px; }
+        .ec-bar i.p { background: #17a99b; } .ec-bar i.m { background: #bf8530; }
+        .ec-v { font: 600 12.5px var(--mono); text-align: right; min-width: 70px; }
+        @media (max-width: 760px) {
+            .ec-hero { grid-template-columns: 1fr 1fr; } .ec-big { grid-column: 1 / -1; }
+            .ec-cols { grid-template-columns: 1fr; }
+            .ec-table th:nth-child(5), .ec-table td:nth-child(5), .ec-table th:nth-child(3), .ec-table td:nth-child(3) { display: none; }
+            .ec-row { grid-template-columns: minmax(0, 1fr) 70px auto; }
+        }
+
         /* =================== 📊 СТАТИСТИКА 2.0 =================== */
         #tab-main {
             --s-1: #8f74e6; --s-ban: #d47428; --s-mute: #8f74e6; --s-post: #1ca58b; --s-ticket: #8f74e6; --s-user: #8f74e6;
@@ -1049,6 +1088,7 @@
         <button class="nav-item" data-tab="tab-promos" onclick="openTab('tab-promos')"><span class="ico">🎫</span><span class="lbl">Скидки</span></button>
         <button class="nav-item" data-tab="ads-tab" onclick="openTab('ads-tab')"><span class="ico">📢</span><span class="lbl">Биржа рекламы</span></button>
         {% if is_owner %}<button id="btn-secret-finance" class="nav-item" data-tab="tab-live-finance" onclick="openTab('tab-live-finance')"><span class="ico">💰</span><span class="lbl">Live-финансы</span></button>{% endif %}
+        {% if is_owner %}<button class="nav-item" data-tab="tab-economy" onclick="openTab('tab-economy')"><span class="ico">💎</span><span class="lbl">Экономика очков</span></button>{% endif %}
       </div>
       <div class="nav-group">
         <div class="nav-group-title">Система</div>
@@ -2157,6 +2197,20 @@
         </div>
     </div>
 {% if is_owner %}
+    <!-- ================= ВКЛАДКА: ЭКОНОМИКА ОЧКОВ (только владелец) ================= -->
+    <div id="tab-economy" class="tab-content">
+        <div class="sec-head" style="margin-top:0;">
+            <div><h2>Экономика очков</h2><p>Все очки в игре, включая семейные копилки и сейфы, — и откуда они берутся. Видно только вам.</p></div>
+            <div class="seg" id="ec-period">
+                <button class="seg-btn" data-d="1" onclick="loadEconomy(1)">Сутки</button>
+                <button class="seg-btn active" data-d="7" onclick="loadEconomy(7)">7 дней</button>
+                <button class="seg-btn" data-d="30" onclick="loadEconomy(30)">30 дней</button>
+            </div>
+        </div>
+        <div id="ec-body"><div class="set-empty">Считаю всю экономику… (на большой базе до 10–20 секунд)</div></div>
+    </div>
+{% endif %}
+{% if is_owner %}
     <!-- ================= ВКЛАДКА: LIVE-ФИНАНСЫ (только владелец) ================= -->
     <div id="tab-live-finance" class="tab-content">
         <div class="sec-head">
@@ -2326,7 +2380,7 @@
         'tab-mass': ['Модерация', 'Пакетная модерация'], 'tab-blackbox': ['Модерация', 'Чёрный ящик'],
         'tab-support': ['Связь', 'Входящие'], 'tab-broadcast': ['Связь', 'Рассылка'],
         'tab-withdrawals': ['Деньги', 'Касса и награды'], 'tab-promos': ['Деньги', 'Скидки'], 'ads-tab': ['Деньги', 'Биржа рекламы'],
-        'tab-live-finance': ['Деньги', 'Live-финансы'],
+        'tab-live-finance': ['Деньги', 'Live-финансы'], 'tab-economy': ['Деньги', 'Экономика очков'],
         'tab-control': ['Система', 'Настройки'], 'tab-infrastructure': ['Система', 'Инфраструктура'], 'tab-diag': ['Система', 'Диагностика']
     };
     function toggleNav(force) {
@@ -2364,6 +2418,7 @@
         if (tabId === 'tab-infrastructure') loadInfrastructure();
         if (tabId === 'ads-tab') loadAds();
         if (tabId === 'tab-live-finance') loadLiveFinance(1);
+        if (tabId === 'tab-economy') loadEconomy();
         if (tabId === 'tab-control') {
             loadControl();
             if (!_settingsLoaded) {
@@ -4783,6 +4838,101 @@ function addInfraROEnemy() {
 function removeInfraROEnemy(id) {
     if (!confirm('Убрать чат из списка РО?')) return;
     _post('/glaz/api/spy_ro/del', {chat: id}).then(d => { if (d.success) { renderInfraROEnemies(); showToast('🗑 Убрано'); } });
+}
+</script>
+<script>
+// =====================================================================
+// 💎 ЭКОНОМИКА ОЧКОВ (владелец)
+// =====================================================================
+const EC_COL = {wallets: '#9a6fe6', banks: '#17a99b', safes: '#bf8530', auction: '#5d8ee8', plus: '#17a99b', minus: '#bf8530'};
+let _ecDays = 7, _ecChart = null, _ecHist = null;
+const _n = v => Math.round(v || 0).toLocaleString('ru-RU');
+function loadEconomy(days) {
+    _ecDays = days || _ecDays;
+    document.querySelectorAll('#ec-period .seg-btn').forEach(b => b.classList.toggle('active', +b.dataset.d === _ecDays));
+    fetch('/glaz/api/economy?days=' + _ecDays).then(r => r.json()).then(renderEconomy)
+        .catch(() => { document.getElementById('ec-body').innerHTML = '<div class="set-empty">Не удалось посчитать — попробуйте ещё раз.</div>'; });
+}
+function _ecList(items, cls, sign) {
+    if (!items.length) return '<div class="set-empty sm">Нет записей за период</div>';
+    const max = Math.max(...items.map(i => Math.abs(i.net)));
+    return items.map(i => `<div class="ec-row" title="${_h(i.reason)} · операций: ${_n(i.n)}">
+        <span class="ec-lbl">${_h(i.label)}</span>
+        <span class="ec-bar"><i class="${cls}" style="width:${Math.max(2, Math.abs(i.net) / max * 100)}%"></i></span>
+        <span class="ec-v">${sign}${_n(Math.abs(i.net))}</span></div>`).join('');
+}
+function renderEconomy(d) {
+    if (!d || d.error) { document.getElementById('ec-body').innerHTML = '<div class="set-empty">Нет доступа.</div>'; return; }
+    const s = d.stock, r = d.rate, c = d.concentration, f = d.flows;
+    const stars = s.total / r.points_per_star, rub = stars * r.rub_per_star;
+    const parts = [['wallets', 'Кошельки игроков', s.wallets, `${_n(s.holders)} игроков`], ['banks', 'Семейные копилки', s.banks, `${_n(s.banks_n)} копилок`],
+                   ['safes', 'Сейфы', s.safe_pts, 'налоги, кот, комиссии'], ['auction', 'Ставки на аукционе', s.auction, `${_n(s.auction_n)} лотов`]];
+    const tot = s.total || 1;
+    const perDay = f.days ? f.net / f.days : 0;
+    const hidden = s.banks + s.safe_pts + s.auction;
+    let html = `
+    <div class="ec-hero">
+        <div class="ec-big"><div class="eyebrow">Всего очков в игре</div><div class="v">${_n(s.total)} 💎</div>
+            <div class="sub">≈ ${_n(stars)} ⭐️ услуг ≈ ${_n(rub)} ₽ по курсу ${r.points_per_star} 💎 = 1 ⭐️</div></div>
+        <div class="ec-kpi"><div class="eyebrow">Не видно в ТОП-30</div><div class="v">${_n(hidden)}</div><div class="sub">${Math.round(hidden / tot * 100)}% массы — копилки, сейфы, ставки</div></div>
+        <div class="ec-kpi"><div class="eyebrow">Чистый выпуск в сутки</div><div class="v ${perDay > 0 ? 'up' : 'down'}">${perDay > 0 ? '+' : ''}${_n(perDay)}</div><div class="sub">среднее за ${f.days} дн., без переводов</div></div>
+        <div class="ec-kpi"><div class="eyebrow">Долги по займам</div><div class="v">${_n(s.debt)}</div><div class="sub">${_n(s.debt_n)} должников</div></div>
+    </div>
+    <div class="panel-block set-card">
+        <div class="set-head"><div class="set-ic">🧺</div><div class="set-title"><h3>Где лежат очки</h3><p>У админов на руках ещё ${_n(s.staff_wallets)} — в общую сумму не входят.</p></div></div>
+        <div class="ec-stack">${parts.filter(p => p[2] > 0).map(p => `<i style="flex:${p[2]};background:${EC_COL[p[0]]}" title="${p[1]}: ${_n(p[2])}"></i>`).join('')}</div>
+        <div class="ec-legend">${parts.map(p => `<div><span class="sw-dot" style="background:${EC_COL[p[0]]}"></span><b>${p[1]}</b><span class="mono">${_n(p[2])}</span><span class="muted">${Math.round(p[2] / tot * 100)}% · ${p[3]}</span></div>`).join('')}</div>
+    </div>
+    <div class="panel-block set-card">
+        <div class="set-head"><div class="set-ic">🏦</div><div class="set-title"><h3>Кто держит массу</h3><p>Кошельки и копилки вместе. ${c.top1pct_n} владельцев (1%) держат <b>${c.top1pct}%</b> всех очков, первая десятка — <b>${c.top10}%</b>.</p></div></div>
+        <table class="ec-table"><thead><tr><th>#</th><th>Кто</th><th>Где</th><th class="r">Очки</th><th class="r">≈ ⭐️</th></tr></thead><tbody>
+        ${c.rows.map((x, i) => `<tr class="${i >= 10 ? 'more' : ''}"><td class="muted">${i + 1}</td><td>${x.kind === 'Кошелёк' ? `<a href="/glaz?search_id=${encodeURIComponent(x.id)}">${_h(x.who)}</a>` : _h(x.who)}<div class="muted mono sm">${_h(x.id)}</div></td><td><span class="chip ${x.kind === 'Кошелёк' ? 'violet' : 'green'}">${x.kind}</span></td><td class="r mono">${_n(x.value)}</td><td class="r mono muted">${_n(x.value / r.points_per_star)}</td></tr>`).join('')}
+        </tbody></table>
+        ${c.rows.length > 10 ? `<button class="btn sm ghost ec-more" onclick="this.previousElementSibling.classList.toggle('all'); this.textContent = this.previousElementSibling.classList.contains('all') ? 'Свернуть' : 'Показать всех (${c.rows.length})'">Показать всех (${c.rows.length})</button>` : ''}
+    </div>
+    <div class="panel-block set-card">
+        <div class="set-head"><div class="set-ic">🚰</div><div class="set-title"><h3>Откуда берутся и куда уходят — за ${f.days} дн.</h3><p>Выпущено <b class="up">+${_n(f.minted)}</b>, сожжено <b class="down">−${_n(Math.abs(f.burned))}</b>, итого ${f.net >= 0 ? 'масса выросла на' : 'масса уменьшилась на'} <b>${_n(Math.abs(f.net))}</b>. По журналу Секретаря.</p></div></div>
+        <div class="ec-daily"><canvas id="ec-daily"></canvas></div>
+        <div class="ec-cols">
+            <div><div class="set-sub">🚰 Краны — откуда берутся</div>${_ecList(f.faucets, 'p', '+')}</div>
+            <div><div class="set-sub">🕳 Стоки — куда сгорают</div>${_ecList(f.sinks, 'm', '−')}</div>
+        </div>
+        <details class="pay-log"><summary>↔️ Перемещения между игроками, копилками и сейфами (не выпуск и не сжигание)</summary>
+            <div class="ec-moves">${f.moves.length ? f.moves.map(m => `<div class="ec-row"><span class="ec-lbl">${_h(m.label)}</span><span class="ec-v up">+${_n(m.plus)}</span><span class="ec-v down">−${_n(Math.abs(m.minus))}</span></div>`).join('') : '<div class="set-empty sm">Нет</div>'}</div>
+            <p class="muted sm">«Копилки: положили» — это очки, которые ушли из кошельков в копилки. Если «−» там намного больше «+», игроки прячут очки.</p>
+        </details>
+    </div>
+    <div class="panel-block set-card">
+        <div class="set-head"><div class="set-ic">📈</div><div class="set-title"><h3>Вся масса по дням</h3><p>Снимок сохраняется раз в сутки, когда вы открываете этот раздел. ${d.history.length < 2 ? 'Пока снимок один — график появится со второго дня.' : ''}</p></div></div>
+        ${d.history.length >= 2 ? '<div class="ec-daily"><canvas id="ec-hist"></canvas></div>' : ''}
+    </div>`;
+    document.getElementById('ec-body').innerHTML = html;
+    if (typeof Chart === 'undefined') return;
+    if (_ecChart) _ecChart.destroy();
+    const dl = f.daily.map(x => x.d.slice(8, 10) + '.' + x.d.slice(5, 7));
+    _ecChart = new Chart(document.getElementById('ec-daily'), {
+        type: 'bar',
+        data: {labels: dl, datasets: [
+            {label: 'Выпущено', data: f.daily.map(x => x.plus), backgroundColor: EC_COL.plus, borderRadius: 4, maxBarThickness: 28},
+            {label: 'Сожжено', data: f.daily.map(x => x.minus), backgroundColor: EC_COL.minus, borderRadius: 4, maxBarThickness: 28}]},
+        options: {responsive: true, maintainAspectRatio: false, interaction: {mode: 'index', intersect: false},
+            scales: {x: {stacked: true, grid: {display: false}, ticks: {color: '#8b909a'}}, y: {stacked: true, grid: {color: '#22252b'}, ticks: {color: '#8b909a', callback: v => _n(v)}}},
+            plugins: {legend: {position: 'bottom', labels: {color: '#c5c8cf', usePointStyle: true, boxWidth: 8}},
+                tooltip: {callbacks: {label: t => ` ${t.dataset.label}: ${_n(Math.abs(t.parsed.y))}`,
+                    footer: items => 'Итого за день: ' + (items.reduce((a, t) => a + t.parsed.y, 0) >= 0 ? '+' : '') + _n(items.reduce((a, t) => a + t.parsed.y, 0))}}}}
+    });
+    if (_ecHist) { _ecHist.destroy(); _ecHist = null; }
+    if (d.history.length >= 2) {
+        _ecHist = new Chart(document.getElementById('ec-hist'), {
+            type: 'line',
+            data: {labels: d.history.map(x => x.d.slice(8, 10) + '.' + x.d.slice(5, 7)), datasets: [
+                {label: 'Кошельки', data: d.history.map(x => x.wallets), borderColor: EC_COL.wallets, backgroundColor: EC_COL.wallets, borderWidth: 2, pointRadius: 3, tension: .3},
+                {label: 'Копилки', data: d.history.map(x => x.banks), borderColor: EC_COL.banks, backgroundColor: EC_COL.banks, borderWidth: 2, pointRadius: 3, tension: .3}]},
+            options: {responsive: true, maintainAspectRatio: false, interaction: {mode: 'index', intersect: false},
+                scales: {x: {grid: {display: false}, ticks: {color: '#8b909a'}}, y: {beginAtZero: true, grid: {color: '#22252b'}, ticks: {color: '#8b909a', callback: v => _n(v)}}},
+                plugins: {legend: {position: 'bottom', labels: {color: '#c5c8cf', usePointStyle: true, boxWidth: 8}}, tooltip: {callbacks: {label: t => ` ${t.dataset.label}: ${_n(t.parsed.y)}`}}}}
+        });
+    }
 }
 </script>
 </body>
