@@ -1207,7 +1207,7 @@
 <!-- 👇 ОТДЕЛЬНАЯ ВКЛАДКА LIVE-ВЕРИФИКАЦИИ 👇 -->
     <div id="tab-verif" class="tab-content">
         <div class="panel-block" style="max-width: 1000px; border-left: 4px solid #ffeb3b; box-shadow: 0 0 15px rgba(255, 235, 59, 0.1);">
-            <h3 style="color: #ffeb3b; margin-top: 0;">🎥 Шоу на выживание (Live Верификация)</h3>
+            <h3 style="color: #ffeb3b; margin-top: 0;">🎥 (Live Верификация)</h3>
             <p style="color: #aaa; margin-bottom: 15px;">Кандидаты, которые прямо сейчас записывают кружок (5 мин) или ожидают прихода Санитара Архивов за игнор (24 ч).</p>
             
             <button class="form-btn" style="margin-bottom: 15px; background: #2d2d2d; color: #fff; border: 1px solid #444;" onclick="loadVerifList()">🔄 Обновить список</button>
@@ -1318,7 +1318,7 @@
                 <div class="bc-card">
                     <div class="bc-step"><span>2</span>Причина</div>
                     <select id="mass-reason" class="ms-sel">
-                        <option value="Массовая репрессия (Web)">💀 Глобальная чистка Скайнета</option>
+                        <option value="Массовая репрессия (Web)">🧹 Глобальная блокировка</option>
                         <option value="Несогласованная реклама / Спам сетей">📺 Спам / реклама каналов и услуг</option>
                         <option value="Несовершеннолетний аккаунт (<18)">🔞 Нарушение возрастного ценза (&lt;18)</option>
                         <option value="Коммерция / Платные услуги">💸 Коммерческая анкета / поиск спонсора</option>
@@ -1535,7 +1535,7 @@
         </div>
 
         <div class="panel-block" style="margin-top: 25px; background: #1a1a1a; border: 1px solid #333; padding: 20px; border-radius: 10px; max-width: 1000px;">
-            <h3 style="color: #cf6679; margin-bottom: 10px; font-size: 18px;">🤬 Словарь Инквизитора (Живые фильтры)</h3>
+            <h3 style="color: #cf6679; margin-bottom: 10px; font-size: 18px;">🛡️ Словарь Автомодератора (Живые фильтры)</h3>
             <p style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Добавляйте слова-триггеры. Бот начнет удалять их без перезагрузки сервера.</p>
             
             <div style="display: flex; gap: 20px;">
@@ -1570,7 +1570,7 @@
             </div>
             <div style="margin-top: 20px; border: 1px solid #ff8a65; padding: 15px; border-radius: 8px; background: rgba(255, 138, 101, 0.05);">
                 <h4 style="color: #ff8a65; margin-top: 0;">🕵️ Сленг и эмодзи под проверку ИИ (Шпион)</h4>
-                <p style="color: #aaa; font-size: 12px; margin: 0 0 10px;">Не банит сразу: Шпион отдаёт сообщение ИИ, тот решает по смыслу («угощу 🐻» — бан, «ищу пухлого 🐻» — нет). Если ИИ недоступен — дело придёт вам на ручное решение.</p>
+                <p style="color: #aaa; font-size: 12px; margin: 0 0 10px;">Не банит сразу: Сканер отдаёт сообщение ИИ, тот решает по смыслу («угощу 🐻» — бан, «ищу пухлого 🐻» — нет). Если ИИ недоступен — дело придёт вам на ручное решение.</p>
                 <div id="dict-soft_red-list" style="margin-bottom: 15px; min-height: 30px; display: flex; flex-wrap: wrap; gap: 5px;"></div>
                 <input type="text" id="dict-soft_red-input" class="form-control" placeholder="Например: 🍭 или клад" style="width: 100%; margin-bottom: 10px; background: #222; color: #fff; border: 1px solid #555; padding: 8px; box-sizing: border-box;">
                 <label style="font-size: 12px; color: #aaa; display: flex; align-items: center; gap: 5px; margin-bottom: 10px;">
@@ -1655,8 +1655,8 @@
         <div class="panel-block" style="margin-top:20px;" id="corpse-block">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
                 <div>
-                    <h3 style="margin:0;">💀 Мёртвые души в группах</h3>
-                    <div style="color:var(--muted); font-size:13px; margin-top:6px; max-width:640px;">Шпион просматривает участников групп сети и находит удалённые аккаунты («Deleted Account»), Скайнет их выносит. В базе они остаются с пометкой «удалён», рассылки им больше не уходят. Частота проверки — в «Настройки → Модерация и уборка».</div>
+                    <h3 style="margin:0;">🗑️ Неактивные аккаунты в группах</h3>
+                    <div style="color:var(--muted); font-size:13px; margin-top:6px; max-width:640px;">Сканер проверяет участников групп сети и находит удалённые аккаунты («Deleted Account»), Скайнет их выносит. В базе они остаются с пометкой «удалён», рассылки им больше не уходят. Частота проверки — в «Настройки → Модерация и уборка».</div>
                 </div>
                 <button class="btn primary" id="corpse-run-btn" onclick="runCorpseSweep()">🔎 Проверить группы сейчас</button>
             </div>
@@ -1892,21 +1892,21 @@
         </div>
 
         <div class="panel-block" style="max-width: 1000px; margin-top: 20px; border-left: 4px solid #cf6679; background: rgba(207, 102, 121, 0.05);">
-            <h3 style="color: #cf6679; margin-top: 0;">🎯 Вражеские базы (Цели Андрюшеньки)</h3>
-            <p style="font-size: 12px; color: #aaa;">Добавьте ID чатов или юзернеймы конкурентов. Шпион будет прочесывать их автономно.</p>
+            <h3 style="color: #cf6679; margin-top: 0;">🎯 Внешний мониторинг (Сторонние чаты)</h3>
+            <p style="font-size: 12px; color: #aaa;">Добавьте ID чатов или юзернеймы конкурентов. Сканер будет прочесывать их автономно.</p>
             <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                 <input type="text" id="new-enemy-id" placeholder="@username или -100..." class="form-control" style="flex: 1; background: #111; color: #fff; border: 1px solid #cf6679; padding: 8px; border-radius: 4px;">
-                <button onclick="addInfraEnemy()" class="btn" style="background: #cf6679; color: #fff; font-weight: bold; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer;">➕ Захватить цель</button>
+                <button onclick="addInfraEnemy()" class="btn" style="background: #cf6679; color: #fff; font-weight: bold; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer;">➕ Добавить в мониторинг</button>
             </div>
             <div id="infra-enemies-list" style="display: flex; flex-wrap: wrap; gap: 10px; min-height: 40px;"></div>
         </div>
 <div class="panel-block" style="max-width: 1000px; margin-top: 20px; border-left: 4px solid #ff4d4d; background: rgba(255, 77, 77, 0.05);">
-            <h3 style="color: #ff4d4d; margin-top: 0;">💀 Вражеские чаты РО (Русская Община)</h3>
+            <h3 style="color: #ff4d4d; margin-top: 0;">🛡️ Внешний мониторинг РО (Русская Община)</h3>
             <p style="font-size: 12px; color: #aaa;">Вставьте список ID чатов или юзернеймов конкурентов (в столбик, через запятую или пробел). <b>Можно вставить хоть 500 штук за раз.</b> Андрюшенька будет отправлять в пермач любого, кто там напишет.</p>
             
             <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                 <textarea id="new-ro-enemy-id" placeholder="-100123456789&#10;@ro_region&#10;-100987654321" class="form-control" style="flex: 1; height: 60px; background: #111; color: #fff; border: 1px solid #ff4d4d; padding: 8px; border-radius: 4px; resize: vertical;"></textarea>
-                <button onclick="addInfraROEnemy()" class="btn" style="background: #ff4d4d; color: #fff; font-weight: bold; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer;">🔥 Навести ракеты</button>
+                <button onclick="addInfraROEnemy()" class="btn" style="background: #ff4d4d; color: #fff; font-weight: bold; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer;">⚡ Загрузить список</button>
             </div>
             
             <div id="infra-ro-enemies-list" style="display: flex; flex-wrap: wrap; gap: 10px; min-height: 40px; max-height: 350px; overflow-y: auto; padding-right: 5px;"></div>
@@ -2046,7 +2046,7 @@
         fetch('/glaz/api/corpses').then(r => r.json()).then(d => {
             if (d.error) return;
             const st = d.running ? '🔄 идёт проверка…' : (d.requested ? '⏳ проверка заказана, Шпион начнёт в течение 5 минут' : (d.last_run ? 'последняя проверка ' + d.last_run : 'проверок ещё не было'));
-            let cards = _card('Ждут выноса', d.pending, false) + _card('Вынесено за сутки', d.done_24h, false) + _card('Вынесено всего', d.done_total, false) + _card('Не удалось вынести', d.errors, d.errors > 0);
+            let cards = _card('Ожидают удаления', d.pending, false) + _card('Очищено за сутки', d.done_24h, false) + _card('Удалено всего', d.done_total, false) + _card('Не удалось удалить', d.errors, d.errors > 0);
             if (!d.enabled) cards = _card('Вынос', '⏸ выключен тумблером «Автоочистка трупов»', true) + cards;
             document.getElementById('corpse-cards').innerHTML = cards + `<div style="align-self:center; color:var(--muted); font-size:12.5px;">${_esc(st)}</div>`;
             const btn = document.getElementById('corpse-run-btn');
@@ -2061,7 +2061,7 @@
     }
     function runCorpseSweep() {
         fetch('/glaz/api/corpses/run', {method: 'POST'}).then(r => r.json()).then(d => {
-            showToast(d.success ? '🔎 Шпион проверит группы в течение 5 минут' : '⚠️ Не получилось');
+            showToast(d.success ? '🔎 Сканер проверяет группы в течение 5 минут' : '⚠️ Не получилось');
             loadCorpses();
         });
     }
@@ -2305,7 +2305,7 @@
         function fireAction(uid, actionName) {
             // 👇 ДОБАВЛЯЕМ ПРЕДОХРАНИТЕЛЬ ДЛЯ ВЕБ-ПАНЕЛИ 👇
             if (actionName === 'ban') {
-                if (!confirm("⚠️ ВНИМАНИЕ!\nВы собираетесь глобально забанить этого пользователя.\nУбедитесь, что он НЕ является VIP или QUEER (проверьте бейджики в досье).\n\nТочно снести его?")) {
+                if (!confirm("⚠️ ВНИМАНИЕ!\nВы собираетесь глобально забанить этого пользователя.\nУбедитесь, что он НЕ является VIP или QUEER (проверьте бейджики в досье).\n\nТочно заблокировать пользователя?")) {
                     return;
                 }
             }
@@ -2388,10 +2388,10 @@
             "red_zone": "☢️ Красная зона (Фильтр: Наркотики, CP, тяжелые нарушения)",
             "yellow_commerce": "💰 Желтая зона (Фильтр: Коммерция, папики, спонсоры, реклама)",
             "twin_radar": "👥 Радар Твинков (Автопоиск и бан клонов)",
-            "autoban_on_block": "🚫 Автобан за блок бота (Ликвидация беглецов из воронки)",
-            "vip_sniper": "🎯 VIP-Снайпер (Ликвидация тех, кто бросил верификацию)",
+            "autoban_on_block": "🚫 Автобан за блок бота (Блокировка отписавшихся)",
+            "vip_sniper": "⏱ Тайм-аут заявок (Удаление брошенных верификаций)",
             "bio_hardcheck": "🔍 Жесткая проверка БИО (Контроль возраста и ссылок на входе)",
-            "auto_corpse_removal": "💀 Автоочистка трупов (Вынос Deleted Accounts из 85+ чатов)",
+            "auto_corpse_removal": "🗑️ Автоочистка удаленных профилей (Удаление Deleted Accounts из 85+ чатов)",
             "proxy_system": "🕵️ Черный Ящик (Включение/выключение анонимных чатов Прокси)",
             "referral_system": "🔗 Реферальная VIP-система (Начисление бонусов за друзей)",
             "parni_autounmute": "🕊️ Локальная амнистия (Авторазмут в сети ПАРНИ 18+ при входе)",
@@ -3359,7 +3359,7 @@ function scanNetworks(uid) {
             const chats = val.split(/[\n, ]+/).map(c => c.trim()).filter(c => c);
             if(chats.length === 0) return;
             
-            document.getElementById('new-ro-enemy-id').value = '⏳ Идёт наведение ракет...';
+            document.getElementById('new-ro-enemy-id').value = '⏳ Идёт обработка списка...';
             
             fetch('/glaz/api/spy_ro/add_mass', {
                 method: 'POST',
@@ -3442,7 +3442,7 @@ function loadVerifList() {
                         badge = '<span style="background: #03dac6; color: #121212; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-right: 5px;">🎥 ПИШЕТ КРУЖОК</span>';
                         color = '#03dac6';
                     } else {
-                        badge = '<span style="background: #cf6679; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-right: 5px;">💀 ЖДЕТ ЛИКВИДАЦИИ</span>';
+                        badge = '<span style="background: #cf6679; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-right: 5px;">🚫 ЖДЕТ БЛОКИРОВКИ</span>';
                         color = '#cf6679';
                     }
                     
@@ -3455,7 +3455,7 @@ function loadVerifList() {
                             ${badge} ⏱ <span class="q-live-timer" data-sec="${item.seconds_left}">${initialTimeStr}</span>
                         </td>
                         <td>
-                            <button class="act-btn ban" style="padding: 4px 8px; font-size: 11px; width: auto;" onclick="fireAction(${item.id}, 'ban')">СНЕСТИ СЕЙЧАС</button>
+                            <button class="act-btn ban" style="padding: 4px 8px; font-size: 11px; width: auto;" onclick="fireAction(${item.id}, 'ban')">ЗАБЛОКИРОВАТЬ</button>
                         </td>
                     </tr>`;
                 });
@@ -4564,7 +4564,7 @@ function loadProxyChat(sessionId) {
 }
 function bbStart() { loadProxySessions(true); }
 
-// =================== 💥 РЕПРЕССИИ ===================
+// =================== ⚡ Пакетная модерация ===================
 let _msT = null, MS_JOBS_T = null;
 function msReasonText() {
     const sel = document.getElementById('mass-reason');
