@@ -3,28 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Подтверждение | Глаз Саурона</title>
+    <meta name="color-scheme" content="dark">
+    <title>Подтверждение · Глаз Саурона</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #121212; color: #ffffff; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .login-card { background-color: #1e1e1e; padding: 40px; border-radius: 10px; box-shadow: 0 4px 25px rgba(0,0,0,0.7); border-bottom: 4px solid #bb86fc; width: 320px; text-align: center; }
-        h2 { color: #bb86fc; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; }
-        p { color: #aaa; font-size: 14px; margin-bottom: 25px; }
-        .form-input { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 5px; border: 1px solid #333; background-color: #2d2d2d; color: #fff; font-size: 24px; letter-spacing: 8px; text-align: center; box-sizing: border-box; }
-        .form-input:focus { border-color: #bb86fc; outline: none; }
-        .login-btn { width: 100%; padding: 12px; background-color: #bb86fc; color: #121212; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 16px; text-transform: uppercase; transition: 0.2s; }
-        .login-btn:hover { background-color: #9965db; }
-        .error { color: #cf6679; font-weight: bold; margin-bottom: 15px; font-size: 14px; }
+        :root {
+            --bg: #0c0d10; --surface: #14161a; --surface-2: #1b1e23; --line: #262a31; --line-2: #323741;
+            --text: #ececf1; --muted: #8b909a; --dim: #5d626c;
+            --accent: #bb86fc; --accent-ink: #14081f; --teal: #03dac6; --danger: #ef6f86; --ok: #4cd6a0;
+            --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+            --sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+        }
+        * { box-sizing: border-box; }
+        html { -webkit-text-size-adjust: 100%; }
+        body {
+            margin: 0; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 20px;
+            background: radial-gradient(900px 520px at 50% -8%, rgba(187,134,252,.13), transparent 62%), var(--bg);
+            color: var(--text); font: 14px/1.45 var(--sans);
+        }
+        ::selection { background: var(--accent); color: var(--accent-ink); }
+        .auth { width: min(400px, 100%); position: relative; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 30px 28px 26px; }
+        .auth::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: linear-gradient(90deg, var(--accent), var(--teal)); }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
+        .brand-eye { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-size: 21px;
+                     background: radial-gradient(circle at 50% 45%, #3a1f5c, #17101f 70%); box-shadow: 0 0 0 1px #3b2a52, 0 0 22px rgba(187,134,252,.28); }
+        .brand-title { font-weight: 800; letter-spacing: .08em; font-size: 14px; text-transform: uppercase; }
+        .brand-sub { font: 500 10px var(--mono); color: var(--muted); letter-spacing: .12em; text-transform: uppercase; }
+        h1 { margin: 0 0 4px; font-size: 21px; font-weight: 800; letter-spacing: -.01em; }
+        .lead { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
+        .lead b { color: var(--text); font-weight: 600; }
+        .error { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 16px; padding: 10px 12px; border-radius: 10px; font-size: 13px; font-weight: 600;
+                 color: #ff9fb1; background: rgba(239,111,134,.10); border: 1px solid rgba(239,111,134,.45); }
+        .code { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line-2); border-radius: 12px; padding: 14px 10px 14px 22px;
+                font: 700 30px var(--mono); letter-spacing: .5em; text-align: center; transition: border-color .15s, box-shadow .15s; }
+        .code::placeholder { color: var(--line-2); }
+        .code:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(187,134,252,.18); }
+        .btn { width: 100%; margin-top: 14px; padding: 13px 16px; border: 1px solid var(--accent); border-radius: 10px; background: var(--accent); color: var(--accent-ink); font: 700 14px var(--sans); cursor: pointer; transition: filter .15s, transform .05s; }
+        .btn:hover { filter: brightness(1.08); }
+        .btn:active { transform: translateY(1px); }
+        .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .btn:disabled { opacity: .55; cursor: default; }
+        .meta { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; font-size: 12.5px; color: var(--muted); }
+        .meta a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted #6d5a9e; }
+        .foot { margin-top: 18px; text-align: center; font: 500 10.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
     </style>
 </head>
 <body>
-    <div class="login-card">
-        <h2>🔐 Код из Telegram</h2>
-        <p>Бот отправил 6-значный код владельцу в личные сообщения. Действует 5 минут.</p>
-        {% if error %}<div class="error">{{ error }}</div>{% endif %}
-        <form method="POST">
-            <input type="text" name="code" class="form-input" placeholder="••••••" maxlength="6" inputmode="numeric" autocomplete="one-time-code" autofocus required>
-            <button type="submit" class="login-btn">Подтвердить</button>
+    <main class="auth">
+        <div class="brand">
+            <div class="brand-eye" aria-hidden="true">👁️</div>
+            <div><div class="brand-title">Глаз Саурона</div><div class="brand-sub">ЦУП империи</div></div>
+        </div>
+
+        <h1>Код из Telegram</h1>
+        <p class="lead">Бот отправил 6-значный код владельцу в личные сообщения. Он действует <b>5 минут</b>.</p>
+
+        {% if error %}<div class="error" role="alert"><span aria-hidden="true">⚠️</span><span>{{ error }}</span></div>{% endif %}
+
+        <form method="POST" id="f">
+            <input type="text" name="code" id="code" class="code" placeholder="••••••" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code" aria-label="Код подтверждения" autofocus required>
+            <button type="submit" class="btn" id="go">Подтвердить</button>
         </form>
-    </div>
+
+        <div class="meta"><span>Не пришёл код? Вернитесь ко входу и начните заново.</span></div>
+        <div class="foot">Skynet Enterprise</div>
+    </main>
+    <script>
+        (function () {
+            var f = document.getElementById('f'), c = document.getElementById('code'), go = document.getElementById('go');
+            c.addEventListener('input', function () {
+                c.value = c.value.replace(/\D/g, '').slice(0, 6);
+                if (c.value.length === 6 && !go.disabled) { go.disabled = true; go.textContent = 'Проверяю…'; f.submit(); }
+            });
+        })();
+    </script>
 </body>
 </html>
