@@ -70,7 +70,7 @@ def register_stats_routes(app):
 
         # 3. Тикеты поддержки
         tickets = series_from_ts(t.get("timestamp") for t in db['support_tickets'].find(
-            {"timestamp": {"$gte": start_ts}}, {"timestamp": 1}))
+            {"timestamp": {"$gte": start_ts}, "from_admin": {"$ne": True}}, {"timestamp": 1}))  # ответы админов не считаем
 
         # 4. Наказания из архива: даты строками «дд.мм.гггг чч:мм» по Екатеринбургу
         date_strs = {}

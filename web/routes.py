@@ -4,6 +4,7 @@ import uuid
 import json
 import threading
 from datetime import datetime
+import pytz
 from flask import request, render_template, session, redirect, url_for, jsonify
 from core.settings import SkynetSettings
 from core.cfg import cfg
@@ -582,9 +583,13 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                 
         try:
             # Отправляем тестовое сообщение создателю (OWNER_ID берется из config.py)
+            # Тест приходит тому админу, кто нажал (раньше всегда — владельцу)
+            from web_auth import ALLOWED_ADMINS
+            me = session.get("login")
+            to_id = next((tid for tid, lg in ALLOWED_ADMINS.items() if lg == me), OWNER_ID)
             bot.send_message(
-                OWNER_ID, 
-                f"👀 **ПРЕДПРОСМОТР РАССЫЛКИ:**\n\n{txt}", 
+                to_id, 
+                f"👀 <b>ПРЕДПРОСМОТР РАССЫЛКИ:</b>\n\n{txt}", 
                 parse_mode="HTML", 
                 disable_web_page_preview=True, 
                 reply_markup=markup
@@ -603,10 +608,42 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         if link_data: return redirect(link_data["url"])
         return "Ссылка не найдена или устарела", 404
 
-    def execute_broadcast(txt, tgt, btns_list):
+    BC_TARGETS = {"groups_all": "📢 Все группы сети", "all": "🌐 Всем в ЛС", "vip": "👑 VIP в ЛС", "queer": "🏳️‍🌈 BEYOND в ЛС"}
+    BC_TZ = pytz.timezone('Asia/Yekaterinburg')  # время рассылок вводится и показывается по Екатеринбургу
+
+    def _bc_groups():
+        from config import all_cities
+        ids = set()
+        for city, networks in all_cities.items():
+            for net_key, groups in networks.items():
+                for group in groups:
+                    ids.add(group['chat_id'])
+        return ids
+
+    def _bc_audience_query(tgt):
+        alive = {"is_deleted": {"$ne": True}}
+        return {"all": alive, "vip": {"is_vip": True, **alive}, "queer": {"is_queer": True, **alive}}.get(tgt)
+
+    def _bc_progress(bid, **inc_set):
+        if not bid:
+            return
+        try:
+            db['broadcast_history'].update_one({"_id": bid}, inc_set)
+        except Exception:
+            pass
+
+    def execute_broadcast(txt, tgt, btns_list, bid=None, admin=None, source="Панель"):
         from telebot import types
         import time
-        from config import all_cities # <-- Достаем список всех городов и чатов
+        if not bid:
+            bid = str(uuid.uuid4())[:10]
+            total = len(_bc_groups()) if tgt == 'groups_all' else (users_collection.count_documents(_bc_audience_query(tgt)) if _bc_audience_query(tgt) else 0)
+            db['broadcast_history'].insert_one({"_id": bid, "target": tgt, "text": txt[:4000], "buttons": btns_list, "admin": admin or "—",
+                                                "source": source, "status": "running", "started_at": time.time(), "total": total,
+                                                "sent": 0, "blocked": 0, "dead": 0, "failed": 0})
+        else:
+            db['broadcast_history'].update_one({"_id": bid}, {"$set": {"status": "running", "started_at": time.time()}})
+        sent = blocked = failed = 0
         
         markup = None
         if btns_list:
@@ -624,20 +661,18 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
 
         # 👇 НОВЫЙ БЛОК: РАССЫЛКА ПО ВСЕМ ГРУППАМ СЕТИ 👇
         if tgt == 'groups_all':
-            group_ids = set() # Используем set, чтобы исключить дубликаты
-            for city, networks in all_cities.items():
-                for net_key, groups in networks.items():
-                    for group in groups:
-                        group_ids.add(group['chat_id'])
-            
+            group_ids = _bc_groups()
             for chat_id in group_ids:
                 try:
                     bot.send_message(chat_id, txt, parse_mode="HTML", disable_web_page_preview=True, reply_markup=markup)
                     count += 1
                     time.sleep(0.5) # Пауза для групп чуть больше (0.5 сек), чтобы ТГ не дал Flood Wait
                 except Exception as e:
+                    failed += 1
                     print(f"Ошибка рассылки в чат {chat_id}: {e}")
-                    
+                if (count + failed) % 10 == 0:
+                    _bc_progress(bid, **{"$set": {"sent": count, "failed": failed}})
+            _bc_progress(bid, **{"$set": {"sent": count, "failed": failed, "status": "done", "finished_at": time.time()}})
             add_radar_log(f"✅ Рассылка по группам: Доставлено в {count} чатов.")
             try: bot.send_message(STAFF_GROUP_ID, f"🚀 **Рассылка по ГРУППАМ завершена!**\n✅ Опубликовано в: {count} чатов.")
             except: pass
@@ -647,9 +682,18 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         # --- СТАРАЯ ЛОГИКА ДЛЯ ЛС ПОЛЬЗОВАТЕЛЕЙ ---
         _alive = {"is_deleted": {"$ne": True}}  # удалённые аккаунты рассылку не получают
         cursor = users_collection.find(_alive) if tgt == 'all' else users_collection.find({"is_vip": True, **_alive}) if tgt == 'vip' else users_collection.find({"is_queer": True, **_alive}) if tgt == 'queer' else None
-        if not cursor: return
+        if not cursor:
+            _bc_progress(bid, **{"$set": {"status": "failed", "finished_at": time.time()}})
+            return
         
+        n = 0
         for u in cursor:
+            n += 1
+            if n % 50 == 0:
+                _bc_progress(bid, **{"$set": {"sent": count, "blocked": blocked, "dead": dead_count, "failed": failed}})
+                st = (db['broadcast_history'].find_one({"_id": bid}, {"status": 1}) or {}).get("status")
+                if st == "stopping":  # админ нажал «Остановить»
+                    break
             try:
                 bot.send_message(u['_id'], txt, parse_mode="HTML", disable_web_page_preview=True, reply_markup=markup)
                 count += 1
@@ -679,7 +723,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                         
                 # 3. Пользователь просто заблокировал бота в ЛС (он жив, но рассылку не хочет)
                 elif "blocked" in err_text:
-                    pass # <--- МЫ ПРОСТО ИГНОРИРУЕМ ОШИБКУ. Из базы он НЕ удаляется!
+                    blocked += 1  # он жив, просто не хочет рассылку — из базы НЕ удаляется
                     
                 # 4. Ошибка форматирования текста
                 elif "parse entities" in err_text:
@@ -688,8 +732,13 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                         count += 1
                         time.sleep(0.05)
                     except Exception:
-                        pass
+                        failed += 1
+                else:
+                    failed += 1
 
+        _stopped = (db['broadcast_history'].find_one({"_id": bid}, {"status": 1}) or {}).get("status") == "stopping"
+        _bc_progress(bid, **{"$set": {"sent": count, "blocked": blocked, "dead": dead_count, "failed": failed,
+                                       "status": "stopped" if _stopped else "done", "finished_at": time.time()}})
         add_radar_log(f"✅ Рассылка: Доставлено {count}. 💀 Вывезено трупов: {dead_count}")
         try: bot.send_message(STAFF_GROUP_ID, f"🚀 **Рассылка завершена!**\nЦель: {tgt}\n✅ Доставлено: {count} чел.\n💀 Мертвых душ удалено: {dead_count}")
         except: pass
@@ -707,7 +756,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                     )
                     if not t:
                         break
-                    execute_broadcast(t["text"], t["target"], t.get("buttons", []))
+                    execute_broadcast(t["text"], t["target"], t.get("buttons", []), bid=t.get("bid"), admin=t.get("admin"), source="По таймеру")
             except Exception as e: print(e)
             time.sleep(30)
             
@@ -724,6 +773,11 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         try: buttons_list = json.loads(buttons_raw)
         except: buttons_list = []
 
+        if not text or target not in BC_TARGETS:
+            return jsonify({"success": False, "message": "⚠️ Нет текста или неизвестная аудитория"})
+        admin = session.get("login") or "админ"
+        bid = str(uuid.uuid4())[:10]
+
         # 🎯 ТРЕКЕР КЛИКОВ: Превращаем обычные ссылки в наши трекеры
         host_url = request.url_root.replace('http://', 'https://')
         for btn in buttons_list:
@@ -731,9 +785,12 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                 link_id = str(uuid.uuid4())[:8]
                 db['tracked_links'].insert_one({
                     "_id": link_id, "url": btn["url"], "clicks": 0, 
-                    "name": btn["text"], "timestamp": time.time()
+                    "name": btn["text"], "timestamp": time.time(), "bid": bid
                 })
                 btn["url"] = f"{host_url}t/{link_id}"
+
+        q = _bc_audience_query(target)
+        total = len(_bc_groups()) if target == 'groups_all' else (users_collection.count_documents(q) if q else 0)
 
         # ⏰ ТАЙМЕР: Проверка на отложенный запуск
         if run_at_str:
@@ -741,7 +798,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                 import pytz # На всякий случай импортируем библиотеку
                 
                 # Указываем ваш часовой пояс (если нужна Москва, напишите 'Europe/Moscow')
-                tz = pytz.timezone('Asia/Yekaterinburg') 
+                tz = BC_TZ
                 
                 # Читаем время и привязываем к нему часовой пояс
                 naive_dt = datetime.strptime(run_at_str, "%Y-%m-%dT%H:%M")
@@ -750,33 +807,70 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                 if run_at_ts > time.time():
                     db['scheduled_broadcasts'].insert_one({
                         "text": text, "target": target, "buttons": buttons_list,
-                        "run_at": run_at_ts, "status": "pending"
+                        "run_at": run_at_ts, "status": "pending", "bid": bid, "admin": admin
                     })
+                    db['broadcast_history'].insert_one({"_id": bid, "target": target, "text": text[:4000], "buttons": buttons_list,
+                                                        "admin": admin, "source": "По таймеру", "status": "scheduled", "run_at": run_at_ts,
+                                                        "total": total, "sent": 0, "blocked": 0, "dead": 0, "failed": 0})
                     add_radar_log(f"⏰ Рассылка отложена до {run_at_str.replace('T', ' ')}")
                     return jsonify({"success": True, "message": "⏰ Рассылка успешно поставлена в очередь!"})
             except Exception as e: print("Ошибка таймера:", e)
 
         # 🚀 ЗАПУСК СЕЙЧАС (если дата не указана)
-        threading.Thread(target=execute_broadcast, args=(text, target, buttons_list), daemon=True).start()
-        return jsonify({"success": True, "message": "🚀 Рассылка запущена в фоне!"})
+        db['broadcast_history'].insert_one({"_id": bid, "target": target, "text": text[:4000], "buttons": buttons_list,
+                                            "admin": admin, "source": "Панель", "status": "running", "started_at": time.time(),
+                                            "total": total, "sent": 0, "blocked": 0, "dead": 0, "failed": 0})
+        threading.Thread(target=execute_broadcast, args=(text, target, buttons_list), kwargs={"bid": bid, "admin": admin}, daemon=True).start()
+        return jsonify({"success": True, "message": "🚀 Рассылка запущена — прогресс в «Истории рассылок»"})
 
     @app.route('/glaz/api/broadcast_stats')
     def api_broadcast_stats():
         if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
-        # Собираем очередь
+        fmt = lambda ts: datetime.fromtimestamp(ts, BC_TZ).strftime("%d.%m %H:%M") if ts else ""
         scheduled = list(db['scheduled_broadcasts'].find({"status": "pending"}).sort("run_at", 1))
-        sched_res = [{"id": str(s["_id"]), "target": s["target"], "time": datetime.fromtimestamp(s["run_at"]).strftime("%d.%m.%Y %H:%M")} for s in scheduled]
-        # Собираем статистику кликов
-        links = list(db['tracked_links'].find().sort("timestamp", -1).limit(50))
-        links_res = [{"id": L["_id"], "name": L.get("name", "Кнопка"), "url": L.get("url", ""), "clicks": L.get("clicks", 0), "time": datetime.fromtimestamp(L.get("timestamp", time.time())).strftime("%d.%m.%Y %H:%M")} for L in links]
-            
-        return jsonify({"scheduled": sched_res, "links": links_res})
+        sched_res = [{"id": str(s["_id"]), "target": s["target"], "target_label": BC_TARGETS.get(s["target"], s["target"]),
+                      "time": fmt(s["run_at"]), "text": str(s.get("text", ""))[:160], "admin": s.get("admin", "")} for s in scheduled]
+        clicks = {}
+        for L in db['tracked_links'].find({"bid": {"$exists": True}}, {"bid": 1, "clicks": 1, "name": 1}):
+            c = clicks.setdefault(L["bid"], {"total": 0, "buttons": []})
+            c["total"] += int(L.get("clicks") or 0)
+            c["buttons"].append({"name": L.get("name", "Кнопка"), "clicks": int(L.get("clicks") or 0)})
+        hist = []
+        for h in db['broadcast_history'].find({"status": {"$ne": "scheduled"}}).sort([("started_at", -1)]).limit(25):
+            hist.append({"id": h["_id"], "target": h.get("target"), "target_label": BC_TARGETS.get(h.get("target"), h.get("target")),
+                         "text": str(h.get("text", ""))[:300], "admin": h.get("admin", ""), "source": h.get("source", ""),
+                         "status": h.get("status"), "started": fmt(h.get("started_at")), "finished": fmt(h.get("finished_at")),
+                         "total": h.get("total", 0), "sent": h.get("sent", 0), "blocked": h.get("blocked", 0),
+                         "dead": h.get("dead", 0), "failed": h.get("failed", 0), "clicks": clicks.get(h["_id"])})
+        # старые кнопки (до истории) — отдельным списком
+        links = list(db['tracked_links'].find({"bid": {"$exists": False}}).sort("timestamp", -1).limit(30))
+        links_res = [{"id": L["_id"], "name": L.get("name", "Кнопка"), "url": L.get("url", ""), "clicks": L.get("clicks", 0),
+                      "time": fmt(L.get("timestamp"))} for L in links]
+        return jsonify({"scheduled": sched_res, "history": hist, "links": links_res})
+
+    @app.route('/glaz/api/broadcast/audience')
+    def api_broadcast_audience():
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+        out = {"groups_all": len(_bc_groups())}
+        for k in ("all", "vip", "queer"):
+            out[k] = users_collection.count_documents(_bc_audience_query(k))
+        return jsonify(out)
+
+    @app.route('/glaz/api/broadcast/stop', methods=['POST'])
+    def api_broadcast_stop():
+        if not session.get('logged_in'): return jsonify({"success": False}), 401
+        bid = (request.json or {}).get("id")
+        r = db['broadcast_history'].update_one({"_id": bid, "status": "running"}, {"$set": {"status": "stopping"}})
+        add_radar_log(f"⛔ {session.get('login')} остановил рассылку {bid}")
+        return jsonify({"success": bool(r.modified_count)})
     
     @app.route('/glaz/api/cancel_broadcast', methods=['POST'])
     def api_cancel_broadcast():
         if not session.get('logged_in'): return jsonify({"success": False}), 401
         from bson import ObjectId
-        db['scheduled_broadcasts'].delete_one({"_id": ObjectId(request.json.get("id"))})
+        s = db['scheduled_broadcasts'].find_one_and_delete({"_id": ObjectId(request.json.get("id")), "status": "pending"})
+        if s and s.get("bid"):
+            db['broadcast_history'].delete_one({"_id": s["bid"], "status": "scheduled"})
         return jsonify({"success": True})
     # 👆 ================================================== 👆
 
@@ -872,6 +966,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
 
     @app.route('/glaz/api/templates', methods=['GET'])
     def api_get_templates():
+        if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
         templates = list(db['templates'].find({}, {"_id": 0}))
         return jsonify(templates)
 

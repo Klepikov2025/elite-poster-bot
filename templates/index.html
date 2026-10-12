@@ -475,6 +475,139 @@
         .st-empty { color: var(--dim); font-size: 13px; padding: 14px 0; text-align: center; }
 
 
+
+        /* =================== 📩 ВХОДЯЩИЕ 2.0 =================== */
+        .ib-tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .ib-tools .seg-btn b { font-weight: 700; color: var(--danger); margin-left: 2px; }
+        .ib-search { background: var(--surface); border: 1px solid var(--line); color: var(--text); border-radius: 10px; padding: 8px 12px; font: 13px var(--sans); width: 240px; }
+        .ib-search:focus { outline: none; border-color: var(--accent); }
+        .ib { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 12px; height: calc(100vh - 170px); min-height: 560px; }
+        .ib-list { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+        .ib-items { flex: 1; overflow-y: auto; }
+        .ib-item { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 4px 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); cursor: pointer; position: relative; }
+        .ib-item:hover { background: var(--surface-2); }
+        .ib-item.active { background: var(--surface-3); box-shadow: inset 3px 0 0 var(--accent); }
+        .ib-ava { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 15px; color: #fff; grid-row: span 2; }
+        .ib-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ib-time { font: 500 11px var(--mono); color: var(--dim); text-align: right; white-space: nowrap; }
+        .ib-time.late { color: var(--warn); }
+        .ib-snip { grid-column: 2; font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ib-unread { grid-column: 3; justify-self: end; min-width: 20px; height: 20px; border-radius: 10px; background: var(--danger); color: #fff; font: 700 11px var(--sans); display: grid; place-items: center; padding: 0 6px; }
+        .ib-done { grid-column: 3; justify-self: end; font-size: 11px; color: var(--dim); }
+        .ib-tags { grid-column: 2 / -1; display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+        .ib-tags .chip { padding: 1px 7px; font-size: 10.5px; }
+        .ib-empty { color: var(--dim); text-align: center; padding: 28px 12px; font-size: 13px; }
+        .ib-wrath { border-top: 1px solid var(--line); padding: 10px 14px; font-size: 12.5px; }
+        .ib-wrath summary { cursor: pointer; color: #ff9fb1; font-weight: 600; }
+        .ib-wrath #wrath-radar-box { margin-top: 8px; max-height: 140px; overflow-y: auto; color: #c5c8cf; }
+        .ib-chat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+        .ib-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); min-height: 40px; flex-wrap: wrap; }
+        .ib-head-empty { color: var(--muted); }
+        .ib-head .who { min-width: 0; flex: 1; }
+        .ib-head .who b { font-size: 15px; }
+        .ib-head .who .muted { font: 12px var(--mono); }
+        .ib-head .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+        .ib-head .acts a.btn { text-decoration: none; }
+        .ib-back { display: none; }
+        .ib-msgs { flex: 1; overflow-y: auto; padding: 18px 16px; display: flex; flex-direction: column; gap: 10px; background: var(--bg); }
+        .ib-placeholder { margin: auto; text-align: center; color: var(--muted); line-height: 1.6; }
+        .ib-ph-ico { font-size: 34px; margin-bottom: 6px; opacity: .6; }
+        .ib-day { align-self: center; font: 500 11px var(--mono); color: var(--dim); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; margin: 6px 0; }
+        .ib-msg { max-width: min(75%, 620px); padding: 9px 13px 7px; border-radius: 14px; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+        .ib-msg.user { align-self: flex-start; background: var(--surface-2); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+        .ib-msg.admin { align-self: flex-end; background: #2b2140; border: 1px solid #3d2f5c; border-bottom-right-radius: 4px; }
+        .ib-msg .meta { display: block; text-align: right; font: 500 10.5px var(--mono); color: var(--dim); margin-top: 3px; white-space: normal; }
+        .ib-msg.admin .meta { color: #9d8cc0; }
+        .ib-msg a { color: #b9a2ff; }
+        .ib-compose { border-top: 1px solid var(--line); padding: 10px 12px 12px; background: var(--surface); }
+        .ib-compose.off { opacity: .45; pointer-events: none; }
+        .ib-quick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+        .ib-quick .q { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line-2); background: var(--surface-2); color: #c5c8cf; border-radius: 999px; font: 600 12px var(--sans); padding: 4px 4px 4px 10px; cursor: pointer; }
+        .ib-quick .q:hover { border-color: var(--accent); color: var(--text); }
+        .ib-quick .q i { font-style: normal; color: var(--dim); padding: 0 6px; border-radius: 50%; }
+        .ib-quick .q i:hover { color: var(--danger); }
+        .ib-quick .q.add { padding: 4px 10px; border-style: dashed; color: var(--muted); }
+        .ib-btns { margin-top: 8px; font-size: 12.5px; }
+        .ib-btns summary { cursor: pointer; color: #c5c8cf; }
+        .ib-btns #ticket-buttons-container { margin: 8px 0; }
+        .ib-send-row { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 8px; }
+        .ib-hint { font-size: 12px; }
+        .btn-row-in { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+        .btn-row-in input, .btn-row-in select { flex: 1 1 140px; min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--line-2); border-radius: 8px; padding: 7px 10px; font: 13px var(--sans); }
+        .btn-row-in input:focus, .btn-row-in select:focus { outline: none; border-color: var(--accent); }
+        .btn-row-in .x { flex: 0 0 auto; }
+        /* редактор в стиле панели */
+        .ib-compose .note-editor, .bc .note-editor { border: 1px solid var(--line-2) !important; border-radius: 10px !important; overflow: hidden; background: var(--bg) !important; }
+        .ib-compose .note-toolbar, .bc .note-toolbar { background: var(--surface-2) !important; border-bottom: 1px solid var(--line) !important; padding: 4px 6px !important; }
+        .ib-compose .note-btn, .bc .note-btn { background: transparent !important; border: 1px solid transparent !important; color: #c5c8cf !important; border-radius: 6px !important; }
+        .ib-compose .note-btn:hover, .bc .note-btn:hover { background: var(--surface-3) !important; border-color: var(--line-2) !important; color: var(--text) !important; }
+        .ib-compose .note-editable, .bc .note-editable { background: var(--bg) !important; color: var(--text) !important; font: 14px/1.5 var(--sans) !important; }
+        .ib-compose .note-statusbar, .bc .note-statusbar { background: var(--surface-2) !important; border-top: 1px solid var(--line) !important; }
+        .ib-compose .note-placeholder, .bc .note-placeholder { color: var(--dim) !important; }
+
+        /* =================== 🚀 РАССЫЛКА 2.0 =================== */
+        .bc { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; align-items: start; margin-bottom: 12px; }
+        .bc-main { display: grid; gap: 12px; min-width: 0; }
+        .bc-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; min-width: 0; }
+        .bc-main .bc-card { margin-bottom: 0; }
+        .bc-step { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; margin-bottom: 12px; }
+        .bc-step span { min-width: 24px; height: 24px; border-radius: 50%; background: var(--surface-3); border: 1px solid var(--line-2); display: grid; place-items: center; font-size: 12px; }
+        .bc-sub { font-weight: 600; font-size: 13px; color: #c5c8cf; margin: 14px 0 8px; }
+        .bc-note { color: var(--muted); font-size: 12.5px; margin: 10px 0 0; }
+        .bc-targets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+        .bc-tgt { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 12px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface-2); cursor: pointer; }
+        .bc-tgt input { position: absolute; opacity: 0; pointer-events: none; }
+        .bc-tgt b { font-size: 13.5px; }
+        .bc-tgt small { color: var(--muted); font-size: 11.5px; }
+        .bc-tgt em { font: 700 18px var(--sans); font-style: normal; margin-top: 4px; }
+        .bc-tgt:has(input:checked) { border-color: var(--accent); background: rgba(187,134,252,.08); box-shadow: inset 0 0 0 1px var(--accent); }
+        .bc-tgt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .bc-when { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .bc-time { background: var(--bg); color: var(--text); border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 10px; font: 13px var(--sans); color-scheme: dark; }
+        .bc-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
+        .bc-sticky { position: sticky; top: 76px; margin-bottom: 0; }
+        .tg-screen { background: #0e1621 radial-gradient(circle at 20% 10%, #17212b, #0e1621 70%); border-radius: 12px; padding: 14px 12px; min-height: 160px; border: 1px solid var(--line); }
+        .tg-bubble { background: #182533; color: #f5f5f5; border-radius: 12px 12px 12px 4px; padding: 8px 11px; font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; max-width: 100%; }
+        .tg-bubble a { color: #6ab3f3; }
+        .tg-bubble code, .tg-bubble pre { font-family: var(--mono); font-size: 12.5px; }
+        .tg-kb { display: grid; gap: 4px; margin-top: 4px; }
+        .tg-kb span { background: rgba(24,37,51,.85); color: #fff; text-align: center; border-radius: 8px; padding: 7px; font-size: 13px; font-weight: 500; }
+        .tg-kb span.primary { background: #2f6ea5; } .tg-kb span.success { background: #2e7d4f; } .tg-kb span.danger { background: #a23b4c; }
+        .bc-sum { margin-top: 12px; font-size: 13px; color: #c5c8cf; line-height: 1.6; }
+        .bc-sum b { color: var(--text); }
+        .bc-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+        .bc-list { display: grid; gap: 8px; }
+        .bc-row { border: 1px solid var(--line); background: var(--surface-2); border-radius: 10px; padding: 12px 14px; display: grid; gap: 8px; }
+        .bc-row-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .bc-row-top .when { font: 500 12px var(--mono); color: var(--muted); }
+        .bc-row-top .sp { flex: 1; }
+        .bc-txt { font-size: 13px; color: #c5c8cf; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .bc-prog { height: 8px; border-radius: 4px; background: var(--surface); overflow: hidden; display: flex; }
+        .bc-prog i { display: block; height: 100%; }
+        .bc-nums { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+        .bc-nums b { color: var(--text); font-variant-numeric: tabular-nums; }
+        .bc-nums .dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+        .bc-clicks { font-size: 12.5px; color: var(--muted); }
+        .bc-clicks b { color: var(--teal); }
+        .bc-old { margin-top: 12px; font-size: 12.5px; color: var(--muted); }
+        .bc-old summary { cursor: pointer; }
+        .bc-tpl-save { display: flex; gap: 8px; flex-wrap: wrap; }
+        .bc-tpl-save input { background: var(--bg); color: var(--text); border: 1px solid var(--line-2); border-radius: 8px; padding: 7px 10px; font: 13px var(--sans); width: 220px; }
+        .bc-tpl-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; }
+        .bc-tpl-row select { background: var(--bg); color: var(--text); border: 1px solid var(--line-2); border-radius: 8px; padding: 6px 8px; font: 12.5px var(--sans); }
+        @media (max-width: 1100px) { .bc { grid-template-columns: 1fr; } .bc-sticky { position: static; } .bc-targets { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 860px) {
+            .ib { grid-template-columns: 1fr; height: auto; min-height: 0; }
+            .ib-list { max-height: none; }
+            .ib.chat-open .ib-list { display: none; }
+            .ib:not(.chat-open) .ib-chat { display: none; }
+            .ib-chat { height: calc(100vh - 150px); min-height: 520px; }
+            .ib-back { display: inline-flex; }
+            .ib-search { width: 100%; }
+            .ib-tools { width: 100%; }
+            .bc-tpl-row { grid-template-columns: 1fr; }
+            .ib-hint { display: none; }
+        }
         /* «Кто в базе» и воронки */
         .pp-note { font: 500 11.5px var(--mono); color: var(--dim); }
         .pp-bar { height: 18px; border-radius: 9px; }
@@ -892,43 +1025,49 @@
     </div>
 
     <div id="tab-support" class="tab-content">
-        <div class="panel-block" style="max-width: 1200px; padding: 0; background: transparent; box-shadow: none;">
-            <div class="chat-app">
-                <div class="chat-sidebar" style="width: 350px;">
-                    <div style="padding: 15px; background: #252525; border-bottom: 1px solid #333; font-weight: bold; color: #03dac6; text-align: center;">
-                        📩 Служба Поддержки
-                        <button style="background: none; border:none; cursor:pointer;" onclick="loadSupportTickets()">🔄</button>
-                    </div>
-                    <div style="margin: 10px; background: rgba(207, 102, 121, 0.05); border: 1px solid #cf6679; padding: 10px; border-radius: 8px;">
-                        <span style="color: #cf6679; font-weight: bold; font-size: 12px; display: block; margin-bottom: 5px;">🚨 РАДАР ГНЕВА (Жалобы 1-2⭐️)</span>
-                        <div id="wrath-radar-box" style="font-size: 11px; color: #ccc; max-height: 100px; overflow-y: auto;">
-                            Сканирование эфира...
-                        </div>
-                    </div>
-                    <div id="tickets-list-container">
-                        <div style="padding: 20px; text-align: center; color: #888;">Загрузка сообщений...</div>
-                    </div>
+        <div class="sec-head">
+            <div><h2>Входящие</h2><p>Вопросы из Скайнета (кнопка «💬 Написать в Поддержку»). Секретарь отвечает в своей группе-форуме.</p></div>
+            <div class="ib-tools">
+                <div class="seg" role="tablist" aria-label="Какие диалоги показать">
+                    <button class="seg-btn active" data-v="wait" onclick="ibSetView('wait')">Ждут ответа <b id="ib-cnt-wait"></b></button>
+                    <button class="seg-btn" data-v="open" onclick="ibSetView('open')">Все открытые</button>
+                    <button class="seg-btn" data-v="archive" onclick="ibSetView('archive')">Архив</button>
                 </div>
-                
-                <div class="chat-main">
-                    <div class="chat-header" id="ticket-header">Выберите сообщение из списка слева</div>
-                    <div class="chat-messages" id="ticket-box" style="padding: 20px;">
-                        <div style="color: #888; text-align: center; margin-top: 40px;">Здесь появится текст вопроса.</div>
-                    </div>
-                    <div style="padding: 15px; background: #1e1e1e; border-top: 1px solid #333; border-radius: 0 0 10px 10px;">
-                        <textarea id="ticket-reply-text" class="form-control" placeholder="Написать ответ пользователю..." style="width: 100%; height: 60px; background: #121212; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 5px; margin-bottom: 10px; resize: vertical; box-sizing: border-box; font-size: 13px;"></textarea>
-                        
-                        <label style="color: #aaa; font-size: 14px; display:block; margin-top:10px; margin-bottom:8px;">🎛 Кнопки для ответа (необязательно):</label>
-                        <div id="ticket-buttons-container" style="margin-bottom: 15px;"></div>
-                        <button onclick="addTicketButtonRow('', '')" class="tab-btn" style="color: #03dac6; border-color: #03dac6; margin-bottom: 20px; font-size: 12px; padding: 6px 12px;">➕ Добавить кнопку</button>
-                        <div style="display: flex; gap: 10px;">
-                            <button class="form-btn" style="flex: 2; background: #03dac6; color: #121212; font-weight: bold;" onclick="sendTicketReply()">📤 Отправить ответ</button>
-                            <button class="form-btn" style="flex: 1; background: #252525; color: #aaa; border: 1px solid #444;" onclick="closeTicket()" onmouseover="this.style.color='#fff'; this.style.borderColor='#cf6679';" onmouseout="this.style.color='#aaa'; this.style.borderColor='#444';">✅ Вопрос Решен</button>
-                        </div>
-                        
-                    </div>
-                </div>
+                <input id="ib-search" class="ib-search" type="search" placeholder="Поиск: имя, @ник, ID, текст" oninput="ibSearchSoon()">
             </div>
+        </div>
+        <div class="ib" id="ib">
+            <aside class="ib-list">
+                <div id="tickets-list-container" class="ib-items"><div class="ib-empty">Загрузка…</div></div>
+                <details class="ib-wrath">
+                    <summary>🚨 Жалобы на поддержку (1–2⭐)</summary>
+                    <div id="wrath-radar-box">Загрузка…</div>
+                </details>
+            </aside>
+            <section class="ib-chat">
+                <header class="ib-head" id="ticket-header">
+                    <div class="ib-head-empty">Выберите диалог слева</div>
+                </header>
+                <div class="ib-msgs" id="ticket-box">
+                    <div class="ib-placeholder">
+                        <div class="ib-ph-ico">📩</div>
+                        <div>Здесь появится переписка.<br><span class="muted">Сначала показаны те, кто ждёт ответа дольше всех.</span></div>
+                    </div>
+                </div>
+                <footer class="ib-compose" id="ib-compose">
+                    <div class="ib-quick" id="ib-quick"></div>
+                    <textarea id="ticket-reply-text"></textarea>
+                    <details class="ib-btns">
+                        <summary>🎛 Кнопки под ответом <span class="muted">(необязательно)</span></summary>
+                        <div id="ticket-buttons-container"></div>
+                        <button type="button" class="btn sm ghost" onclick="addTicketButtonRow('', '')">＋ Добавить кнопку</button>
+                    </details>
+                    <div class="ib-send-row">
+                        <span class="muted ib-hint">Ctrl + Enter — отправить</span>
+                        <button class="btn primary" id="ib-send" onclick="sendTicketReply()">Отправить ответ</button>
+                    </div>
+                </footer>
+            </section>
         </div>
     </div>
 
@@ -970,64 +1109,87 @@
     <!-- 👆 =================================== 👆 -->
 
     <div id="tab-broadcast" class="tab-content">
-        <div class="panel-block" style="max-width: 1000px;">
-            <h3 style="color: #bb86fc;">🚀 Центр Рассылок</h3>
-            
-            <textarea id="broadcast-text"></textarea>
-            
-            <div id="broadcast-buttons-container" style="margin-top: 15px; margin-bottom: 15px;"></div>
-            <button onclick="addBroadcastButtonRow('', '')" class="tab-btn" style="color: #03dac6; border-color: #03dac6; margin-bottom: 20px; font-size: 12px; padding: 6px 12px;">➕ Добавить кнопку (URL)</button>
+        <div class="sec-head">
+            <div><h2>Рассылка</h2><p>Сообщение от бота в группы сети или в личку участникам. Время — по Екатеринбургу (МСК+2).</p></div>
+        </div>
 
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <select id="broadcast-target" class="form-input" style="flex: 1;">
-                    <option value="groups_all" style="font-weight: bold; color: #03dac6;">📢 Все группы сети (Чаты)</option>
-                    <option value="all">🌐 Всем пользователям базы (ЛС)</option>
-                    <option value="vip">👑 Только VIP Элита (ЛС)</option>
-                    <option value="queer">🏳️‍🌈 Только участники QUEER (ЛС)</option>
-                </select>
-                <input type="datetime-local" id="broadcast-time" class="form-input" style="flex: 1;" title="Оставьте пустым для мгновенной отправки">
-            </div>
-            
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <button class="form-btn" style="background: #3390ec; color: #fff; font-weight: bold; font-size: 16px;" onclick="previewBroadcast()">👀 ТЕСТ (ЛС)</button>
-                <button class="form-btn" style="flex: 1; background: #03dac6; color: #121212; font-weight: bold; font-size: 16px;" onclick="fireBroadcast()">🚀 ЗАПУСТИТЬ / ЗАПЛАНИРОВАТЬ</button>
-            </div>
-            
-            <div style="margin-top: 30px; border-top: 2px dashed #333; padding-top: 20px;">
-                <h3 style="color: #ffb74d; margin-bottom: 15px;">⏰ Очередь и 📊 Статистика кликов (CTR)</h3>
-                <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 300px;">
-                        <h4 style="color: #aaa; margin-top: 0;">Ожидают отправки:</h4>
-                        <table class="admin-table">
-                            <thead><tr><th>Время</th><th>Аудитория</th><th>Отмена</th></tr></thead>
-                            <tbody id="scheduled-tbody"><tr><td colspan="3" style="text-align: center; color:#888;">Пусто</td></tr></tbody>
-                        </table>
+        <div class="bc">
+            <div class="bc-main">
+                <div class="bc-card">
+                    <div class="bc-step"><span>1</span>Кому отправить</div>
+                    <div class="bc-targets" id="bc-targets">
+                        <label class="bc-tgt"><input type="radio" name="bc-tgt" value="groups_all" checked><b>📢 Все группы сети</b><small>сообщение в каждом чате</small><em id="bc-n-groups_all">…</em></label>
+                        <label class="bc-tgt"><input type="radio" name="bc-tgt" value="all"><b>🌐 Всем в личку</b><small>все живые аккаунты базы</small><em id="bc-n-all">…</em></label>
+                        <label class="bc-tgt"><input type="radio" name="bc-tgt" value="vip"><b>👑 VIP</b><small>в личку</small><em id="bc-n-vip">…</em></label>
+                        <label class="bc-tgt"><input type="radio" name="bc-tgt" value="queer"><b>🏳️‍🌈 BEYOND</b><small>в личку</small><em id="bc-n-queer">…</em></label>
                     </div>
-                    <div style="flex: 1; min-width: 300px;">
-                        <h4 style="color: #03dac6; margin-top: 0;">Живой трекер нажатий:</h4>
-                        <table class="admin-table">
-                            <thead><tr><th>Кнопка</th><th>Клики</th><th>Дата</th></tr></thead>
-                            <tbody id="clicks-tbody"><tr><td colspan="3" style="text-align: center; color:#888;">Пусто</td></tr></tbody>
-                        </table>
+                    <select id="broadcast-target" hidden>
+                        <option value="groups_all">groups_all</option><option value="all">all</option><option value="vip">vip</option><option value="queer">queer</option>
+                    </select>
+                    <p class="bc-note">В личку дойдёт не всем: часть людей заблокировала бота. Удалённые аккаунты пропускаются, а их «трупы» чистятся из групп.</p>
+                </div>
+
+                <div class="bc-card">
+                    <div class="bc-step"><span>2</span>Текст</div>
+                    <textarea id="broadcast-text"></textarea>
+                    <div class="bc-sub">Кнопки-ссылки под сообщением</div>
+                    <div id="broadcast-buttons-container"></div>
+                    <button type="button" class="btn sm ghost" onclick="addBroadcastButtonRow('', '')">＋ Добавить кнопку</button>
+                    <p class="bc-note">Клики по кнопкам считаются — увидите их в истории ниже.</p>
+                </div>
+
+                <div class="bc-card">
+                    <div class="bc-step"><span>3</span>Когда</div>
+                    <div class="bc-when">
+                        <div class="seg">
+                            <button type="button" class="seg-btn active" data-w="now" onclick="bcWhen('now')">Сразу</button>
+                            <button type="button" class="seg-btn" data-w="later" onclick="bcWhen('later')">По времени</button>
+                        </div>
+                        <input type="datetime-local" id="broadcast-time" class="bc-time" hidden>
+                    </div>
+                    <div class="bc-actions">
+                        <button class="btn" onclick="previewBroadcast()">👀 Прислать тест себе</button>
+                        <button class="btn primary" id="bc-fire" onclick="fireBroadcast()">🚀 Запустить</button>
                     </div>
                 </div>
             </div>
 
-            <div style="margin-top: 30px; border-top: 2px dashed #333; padding-top: 20px;">
-                <h3 style="color: #03dac6; margin-bottom: 15px;">🤖 База Шаблонов и Автопилот</h3>
-                
-                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                    <input type="text" id="template-name" class="form-input" placeholder="Название шаблона (напр. Реклама VPN)" style="flex: 1;">
-                    <button class="form-btn" style="background: #bb86fc; color: #121212;" onclick="saveTemplate()">💾 Сохранить текущий пост как Шаблон</button>
+            <aside class="bc-side">
+                <div class="bc-card bc-sticky">
+                    <div class="bc-sub" style="margin-top:0">Так увидят в Telegram</div>
+                    <div class="tg-screen">
+                        <div class="tg-bubble" id="bc-preview"><span class="muted">Начните писать текст…</span></div>
+                        <div class="tg-kb" id="bc-preview-kb"></div>
+                    </div>
+                    <div class="bc-sum" id="bc-sum"></div>
                 </div>
+            </aside>
+        </div>
 
-                <table class="admin-table">
-                    <thead><tr><th>Название</th><th>Аудитория</th><th>Автопилот</th><th>Действия</th></tr></thead>
-                    <tbody id="templates-tbody">
-                        <tr><td colspan="4" style="text-align: center; color: #888;">Загрузка шаблонов...</td></tr>
-                    </tbody>
-                </table>
+        <div class="bc-card">
+            <div class="bc-head"><div class="bc-step" style="margin:0"><span>⏰</span>Запланировано</div></div>
+            <div id="scheduled-tbody" class="bc-list"><div class="ib-empty">Пусто</div></div>
+        </div>
+
+        <div class="bc-card">
+            <div class="bc-head"><div class="bc-step" style="margin:0"><span>📊</span>История рассылок</div><span class="muted" id="bc-hist-upd"></span></div>
+            <div id="bc-history" class="bc-list"><div class="ib-empty">Загрузка…</div></div>
+            <details class="bc-old" id="bc-old-wrap" hidden>
+                <summary>Клики по старым кнопкам (до истории)</summary>
+                <div id="clicks-tbody"></div>
+            </details>
+        </div>
+
+        <div class="bc-card">
+            <div class="bc-head">
+                <div class="bc-step" style="margin:0"><span>🤖</span>Шаблоны и автопилот</div>
+                <div class="bc-tpl-save">
+                    <input type="text" id="template-name" placeholder="Название шаблона">
+                    <button class="btn sm" onclick="saveTemplate()">💾 Сохранить текущий текст</button>
+                </div>
             </div>
+            <p class="bc-note" style="margin-top:0">Автопилот сам повторяет шаблон с выбранной периодичностью (только рассылки в личку).</p>
+            <div id="templates-tbody" class="bc-list"><div class="ib-empty">Загрузка…</div></div>
         </div>
     </div>
     <div id="tab-mass" class="tab-content">
@@ -1859,21 +2021,8 @@
             toolbar: [['style', ['bold', 'italic', 'underline', 'strikethrough', 'clear']], ['insert', ['link']], ['view', ['codeview']]],
             disableDragAndDrop: true, dialogsInBody: true
         };
-        if (tabId === 'tab-broadcast') {
-            loadTemplates();
-            loadBroadcastStats();
-            if (!$('#broadcast-text').hasClass('sn-loaded')) {
-                $('#broadcast-text').summernote({ ...minimalToolbar, height: 250, placeholder: 'Введите текст рассылки...' });
-                $('#broadcast-text').addClass('sn-loaded');
-            }
-        }
-        if (tabId === 'tab-support') {
-            loadSupportTickets();
-            if (!$('#ticket-reply-text').hasClass('sn-loaded')) {
-                $('#ticket-reply-text').summernote({ ...minimalToolbar, height: 150, placeholder: 'Напишите ответ пользователю...' });
-                $('#ticket-reply-text').addClass('sn-loaded');
-            }
-        }
+        if (tabId === 'tab-broadcast') bcStart();
+        if (tabId === 'tab-support') ibStart();
     }
 
     // ===== 🔥 ЧТО ГОРИТ =====
@@ -2306,135 +2455,6 @@ function toggleSetting(key) {
             .then(res => res.json()).then(data => { if(data.success) { showToast("✅ Новорег амнистирован!"); loadQuarantine(); } });
         }
 
-        // 1. Создание строки кнопки для рассылки
-function addBroadcastButtonRow(text, url, style = 'default', emojiId = '') {
-    const row = document.createElement('div');
-    row.style.cssText = "display:flex; gap:10px; margin-bottom:10px;";
-    row.className = "bc-btn-row";
-    row.innerHTML = `
-        <input type="text" placeholder="Текст кнопки" value="${text}" class="form-control" style="width: 25%; background: #222; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 5px;">
-        <input type="text" placeholder="Ссылка (https://...)" value="${url}" class="form-control" style="width: 30%; background: #222; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 5px;">
-        <select class="form-control" style="width: 20%; background: #222; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 5px;">
-            <option value="default" ${style==='default'?'selected':''}>Обычный</option>
-            <option value="primary" ${style==='primary'?'selected':''}>Синий</option>
-            <option value="success" ${style==='success'?'selected':''}>Зеленый</option>
-            <option value="danger" ${style==='danger'?'selected':''}>Красный</option>
-        </select>
-        <input type="text" placeholder="ID Эмодзи" value="${emojiId}" class="form-control" style="width: 20%; background: #222; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 5px;">
-        <button onclick="this.parentElement.remove()" class="btn btn-danger" style="background: #cf6679; border: none; padding: 8px 12px; border-radius: 5px; color: white; cursor: pointer;">❌</button>
-    `;
-    document.getElementById('broadcast-buttons-container').appendChild(row);
-}
-
-// 2. Модифицированный запуск рассылки с кнопками
-// 👇 ОБНОВЛЕННАЯ ЛОГИКА РАССЫЛКИ, ТАЙМЕРА И СТАТИСТИКИ 👇
-function fireBroadcast() {
-    let rawHtml = $('#broadcast-text').summernote('code');
-    const tgt = document.getElementById('broadcast-target').value;
-    const runAt = document.getElementById('broadcast-time').value; // <-- Забираем дату таймера
-    
-    if(!rawHtml || rawHtml === '<p><br></p>') { showToast("⚠️ Введите текст рассылки!"); return; }
-    const cleanText = cleanTelegramHtml(rawHtml);
-    
-    const rows = document.querySelectorAll('#broadcast-buttons-container .bc-btn-row');
-    const buttons = [];
-    rows.forEach(row => {
-        const inputs = row.querySelectorAll('input');
-        const select = row.querySelector('select');
-        const bText = inputs[0].value.trim(); const bUrl = inputs[1].value.trim();
-        const bStyle = select.value; const bEmojiId = inputs[2].value.trim();
-        if(bText && bUrl) { buttons.push({text: bText, url: bUrl, style: bStyle, emoji_id: bEmojiId}); }
-    });
-
-    const formData = new FormData(); 
-    formData.append('text', cleanText); 
-    formData.append('target', tgt);
-    formData.append('run_at', runAt); // <-- Передаем дату Питон-серверу
-    formData.append('buttons', JSON.stringify(buttons)); 
-
-    fetch('/glaz/broadcast', { method: 'POST', body: formData })
-    .then(res => res.json())
-    .then(data => {
-        if(data.success) { 
-            showToast(data.message); 
-            $('#broadcast-text').summernote('reset'); 
-            document.getElementById('broadcast-buttons-container').innerHTML = ''; 
-            document.getElementById('broadcast-time').value = ''; 
-            loadBroadcastStats(); // <-- Обновляем таблички
-        }
-    }).catch(() => showToast("❌ Ошибка отправки"));
-}
-
-function loadBroadcastStats() {
-    fetch('/glaz/api/broadcast_stats').then(res => res.json()).then(data => {
-        // Очередь
-        let schedHtml = '';
-        data.scheduled.forEach(s => {
-            schedHtml += `<tr>
-                <td><span style="color:#ffb74d;">${s.time}</span></td>
-                <td>${s.target === 'all' ? 'Всем' : s.target === 'vip' ? 'VIP' : 'QUEER'}</td>
-                <td><button class="act-btn ban" style="padding:4px 8px; width:auto;" onclick="cancelBroadcast('${s.id}')">❌</button></td>
-            </tr>`;
-        });
-        if(!schedHtml) schedHtml = '<tr><td colspan="3" style="text-align: center; color:#888;">Нет запланированных рассылок</td></tr>';
-        document.getElementById('scheduled-tbody').innerHTML = schedHtml;
-
-        // Клики
-        let linksHtml = '';
-        data.links.forEach(l => {
-            linksHtml += `<tr>
-                <td title="${l.url}"><strong>${l.name}</strong></td>
-                <td><span style="color:#03dac6; font-size:16px; font-weight:bold;">${l.clicks}</span></td>
-                <td><span style="font-size:11px; color:#888;">${l.time}</span></td>
-            </tr>`;
-        });
-        if(!linksHtml) linksHtml = '<tr><td colspan="3" style="text-align: center; color:#888;">Статистика пуста</td></tr>';
-        document.getElementById('clicks-tbody').innerHTML = linksHtml;
-    });
-}
-
-function cancelBroadcast(id) {
-    if(!confirm("Отменить запланированную рассылку?")) return;
-    fetch('/glaz/api/cancel_broadcast', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({id: id})
-    }).then(res => res.json()).then(data => {
-        if(data.success) { showToast("🚫 Рассылка отменена"); loadBroadcastStats(); }
-    });
-}
-// 👆 ======================================================== 👆
-
-// 👇 НОВАЯ ФУНКЦИЯ ПРЕДПРОСМОТРА РАССЫЛКИ 👇
-function previewBroadcast() {
-    let rawHtml = $('#broadcast-text').summernote('code');
-    if(!rawHtml || rawHtml === '<p><br></p>') { showToast("⚠️ Введите текст для теста!"); return; }
-    
-    // Очищаем HTML перед тестом
-    const cleanText = cleanTelegramHtml(rawHtml);
-    
-    const rows = document.querySelectorAll('#broadcast-buttons-container .bc-btn-row');
-    const buttons = [];
-    rows.forEach(row => {
-        const inputs = row.querySelectorAll('input');
-        const select = row.querySelector('select');
-        if(inputs[0].value.trim() && inputs[1].value.trim()) { 
-            buttons.push({text: inputs[0].value.trim(), url: inputs[1].value.trim(), style: select.value, emoji_id: inputs[2].value.trim()}); 
-        }
-    });
-
-    fetch('/glaz/api/preview_broadcast', { 
-        method: 'POST', 
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({text: cleanText, buttons: buttons}) 
-    })
-    .then(res => res.json())
-    .then(data => {
-        if(data.success) showToast("✅ Тестовое сообщение отправлено вам в ЛС!");
-        else showToast("❌ Ошибка: " + (data.error || "Сбой"));
-    });
-}
-// 👆 ====================================== 👆
-
         // Инициализация графиков
         function loadXRay() { loadPeople(); }   // старое имя — вызывается из других мест
 
@@ -2730,100 +2750,6 @@ function sendSauronMessage(uid) {
     .catch(() => showToast("❌ Ошибка связи с сервером"));
 }
 
-// === АВТОПИЛОТ И ШАБЛОНЫ ===
-function loadTemplates() {
-    fetch('/glaz/api/templates').then(res => res.json()).then(data => {
-        let html = '';
-        data.forEach(t => {
-            const targetName = t.target === 'all' ? '🌐 Всем' : t.target === 'vip' ? '👑 VIP' : '🏳️‍🌈 QUEER';
-            
-            const selectHtml = `
-                <select class="form-control" style="background: #222; color: #fff; border: 1px solid #444; padding: 5px; font-size: 12px; width: 130px;" onchange="toggleAutopilot('${t.id}', this.value)">
-                    <option value="0" ${t.autopilot_interval == 0 ? 'selected' : ''}>Остановлен</option>
-                    <option value="6" ${t.autopilot_interval == 6 ? 'selected' : ''}>Каждые 6 часов</option>
-                    <option value="12" ${t.autopilot_interval == 12 ? 'selected' : ''}>Каждые 12 часов</option>
-                    <option value="24" ${t.autopilot_interval == 24 ? 'selected' : ''}>Раз в сутки (24ч)</option>
-                    <option value="48" ${t.autopilot_interval == 48 ? 'selected' : ''}>Раз в 2 дня</option>
-                    <option value="168" ${t.autopilot_interval == 168 ? 'selected' : ''}>Раз в неделю</option>
-                </select>
-            `;
-
-            const badge = t.autopilot_interval > 0 
-                ? `<span style="color:#03dac6; font-size:10px; display:block; margin-top:3px;">🟢 Активен (${t.autopilot_interval}ч)</span>`
-                : '';
-
-            html += `<tr>
-                <td><strong>${t.name}</strong></td>
-                <td>${targetName}</td>
-                <td>${selectHtml}${badge}</td>
-                <td>
-                    <div style="display:flex; gap:5px;">
-                        <button class="act-btn unban" style="padding: 5px 10px; font-size:11px; width: auto;" onclick='loadTemplateToForm(${JSON.stringify(t).replace(/'/g, "&apos;")})'>📥 Загрузить</button>
-                        <button class="act-btn ban" style="padding: 5px 10px; font-size:11px; width: auto;" onclick="deleteTemplate('${t.id}')">❌</button>
-                    </div>
-                </td>
-            </tr>`;
-        });
-        if(data.length === 0) html = '<tr><td colspan="4" style="text-align: center; color: #888;">Шаблонов пока нет</td></tr>';
-        
-        const tbody = document.getElementById('templates-tbody');
-        if(tbody) tbody.innerHTML = html;
-    });
-}
-
-// 👇 ОБНОВЛЕННАЯ ФУНКЦИЯ СОХРАНЕНИЯ ШАБЛОНА (С ОЧИСТКОЙ HTML) 👇
-function saveTemplate() {
-    const name = document.getElementById('template-name').value.trim();
-    const tgt = document.getElementById('broadcast-target').value;
-    
-    // Берем сырой HTML и сразу очищаем его нашим Санитаром!
-    let rawHtml = $('#broadcast-text').summernote('code');
-    if(!name || !rawHtml || rawHtml === '<p><br></p>') { showToast("⚠️ Введите название и текст рассылки!"); return; }
-    
-    const cleanText = cleanTelegramHtml(rawHtml);
-
-    const rows = document.querySelectorAll('#broadcast-buttons-container .bc-btn-row');
-    const buttons = [];
-    rows.forEach(row => {
-        const inputs = row.querySelectorAll('input');
-        const select = row.querySelector('select');
-        const bText = inputs[0].value.trim(), bUrl = inputs[1].value.trim(), bStyle = select.value, bEmojiId = inputs[2].value.trim();
-        if(bText && bUrl) buttons.push({text: bText, url: bUrl, style: bStyle, emoji_id: bEmojiId});
-    });
-
-    fetch('/glaz/api/templates/save', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name: name, text: cleanText, target: tgt, buttons: buttons})
-    }).then(res => res.json()).then(data => {
-        if(data.success) { showToast("✅ Шаблон сохранен!"); document.getElementById('template-name').value = ''; loadTemplates(); }
-    });
-}
-// 👆 ===================================================================== 👆
-
-function deleteTemplate(id) {
-    if(!confirm("Удалить этот шаблон?")) return;
-    fetch('/glaz/api/templates/delete', {
-        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: id})
-    }).then(res => res.json()).then(data => { if(data.success) loadTemplates(); });
-}
-
-function toggleAutopilot(id, interval) {
-    fetch('/glaz/api/templates/toggle_autopilot', {
-        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: id, interval: interval})
-    }).then(res => res.json()).then(data => { 
-        if(data.success) { showToast(interval > 0 ? "🟢 Автопилот запущен!" : "🔴 Автопилот остановлен!"); loadTemplates(); } 
-    });
-}
-
-// Загрузка шаблона в редактор
-function loadTemplateToForm(t) {
-    $('#broadcast-text').summernote('code', t.text); // <-- Вставляем HTML в редактор
-    document.getElementById('broadcast-target').value = t.target;
-    document.getElementById('broadcast-buttons-container').innerHTML = '';
-    if(t.buttons) { t.buttons.forEach(b => addBroadcastButtonRow(b.text, b.url, b.style, b.emoji_id)); }
-    showToast("📥 Шаблон загружен в редактор!");
-}
-
 // === КОНСТРУКТОР ТЕКСТОВ ===
 function loadSystemTexts() {
     fetch('/glaz/api/system_texts').then(res => res.json()).then(data => {
@@ -2849,195 +2775,6 @@ function saveSystemTexts() {
     .then(data => {
         if(data.success) showToast(data.message);
     }).catch(() => showToast("❌ Ошибка связи с сервером"));
-}
-
-// === СИСТЕМА ТИКЕТОВ (ВХОДЯЩИЕ 2.0 - РЕЖИМ МЕССЕНДЖЕРА) ===
-let currentActiveUid = null;
-let currentActiveName = "";
-
-function loadSupportTickets() {
-    fetch('/glaz/api/tickets').then(res => res.json()).then(data => {
-        let html = '';
-        data.forEach(t => {
-            const statusBadge = t.is_answered 
-                ? '<span style="color:#888; font-size:10px;">✅ Отвечен</span>' 
-                : '<span style="color:#cf6679; font-size:10px; font-weight:bold;">🔴 Новое сообщение</span>';
-                
-            const shortText = t.text.length > 30 ? t.text.substring(0, 30) + '...' : t.text;
-            const safeName = String(t.name || 'Без имени').replace(/'/g, "\\'");
-            
-            html += `<div class="session-item" id="ticket-${t.uid}" onclick="openTicket(${t.uid}, '${safeName}')">
-                        <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px; color: #fff;">${t.name} <span style="font-size: 11px; color: #aaa;">(${t.uid})</span></div>
-                        <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">${shortText}</div>
-                        <div style="display:flex; justify-content:space-between;">${statusBadge}</div>
-                     </div>`;
-        });
-        if(data.length === 0) html = '<div style="padding: 20px; text-align: center; color: #888;">Входящих сообщений нет</div>';
-        document.getElementById('tickets-list-container').innerHTML = html;
-        
-        // Сохраняем подсветку активного чата при автообновлении
-        if(currentActiveUid) {
-            const activeItem = document.getElementById(`ticket-${currentActiveUid}`);
-            if(activeItem) activeItem.classList.add('active');
-        }
-    });
-}
-
-function openTicket(uid, name) {
-    currentActiveUid = uid;
-    currentActiveName = name;
-    
-    document.querySelectorAll('#tickets-list-container .session-item').forEach(el => el.classList.remove('active'));
-    const item = document.getElementById(`ticket-${uid}`);
-    if(item) item.classList.add('active');
-    
-    document.getElementById('ticket-header').innerHTML = `Диалог с: ${name} [ID: ${uid}]`;
-    
-    // Подгружаем ВСЮ историю переписки с сервера для этого юзера
-    fetch(`/glaz/api/tickets/history?uid=${uid}`).then(res => res.json()).then(history => {
-        const box = document.getElementById('ticket-box');
-        box.innerHTML = '';
-        
-        history.forEach(t => {
-            const dateStr = new Date(t.timestamp * 1000).toLocaleString();
-            
-            // Рендерим сообщение пользователя
-            box.innerHTML += `<div class="msg-box msg-guest" style="max-width: 90%; margin-bottom: 5px; align-self: flex-start;">
-                                <div style="font-size:11px; color:#bb86fc; font-weight:bold; margin-bottom:3px;">👤 ${t.name}:</div>
-                                ${t.text}
-                                <div class="msg-meta">${dateStr}</div>
-                             </div>`;
-            
-            // Если на это сообщение был дан ответ админа — выводим его следом в правый бок
-            if(t.reply_text) {
-                box.innerHTML += `<div class="msg-box msg-vip" style="max-width: 90%; background: #03dac6; color: #121212; margin-bottom: 15px; align-self: flex-end;">
-                                    <div style="font-size:11px; font-weight:bold; margin-bottom:3px;">👨‍💻 Ваш ответ:</div>
-                                    ${t.reply_text}
-                                 </div>`;
-            }
-        });
-        box.scrollTop = box.scrollHeight; // Скроллим чат вниз до упора
-    });
-}
-
-// 👇 НОВАЯ ФУНКЦИЯ ДЛЯ ОТРИСОВКИ КНОПОК В САППОРТЕ 👇
-function addTicketButtonRow(text, url) {
-    const row = document.createElement('div');
-    row.style.cssText = "display:flex; gap:10px; margin-bottom:10px;";
-    row.className = "ticket-btn-row";
-    row.innerHTML = `
-        <input type="text" placeholder="Текст кнопки (напр: Оплатить)" value="${text}" class="form-control" style="width: 45%; background: #222; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 5px;">
-        <input type="text" placeholder="Ссылка (https://...)" value="${url}" class="form-control" style="width: 45%; background: #222; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 5px;">
-        <button onclick="this.parentElement.remove()" class="btn btn-danger" style="background: #cf6679; border: none; padding: 8px 12px; border-radius: 5px; color: white; cursor: pointer;">❌</button>
-    `;
-    document.getElementById('ticket-buttons-container').appendChild(row);
-}
-
-// 👇 НОВАЯ ФУНКЦИЯ-САНИТАР (ОЧИЩАЕТ HTML ДЛЯ ТЕЛЕГРАМА) 👇
-function cleanTelegramHtml(html) {
-    // 1. Превращаем параграфы и отступы в обычные переносы строк (\n)
-    let text = html.replace(/<p><br><\/p>/gi, '\n');
-    text = text.replace(/<\/p>/gi, '\n');
-    text = text.replace(/<br\s*\/?>/gi, '\n');
-    text = text.replace(/<\/div>/gi, '\n');
-    
-    // 2. Создаем временный элемент для безопасной зачистки тегов
-    const temp = document.createElement('div');
-    temp.innerHTML = text;
-    
-    function cleanNode(node) {
-        // Список тегов, которые Телеграм РАЗРЕШАЕТ
-        const allowedTags = ['B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'DEL', 'A', 'CODE', 'PRE'];
-        for (let i = node.childNodes.length - 1; i >= 0; i--) {
-            const child = node.childNodes[i];
-            if (child.nodeType === 1) { // Если это HTML-элемент
-                cleanNode(child); // Проверяем его внутренности
-                if (!allowedTags.includes(child.nodeName)) {
-                    // Если тег запрещен (например, SPAN), уничтожаем тег, но оставляем текст внутри него
-                    const fragment = document.createDocumentFragment();
-                    while (child.firstChild) fragment.appendChild(child.firstChild);
-                    node.replaceChild(fragment, child);
-                } else {
-                    // Если тег разрешен (например, A или B), удаляем все стили и классы (оставляем только ссылку href)
-                    const attrs = child.attributes;
-                    for (let j = attrs.length - 1; j >= 0; j--) {
-                        if (child.nodeName === 'A' && attrs[j].name === 'href') continue;
-                        child.removeAttribute(attrs[j].name);
-                    }
-                }
-            }
-        }
-    }
-    cleanNode(temp);
-    
-    // Возвращаем чистый код, убирая лишние пробелы и пустые строки
-    return temp.innerHTML.replace(/\n\s*\n/g, '\n\n').trim();
-}
-// 👆 ==================================================== 👆
-
-// 👇 ОБНОВЛЕННАЯ ФУНКЦИЯ ОТПРАВКИ ОТВЕТА (С ЗАЩИТОЙ) 👇
-function sendTicketReply() {
-    if(!currentActiveUid) { showToast("⚠️ Выберите диалог из списка!"); return; }
-    
-    // 1. Берем сырой HTML из редактора
-    let rawHtml = $('#ticket-reply-text').summernote('code');
-    if(!rawHtml || rawHtml === '<p><br></p>') { showToast("⚠️ Напишите текст ответа!"); return; }
-    
-    // 🛡 2. ПРОПУСКАЕМ ЧЕРЕЗ САНИТАРА ДЛЯ ТЕЛЕГРАМА
-    const cleanText = cleanTelegramHtml(rawHtml);
-
-    // 3. Собираем кнопки
-    const rows = document.querySelectorAll('#ticket-buttons-container .ticket-btn-row');
-    const buttons = [];
-    rows.forEach(row => {
-        const inputs = row.querySelectorAll('input');
-        const bText = inputs[0].value.trim();
-        const bUrl = inputs[1].value.trim();
-        if(bText && bUrl) {
-            buttons.push({text: bText, url: bUrl});
-        }
-    });
-
-    // 4. Отправляем ЧИСТЫЙ текст
-    fetch('/glaz/api/tickets/reply', {
-        method: 'POST', 
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ uid: currentActiveUid, text: cleanText, buttons: buttons }) 
-    })
-    .then(res => res.json())
-    .then(data => {
-        if(data.success) {
-            showToast("✅ Ответ отправлен!");
-            $('#ticket-reply-text').summernote('reset'); 
-            document.getElementById('ticket-buttons-container').innerHTML = ''; 
-            openTicket(currentActiveUid, currentActiveName); 
-            loadSupportTickets(); 
-        } else {
-            showToast("❌ Ошибка: " + (data.error || "Не удалось отправить"));
-        }
-    });
-}
-// 👆 ============================================== 👆
-
-function closeTicket() {
-    if(!currentActiveUid) { showToast("⚠️ Выберите диалог для закрытия!"); return; }
-    if(!confirm("Уверены, что вопрос решен? Диалог будет скрыт в архив.")) return;
-
-    fetch('/glaz/api/tickets/close', {
-        method: 'POST', 
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ uid: currentActiveUid })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if(data.success) {
-            showToast("🧹 Диалог успешно закрыт и убран из панели!");
-            currentActiveUid = null;
-            document.getElementById('ticket-header').innerHTML = 'Выберите сообщение из списка слева';
-            document.getElementById('ticket-box').innerHTML = '<div style="color: #888; text-align: center; margin-top: 40px;">Диалог закрыт.в архив</div>';
-            loadSupportTickets(); // Обновляем список, закрытый контакт исчезнет!
-        }
-    });
 }
 
 function loadAds() {
@@ -4237,6 +3974,451 @@ function loadVerifList() {
             });
         }).catch(() => {});
     }
+</script>
+<script>
+// =================== Общие помощники: безопасный HTML для Telegram ===================
+function _e(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const TG_TAGS = ['B', 'STRONG', 'I', 'EM', 'U', 'INS', 'S', 'STRIKE', 'DEL', 'A', 'CODE', 'PRE', 'BLOCKQUOTE', 'TG-SPOILER'];
+// Чистит HTML до тегов, которые понимает Telegram. DOMParser не выполняет скрипты и не грузит картинки.
+function _tgClean(html, keepBreaks) {
+    let text = String(html || '');
+    if (keepBreaks) text = text.replace(/<p><br><\/p>/gi, '\n').replace(/<\/p>/gi, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<\/div>/gi, '\n');
+    const doc = new DOMParser().parseFromString('<div id="r">' + text + '</div>', 'text/html');
+    const root = doc.getElementById('r');
+    (function walk(node) {
+        for (let i = node.childNodes.length - 1; i >= 0; i--) {
+            const ch = node.childNodes[i];
+            if (ch.nodeType === 8) { ch.remove(); continue; }
+            if (ch.nodeType !== 1) continue;
+            walk(ch);
+            if (!TG_TAGS.includes(ch.nodeName)) {
+                if (['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT'].includes(ch.nodeName)) { ch.remove(); continue; }
+                const frag = doc.createDocumentFragment();
+                while (ch.firstChild) frag.appendChild(ch.firstChild);
+                node.replaceChild(frag, ch);
+            } else {
+                for (const a of Array.from(ch.attributes)) {
+                    const ok = ch.nodeName === 'A' && a.name === 'href' && /^(https?:|tg:)/i.test(a.value.trim());
+                    if (!ok) ch.removeAttribute(a.name);
+                }
+                if (ch.nodeName === 'A') { ch.setAttribute('target', '_blank'); ch.setAttribute('rel', 'noopener'); }
+            }
+        }
+    })(root);
+    return root.innerHTML.replace(/\n\s*\n\s*\n+/g, '\n\n').trim();
+}
+// Старое имя — им пользуются и другие вкладки
+function cleanTelegramHtml(html) { return _tgClean(html, true).replace(/ target="_blank" rel="noopener"/g, ''); }
+function _snEmpty(html) { return !html || !String(html).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim(); }
+function _ago(ts) {
+    const s = Math.max(0, Date.now() / 1000 - ts);
+    if (s < 60) return 'только что';
+    if (s < 3600) return Math.floor(s / 60) + ' мин';
+    if (s < 86400) return Math.floor(s / 3600) + ' ч';
+    if (s < 7 * 86400) return Math.floor(s / 86400) + ' д';
+    return new Date(ts * 1000).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+}
+function _fmtN(n) { return (+n || 0).toLocaleString('ru-RU'); }
+function _btnRow(container, cls, b, withStyle) {
+    const row = document.createElement('div');
+    row.className = 'btn-row-in ' + cls;
+    row.innerHTML = `<input type="text" placeholder="Текст кнопки" aria-label="Текст кнопки">
+        <input type="url" placeholder="Ссылка https://…" aria-label="Ссылка">` +
+        (withStyle ? `<select aria-label="Цвет кнопки"><option value="default">Обычная</option><option value="primary">Синяя</option><option value="success">Зелёная</option><option value="danger">Красная</option></select>
+        <input type="text" placeholder="ID эмодзи (необяз.)" aria-label="ID премиум-эмодзи">` : '') +
+        `<button type="button" class="btn sm danger x" title="Убрать кнопку">✕</button>`;
+    const ins = row.querySelectorAll('input');
+    ins[0].value = b.text || ''; ins[1].value = b.url || '';
+    if (withStyle) { row.querySelector('select').value = b.style || 'default'; ins[2].value = b.emoji_id || ''; }
+    row.querySelector('.x').onclick = () => { row.remove(); container.dispatchEvent(new Event('input', { bubbles: true })); };
+    document.getElementById(container.id).appendChild(row);
+}
+function _readBtns(container, withStyle) {
+    const out = [];
+    container.querySelectorAll('.btn-row-in').forEach(r => {
+        const ins = r.querySelectorAll('input');
+        const t = ins[0].value.trim(), u = ins[1].value.trim();
+        if (!t || !u) return;
+        const b = { text: t, url: u };
+        if (withStyle) { b.style = r.querySelector('select').value; b.emoji_id = ins[2].value.trim(); }
+        out.push(b);
+    });
+    return out;
+}
+
+// =================== 📩 ВХОДЯЩИЕ ===================
+const IB = { view: 'wait', uid: null, name: '', list: [], lastSig: '', histLen: 0, quick: [], timer: null, q: '' };
+let currentActiveUid = null;   // старые имена — на всякий случай
+let currentActiveName = '';
+const AVA_COL = ['#7b5bd6', '#1c8f7a', '#c0662a', '#3d7bc7', '#b0476a', '#5f8f2e', '#8a5a9e'];
+
+function ibSetView(v) {
+    IB.view = v;
+    document.querySelectorAll('#tab-support .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.v === v));
+    loadSupportTickets(true);
+}
+let _ibSearchT = null;
+function ibSearchSoon() { clearTimeout(_ibSearchT); _ibSearchT = setTimeout(() => { IB.q = document.getElementById('ib-search').value.trim(); loadSupportTickets(true); }, 300); }
+
+function loadSupportTickets(force) {
+    const url = '/glaz/api/tickets?view=' + (IB.view === 'archive' ? 'archive' : 'open') + (IB.q ? '&q=' + encodeURIComponent(IB.q) : '');
+    return fetch(url).then(r => r.json()).then(data => {
+        if (!Array.isArray(data)) return;
+        if (IB.view !== 'archive') {
+            const w = data.filter(t => t.unread).length;
+            document.getElementById('ib-cnt-wait').textContent = w ? w : '';
+        }
+        const list = IB.view === 'wait' ? data.filter(t => t.unread) : data;
+        const sig = JSON.stringify(list.map(t => [t.uid, t.timestamp, t.unread]));
+        if (!force && sig === IB.lastSig) return;   // ничего нового — не перерисовываем
+        IB.lastSig = sig; IB.list = list;
+        const box = document.getElementById('tickets-list-container');
+        if (!list.length) {
+            box.innerHTML = `<div class="ib-empty">${IB.view === 'wait' ? '🎉 Все ответы даны — никто не ждёт' : IB.q ? 'Ничего не найдено' : 'Пусто'}</div>`;
+            return;
+        }
+        box.innerHTML = list.map(t => {
+            const un = String(t.username || '').replace(/^@/, ''); const nm = t.name || (un ? '@' + un : 'Без имени');
+            const c = t.card || {};
+            const tags = [c.vip ? '<span class="chip violet">VIP</span>' : '', c.beyond ? '<span class="chip pink">BEYOND</span>' : '',
+                c.banned ? '<span class="chip red">в ЧС</span>' : '', c.muted ? '<span class="chip amber">мут</span>' : '',
+                c.city ? `<span class="chip">${_e(c.city)}</span>` : ''].join('');
+            const late = t.unread && (Date.now() / 1000 - t.timestamp > 6 * 3600);
+            const snip = String(t.text || '').replace(/<[^>]*>/g, '');
+            return `<div class="ib-item${t.uid === IB.uid ? ' active' : ''}" data-uid="${t.uid}" tabindex="0" role="button">
+                <div class="ib-ava" style="background:${AVA_COL[Math.abs(t.uid) % AVA_COL.length]}">${_e((nm.replace('@', '')[0] || '?').toUpperCase())}</div>
+                <div class="ib-name">${_e(nm)}</div>
+                <div class="ib-time${late ? ' late' : ''}" title="${late ? 'Ждёт ответа больше 6 часов' : ''}">${_ago(t.timestamp)}</div>
+                <div class="ib-snip">${_e(snip)}</div>
+                ${t.unread ? `<div class="ib-unread" title="Сообщений без ответа">${t.unread}</div>` : `<div class="ib-done" title="Последним отвечал">${t.answered_by ? '✓ ' + _e(t.answered_by) : '✓'}</div>`}
+                ${tags ? `<div class="ib-tags">${tags}</div>` : ''}
+            </div>`;
+        }).join('');
+        box.querySelectorAll('.ib-item').forEach(el => {
+            const go = () => { const t = IB.list.find(x => x.uid === +el.dataset.uid); openTicket(+el.dataset.uid, t ? (t.name || t.username || '') : ''); };
+            el.onclick = go; el.onkeydown = e => { if (e.key === 'Enter') go(); };
+        });
+    }).catch(() => {});
+}
+
+function openTicket(uid, name) {
+    IB.uid = uid; IB.name = name; currentActiveUid = uid; currentActiveName = name;
+    document.getElementById('ib').classList.add('chat-open');
+    document.querySelectorAll('#tickets-list-container .ib-item').forEach(el => el.classList.toggle('active', +el.dataset.uid === uid));
+    const t = IB.list.find(x => x.uid === uid) || {};
+    const c = t.card || {};
+    const arch = IB.view === 'archive';
+    document.getElementById('ticket-header').innerHTML = `
+        <button class="btn sm ghost ib-back" onclick="ibBack()" aria-label="К списку">←</button>
+        <div class="who"><b>${_e(name || 'Без имени')}</b> ${t.username ? `<span class="muted">@${_e(String(t.username).replace(/^@/, ''))}</span>` : ''}
+            <div class="muted">ID ${uid}${c.city ? ' · ' + _e(c.city) : ''}${c.vip ? ' · 👑 VIP' : ''}${c.beyond ? ' · 🏳️‍🌈 BEYOND' : ''}${c.banned ? ' · 🔨 в ЧС' : ''}${c.muted ? ' · 🔇 в муте' : ''}</div></div>
+        <div class="acts">
+            <a class="btn sm" href="/glaz?search_id=${uid}">🗂 Досье</a>
+            ${arch ? `<button class="btn sm" onclick="reopenTicket()">↩ Вернуть из архива</button>`
+                   : `<button class="btn sm ok" onclick="closeTicket(false)" title="Человеку придёт сообщение, что вопрос решён">✅ Решено</button>
+                      <button class="btn sm ghost" onclick="closeTicket(true)" title="Убрать в архив без сообщения человеку">В архив молча</button>`}
+        </div>`;
+    document.getElementById('ib-compose').classList.toggle('off', arch);
+    loadTicketHistory(true);
+}
+function ibBack() { document.getElementById('ib').classList.remove('chat-open'); }
+
+function loadTicketHistory(scroll) {
+    const uid = IB.uid; if (!uid) return;
+    fetch(`/glaz/api/tickets/history?uid=${uid}`).then(r => r.json()).then(h => {
+        if (uid !== IB.uid || !Array.isArray(h)) return;
+        if (!scroll && h.length === IB.histLen) return;
+        IB.histLen = h.length;
+        const box = document.getElementById('ticket-box');
+        let html = '', lastDay = '';
+        h.forEach(m => {
+            const d = new Date((m.ts || 0) * 1000);
+            const day = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+            if (day !== lastDay) { html += `<div class="ib-day">${day}</div>`; lastDay = day; }
+            const tm = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+            if (m.kind === 'admin') html += `<div class="ib-msg admin">${_tgClean(m.text)}<span class="meta">${_e(m.admin)} · ${tm}</span></div>`;
+            else html += `<div class="ib-msg user">${_e(m.text)}<span class="meta">${tm}</span></div>`;
+        });
+        box.innerHTML = html || '<div class="ib-placeholder">Сообщений нет</div>';
+        box.scrollTop = box.scrollHeight;
+    });
+}
+
+function addTicketButtonRow(text, url) { _btnRow(document.getElementById('ticket-buttons-container'), 'ticket-btn-row', { text, url }, false); }
+
+function sendTicketReply() {
+    if (!IB.uid) { showToast('⚠️ Выберите диалог из списка'); return; }
+    const raw = $('#ticket-reply-text').summernote('code');
+    if (_snEmpty(raw)) { showToast('⚠️ Напишите текст ответа'); return; }
+    const btn = document.getElementById('ib-send'); btn.disabled = true; btn.textContent = 'Отправляю…';
+    fetch('/glaz/api/tickets/reply', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: IB.uid, text: cleanTelegramHtml(raw), buttons: _readBtns(document.getElementById('ticket-buttons-container'), false) })
+    }).then(r => r.json()).then(d => {
+        if (d.success) {
+            showToast('✅ Ответ отправлен');
+            $('#ticket-reply-text').summernote('reset');
+            document.getElementById('ticket-buttons-container').innerHTML = '';
+            loadTicketHistory(true); loadSupportTickets(true);
+        } else showToast('❌ ' + (d.error || 'Не удалось отправить'));
+    }).catch(() => showToast('❌ Нет связи с сервером')).finally(() => { btn.disabled = false; btn.textContent = 'Отправить ответ'; });
+}
+
+function closeTicket(silent) {
+    if (!IB.uid) return;
+    if (!confirm(silent ? 'Убрать диалог в архив без сообщения человеку?' : 'Вопрос решён? Человеку придёт сообщение, диалог уйдёт в архив.')) return;
+    fetch('/glaz/api/tickets/close', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: IB.uid, silent: !!silent }) })
+    .then(r => r.json()).then(d => {
+        if (!d.success) return;
+        showToast(silent ? '🗄 Убрано в архив' : '✅ Закрыто, человек уведомлён');
+        _ibReset(); loadSupportTickets(true);
+    });
+}
+function reopenTicket() {
+    fetch('/glaz/api/tickets/reopen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: IB.uid }) })
+    .then(r => r.json()).then(d => { if (d.success) { showToast('↩ Диалог снова в открытых'); _ibReset(); ibSetView('open'); } });
+}
+function _ibReset() {
+    IB.uid = null; currentActiveUid = null; IB.histLen = 0;
+    document.getElementById('ib').classList.remove('chat-open');
+    document.getElementById('ticket-header').innerHTML = '<div class="ib-head-empty">Выберите диалог слева</div>';
+    document.getElementById('ticket-box').innerHTML = '<div class="ib-placeholder"><div class="ib-ph-ico">📩</div><div>Здесь появится переписка.</div></div>';
+}
+
+// Быстрые ответы (общие для всех админов)
+function loadQuickReplies() {
+    fetch('/glaz/api/tickets/quick').then(r => r.json()).then(items => { if (Array.isArray(items)) { IB.quick = items; renderQuick(); } });
+}
+function renderQuick() {
+    const box = document.getElementById('ib-quick');
+    box.innerHTML = IB.quick.map((q, i) => `<span class="q" data-i="${i}" title="${_e(q.text)}" role="button" tabindex="0">${_e(q.title)}<i data-del="${i}" title="Удалить заготовку" aria-label="Удалить">×</i></span>`).join('') +
+        `<span class="q add" role="button" tabindex="0" title="Сохранить текст из редактора как заготовку">＋ заготовка</span>`;
+    box.querySelectorAll('.q[data-i]').forEach(el => el.onclick = e => {
+        if (e.target.dataset.del !== undefined) {
+            if (!confirm('Удалить заготовку «' + IB.quick[+e.target.dataset.del].title + '»?')) return;
+            IB.quick.splice(+e.target.dataset.del, 1); saveQuick(); return;
+        }
+        const q = IB.quick[+el.dataset.i];
+        $('#ticket-reply-text').summernote('focus');
+        $('#ticket-reply-text').summernote('pasteHTML', _e(q.text).replace(/\n/g, '<br>'));
+    });
+    box.querySelector('.q.add').onclick = () => {
+        const raw = $('#ticket-reply-text').summernote('code');
+        if (_snEmpty(raw)) { showToast('Сначала напишите текст в поле ответа — он и станет заготовкой'); return; }
+        const title = prompt('Короткое название кнопки-заготовки:');
+        if (!title) return;
+        const text = cleanTelegramHtml(raw).replace(/<[^>]*>/g, '');
+        IB.quick.push({ title: title.trim().slice(0, 40), text }); saveQuick();
+    };
+}
+function saveQuick() {
+    fetch('/glaz/api/tickets/quick/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: IB.quick }) })
+    .then(r => r.json()).then(d => { if (d.success) { IB.quick = d.items; renderQuick(); showToast('💾 Заготовки сохранены'); } });
+}
+
+function ibStart() {
+    loadSupportTickets(true); loadQuickReplies(); updateRatingsPanel();
+    if (!$('#ticket-reply-text').hasClass('sn-loaded')) {
+        $('#ticket-reply-text').summernote({ toolbar: [['style', ['bold', 'italic', 'underline', 'strikethrough', 'clear']], ['insert', ['link']]],
+            disableDragAndDrop: true, dialogsInBody: true, height: 110, placeholder: 'Ответ человеку…',
+            callbacks: { onKeydown: e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); sendTicketReply(); } } } });
+        $('#ticket-reply-text').addClass('sn-loaded');
+    }
+    if (!IB.uid) document.getElementById('ib-compose').classList.add('off');
+    clearInterval(IB.timer);
+    IB.timer = setInterval(() => {
+        if (!document.getElementById('tab-support').classList.contains('active') || document.hidden) return;
+        loadSupportTickets(false);
+        if (IB.uid) loadTicketHistory(false);
+    }, 15000);
+}
+
+// =================== 🚀 РАССЫЛКА ===================
+const BC = { aud: {}, timer: null, running: false, when: 'now', labels: { groups_all: '📢 Все группы', all: '🌐 Всем в ЛС', vip: '👑 VIP', queer: '🏳️‍🌈 BEYOND' } };
+function bcTarget() { const r = document.querySelector('input[name="bc-tgt"]:checked'); return r ? r.value : 'groups_all'; }
+function bcWhen(w) {
+    BC.when = w;
+    document.querySelectorAll('#tab-broadcast .bc-when .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.w === w));
+    const t = document.getElementById('broadcast-time');
+    t.hidden = w !== 'later';
+    if (w === 'later' && !t.value) {
+        // по умолчанию — через час, по Екатеринбургу
+        const d = new Date(Date.now() + 3600e3 + 5 * 3600e3);   // toISOString — UTC, +5 ч = Екатеринбург
+        t.value = d.toISOString().slice(0, 16);
+    }
+    bcSummary();
+}
+function addBroadcastButtonRow(text, url, style, emojiId) {
+    _btnRow(document.getElementById('broadcast-buttons-container'), 'bc-btn-row', { text, url, style, emoji_id: emojiId }, true);
+    bcPreview();
+}
+function bcButtons() { return _readBtns(document.getElementById('broadcast-buttons-container'), true); }
+function bcPreview() {
+    const raw = $('#broadcast-text').hasClass('sn-loaded') ? $('#broadcast-text').summernote('code') : '';
+    const box = document.getElementById('bc-preview');
+    box.innerHTML = _snEmpty(raw) ? '<span class="muted">Начните писать текст…</span>' : _tgClean(raw, true);
+    document.getElementById('bc-preview-kb').innerHTML = bcButtons().map(b => `<span class="${_e(b.style || '')}">${_e(b.text)}</span>`).join('');
+    bcSummary();
+}
+function bcSummary() {
+    const t = bcTarget(), n = BC.aud[t];
+    const when = BC.when === 'later' && document.getElementById('broadcast-time').value
+        ? 'в ' + document.getElementById('broadcast-time').value.replace('T', ' ').replace(/^(\d+)-(\d+)-(\d+)/, '$3.$2.$1') + ' (Екб)' : 'сразу после нажатия';
+    document.getElementById('bc-sum').innerHTML = `Кому: <b>${BC.labels[t]}</b>${n != null ? ` — <b>${_fmtN(n)}</b> ${t === 'groups_all' ? 'чатов' : 'чел.'}` : ''}<br>Когда: <b>${when}</b>` +
+        (t !== 'groups_all' && n > 3000 ? `<br><span class="muted">≈ ${Math.ceil(n / 20 / 60)} мин на отправку (20 сообщений в секунду)</span>` : '');
+    document.getElementById('bc-fire').textContent = BC.when === 'later' ? '⏰ Запланировать' : '🚀 Запустить';
+    document.getElementById('broadcast-target').value = t;
+}
+function bcLoadAudience() {
+    fetch('/glaz/api/broadcast/audience').then(r => r.json()).then(a => {
+        if (a.error) return; BC.aud = a;
+        Object.keys(a).forEach(k => { const el = document.getElementById('bc-n-' + k); if (el) el.textContent = _fmtN(a[k]); });
+        bcSummary();
+    });
+}
+
+function fireBroadcast() {
+    const raw = $('#broadcast-text').summernote('code');
+    if (_snEmpty(raw)) { showToast('⚠️ Введите текст рассылки'); return; }
+    const tgt = bcTarget(), n = BC.aud[tgt];
+    const runAt = BC.when === 'later' ? document.getElementById('broadcast-time').value : '';
+    if (BC.when === 'later' && !runAt) { showToast('⚠️ Укажите дату и время'); return; }
+    const who = `${BC.labels[tgt]}${n != null ? ' (' + _fmtN(n) + (tgt === 'groups_all' ? ' чатов' : ' чел.') + ')' : ''}`;
+    if (!confirm(runAt ? `Запланировать рассылку: ${who} на ${runAt.replace('T', ' ')} по Екатеринбургу?` : `Отправить рассылку сейчас: ${who}?\nОстановить можно будет в «Истории».`)) return;
+    const fd = new FormData();
+    fd.append('text', cleanTelegramHtml(raw)); fd.append('target', tgt); fd.append('run_at', runAt);
+    fd.append('buttons', JSON.stringify(bcButtons()));
+    const btn = document.getElementById('bc-fire'); btn.disabled = true;
+    fetch('/glaz/broadcast', { method: 'POST', body: fd }).then(r => r.json()).then(d => {
+        showToast(d.message || (d.success ? 'Готово' : 'Ошибка'));
+        if (d.success) {
+            $('#broadcast-text').summernote('reset');
+            document.getElementById('broadcast-buttons-container').innerHTML = '';
+            bcWhen('now'); document.getElementById('broadcast-time').value = '';
+            bcPreview(); loadBroadcastStats();
+        }
+    }).catch(() => showToast('❌ Ошибка отправки')).finally(() => { btn.disabled = false; });
+}
+
+function previewBroadcast() {
+    const raw = $('#broadcast-text').summernote('code');
+    if (_snEmpty(raw)) { showToast('⚠️ Введите текст для теста'); return; }
+    fetch('/glaz/api/preview_broadcast', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: cleanTelegramHtml(raw), buttons: bcButtons() }) })
+    .then(r => r.json()).then(d => showToast(d.success ? '✅ Тест отправлен вам в личку от бота' : '❌ ' + (d.error || 'Сбой')));
+}
+
+const BC_ST = { running: ['amber', '⏳ идёт'], stopping: ['amber', '⏸ останавливается'], done: ['green', '✓ завершена'], stopped: ['red', '⛔ остановлена'], failed: ['red', 'ошибка'] };
+function loadBroadcastStats() {
+    return fetch('/glaz/api/broadcast_stats').then(r => r.json()).then(d => {
+        if (d.error) return;
+        const sc = document.getElementById('scheduled-tbody');
+        sc.innerHTML = d.scheduled.length ? d.scheduled.map(s => `<div class="bc-row"><div class="bc-row-top">
+                <span class="chip violet">${_e(s.target_label)}</span><span class="when">⏰ ${_e(s.time)} (Екб)</span>${s.admin ? `<span class="muted">· ${_e(s.admin)}</span>` : ''}
+                <span class="sp"></span><button class="btn sm danger" onclick="cancelBroadcast('${_e(s.id)}')">Отменить</button></div>
+                <div class="bc-txt">${_e(String(s.text).replace(/<[^>]*>/g, ''))}</div></div>`).join('')
+            : '<div class="ib-empty">Ничего не запланировано</div>';
+        BC.running = false;
+        const hb = document.getElementById('bc-history');
+        hb.innerHTML = d.history.length ? d.history.map(h => {
+            const st = BC_ST[h.status] || ['', h.status];
+            if (h.status === 'running' || h.status === 'stopping') BC.running = true;
+            const tot = Math.max(1, h.total || (h.sent + h.blocked + h.dead + h.failed));
+            const seg = (v, c) => v ? `<i style="width:${(v / tot * 100).toFixed(2)}%;background:${c}" title="${_fmtN(v)}"></i>` : '';
+            const isG = h.target === 'groups_all';
+            const clicks = h.clicks ? `<div class="bc-clicks">👆 Клики: <b>${_fmtN(h.clicks.total)}</b>${h.sent ? ` (${(h.clicks.total / h.sent * 100).toFixed(1)}% от доставленных)` : ''} — ` +
+                h.clicks.buttons.map(b => `${_e(b.name)}: ${_fmtN(b.clicks)}`).join(', ') + '</div>' : '';
+            return `<div class="bc-row"><div class="bc-row-top">
+                    <span class="chip ${st[0]}">${st[1]}</span><span class="chip">${_e(h.target_label)}</span>
+                    <span class="when">${_e(h.started)}${h.finished ? ' → ' + _e(h.finished.split(' ')[1] || h.finished) : ''}</span>
+                    <span class="muted">· ${_e(h.admin)}${h.source && h.source !== 'Панель' ? ' · ' + _e(h.source) : ''}</span><span class="sp"></span>
+                    ${h.status === 'running' ? `<button class="btn sm danger" onclick="stopBroadcast('${_e(h.id)}')">Остановить</button>` : ''}</div>
+                <div class="bc-txt">${_e(String(h.text).replace(/<[^>]*>/g, ''))}</div>
+                <div class="bc-prog">${seg(h.sent, '#1ca58b')}${seg(h.blocked, '#d47428')}${seg(h.dead, '#5d626c')}${seg(h.failed, '#c2415b')}</div>
+                <div class="bc-nums"><span><i class="dot" style="background:#1ca58b"></i>доставлено <b>${_fmtN(h.sent)}</b> из ${_fmtN(h.total)}</span>
+                    ${isG ? '' : `<span><i class="dot" style="background:#d47428"></i>заблокировали бота <b>${_fmtN(h.blocked)}</b></span>
+                    <span><i class="dot" style="background:#5d626c"></i>удалённых аккаунтов <b>${_fmtN(h.dead)}</b></span>`}
+                    <span><i class="dot" style="background:#c2415b"></i>ошибок <b>${_fmtN(h.failed)}</b></span></div>${clicks}</div>`;
+        }).join('') : '<div class="ib-empty">Рассылок пока не было (история ведётся с этого обновления)</div>';
+        document.getElementById('bc-hist-upd').textContent = BC.running ? 'обновляется каждые 5 сек' : '';
+        const old = document.getElementById('clicks-tbody');
+        document.getElementById('bc-old-wrap').hidden = !d.links.length;
+        old.innerHTML = d.links.map(l => `<div class="bc-nums" style="padding:4px 0"><span>${_e(l.name)}</span><span><b>${_fmtN(l.clicks)}</b> кликов</span><span>${_e(l.time)}</span></div>`).join('');
+        clearTimeout(BC.timer);
+        if (BC.running) BC.timer = setTimeout(() => { if (document.getElementById('tab-broadcast').classList.contains('active')) loadBroadcastStats(); }, 5000);
+    });
+}
+function cancelBroadcast(id) {
+    if (!confirm('Отменить запланированную рассылку?')) return;
+    fetch('/glaz/api/cancel_broadcast', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+    .then(r => r.json()).then(d => { if (d.success) { showToast('🚫 Рассылка отменена'); loadBroadcastStats(); } });
+}
+function stopBroadcast(id) {
+    if (!confirm('Остановить рассылку? Уже отправленные сообщения останутся.')) return;
+    fetch('/glaz/api/broadcast/stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+    .then(r => r.json()).then(d => { showToast(d.success ? '⏸ Останавливаю…' : 'Рассылка уже завершилась'); loadBroadcastStats(); });
+}
+
+// Шаблоны и автопилот
+const AP_OPTS = [[0, 'Выключен'], [6, 'Каждые 6 ч'], [12, 'Каждые 12 ч'], [24, 'Раз в сутки'], [48, 'Раз в 2 дня'], [168, 'Раз в неделю']];
+let _tpls = [];
+function loadTemplates() {
+    fetch('/glaz/api/templates').then(r => r.json()).then(data => {
+        if (!Array.isArray(data)) return;
+        _tpls = data;
+        const box = document.getElementById('templates-tbody');
+        box.innerHTML = data.length ? data.map((t, i) => {
+            const g = t.target === 'groups_all';
+            return `<div class="bc-row"><div class="bc-tpl-row">
+                <div><div class="bc-row-top"><b>${_e(t.name)}</b><span class="chip">${_e(BC.labels[t.target] || t.target)}</span>
+                    ${t.autopilot_interval > 0 ? `<span class="chip green">🟢 автопилот</span>` : ''}</div>
+                    <div class="bc-txt" style="margin-top:4px">${_e(String(t.text).replace(/<[^>]*>/g, ''))}</div></div>
+                <select aria-label="Автопилот" ${g ? 'disabled title="Автопилот работает только для рассылок в личку"' : ''} onchange="toggleAutopilot('${_e(t.id)}', this.value)">
+                    ${AP_OPTS.map(o => `<option value="${o[0]}" ${+t.autopilot_interval === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>
+                <div style="display:flex;gap:6px"><button class="btn sm" onclick="loadTemplateToForm(_tpls[${i}])">В редактор</button>
+                    <button class="btn sm danger" onclick="deleteTemplate('${_e(t.id)}')" aria-label="Удалить шаблон">✕</button></div>
+            </div></div>`;
+        }).join('') : '<div class="ib-empty">Шаблонов пока нет — напишите текст выше и сохраните</div>';
+    });
+}
+function saveTemplate() {
+    const name = document.getElementById('template-name').value.trim();
+    const raw = $('#broadcast-text').summernote('code');
+    if (!name || _snEmpty(raw)) { showToast('⚠️ Нужны название и текст рассылки'); return; }
+    fetch('/glaz/api/templates/save', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, text: cleanTelegramHtml(raw), target: bcTarget(), buttons: bcButtons() }) })
+    .then(r => r.json()).then(d => { if (d.success) { showToast('✅ Шаблон сохранён'); document.getElementById('template-name').value = ''; loadTemplates(); } });
+}
+function deleteTemplate(id) {
+    if (!confirm('Удалить этот шаблон?')) return;
+    fetch('/glaz/api/templates/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+    .then(r => r.json()).then(d => { if (d.success) loadTemplates(); });
+}
+function toggleAutopilot(id, interval) {
+    fetch('/glaz/api/templates/toggle_autopilot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, interval }) })
+    .then(r => r.json()).then(d => { if (d.success) { showToast(+interval > 0 ? '🟢 Автопилот включён' : '🔴 Автопилот выключен'); loadTemplates(); } });
+}
+function loadTemplateToForm(t) {
+    $('#broadcast-text').summernote('code', t.text);
+    const r = document.querySelector(`input[name="bc-tgt"][value="${t.target}"]`); if (r) r.checked = true;
+    document.getElementById('broadcast-buttons-container').innerHTML = '';
+    (t.buttons || []).forEach(b => addBroadcastButtonRow(b.text, b.url, b.style, b.emoji_id));
+    bcPreview(); window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast('📥 Шаблон в редакторе');
+}
+
+function bcStart() {
+    if (!$('#broadcast-text').hasClass('sn-loaded')) {
+        $('#broadcast-text').summernote({ toolbar: [['style', ['bold', 'italic', 'underline', 'strikethrough', 'clear']], ['insert', ['link']], ['view', ['codeview']]],
+            disableDragAndDrop: true, dialogsInBody: true, height: 200, placeholder: 'Текст рассылки… Жирный, курсив и ссылки поддерживаются.',
+            callbacks: { onChange: () => bcPreview() } });
+        $('#broadcast-text').addClass('sn-loaded');
+        document.getElementById('bc-targets').addEventListener('change', bcSummary);
+        document.getElementById('broadcast-buttons-container').addEventListener('input', bcPreview);
+        document.getElementById('broadcast-time').addEventListener('input', bcSummary);
+    }
+    bcLoadAudience(); loadBroadcastStats(); loadTemplates(); bcPreview();
+}
 </script>
 </body>
 </html>
