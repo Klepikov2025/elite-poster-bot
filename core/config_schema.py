@@ -73,8 +73,10 @@ SCHEMA = [
     # --- ИИ ---
     {"key": "groq_model", "group": G_AI, "label": "Модель Groq", "type": "text", "default": "openai/gpt-oss-120b",
      "help": "Если Groq снова отключит модель, впишите новую из console.groq.com/docs/models. Пусто — по умолчанию.", "bots": "Скайнет, Шпион"},
-    {"key": "groq_fallback_models", "group": G_AI, "label": "Запасные модели Groq (через запятую)", "type": "text", "default": "openai/gpt-oss-20b, llama-3.1-8b-instant",
-     "help": "Когда у основной модели кончается лимит (ошибка 429), бот переключается на запасные — у каждой модели в Groq свой лимит. Прожарки сразу идут на запасные, чтобы беречь основную для проверок.", "bots": "Скайнет"},
+    {"key": "gemini_model", "group": G_AI, "label": "Модель Google Gemini (резерв)", "type": "text", "default": "gemini-3.8-flash",
+     "help": "Вторая «умная» линия после основной модели Groq. Работает, только если в Render у Скайнета задан GEMINI_API_KEY (бесплатно, без карты: aistudio.google.com → Get API key). Если Google переименует модель — впишите новое название сюда.", "bots": "Скайнет"},
+    {"key": "groq_fallback_models", "group": G_AI, "label": "Запасные модели Groq (через запятую)", "type": "text", "default": "qwen/qwen3.8-27b, openai/gpt-oss-20b",
+     "help": "Когда у основной модели кончается лимит (ошибка 429), бот сначала пробует Google Gemini (если в Render задан GEMINI_API_KEY), потом эти запасные. Запасные слабее, поэтому их «виновен» не исполняется сам — админам приходят кнопки. Прожарки сразу идут на запасные, чтобы беречь основную для проверок.", "bots": "Скайнет"},
 
     # --- ссылки ---
     {"key": "support_bot", "group": G_LINKS, "label": "Бот поддержки (без @)", "type": "text", "default": "FAQMKBOT", "bots": "Скайнет, МП",

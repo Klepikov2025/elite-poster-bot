@@ -428,7 +428,10 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         action, reason = ZONE_REASONS.get(zone, ("ban", zone_name))
         try:
             mk = create_review(user_id, action, reason, trigger_text=text, origin_chat=chat_title, user_link=user_link)
-            bot.send_message(STAFF_GROUP_ID, f"🤖 **ИИ-проверка недоступна** ({zone_name})\n{user_link} (`{user_id}`) · {escape_md(str(chat_title))}\n"
+            from core.ai import last_was_weak
+            head = (f"🤖 **Запасной ИИ видит нарушение** ({zone_name})\nОсновная модель на перерыве из-за лимита, а запасная слабее — сама не наказываю."
+                    if last_was_weak() else f"🤖 **ИИ-проверка недоступна** ({zone_name})")
+            bot.send_message(STAFF_GROUP_ID, f"{head}\n{user_link} (`{user_id}`) · {escape_md(str(chat_title))}\n"
                              f"Положено: {'бан' if action == 'ban' else 'мут'} — {escape_md(reason)}\n_{escape_md(str(text)[:300])}_\n"
                              f"Автоматика ничего не сделала — решите вручную.", parse_mode="Markdown", reply_markup=mk)
         except Exception as e:

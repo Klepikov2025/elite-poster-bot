@@ -474,6 +474,34 @@
         .hbar .v { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
         .st-empty { color: var(--dim); font-size: 13px; padding: 14px 0; text-align: center; }
 
+
+        /* «Кто в базе» и воронки */
+        .pp-note { font: 500 11.5px var(--mono); color: var(--dim); }
+        .pp-bar { height: 18px; border-radius: 9px; }
+        .pp-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 28px; }
+        .pp-list li { display: grid; grid-template-columns: 12px 1fr auto 52px; gap: 4px 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line); }
+        .pp-list i { width: 10px; height: 10px; border-radius: 3px; align-self: center; }
+        .pp-list .nm { font-size: 13.5px; color: var(--text); font-weight: 600; }
+        .pp-list .n { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+        .pp-list .p { color: var(--muted); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+        .pp-list .h { grid-column: 2 / -1; font-size: 12px; color: var(--muted); line-height: 1.45; }
+        .fn-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+        .fn { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
+        .fn-h { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; margin-bottom: 10px; }
+        .fn-big { font: 700 26px var(--sans); letter-spacing: -.02em; line-height: 1.1; }
+        .fn-big small { font: 500 12px var(--sans); color: var(--muted); margin-left: 4px; letter-spacing: 0; }
+        .fn-cap { font-size: 12px; color: var(--muted); margin: 2px 0 10px; }
+        .fn-step { margin: 8px 0; }
+        .fn-step .t { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: #c5c8cf; }
+        .fn-step .t b { color: var(--text); font-variant-numeric: tabular-nums; }
+        .fn-step .tr { height: 6px; background: var(--surface); border-radius: 3px; margin-top: 4px; overflow: hidden; }
+        .fn-step .fl { height: 100%; width: 0; border-radius: 3px; transition: width .9s cubic-bezier(.2,.8,.2,1); }
+        .fn-sub { list-style: none; margin: 8px 0 0; padding: 8px 0 0; border-top: 1px dashed var(--line-2); font-size: 12px; color: var(--muted); display: grid; gap: 3px; }
+        .fn-sub li { display: flex; justify-content: space-between; gap: 8px; }
+        .fn-sub b { color: #c5c8cf; font-variant-numeric: tabular-nums; }
+        .fn-warn { color: #f0b37e !important; }
+        @media (max-width: 1100px) { .fn-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 860px) { .pp-list, .fn-grid { grid-template-columns: 1fr; } }
         .st-xray { font-size: 13.5px; color: #c5c8cf; line-height: 1.7; }
         .st-xray [style*="background"] { border-radius: 8px !important; }
 
@@ -824,35 +852,30 @@
                 <div class="heat" id="st-heat"></div>
             </div>
 
+            <div class="st-card st-wide">
+                <div class="st-card-head">
+                    <div><div class="st-title">Кто в базе</div><div class="st-sub">все <b id="pp-total">…</b> записей, каждый человек посчитан ровно один раз — группы в сумме дают всю базу</div></div>
+                    <span class="pp-note" id="pp-gen"></span>
+                </div>
+                <div class="comp-bar pp-bar" id="pp-bar"></div>
+                <ul class="pp-list" id="pp-list"><li class="st-empty">Считаю…</li></ul>
+                <div class="comp-foot" id="pp-foot"></div>
+            </div>
+
+            <div class="st-card st-wide">
+                <div class="st-card-head"><div><div class="st-title">Воронки</div><div class="st-sub">сколько людей начали путь и сколько дошли до конца — по реальным покупкам и публикациям, а не по нажатиям</div></div></div>
+                <div class="fn-grid" id="fn-grid"><div class="st-empty">Считаю…</div></div>
+            </div>
+
             <div class="st-card">
                 <div class="st-card-head"><div><div class="st-title">Топ-10 городов</div><div class="st-sub">по основному городу участника</div></div></div>
                 <div class="hbars" id="st-cities"></div>
             </div>
 
             <div class="st-card">
-                <div class="st-card-head"><div><div class="st-title">🔍 Рентген базы</div><div class="st-sub">где сейчас люди в воронках</div></div></div>
-                <div id="xray-content" class="st-xray">Загрузка сканера...</div>
-            </div>
-
-            <div class="st-card">
-                <div class="st-card-head"><div><div class="st-title">Состав сети</div><div class="st-sub">кто есть кто среди <b id="stat-total">{{ total }}</b> участников</div></div></div>
-                <div class="comp-bar" id="st-comp-bar"></div>
-                <ul class="comp-list" id="st-comp-list"></ul>
-                <div class="comp-foot">
-                    <span>👑 VIP <b id="stat-vips">{{ vips }}</b></span>
-                    <span>🏳️‍🌈 BEYOND <b id="stat-queers">{{ queers }}</b></span>
-                    <span>🔨 В чёрном списке <b id="stat-banned">{{ banned }}</b></span>
-                </div>
-            </div>
-
-            <div class="st-card">
-                <div class="st-card-head"><div><div class="st-title">Оценки поддержки</div><div class="st-sub">средний балл из 5 по каждому, кто отвечал</div></div></div>
+                <div class="st-card-head"><div><div class="st-title">Оценки поддержки</div><div class="st-sub" id="st-ratings-sub">средний балл из 5 — только реально поставленные оценки</div></div></div>
                 <div class="hbars" id="st-ratings"></div>
-            </div>
-
-            <div class="st-card st-wide">
-                <div class="st-card-head"><div><div class="st-title">🎯 Зачем пришли</div><div class="st-sub">что люди нажимали в ботах (трекеры)</div></div></div>
-                <div id="motives-content" class="st-xray">Загрузка данных трекеров...</div>
+                <div class="comp-foot" id="st-ratings-foot" style="display:none"></div>
             </div>
         </div>
         <div class="st-tip" id="st-tip" role="tooltip"></div>
@@ -2413,67 +2436,7 @@ function previewBroadcast() {
 // 👆 ====================================== 👆
 
         // Инициализация графиков
-        function loadXRay() {
-            fetch('/glaz/api/xray')
-            .then(res => res.json())
-            .then(data => {
-                // Отрисовка Рентгена (Левый блок) с новыми категориями
-                let xrayHtml = `
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>Всего в базе:</span> <b style="color:#fff;">${data.total}</b></div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>👑 Элита (VIP + QUEER):</span> <b style="color:#ffb74d;">${data.vips + data.queers}</b></div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>🛡 Обычные верифицированные:</span> <b style="color:#03dac6;">${data.verified}</b></div>
-                    
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px; background: rgba(76, 175, 80, 0.1); padding: 3px 5px; border-radius: 4px;">
-                        <span>🏃‍♂️ Активные юзеры (Без VIP):</span> <b style="color:#4caf50;">${data.active_regular}</b>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px; background: rgba(255, 235, 59, 0.1); padding: 3px 5px; border-radius: 4px;">
-                        <span>⏳ В воронке VIP:</span> <b style="color:#ffeb3b;">${data.in_verification + data.pending_vip}</b>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px; background: rgba(246, 165, 192, 0.1); padding: 3px 5px; border-radius: 4px;">
-                        <span>🏳️‍🌈 В воронке BEYOND:</span> <b style="color:#f6a5c0;">${data.beyond_verification || 0}</b>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>🔨 В Черном списке:</span> <b style="color:#cf6679;">${data.banned}</b></div>
-                    
-                    <hr style="border-color: #333; margin: 10px 0;">
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 5px; border-radius: 5px; margin-bottom: 5px;">
-                        <span>👀 Зеваки (Просто зашли в бота):</span> 
-                        <b style="color:#aaa; font-size: 14px;">${data.just_viewed}</b>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,0,0,0.05); padding: 5px; border-radius: 5px;">
-                        <span>👻 Мертвые души (Пустые):</span> 
-                        <b style="color:#666; font-size: 14px;">${data.ghosts}</b>
-                    </div>
-                `;
-                document.getElementById('xray-content').innerHTML = xrayHtml;
-
-                // Отрисовка Мотивов/Жучков (Правый блок)
-                // Считаем конверсию VIP: Купили VIP / Интересовались * 100
-                let vipConversion = data.intent_vip > 0 ? Math.round(((data.vips + data.queers) / data.intent_vip) * 100) : 0;
-                
-                let motivesHtml = `
-                    <div style="margin-bottom: 10px;">
-                        <div style="display: flex; justify-content: space-between; color: #fff;">
-                            <span>👑 Интересовались VIP:</span> <b>${data.intent_vip} чел.</b>
-                        </div>
-                        <div style="font-size: 11px; color: #ffb74d;">↳ Конверсия в реальную покупку: <b>${vipConversion}%</b></div>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px; color: #fff;">
-                        <span>📝 Создавали объявления:</span> <b>${data.intent_ads} чел.</b>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px; color: #fff;">
-                        <span>🆘 Обращались в поддержку:</span> <b>${data.intent_support} чел.</b>
-                    </div>
-                `;
-                document.getElementById('motives-content').innerHTML = motivesHtml;
-            });
-        }
+        function loadXRay() { loadPeople(); }   // старое имя — вызывается из других мест
 
         let ratingsChartInstance = null;
 
@@ -2486,12 +2449,6 @@ function previewBroadcast() {
             fetch('/glaz/api/ratings_analytics')
             .then(res => res.json())
             .then(data => {
-                // Отрисовка сравнительного графика саппорта
-                const labels = data.stats.map(item => `${item.admin} (${item.count} шт)`);
-                const scores = data.stats.map(item => item.avg);
-
-                renderStHbars('st-ratings', data.stats.map(it => ({ name: `${it.admin} · ${it.count} шт`, v: it.avg, title: `${it.admin}: средний балл ${it.avg} из 5 по ${it.count} оценкам` })), v => v.toFixed(1), 5);
-
                 // Отрисовка Радара Гнева
                 let radarHtml = '';
                 data.bad_list.forEach(item => {
@@ -2510,10 +2467,6 @@ function previewBroadcast() {
             // 1. Обновляем статистику и бейджик входящих
             fetch('/glaz/api/stats').then(res => res.json()).then(data => {
                 if(!data.error) { 
-                    document.getElementById('stat-total').innerText = data.total; 
-                    document.getElementById('stat-vips').innerText = data.vips; 
-                    document.getElementById('stat-queers').innerText = data.queers; 
-                    document.getElementById('stat-banned').innerText = data.banned; 
                     
                     const badge = document.getElementById('ticket-badge');
                     if (data.unanswered_tickets > 0) {
@@ -2525,8 +2478,8 @@ function previewBroadcast() {
                 }
             });
 
-            loadXRay(); // <--- ДОБАВЬ ЭТО СЮДА, ЧТОБЫ ЖУЧКИ ОБНОВЛЯЛИСЬ КАЖДЫЕ 5 СЕК
-            updateRatingsPanel(); // <--- ДОБАВИТЬ ЭТУ СТРОКУ ДЛЯ ЖИВОГО РАДАРА ОЦЕНОК
+            // Радар гнева — только пока открыта поддержка (раньше раз в 5 сек перерисовывались и «Оценки», отсюда дёрганье)
+            if (document.getElementById('tab-support').classList.contains('active')) updateRatingsPanel();
 
             // 2. Обновляем Живой Радар (Web-Логи)
             fetch('/glaz/api/radar').then(res => res.json()).then(data => {
@@ -2564,7 +2517,6 @@ function previewBroadcast() {
 
         window.onload = function() {
             initCharts();
-            loadXRay();
             const forced = {{ 'true' if (search_id or search_error) else 'false' }};
             let savedTab = forced ? 'tab-dossier' : (_load('activeTab') || 'tab-home');
             if (savedTab === 'tab-system') savedTab = 'tab-control';
@@ -4096,6 +4048,99 @@ function loadVerifList() {
         const sb = document.getElementById('stat-banned'); if (sb) sb.textContent = _stNum(c.banned);
     }
 
+    // ===== «Кто в базе», воронки, оценки (одним запросом, сервер кэширует 2 минуты) =====
+    const PP_GROUPS = [
+        { k: 'vip', n: '👑 VIP', c: '#8f74e6', h: 'Действующий VIP-статус.' },
+        { k: 'beyond', n: '🏳️‍🌈 BEYOND', c: '#1ca58b', h: 'Статус BEYOND без VIP (у кого оба — посчитаны в VIP).' },
+        { k: 'verified', n: '🛡 Верифицированы', c: '#d47428', h: 'Прошли проверку, статуса нет.' },
+        { k: 'new', n: '🌱 Новые за 30 дней', c: '#4c9be8', h: 'Впервые появились в группах или боте за последний месяц.' },
+        { k: 'city', n: '🏙 Были в группах', c: '#7d828c', h: 'Бот знает их город — когда-то вступали или писали в группе. Это не «активные сейчас».' },
+        { k: 'bot_only', n: '🤖 Только запускали бота', c: '#565b64', h: 'Появились после включения учёта, но город так и не определился.' },
+        { k: 'legacy', n: '📦 Старые записи без данных', c: '#3b3f47', h: 'Попали в базу до того, как бот начал отмечать дату появления. Это НЕ удалённые аккаунты.' },
+        { k: 'banned', n: '🔨 В чёрном списке', c: '#c2415b', h: 'Забанены в сети (без статусов).' },
+        { k: 'deleted', n: '💀 Удалённые аккаунты', c: '#26292f', h: 'Аккаунт в Telegram удалён — чистильщик убирает их из групп.' },
+    ];
+    let _ppLast = '';
+    function _pct(a, b) { return b ? Math.round(a / b * 100) : 0; }
+    function loadPeople() {
+        return fetch('/glaz/api/stats/people').then(r => r.json()).then(d => {
+            if (d.error) return;
+            const sig = JSON.stringify([d.groups, d.funnels, d.ratings]);
+            const gen = document.getElementById('pp-gen');
+            if (gen) gen.textContent = 'посчитано в ' + new Date(d.generated * 1000).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+            if (sig === _ppLast) return;           // ничего не изменилось — не перерисовываем (без дёрганья)
+            _ppLast = sig;
+            renderPeople(d); renderFunnels(d.funnels); renderRatings(d);
+        }).catch(() => {});
+    }
+    function renderPeople(d) {
+        const total = Math.max(1, d.total);
+        document.getElementById('pp-total').textContent = _stNum(d.total);
+        const rows = PP_GROUPS.map(g => ({ ...g, v: d.groups[g.k] || 0 }));
+        document.getElementById('pp-bar').innerHTML = rows.map(g =>
+            `<span data-w="${(g.v / total * 100).toFixed(2)}" style="background:${g.c}" title="${g.n}: ${g.v}"></span>`).join('');
+        requestAnimationFrame(() => document.querySelectorAll('#pp-bar span').forEach(s => { s.style.width = s.dataset.w + '%'; }));
+        document.getElementById('pp-list').innerHTML = rows.map(g =>
+            `<li><i style="background:${g.c}${g.k === 'deleted' ? ';box-shadow:inset 0 0 0 1px #555' : ''}"></i><span class="nm">${g.n}</span>` +
+            `<span class="n">${_stNum(g.v)}</span><span class="p">${(g.v / total * 100).toFixed(1)}%</span><span class="h">${g.h}</span></li>`).join('');
+        document.getElementById('pp-foot').innerHTML =
+            `<span>🔨 Записей в чёрном списке: <b>${_stNum(d.banned_list)}</b></span>` +
+            `<span>из них есть в базе: <b>${_stNum(d.banned_in_base)}</b></span>` +
+            `<span>только в ЧС (в базу не попадали): <b>${_stNum(d.banned_not_in_base)}</b></span>`;
+    }
+    function _fnStep(label, v, of, color) {
+        const w = of ? Math.min(100, v / of * 100) : 0;
+        return `<div class="fn-step"><div class="t"><span>${label}</span><b>${_stNum(v)}${of ? ` · ${_pct(v, of)}%` : ''}</b></div>` +
+               `<div class="tr"><div class="fl" data-w="${w.toFixed(1)}" style="background:${color}"></div></div></div>`;
+    }
+    function _fnStages(f) {
+        if (!f.stages.length) return '<ul class="fn-sub"><li>сейчас никого</li></ul>';
+        return '<ul class="fn-sub">' + f.stages.map(s => `<li><span>${s.label}</span><b>${s.count}</b></li>`).join('') +
+            (f.stale ? `<li class="fn-warn"><span>⚠️ висят дольше 7 дней</span><b class="fn-warn">${f.stale}</b></li>` : '') + '</ul>';
+    }
+    function renderFunnels(f) {
+        const v = f.vip, b = f.beyond, a = f.ads, s = f.support;
+        const html = [
+            `<div class="fn"><div class="fn-h">👑 VIP</div>
+                <div class="fn-big">${_pct(v.bought, v.clicked)}%<small>купили из нажавших</small></div>
+                <div class="fn-cap">нажали «VIP» → стали VIP</div>
+                ${_fnStep('Нажали кнопку VIP', v.clicked, 0, '#8f74e6')}
+                ${_fnStep('Из них купили', v.bought, v.clicked, '#8f74e6')}
+                <div class="fn-step"><div class="t"><span>Сейчас проходят оформление</span><b>${v.now.total}</b></div></div>
+                ${_fnStages(v.now)}
+                <ul class="fn-sub"><li><span>Всего VIP сейчас (вкл. купивших до счётчика)</span><b>${_stNum(v.vips_total)}</b></li></ul></div>`,
+            `<div class="fn"><div class="fn-h">🏳️‍🌈 BEYOND</div>
+                <div class="fn-big">${b.now.total}<small>в процессе</small></div>
+                <div class="fn-cap">анкета → проверка → оплата</div>
+                ${_fnStages(b.now)}
+                <ul class="fn-sub"><li><span>Со статусом BEYOND всего</span><b>${_stNum(b.approved)}</b></li></ul></div>`,
+            `<div class="fn"><div class="fn-h">📝 Объявления</div>
+                <div class="fn-big">${_stNum(a.posters_30)}<small>авторов за 30 дней</small></div>
+                <div class="fn-cap">нажали «создать» → реально опубликовали</div>
+                ${_fnStep('Нажимали «создать»', a.clicked, 0, '#1ca58b')}
+                ${_fnStep('Из них опубликовали', a.clicked_and_posted, a.clicked, '#1ca58b')}
+                <ul class="fn-sub"><li><span>Всего авторов в архиве постов</span><b>${_stNum(a.posters_all)}</b></li></ul></div>`,
+            `<div class="fn"><div class="fn-h">🆘 Поддержка</div>
+                <div class="fn-big">${_stNum(s.people)}<small>человек обращались</small></div>
+                <div class="fn-cap">Скайнет + Секретарь, за всё время</div>
+                ${_fnStep('Поставили оценку', s.rated, s.rated + s.unrated, '#d47428')}
+                <ul class="fn-sub"><li><span>Средний балл</span><b>${s.avg == null ? '—' : s.avg.toFixed(2) + ' из 5'}</b></li>
+                <li><span>Закрыто без оценки</span><b>${_stNum(s.unrated)}</b></li>
+                <li class="${s.bad_week ? 'fn-warn' : ''}"><span>Жалоб 1–2⭐ за неделю</span><b class="${s.bad_week ? 'fn-warn' : ''}">${s.bad_week}</b></li></ul></div>`,
+        ].join('');
+        const box = document.getElementById('fn-grid'); box.innerHTML = html;
+        requestAnimationFrame(() => box.querySelectorAll('.fl').forEach(x => { x.style.width = x.dataset.w + '%'; }));
+    }
+    function renderRatings(d) {
+        const col = a => a >= 4.5 ? '#1ca58b' : (a >= 3.5 ? '#8f74e6' : '#d47428');
+        const plural = n => n % 10 === 1 && n % 100 !== 11 ? 'оценка' : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'оценки' : 'оценок');
+        renderStHbars('st-ratings', d.ratings.map(r => ({ name: `${r.name} · ${r.count} ${plural(r.count)}`, v: r.avg, color: col(r.avg),
+            title: `${r.name}: средний балл ${r.avg} из 5 по ${r.count} ${plural(r.count)}` })), v => v.toFixed(1), 5);
+        const foot = document.getElementById('st-ratings-foot'), s = d.funnels.support;
+        foot.style.display = '';
+        foot.innerHTML = `<span>Отсортировано по числу оценок</span><span>Закрыто без оценки: <b>${_stNum(s.unrated)}</b></span>`;
+    }
+
     function renderStHbars(boxId, rows, fmt, maxVal) {
         const box = document.getElementById(boxId);
         if (!rows.length) { box.innerHTML = '<div class="st-empty">Пока нет данных</div>'; return; }
@@ -4151,7 +4196,7 @@ function loadVerifList() {
             });
             renderStCharts(d);
             renderStHeat(d.heat);
-            renderStComposition(d.composition);
+            loadPeople();
             renderStHbars('st-cities', d.cities.map(c => ({ name: c.name, v: c.count })), _stNum);
         }).catch(() => {}).finally(() => { grid.classList.remove('loading'); kp.classList.remove('loading'); });
     }

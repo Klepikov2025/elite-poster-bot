@@ -1566,7 +1566,9 @@ def _execute_skynet_task(task):
                 mk = create_review(int(task['uid']), "ban" if task['action'] == 'global_ban' else "mute", reason,
                                    trigger_text=trigger_text, origin_chat=task.get('origin_chat', ''),
                                    duration=int(task.get('duration') or 0), source="Шпион")
-                bot.send_message(STAFF_GROUP_ID, f"🤖 ИИ-проверка недоступна. Шпион просит {'бан' if task['action'] == 'global_ban' else 'мут'} для {task['uid']}\nПричина: {reason}\nУлика: {str(trigger_text)[:300]}\nРешите вручную.", reply_markup=mk)
+                from core.ai import last_was_weak
+                _hd = "🤖 Запасной ИИ (основной на перерыве) считает это нарушением, но сам не наказываю." if last_was_weak() else "🤖 ИИ-проверка недоступна."
+                bot.send_message(STAFF_GROUP_ID, f"{_hd} Шпион просит {'бан' if task['action'] == 'global_ban' else 'мут'} для {task['uid']}\nПричина: {reason}\nУлика: {str(trigger_text)[:300]}\nРешите вручную.", reply_markup=mk)
             except Exception as e:
                 log_error("Приказ Шпиона: алерт", e, task.get('uid'))
         elif is_guilty:

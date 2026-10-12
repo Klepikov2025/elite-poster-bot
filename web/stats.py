@@ -1,6 +1,7 @@
 """
 Вкладка «📊 Статистика»: динамика сети по дням для живых графиков.
 GET /glaz/api/stats/trends?days=7|30|90 — одним запросом всё, что рисует вкладка.
+GET /glaz/api/stats/people — «Кто в базе», воронки и оценки поддержки (кэш 2 минуты: 85 тыс. записей).
 Выручку видит только владелец.
 """
 import time
@@ -22,6 +23,7 @@ def _day_keys(days):
 
 def register_stats_routes(app):
     from web_auth import is_owner
+    register_people_routes(app)
 
     @app.route('/glaz/api/stats/trends')
     def api_stats_trends():
@@ -150,3 +152,144 @@ def register_stats_routes(app):
         if revenue is not None:
             data["revenue"] = pack(revenue)
         return jsonify(data)
+
+
+# ===================== «Кто в базе» + воронки + оценки =====================
+_PEOPLE_CACHE = {"ts": 0, "data": None}
+
+VIP_STAGES = {"deciding": "выбирает тариф", "awaiting_video": "должен прислать кружок",
+              "admin_review": "кружок у админов на проверке", "awaiting_payment": "ждём оплату"}
+BEYOND_STEPS = {"start": "начал анкету", "waiting_proof": "должен прислать подтверждение",
+                "admin_review": "у админов на проверке", "waiting_promo": "вводит промокод",
+                "waiting_payment": "ждём оплату", "paying": "оплачивает"}
+
+
+def _age_days(ts, now):
+    try:
+        if isinstance(ts, datetime):
+            ts = (MSK.localize(ts) if ts.tzinfo is None else ts).timestamp()
+        return (now - float(ts)) / 86400
+    except Exception:
+        return None
+
+
+def _funnel_stages(coll, field, names, now):
+    stages, stale = {}, 0
+    for f in db[coll].find({}, {field: 1, "timestamp": 1}):
+        k = f.get(field) or "?"
+        stages[k] = stages.get(k, 0) + 1
+        age = _age_days(f.get("timestamp"), now)
+        if age is not None and age > 7:
+            stale += 1
+    rows = [{"key": k, "label": names.get(k, k), "count": v} for k, v in stages.items()]
+    order = list(names)
+    rows.sort(key=lambda r: order.index(r["key"]) if r["key"] in order else 99)
+    return {"total": sum(stages.values()), "stages": rows, "stale": stale}
+
+
+def build_people():
+    now = time.time()
+    month_ago = now - 30 * 86400
+    banned_ids = {b["_id"] for b in banned_collection.find({}, {"_id": 1})}
+    groups = {k: 0 for k in ("deleted", "vip", "beyond", "verified", "banned", "new", "city", "bot_only", "legacy")}
+    f = {"intent_vip": 0, "intent_vip_bought": 0, "intent_ads": 0, "intent_support": 0}
+    user_ids_ads = set()
+    total = 0
+    proj = {"is_deleted": 1, "is_vip": 1, "is_queer": 1, "is_verified": 1, "first_seen": 1, "main_city": 1,
+            "intent_vip": 1, "intent_post_ads": 1, "intent_support": 1}
+    support_uids = set()
+    banned_in_base = 0
+    for u in users_collection.find({}, proj):
+        total += 1
+        if u["_id"] in banned_ids:
+            banned_in_base += 1
+        city = u.get("main_city")
+        has_city = bool(city) and city != "Не привязан"
+        fs = u.get("first_seen")
+        if u.get("is_deleted"):
+            g = "deleted"
+        elif u.get("is_vip"):
+            g = "vip"
+        elif u.get("is_queer"):
+            g = "beyond"
+        elif u.get("is_verified"):
+            g = "verified"
+        elif u["_id"] in banned_ids:
+            g = "banned"
+        elif fs and (_age_days(fs, now) or 999) <= 30:
+            g = "new"
+        elif has_city:
+            g = "city"
+        elif fs:
+            g = "bot_only"
+        else:
+            g = "legacy"
+        groups[g] += 1
+        if u.get("intent_vip"):
+            f["intent_vip"] += 1
+            if u.get("is_vip"):
+                f["intent_vip_bought"] += 1
+        if u.get("intent_post_ads"):
+            f["intent_ads"] += 1
+            user_ids_ads.add(u["_id"])
+        if u.get("intent_support"):
+            support_uids.add(u["_id"])
+
+    # Объявления: кто реально опубликовал (хоть раз за всё время, что хранятся посты) и за 30 дней
+    since = datetime.utcfromtimestamp(month_ago)
+    posters_all = set(db['posts'].distinct("user_id"))
+    posters_30 = set(db['posts'].distinct("user_id", {"time": {"$gte": since}}))
+    clicked_and_posted = len(user_ids_ads & posters_all)
+
+    # Поддержка: оба бота — тикеты Скайнета + диалоги Секретаря (оценённые и нет)
+    support_uids |= set(x for x in db['support_tickets'].distinct("uid") if x)
+    support_uids |= set(x for x in db['ticket_ratings'].distinct("uid") if x)
+    support_uids |= set(x for x in db['paid_users'].distinct("uid", {"thread_id": {"$exists": True, "$ne": None}}) if x)
+
+    # Оценки: только реально оценённые, стабильный порядок (по числу оценок)
+    ratings, unrated = [], 0
+    rated_total, rated_sum = 0, 0
+    for r in db['ticket_ratings'].aggregate([
+            {"$group": {"_id": "$admin_id", "avg": {"$avg": "$rating"}, "n": {"$sum": {"$cond": [{"$gt": ["$rating", 0]}, 1, 0]}},
+                        "all": {"$sum": 1}, "sum": {"$sum": {"$ifNull": ["$rating", 0]}}}}]):
+        if not r.get("n"):
+            unrated += r.get("all", 0)
+            continue
+        unrated += r.get("all", 0) - r["n"]
+        rated_total += r["n"]
+        rated_sum += r.get("sum") or 0
+        ratings.append({"name": str(r["_id"] or "Неизвестный"), "avg": round(r.get("avg") or 0, 2), "count": r["n"]})
+    ratings.sort(key=lambda x: (-x["count"], x["name"]))
+    since_7 = now - 7 * 86400
+    bad_week = db['ticket_ratings'].count_documents({"rating": {"$lte": 2, "$gt": 0}, "timestamp": {"$gte": since_7}})
+
+    return {
+        "total": total,
+        "groups": groups,
+        "banned_list": len(banned_ids),
+        "banned_in_base": banned_in_base,
+        "banned_not_in_base": len(banned_ids) - banned_in_base,
+        "funnels": {
+            "vip": {"clicked": f["intent_vip"], "bought": f["intent_vip_bought"], "now": _funnel_stages("vip_funnel", "stage", VIP_STAGES, now),
+                    "vips_total": groups["vip"]},
+            "beyond": {"now": _funnel_stages("beyond_funnel", "step", BEYOND_STEPS, now),
+                       "approved": users_collection.count_documents({"is_queer": True})},
+            "ads": {"clicked": f["intent_ads"], "clicked_and_posted": clicked_and_posted,
+                    "posters_all": len(posters_all), "posters_30": len(posters_30)},
+            "support": {"people": len(support_uids), "rated": rated_total, "unrated": unrated,
+                        "avg": round(rated_sum / rated_total, 2) if rated_total else None, "bad_week": bad_week},
+        },
+        "ratings": ratings,
+        "generated": int(now),
+    }
+
+
+def register_people_routes(app):
+    @app.route('/glaz/api/stats/people')
+    def api_stats_people():
+        if not session.get('logged_in'):
+            return jsonify({"error": "Unauthorized"}), 401
+        if not _PEOPLE_CACHE["data"] or time.time() - _PEOPLE_CACHE["ts"] > 120:
+            _PEOPLE_CACHE["data"] = build_people()
+            _PEOPLE_CACHE["ts"] = time.time()
+        return jsonify(_PEOPLE_CACHE["data"])
