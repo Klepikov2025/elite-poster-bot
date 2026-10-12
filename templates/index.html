@@ -1126,7 +1126,7 @@
                     <select id="broadcast-target" hidden>
                         <option value="groups_all">groups_all</option><option value="all">all</option><option value="vip">vip</option><option value="queer">queer</option>
                     </select>
-                    <p class="bc-note">В личку дойдёт не всем: часть людей заблокировала бота. Удалённые аккаунты пропускаются, а их «трупы» чистятся из групп.</p>
+                    <p class="bc-note">В личку бот может написать только тем, кто хоть раз нажимал /start (заявка в группу открывает личку всего на 5 минут). Первая рассылка «Всем» выяснит, кому писать нельзя, — дальше они пропускаются, а после /start снова получают рассылки. Удалённые аккаунты и заблокировавшие бота тоже пропускаются.</p>
                 </div>
 
                 <div class="bc-card">
@@ -4272,7 +4272,17 @@ function bcSummary() {
 function bcLoadAudience() {
     fetch('/glaz/api/broadcast/audience').then(r => r.json()).then(a => {
         if (a.error) return; BC.aud = a;
-        Object.keys(a).forEach(k => { const el = document.getElementById('bc-n-' + k); if (el) el.textContent = _fmtN(a[k]); });
+        ['groups_all', 'all', 'vip', 'queer'].forEach(k => {
+            const el = document.getElementById('bc-n-' + k); if (!el) return;
+            el.textContent = _fmtN(a[k]);
+            if (k !== 'groups_all' && a.base) {
+                const sm = el.parentElement.querySelector('small');
+                sm.textContent = a.learned
+                    ? `можно написать · в базе ${_fmtN(a.base[k])}`
+                    : `в базе ${_fmtN(a.base[k])} · нажимали /start: ${_fmtN(a.started[k])}`;
+                sm.title = 'Бот не может написать первым тому, кто его ни разу не запускал. Первая рассылка это выяснит, дальше такие люди пропускаются.';
+            }
+        });
         bcSummary();
     });
 }
@@ -4323,7 +4333,7 @@ function loadBroadcastStats() {
         hb.innerHTML = d.history.length ? d.history.map(h => {
             const st = BC_ST[h.status] || ['', h.status];
             if (h.status === 'running' || h.status === 'stopping') BC.running = true;
-            const tot = Math.max(1, h.total || (h.sent + h.blocked + h.dead + h.failed));
+            const tot = Math.max(1, h.total || (h.sent + h.blocked + h.dead + (h.not_started || 0) + h.failed));
             const seg = (v, c) => v ? `<i style="width:${(v / tot * 100).toFixed(2)}%;background:${c}" title="${_fmtN(v)}"></i>` : '';
             const isG = h.target === 'groups_all';
             const clicks = h.clicks ? `<div class="bc-clicks">👆 Клики: <b>${_fmtN(h.clicks.total)}</b>${h.sent ? ` (${(h.clicks.total / h.sent * 100).toFixed(1)}% от доставленных)` : ''} — ` +
@@ -4334,10 +4344,11 @@ function loadBroadcastStats() {
                     <span class="muted">· ${_e(h.admin)}${h.source && h.source !== 'Панель' ? ' · ' + _e(h.source) : ''}</span><span class="sp"></span>
                     ${h.status === 'running' ? `<button class="btn sm danger" onclick="stopBroadcast('${_e(h.id)}')">Остановить</button>` : ''}</div>
                 <div class="bc-txt">${_e(String(h.text).replace(/<[^>]*>/g, ''))}</div>
-                <div class="bc-prog">${seg(h.sent, '#1ca58b')}${seg(h.blocked, '#d47428')}${seg(h.dead, '#5d626c')}${seg(h.failed, '#c2415b')}</div>
+                <div class="bc-prog">${seg(h.sent, '#1ca58b')}${seg(h.blocked, '#d47428')}${seg(h.dead, '#5d626c')}${seg(h.not_started || 0, '#3d7bc7')}${seg(h.failed, '#c2415b')}</div>
                 <div class="bc-nums"><span><i class="dot" style="background:#1ca58b"></i>доставлено <b>${_fmtN(h.sent)}</b> из ${_fmtN(h.total)}</span>
                     ${isG ? '' : `<span><i class="dot" style="background:#d47428"></i>заблокировали бота <b>${_fmtN(h.blocked)}</b></span>
-                    <span><i class="dot" style="background:#5d626c"></i>удалённых аккаунтов <b>${_fmtN(h.dead)}</b></span>`}
+                    <span><i class="dot" style="background:#5d626c"></i>удалённых аккаунтов <b>${_fmtN(h.dead)}</b></span>
+                    ${h.not_started ? `<span><i class="dot" style="background:#3d7bc7"></i>не запускали бота <b>${_fmtN(h.not_started)}</b></span>` : ''}`}
                     <span><i class="dot" style="background:#c2415b"></i>ошибок <b>${_fmtN(h.failed)}</b></span></div>${clicks}</div>`;
         }).join('') : '<div class="ib-empty">Рассылок пока не было (история ведётся с этого обновления)</div>';
         document.getElementById('bc-hist-upd').textContent = BC.running ? 'обновляется каждые 5 сек' : '';

@@ -514,7 +514,7 @@ def start(message):
             return
 
         # --- СТАТИСТИКА: ЗАПИСЫВАЕМ НОВОГО ЮЗЕРА В БАЗУ ---
-        users_collection.update_one({"_id": message.from_user.id}, {"$set": {"active": True}}, upsert=True)
+        users_collection.update_one({"_id": message.from_user.id}, {"$set": {"active": True}, "$unset": {"dm_blocked": "", "dm_unreachable": ""}}, upsert=True)
         # -------------------------------------------------
 
         # --- ЖЕСТКИЙ ФЕЙСКОНТРОЛЬ ---

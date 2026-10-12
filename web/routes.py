@@ -620,8 +620,12 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                     ids.add(group['chat_id'])
         return ids
 
-    def _bc_audience_query(tgt):
+    def _bc_audience_query(tgt, everyone=False):
+        """Кому реально можно написать в личку: не удалён, не заблокировал бота и хоть раз запускал его.
+        «Не запускал» узнаём по первой рассылке (ошибка Telegram) и больше таких не трогаем; /start снимает отметку."""
         alive = {"is_deleted": {"$ne": True}}
+        if not everyone:
+            alive.update({"dm_blocked": {"$ne": True}, "dm_unreachable": {"$ne": True}})
         return {"all": alive, "vip": {"is_vip": True, **alive}, "queer": {"is_queer": True, **alive}}.get(tgt)
 
     def _bc_progress(bid, **inc_set):
@@ -643,7 +647,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                                                 "sent": 0, "blocked": 0, "dead": 0, "failed": 0})
         else:
             db['broadcast_history'].update_one({"_id": bid}, {"$set": {"status": "running", "started_at": time.time()}})
-        sent = blocked = failed = 0
+        sent = blocked = failed = not_started = 0
         
         markup = None
         if btns_list:
@@ -690,7 +694,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         for u in cursor:
             n += 1
             if n % 50 == 0:
-                _bc_progress(bid, **{"$set": {"sent": count, "blocked": blocked, "dead": dead_count, "failed": failed}})
+                _bc_progress(bid, **{"$set": {"sent": count, "blocked": blocked, "dead": dead_count, "failed": failed, "not_started": not_started}})
                 st = (db['broadcast_history'].find_one({"_id": bid}, {"status": 1}) or {}).get("status")
                 if st == "stopping":  # админ нажал «Остановить»
                     break
@@ -724,6 +728,13 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                 # 3. Пользователь просто заблокировал бота в ЛС (он жив, но рассылку не хочет)
                 elif "blocked" in err_text:
                     blocked += 1  # он жив, просто не хочет рассылку — из базы НЕ удаляется
+                    users_collection.update_one({"_id": u['_id']}, {"$set": {"dm_blocked": True}})
+
+                # 3б. Человек ни разу не запускал бота: Telegram не даёт боту писать первым
+                # (заявка в группу открывает личку лишь на 5 минут). Запоминаем и больше не тратим на него время.
+                elif "can't initiate" in err_text or "chat not found" in err_text or "user not found" in err_text:
+                    not_started += 1
+                    users_collection.update_one({"_id": u['_id']}, {"$set": {"dm_unreachable": True}})
                     
                 # 4. Ошибка форматирования текста
                 elif "parse entities" in err_text:
@@ -737,7 +748,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                     failed += 1
 
         _stopped = (db['broadcast_history'].find_one({"_id": bid}, {"status": 1}) or {}).get("status") == "stopping"
-        _bc_progress(bid, **{"$set": {"sent": count, "blocked": blocked, "dead": dead_count, "failed": failed,
+        _bc_progress(bid, **{"$set": {"sent": count, "blocked": blocked, "dead": dead_count, "failed": failed, "not_started": not_started,
                                        "status": "stopped" if _stopped else "done", "finished_at": time.time()}})
         add_radar_log(f"✅ Рассылка: Доставлено {count}. 💀 Вывезено трупов: {dead_count}")
         try: bot.send_message(STAFF_GROUP_ID, f"🚀 **Рассылка завершена!**\nЦель: {tgt}\n✅ Доставлено: {count} чел.\n💀 Мертвых душ удалено: {dead_count}")
@@ -841,7 +852,8 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                          "text": str(h.get("text", ""))[:300], "admin": h.get("admin", ""), "source": h.get("source", ""),
                          "status": h.get("status"), "started": fmt(h.get("started_at")), "finished": fmt(h.get("finished_at")),
                          "total": h.get("total", 0), "sent": h.get("sent", 0), "blocked": h.get("blocked", 0),
-                         "dead": h.get("dead", 0), "failed": h.get("failed", 0), "clicks": clicks.get(h["_id"])})
+                         "dead": h.get("dead", 0), "failed": h.get("failed", 0), "not_started": h.get("not_started", 0),
+                         "clicks": clicks.get(h["_id"])})
         # старые кнопки (до истории) — отдельным списком
         links = list(db['tracked_links'].find({"bid": {"$exists": False}}).sort("timestamp", -1).limit(30))
         links_res = [{"id": L["_id"], "name": L.get("name", "Кнопка"), "url": L.get("url", ""), "clicks": L.get("clicks", 0),
@@ -851,9 +863,12 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
     @app.route('/glaz/api/broadcast/audience')
     def api_broadcast_audience():
         if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
-        out = {"groups_all": len(_bc_groups())}
+        out = {"groups_all": len(_bc_groups()), "base": {}, "started": {}}
         for k in ("all", "vip", "queer"):
             out[k] = users_collection.count_documents(_bc_audience_query(k))
+            out["base"][k] = users_collection.count_documents(_bc_audience_query(k, everyone=True))
+            out["started"][k] = users_collection.count_documents({**_bc_audience_query(k), "active": True})
+        out["learned"] = users_collection.count_documents({"$or": [{"dm_unreachable": True}, {"dm_blocked": True}]}) > 0
         return jsonify(out)
 
     @app.route('/glaz/api/broadcast/stop', methods=['POST'])
