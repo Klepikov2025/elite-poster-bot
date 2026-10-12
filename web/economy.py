@@ -70,7 +70,8 @@ def _names(uids):
     if not uids:
         return out
     for u in db['users'].find({"_id": {"$in": uids}}, {"first_name": 1, "username": 1}):
-        out[u["_id"]] = (u.get("first_name") or "") + (f" @{u['username']}" if u.get("username") else "")
+        un = str(u.get("username") or "").lstrip("@")   # в базе username бывает уже с «@»
+        out[u["_id"]] = ((u.get("first_name") or "") + (f" @{un}" if un else "")).strip()
     for u in uids:
         if not out.get(u):
             c = db['chat_stats'].find_one({"uid": u}, {"name": 1}) or {}
