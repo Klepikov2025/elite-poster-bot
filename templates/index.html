@@ -786,6 +786,7 @@
       <div class="nav-group">
         <div class="nav-group-title">Система</div>
         <button class="nav-item" data-tab="tab-control" onclick="openTab('tab-control')"><span class="ico">⚙️</span><span class="lbl">Настройки</span></button>
+        {% if is_owner %}<button class="nav-item" onclick="openRoot()"><span class="ico">👑</span><span class="lbl">Касса и ROOT</span></button>{% endif %}
         <button class="nav-item" data-tab="tab-infrastructure" onclick="openTab('tab-infrastructure')"><span class="ico">🗺</span><span class="lbl">Инфраструктура</span></button>
         <button class="nav-item" data-tab="tab-diag" onclick="openTab('tab-diag')"><span class="ico">🩺</span><span class="lbl">Диагностика</span><span class="nav-badge warm" id="diag-badge" style="display:none">0</span></button>
       </div>
@@ -2585,6 +2586,17 @@ function toggleSetting(key) {
         }
 
 let sessionPin = "";
+
+// Вход владельца в кассу/ROOT: открыть «Настройки», подвести к Пульту и при первом входе спросить ROOT-пароль
+function openRoot() {
+    openTab('tab-control');
+    setTimeout(() => {
+        const sys = document.getElementById('tab-system');
+        const head = sys && sys.querySelector('h3');
+        if (head) head.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (!sessionPin) unlockRoot();
+    }, 120);
+}
 
 // 1. Функция запроса пароля
 function unlockRoot() {
@@ -4643,32 +4655,57 @@ document.addEventListener('DOMContentLoaded', () => { if (document.getElementByI
 const AD = { view: 'on', data: [] };
 function adSet(v) { AD.view = v; document.querySelectorAll('#ads-tab .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.a === v)); adRender(); }
 function _adLeft(s) {
-    if (!s.end_ts) return { cls: '', txt: 'срок неизвестен' };
-    const d = (s.end_ts - Date.now() / 1000) / 86400;
+    const ts = Number(s.end_ts);
+    // Нет даты или 0 (подписка отключена) — считаем закончившейся, чтобы не раздувать «Идут»
+    if (!ts || !isFinite(ts)) return { cls: 'off', txt: s.end_ts === 0 ? 'отключена' : 'срок неизвестен' };
+    const d = (ts - Date.now() / 1000) / 86400;
     if (d < 0) return { cls: 'off', txt: 'закончилась ' + Math.ceil(-d) + ' дн. назад' };
     if (d < 1) return { cls: 'soon', txt: 'осталось ' + Math.max(1, Math.round(d * 24)) + ' ч' };
     return { cls: d <= 3 ? 'soon' : 'on', txt: 'осталось ' + Math.floor(d) + ' дн.' };
 }
+function _adRow(s) {
+    const city = (s.city && s.city !== 'Неизвестно') ? `<span class="chip">${_e(s.city)}</span>` : '';
+    const pin = s.has_pin ? '<span class="chip amber">📌 закреп</span>' : '';
+    const warn = s._l.cls === 'soon' ? 'fn-warn' : '';
+    return `<div class="bc-row ad-row">
+        <div class="ks-main"><div class="bc-row-top"><b>${_e(s.network) || 'Реклама'}</b>${city}${pin}
+            <a class="ks-id" href="/glaz?search_id=${encodeURIComponent(s.uid == null ? '' : s.uid)}">ID ${_e(s.uid)}</a></div>
+            <div class="muted" style="font-size:12.5px">до ${_e(s.end_date)} · <span class="${warn}">${_e(s._l.txt)}</span></div></div>
+        <div class="ks-acts"><button class="btn sm ok" onclick="manageAd('${_e(s.id)}', 'extend')">＋ Продлить</button><button class="btn sm danger" onclick="manageAd('${_e(s.id)}', 'delete')">Отключить</button></div>
+    </div>`;
+}
 function adRender() {
     const box = document.getElementById('ads-table-body');
-    const groups = { on: [], soon: [], off: [] };
-    AD.data.forEach(s => { const l = _adLeft(s); s._l = l; (groups[l.cls === 'soon' ? 'soon' : l.cls === 'off' ? 'off' : 'on']).push(s); });
-    groups.on = groups.on.concat(groups.soon);   // «Идут» включает и те, что скоро закончатся
-    ['on', 'soon', 'off'].forEach(k => { const el = document.getElementById('ad-n-' + k); if (el) el.textContent = groups[k].length || ''; });
-    const list = groups[AD.view];
-    box.innerHTML = list.length ? list.map(s => `<div class="bc-row ad-row">
-        <div class="ks-main"><div class="bc-row-top"><b>${_e(s.network)}</b>${s.city && s.city !== 'Неизвестно' ? `<span class="chip">${_e(s.city)}</span>` : ''}${s.has_pin ? '<span class="chip amber">📌 закреп</span>' : ''}
-            <a class="ks-id" href="/glaz?search_id=${encodeURIComponent(s.uid)}">ID ${_e(s.uid)}</a></div>
-            <div class="muted" style="font-size:12.5px">до ${_e(s.end_date)} · <span class="${s._l.cls === 'off' ? '' : s._l.cls === 'soon' ? 'fn-warn' : ''}">${s._l.txt}</span></div></div>
-        <div class="ks-acts"><button class="btn sm ok" onclick="manageAd('${_e(s.id)}', 'extend')">＋ Продлить</button><button class="btn sm danger" onclick="manageAd('${_e(s.id)}', 'delete')">Отключить</button></div>
-    </div>`).join('') : `<div class="ib-empty">${AD.view === 'off' ? 'Закончившихся подписок нет' : AD.view === 'soon' ? 'В ближайшие 3 дня ничего не кончается' : 'Активных рекламных подписок нет'}</div>`;
+    if (!box) return;
+    try {
+        const groups = { on: [], soon: [], off: [] };
+        (AD.data || []).forEach(s => {
+            try { s._l = _adLeft(s); } catch (e) { s._l = { cls: 'off', txt: 'ошибка даты' }; }
+            groups[s._l.cls === 'soon' ? 'soon' : s._l.cls === 'off' ? 'off' : 'on'].push(s);
+        });
+        const active = groups.on.concat(groups.soon);   // «Идут» = активные + те, что скоро кончатся
+        const counts = { on: active.length, soon: groups.soon.length, off: groups.off.length };
+        ['on', 'soon', 'off'].forEach(k => { const el = document.getElementById('ad-n-' + k); if (el) el.textContent = counts[k] || ''; });
+        const list = AD.view === 'soon' ? groups.soon : AD.view === 'off' ? groups.off : active;
+        if (!list.length) {
+            box.innerHTML = `<div class="ib-empty">${AD.view === 'off' ? 'Закончившихся подписок нет' : AD.view === 'soon' ? 'В ближайшие 3 дня ничего не кончается' : (AD.data && AD.data.length ? 'Активных подписок нет — все закончились (см. «Закончились»)' : 'Рекламных подписок пока нет')}</div>`;
+            return;
+        }
+        // Каждую строку строим отдельно: одна кривая запись не обрушит весь список
+        const rows = [];
+        list.slice(0, 500).forEach(s => { try { rows.push(_adRow(s)); } catch (e) {} });
+        box.innerHTML = rows.join('') || '<div class="ib-empty">Не удалось показать подписки — обновите страницу</div>';
+    } catch (e) {
+        box.innerHTML = `<div class="ib-empty">⚠️ Ошибка отображения: ${_e(e.message)}. Обновите страницу.</div>`;
+    }
 }
 function loadAds() {
+    const box = document.getElementById('ads-table-body');
+    if (box) box.innerHTML = '<div class="ib-empty">Загрузка…</div>';
     fetch('/glaz/api/ads/subs').then(r => r.json()).then(d => {
-        const box = document.getElementById('ads-table-body');
-        if (!Array.isArray(d)) { box.innerHTML = `<div class="ib-empty">❌ ${_e(d.error || 'Не удалось загрузить')}</div>`; return; }
+        if (!Array.isArray(d)) { if (box) box.innerHTML = `<div class="ib-empty">❌ ${_e((d && d.error) || 'Не удалось загрузить')}</div>`; return; }
         AD.data = d; adRender();
-    }).catch(() => { document.getElementById('ads-table-body').innerHTML = '<div class="ib-empty">❌ Нет связи с сервером</div>'; });
+    }).catch(err => { if (box) box.innerHTML = `<div class="ib-empty">❌ Нет связи с сервером (${_e(err.message)})</div>`; });
 }
 function manageAd(sub_id, action) {
     let body = { sub_id, action };
