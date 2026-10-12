@@ -1879,15 +1879,16 @@
                     const meta = document.createElement('div'); meta.style.cssText = 'color:#888; font-size:12px; margin-top:3px;';
                     meta.textContent = (it.help ? it.help + ' ' : '') + '· ' + it.bots + ' · по умолчанию: ' + it.default;
                     left.appendChild(lab); left.appendChild(meta);
-                    const inp = document.createElement(it.type === 'textarea' ? 'textarea' : 'input');
+                    const inp = document.createElement(it.type === 'textarea' ? 'textarea' : it.type === 'bool' ? 'select' : 'input');
                     inp.id = 'cfg-' + it.key; inp.className = 'search-input';
-                    if (it.type === 'textarea') { inp.rows = 4; } else { inp.type = (it.type === 'int' || it.type === 'float') ? 'number' : 'text'; }
+                    if (it.type === 'bool') { inp.innerHTML = '<option value="true">✅ Включено</option><option value="false">⛔ Выключено</option>'; }
+                    else if (it.type === 'textarea') { inp.rows = 4; } else { inp.type = (it.type === 'int' || it.type === 'float') ? 'number' : 'text'; }
                     if (it.type === 'float') inp.step = '0.01';
                     if (it.min !== null && it.min !== undefined) inp.min = it.min;
                     if (it.max !== null && it.max !== undefined) inp.max = it.max;
-                    inp.value = it.value;
+                    inp.value = it.type === 'bool' ? String(!!it.value) : it.value;
                     inp.style.cssText = (it.type === 'textarea' ? 'flex:1 1 100%; min-height:90px; resize:vertical; font-size:13px;' : 'flex:0 1 260px; min-width:120px;') + ' padding:8px; box-sizing:border-box;' + (it.changed ? 'border-color:#ffb74d;' : '');
-                    inp.addEventListener('input', () => { controlDirty[it.key] = inp.value; inp.style.borderColor = '#03dac6'; document.body.classList.add('ctl-dirty'); });
+                    inp.addEventListener(it.type === 'bool' ? 'change' : 'input', () => { controlDirty[it.key] = inp.value; inp.style.borderColor = '#03dac6'; document.body.classList.add('ctl-dirty'); });
                     row.appendChild(left); row.appendChild(inp); sec.appendChild(row);
                 });
                 box.appendChild(sec);

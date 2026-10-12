@@ -228,6 +228,8 @@ def is_real_vip(user_id: int) -> bool:
     return bool(user_data.get("is_vip", False))
 
 # ==================== МОДУЛЬ 2: УМНАЯ ТАМОЖНЯ + СТАТИСТИКА ====================
+from core.join_gate import approve_or_gate, release as join_release, subscribe_bonus, gate_daemon as join_gate_daemon
+
 @bot.chat_join_request_handler()
 def handle_join_requests(message: telebot.types.ChatJoinRequest):
     # 👇 НОВЫЕ ДВЕ СТРОЧКИ 👇
@@ -393,7 +395,7 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
                 except: pass
         
         if is_privileged:
-            bot.approve_chat_join_request(chat_id, user_id)
+            approve_or_gate(bot, chat_id, user_id, getattr(message.chat, "title", "") or "")
             db['network_stats'].update_one(
                 {"_id": "current_period"}, 
                 {"$inc": {"approved": 1, "vip_tickets": 1, f"chats.{chat_id}.approved": 1}}, 
@@ -433,7 +435,7 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
                 return
 
             if has_bad_link:
-                bot.approve_chat_join_request(chat_id, user_id) 
+                bot.approve_chat_join_request(chat_id, user_id)  # спамера пускаем сразу (и тут же мут)
                 db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
                 bot.send_message(STAFF_GROUP_ID, f"⚠️ **СКАЙНЕТ: ТАМОЖНЯ**\nПустил спамера со ссылкой в БИО (`{user_id}`) для массовки.\nЗатыкаю рот глобальным МУТОМ 🤐...")
                 mute_user_everywhere(user_id, reason="Рекламная ссылка в БИО", admin_name="Скайнет 🛂")
@@ -449,7 +451,7 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
             chat_ids_mk.get("Аренда Жилья")
         ]
         if chat_id in big_chats:
-            bot.approve_chat_join_request(chat_id, user_id)
+            approve_or_gate(bot, chat_id, user_id, getattr(message.chat, "title", "") or "")
             db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
             return
 
@@ -472,7 +474,7 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
                 # 📍 СЦЕНАРИЙ А: Юзер уже привязан к городу
                 # Пускаем, если его родной город ИЛИ купленный город есть в списке допустимых для этого чата
                 if main_city in possible_cities or any(c in purchased_cities for c in possible_cities):
-                    bot.approve_chat_join_request(chat_id, user_id)
+                    approve_or_gate(bot, chat_id, user_id, getattr(message.chat, "title", "") or "")
                     db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
                     return
                 else:
@@ -499,7 +501,7 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
                 # 📍 СЦЕНАРИЙ Б: Метод «Первой двери» для новичков
                 users_collection.update_one({"_id": user_id}, {"$set": {"main_city": primary_target_city}}, upsert=True)
                 
-                bot.approve_chat_join_request(chat_id, user_id)
+                approve_or_gate(bot, chat_id, user_id, getattr(message.chat, "title", "") or "")
                 db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
                 return
 
@@ -565,6 +567,14 @@ def start(message):
 
         # 1. Ловим реферальную ссылку (t.me/bot?start=ref_12345)
         start_params = message.text.split()
+        # 🚪 Вход в группы через бота: человек нажал «Вступить» (или просто открыл бота) — одобряем его заявки
+        _joined = join_release(bot, message.from_user.id)
+        if _joined:
+            bot.send_message(message.chat.id, "✅ Заявка одобрена — добро пожаловать в " + ", ".join(f"«{t}»" for t in _joined) + "!\n\nТеперь важные новости сети будут приходить сюда.")
+        # 🔔 Подписка старого участника на новости: разовый бонус
+        if len(start_params) > 1 and start_params[1] == "sub":
+            _pts = subscribe_bonus(message.from_user.id)
+            bot.send_message(message.chat.id, f"🔔 Готово, вы подписаны на новости сети!" + (f"\n🎁 Бонус за подписку: +{_pts} очков (в Игровом кабинете Секретаря)." if _pts else ""))
         is_referral = False
         if len(start_params) > 1 and start_params[1].startswith('ref_') and SkynetSettings.get().get("referral_system", True):
             ref_id = int(start_params[1].replace('ref_', ''))
@@ -1830,6 +1840,7 @@ def cpa_monthly_daemon():
 # Запускаем демонов CPA
 threading.Thread(target=cpa_tracker_daemon, daemon=True).start()
 threading.Thread(target=cpa_monthly_daemon, daemon=True).start()
+threading.Thread(target=join_gate_daemon, args=(bot,), daemon=True).start()
 
 # 🤖 ФОНОВЫЙ ДЕМОН АВТОПИЛОТА
 def autopilot_daemon():
