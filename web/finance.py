@@ -1,3 +1,4 @@
+import re
 from flask import request, jsonify, session, redirect, url_for
 from database import db, withdrawals_collection, update_user_stats
 import time
@@ -265,10 +266,16 @@ def register_finance_routes(app, bot, add_radar_log, OWNER_ID, ROOT_PIN):
     @app.route('/glaz/add_promo', methods=['POST'])
     def glaz_add_promo():
         if not session.get('logged_in'): return redirect(url_for('login'))
-        code = request.form.get('code').strip().upper()
-        discount = int(request.form.get('discount'))
+        code = (request.form.get('code') or '').strip().upper()
+        try:
+            discount = int(request.form.get('discount'))
+            limit = int(request.form.get('limit'))
+        except (TypeError, ValueError):
+            return redirect(url_for('admin_panel'))
         target = request.form.get('target')
-        limit = int(request.form.get('limit'))
+        # Раньше можно было создать скидку 500% или пустой код
+        if not re.fullmatch(r"[A-ZА-ЯЁ0-9_\-]{2,32}", code) or not (1 <= discount <= 100) or limit < 1 or target not in ("all", "vip", "fine", "ads"):
+            return redirect(url_for('admin_panel'))
         db['promocodes'].update_one(
             {"_id": code},
             {"$set": {"type": "percent", "value": discount, "target": target, "usage_limit": limit, "used_count": 0, "owner_uid": OWNER_ID, "is_active": True}},

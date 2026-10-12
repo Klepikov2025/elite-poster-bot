@@ -185,7 +185,7 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
             total=total_users, vips=vip_users, queers=queer_users, banned=banned_users,
             user_data=user_data, search_error=search_error, search_id=search_id or "",
             withdrawals=all_withdrawals, promos=all_promos,
-            tags=all_tags, premiums=all_premium
+            tags=all_tags, premiums=all_premium, owner_id=OWNER_ID
         )
 
     @app.route('/glaz/api/stats')

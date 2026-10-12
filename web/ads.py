@@ -29,6 +29,14 @@ def register_ads_routes(app, bot, add_radar_log):
                 
                 # Бронебойная конвертация времени
                 date_str = "неизвестно"
+                end_ts = None
+                try:
+                    if isinstance(end_date, datetime):
+                        end_ts = (pytz.utc.localize(end_date) if end_date.tzinfo is None else end_date).timestamp()
+                    elif isinstance(end_date, (int, float)):
+                        end_ts = float(end_date)
+                except Exception:
+                    end_ts = None
                 try:
                     if isinstance(end_date, datetime):
                         if end_date.tzinfo is None:
@@ -46,32 +54,17 @@ def register_ads_routes(app, bot, add_radar_log):
                     "uid": str(sub.get("user_id") or sub.get("uid", "Не указан")),
                     "network": str(sub.get("network", "Неизвестно")),
                     "city": str(sub.get("city", "Неизвестно")),
-                    "end_date": date_str,
+                    "end_date": date_str if end_ts != 0 else "отключена",
+                    "end_ts": end_ts,
                     "has_pin": sub.get("has_pin", False)
                 })
             
-            # 🚨 Если база пустая, выводим уведомление прямо на сайт!
-            if not results:
-                return jsonify([{
-                    "id": "0", 
-                    "uid": "⚠️ ПУСТО", 
-                    "network": "В базе elite_bot_db нет рекламы", 
-                    "city": "-", 
-                    "end_date": "---"
-                }])
-                
             return jsonify(results)
             
         except Exception as e:
             # Если питон падает, выводим красную ошибку прямо в таблицу на сайте!
             print(traceback.format_exc())
-            return jsonify([{
-                "id": "ERROR", 
-                "uid": "КРИТИЧЕСКАЯ ОШИБКА", 
-                "network": str(e), 
-                "city": "Смотри логи", 
-                "end_date": "---"
-            }])
+            return jsonify({"error": f"Ошибка чтения подписок: {e}"})
 
     @app.route('/glaz/api/ads/manage', methods=['POST'])
     def api_manage_ad_sub():
@@ -98,12 +91,16 @@ def register_ads_routes(app, bot, add_radar_log):
                 sub = collection.find_one({"_id": ObjectId(sub_id)})
                 
                 if sub:
+                    if not (0 < days <= 3650):
+                        return jsonify({"success": False, "error": "Число дней от 1 до 3650"})
                     end_date = sub.get("end_date")
+                    # Продлеваем от «сейчас», если подписка уже кончилась (раньше прибавляли к прошедшей дате)
                     if isinstance(end_date, (int, float)):
-                        new_date = end_date + (days * 86400)
+                        new_date = max(float(end_date), time.time()) + (days * 86400)
                     elif isinstance(end_date, datetime):
                         from datetime import timedelta
-                        new_date = end_date + timedelta(days=days)
+                        base = end_date if end_date.tzinfo is None else end_date.astimezone(pytz.utc).replace(tzinfo=None)
+                        new_date = max(base, datetime.utcnow()) + timedelta(days=days)
                     else:
                         new_date = time.time() + (days * 86400)
 

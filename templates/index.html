@@ -477,6 +477,32 @@
 
 
 
+
+        /* =================== 💰 КАССА / 🎫 СКИДКИ / 📢 БИРЖА 2.0 =================== */
+        .ks-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .ks-row { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+        .ks-main { min-width: 0; display: grid; gap: 6px; }
+        .ks-sum { font-size: 17px; }
+        .ks-id { font: 500 12px var(--mono); color: var(--muted); text-decoration: none; }
+        .ks-id:hover { color: #b9a2ff; }
+        .ks-req { font-size: 13px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .ks-req code { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; word-break: break-all; }
+        .ks-acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+        .ks-acts form { margin: 0; }
+        .ks-tag { font: 700 14px var(--mono); background: rgba(187,134,252,.12); border: 1px solid rgba(187,134,252,.4); color: #d9bcff; border-radius: 6px; padding: 3px 8px; }
+        .pr-code { font: 700 14px var(--mono); color: var(--text); }
+        .pr-use { display: grid; gap: 5px; font-size: 12.5px; }
+        .pr-use b { color: var(--text); }
+        .pr-prizes summary { cursor: pointer; font-size: 13.5px; }
+        .pr-form { display: grid; gap: 10px; }
+        .pr-form label { display: grid; gap: 5px; font-size: 12.5px; color: #c5c8cf; font-weight: 600; }
+        .pr-form input, .pr-form select { background: var(--bg); color: var(--text); border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 10px; font: 14px var(--sans); }
+        .pr-form input:focus, .pr-form select:focus { outline: none; border-color: var(--accent); }
+        .pr-form input[name="code"] { font-family: var(--mono); text-transform: uppercase; }
+        .ad-row { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+        .ad-left { font: 700 15px var(--sans); }
+        @media (max-width: 860px) { .ks-grid { grid-template-columns: 1fr; } .ks-row, .ad-row { grid-template-columns: 1fr; } .ks-acts { justify-content: flex-start; } }
+
         /* =================== 📡 РАДАР / 🕵️ ЯЩИК / 💥 РЕПРЕССИИ 2.0 =================== */
         .rd { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 12px; align-items: start; }
         .rd-feed { margin-bottom: 0; }
@@ -1658,155 +1684,162 @@
 
 
     <div id="tab-withdrawals" class="tab-content">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1200px; margin: 0 auto;">
-            
-            <!-- ЛЕВАЯ КОЛОНКА: ТЕГИ -->
-            <div style="background: #1a1a1a; padding: 20px; border-radius: 10px; border: 1px solid #bb86fc;">
-<h3 style="color: #bb86fc; margin-top: 0;">🏷 Заявки на личные теги</h3>
-                    <p style="color: #aaa; font-size: 12px; margin-bottom: 15px;">Одобряйте или отклоняйте статусы. Бот сам уведомит пользователя.</p>
-                    
-                    <div style="display: flex; flex-direction: column; gap: 10px;">
-                        {% for tag in tags %}
-                        <div style="background: #252525; padding: 15px; border-radius: 8px; border-left: 4px solid #bb86fc; display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <div style="color: #fff; font-weight: bold; font-size: 15px; margin-bottom: 5px;">
-                                    Желаемый тег: <span style="background: #bb86fc; color: #121212; padding: 2px 6px; border-radius: 4px; font-family: monospace;">{{ tag.tag }}</span>
-                                </div>
-                                <div style="color: #aaa; font-size: 11px;">Юзер: {{ tag.name }} (<code>{{ tag.uid }}</code>)</div>
-                            </div>
-                            <div style="display: flex; gap: 5px;">
-                                <button class="act-btn unban" style="padding: 6px 12px; width: auto;" onclick="manageTag({{ tag.uid }}, 'ok')">✅</button>
-                                <button class="act-btn ban" style="padding: 6px 12px; width: auto;" onclick="manageTag({{ tag.uid }}, 'rej')">❌</button>
-                            </div>
+        <div class="sec-head">
+            <div><h2>Касса и награды</h2><p>Заявки, которые ждут решения админа: выплаты с баланса, личные теги и призовой Telegram Premium. Бот сам сообщит человеку о решении.</p></div>
+        </div>
+        <div class="kpis">
+            <div class="kpi"><div class="muted">💸 Выплаты ждут</div><div class="v">{{ withdrawals|length }}</div></div>
+            <div class="kpi"><div class="muted">🏷 Теги ждут</div><div class="v">{{ tags|length }}</div></div>
+            <div class="kpi"><div class="muted">💎 Premium выдать</div><div class="v">{{ premiums|length }}</div></div>
+        </div>
+
+        <div class="bc-card">
+            <div class="bc-head"><div class="bc-step" style="margin:0"><span>💸</span>Выплаты</div><span class="muted">Отказ возвращает деньги на баланс человека</span></div>
+            <div class="bc-list">
+                {% for wd in withdrawals %}
+                {% set is_ref = (wd._id is string and wd._id.startswith('w_')) %}
+                <div class="bc-row ks-row">
+                    <div class="ks-main">
+                        <div class="bc-row-top">
+                            <b class="ks-sum">{{ wd.amount }} {{ '⭐️' if is_ref else '₽' }}</b>
+                            <span class="chip">{{ 'Рефералка Скайнета' if is_ref else (wd.method or 'Кэшбэк Секретаря') }}</span>
+                            <a class="muted ks-id" href="/glaz?search_id={{ wd.user_id }}" title="Открыть досье">ID {{ wd.user_id }}</a>
                         </div>
-                        {% else %}
-                        <div style="text-align: center; color: #666; padding: 20px;">Новых заявок на теги нет</div>
-                        {% endfor %}
+                        <div class="ks-req"><span class="muted">Реквизиты:</span> <code>{{ wd.details or '—' }}</code>
+                            {% if wd.details %}<button type="button" class="btn sm ghost" onclick="navigator.clipboard.writeText(this.dataset.v).then(() => showToast('📋 Реквизиты скопированы'))" data-v="{{ wd.details }}">Копировать</button>{% endif %}</div>
+                    </div>
+                    <div class="ks-acts">
+                        <form action="/glaz/withdrawal_action" method="POST" onsubmit="return confirm('Деньги уже отправлены человеку? Заявка закроется как выплаченная.')">
+                            <input type="hidden" name="wd_id" value="{{ wd._id }}"><input type="hidden" name="action" value="pay">
+                            <button type="submit" class="btn sm ok">✅ Выплачено</button></form>
+                        <form action="/glaz/withdrawal_action" method="POST" onsubmit="return confirm('Отклонить заявку? {{ 'Звёзды останутся на реферальном балансе.' if is_ref else 'Сумма вернётся на баланс человека.' }}')">
+                            <input type="hidden" name="wd_id" value="{{ wd._id }}"><input type="hidden" name="action" value="reject">
+                            <button type="submit" class="btn sm danger">Отклонить</button></form>
                     </div>
                 </div>
-
-                <!-- ПРАВАЯ КОЛОНКА: ФИНАНСЫ И ПРЕМИУМ -->
-                <div style="display: flex; flex-direction: column; gap: 20px;">
-                    
-                    <!-- БЛОК ПРЕМИУМ -->
-                    <div style="background: #1a1a1a; padding: 20px; border-radius: 10px; border: 1px solid #03dac6;">
-                        <h3 style="color: #03dac6; margin-top: 0;">💎 Выдача Telegram Premium</h3>
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
-                            {% for prem in premiums %}
-                            <div style="background: #252525; padding: 15px; border-radius: 8px; border-left: 4px solid #03dac6;">
-                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                                    <span style="color: #fff; font-weight: bold;">{{ prem.name }} {{ prem.username }}</span>
-                                    <button class="act-btn unban" style="padding: 4px 10px; width: auto; font-size: 11px;" onclick="managePremium({{ prem.uid }})">🎁 Выдано</button>
-                                </div>
-                                <div style="color: #03dac6; font-family: monospace; font-size: 13px; background: #111; padding: 8px; border-radius: 5px;">
-                                    Реквизиты: {{ prem.details }}
-                                </div>
-                            </div>
-                            {% else %}
-                            <div style="text-align: center; color: #666; padding: 10px;">Победителей пока нет</div>
-                            {% endfor %}
-                        </div>
-                    </div>
-
-                    <!-- БЛОК ВЫВОДОВ (СТАРЫЙ) -->
-                    <div style="background: #1a1a1a; padding: 20px; border-radius: 10px; border: 1px solid #4caf50;">
-                        <h3 style="color: #4caf50; margin-top: 0;">💸 Финансовые выплаты</h3>
-                        <table class="admin-table" style="font-size: 12px;">
-                            <thead><tr><th>ID</th><th>Сумма</th><th>Реквизиты</th><th>Действие</th></tr></thead>
-                            <tbody>
-                                {% for wd in withdrawals %}
-                                    {% if wd.status == 'pending' %}
-                                    <tr>
-                                        <td><code>{{ wd.user_id }}</code></td>
-                                        <td><b style="color: #ffb74d;">{{ wd.amount }} {{ '⭐️' if (wd._id is string and wd._id.startswith('w_')) else '₽' }}</b></td>
-                                        <td><code>{{ wd.details }}</code></td>
-                                        <td>
-                                            <div style="display:flex; gap:5px;">
-                                                <form action="/glaz/withdrawal_action" method="POST" style="margin:0;"><input type="hidden" name="wd_id" value="{{ wd._id }}"><input type="hidden" name="action" value="pay"><button type="submit" class="act-btn unban" style="padding: 4px 8px; font-size:10px; width: auto;">✅</button></form>
-                                                <form action="/glaz/withdrawal_action" method="POST" style="margin:0;"><input type="hidden" name="wd_id" value="{{ wd._id }}"><input type="hidden" name="action" value="reject"><button type="submit" class="act-btn ban" style="padding: 4px 8px; font-size:10px; width: auto;">❌</button></form>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {% endif %}
-                                {% else %}
-                                <tr><td colspan="4" style="text-align: center; color: #666;">Очередь выплат пуста</td></tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-
-                </div>
+                {% else %}
+                <div class="ib-empty">🎉 Очередь выплат пуста</div>
+                {% endfor %}
             </div>
         </div>
 
-    <div id="tab-promos" class="tab-content">
-        <div class="panel-block">
-            <h3>🎫 Генератор промокодов</h3>
-            <form action="/glaz/add_promo" method="POST" class="form-group">
-                <input type="text" name="code" class="form-input" placeholder="КОДОВОЕ_СЛОВО" required>
-                <input type="number" name="discount" class="form-input" placeholder="Скидка %" min="1" max="100" required>
-                <select name="target" class="form-input">
-                    <option value="all">Везде</option>
-                    <option value="vip">Только VIP/ТРАНС</option>
-                    <option value="fine">Только штрафы</option>
-                    <option value="ads">На рекламу</option>
-                </select>
-                <input type="number" name="limit" class="form-input" placeholder="Лимит использований" min="1" required>
-                <button type="submit" class="form-btn">Сгенерировать код</button>
-            </form>
-        </div>
-
-        <div class="panel-block" style="max-width: 900px;">
-            <h3>📊 Активные промокоды в базе</h3>
-            <table class="admin-table">
-                <thead>
-                    <tr><th>Код</th><th>Скидка</th><th>Где работает</th><th>Юзано / Лимит</th><th>Состояние</th><th>Действие</th></tr>
-                </thead>
-                <tbody>
-                    {% for promo in promos %}
-                    <tr>
-                        <td><code>{{ promo._id }}</code></td>
-                        <td>{{ promo.value }}%</td>
-                        <td><span class="badge yes" style="background:#555; color:#fff;">{{ promo.target }}</span></td>
-                        <td>{{ promo.used_count }} / {{ promo.usage_limit }}</td>
-                        <td>
-                            {% if promo.is_active and promo.used_count < promo.usage_limit %}
-                                <span class="status-paid">Активен</span>
-                            {% else %}
-                                <span class="status-rejected">Выдохся</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <form action="/glaz/delete_promo" method="POST" style="margin: 0;">
-                                <input type="hidden" name="code" value="{{ promo._id }}">
-                                <button type="submit" class="act-btn ban" style="padding: 5px 10px; font-size:11px; width: auto;">🗑 Удалить</button>
-                            </form>
-                        </td>
-                    </tr>
+        <div class="ks-grid">
+            <div class="bc-card">
+                <div class="bc-head"><div class="bc-step" style="margin:0"><span>🏷</span>Личные теги</div></div>
+                <div class="bc-list">
+                    {% for tag in tags %}
+                    <div class="bc-row ks-row">
+                        <div class="ks-main">
+                            <div class="bc-row-top"><span class="ks-tag">{{ tag.tag }}</span></div>
+                            <div class="muted" style="font-size:12.5px">{{ tag.name }} · <a class="ks-id" href="/glaz?search_id={{ tag.uid }}">ID {{ tag.uid }}</a></div>
+                        </div>
+                        <div class="ks-acts">
+                            <button class="btn sm ok" onclick="manageTag({{ tag.uid }}, 'ok')">✅ Одобрить</button>
+                            <button class="btn sm danger" onclick="if (confirm('Отклонить тег? Купон вернётся человеку.')) manageTag({{ tag.uid }}, 'rej')">Отклонить</button>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="ib-empty">Новых заявок на теги нет</div>
                     {% endfor %}
-                </tbody>
-            </table>
+                </div>
+            </div>
+
+            <div class="bc-card">
+                <div class="bc-head"><div class="bc-step" style="margin:0"><span>💎</span>Telegram Premium</div><span class="muted">Подарите в Telegram, потом отметьте</span></div>
+                <div class="bc-list">
+                    {% for prem in premiums %}
+                    <div class="bc-row ks-row">
+                        <div class="ks-main">
+                            <div class="bc-row-top"><b>{{ prem.name }}</b> <span class="muted">{{ prem.username }}</span></div>
+                            <div class="ks-req"><span class="muted">Кому дарить:</span> <code>{{ prem.details }}</code></div>
+                        </div>
+                        <div class="ks-acts"><button class="btn sm ok" onclick="managePremium({{ prem.uid }})">🎁 Выдано</button></div>
+                    </div>
+                    {% else %}
+                    <div class="ib-empty">Победителей, ждущих Premium, нет</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-promos" class="tab-content">
+        <div class="sec-head">
+            <div><h2>Скидки</h2><p>Промокоды на скидку: человек вводит код при оплате VIP, штрафа или рекламы.</p></div>
+        </div>
+        <div class="bc">
+            <div class="bc-main">
+                <div class="bc-card">
+                    <div class="bc-head"><div class="bc-step" style="margin:0"><span>📊</span>Промокоды админов</div>
+                        <div class="seg"><button type="button" class="seg-btn active" data-p="on" onclick="prSet('on')">Работают</button><button type="button" class="seg-btn" data-p="off" onclick="prSet('off')">Закончились</button></div></div>
+                    <div class="bc-list" id="pr-list">
+                        {% for promo in promos if promo.owner_uid == owner_id or promo.owner_uid is not defined %}
+                        {% set alive = promo.is_active and (promo.used_count or 0) < (promo.usage_limit or 1) %}
+                        <div class="bc-row pr-row" data-alive="{{ 1 if alive else 0 }}">
+                            <div class="bc-row-top">
+                                <code class="pr-code">{{ promo._id }}</code>
+                                <button type="button" class="btn sm ghost" data-v="{{ promo._id }}" onclick="navigator.clipboard.writeText(this.dataset.v).then(() => showToast('📋 Код скопирован'))">Копировать</button>
+                                <span class="chip violet">−{{ promo.value }}%</span>
+                                <span class="chip">{{ {'all': 'везде', 'vip': 'VIP и BEYOND', 'fine': 'штрафы', 'ads': 'реклама'}.get(promo.target, promo.target) }}</span>
+                                <span class="sp"></span>
+                                <form action="/glaz/delete_promo" method="POST" style="margin:0" onsubmit="return confirm('Удалить этот промокод? Им больше нельзя будет воспользоваться.')">
+                                    <input type="hidden" name="code" value="{{ promo._id }}"><button type="submit" class="btn sm danger">Удалить</button></form>
+                            </div>
+                            <div class="pr-use">
+                                <div class="bc-prog"><i style="width: {{ ((promo.used_count or 0) / (promo.usage_limit or 1) * 100)|round(1) if promo.usage_limit else 0 }}%; background: {{ '#1ca58b' if alive else '#5d626c' }}"></i></div>
+                                <span class="muted">использован <b>{{ promo.used_count or 0 }}</b> из {{ promo.usage_limit }}{% if not alive %} · закончился{% endif %}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        <div class="ib-empty pr-empty" hidden>Здесь пусто</div>
+                    </div>
+                </div>
+
+                {% set prizes = promos|selectattr('owner_uid', 'defined')|rejectattr('owner_uid', 'equalto', owner_id)|list %}
+                <details class="bc-card pr-prizes">
+                    <summary><b>🎁 Призы игроков</b> <span class="muted">— коды из казино и артефакты (ордера, купоны на тег, джекпоты): {{ prizes|length }}, из них не использовано {{ prizes|selectattr('is_active')|selectattr('used_count', 'equalto', 0)|list|length }}</span></summary>
+                    <div class="bc-list" style="margin-top:10px">
+                        {% for promo in prizes[:100] %}
+                        <div class="bc-nums" style="padding:4px 0">
+                            <code>{{ promo._id }}</code>
+                            <span>{{ {'artifact': 'артефакт', 'airdrop': 'раздача', 'percent': 'скидка ' ~ promo.value ~ '%'}.get(promo.type, promo.type) }}</span>
+                            <a href="/glaz?search_id={{ promo.owner_uid }}">владелец {{ promo.owner_uid }}</a>
+                            <span>{{ 'использован' if (promo.used_count or 0) >= (promo.usage_limit or 1) or not promo.is_active else 'ещё не использован' }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </details>
+            </div>
+
+            <aside class="bc-side">
+                <div class="bc-card bc-sticky">
+                    <div class="bc-step"><span>＋</span>Новый промокод</div>
+                    <form action="/glaz/add_promo" method="POST" class="pr-form" onsubmit="return prCheck(this)">
+                        <label>Код<input type="text" name="code" placeholder="НАПРИМЕР: OSEN25" required maxlength="32" pattern="[A-Za-zА-Яа-яЁё0-9_\-]+" title="Буквы, цифры, _ и -" autocomplete="off"></label>
+                        <button type="button" class="btn sm ghost" onclick="this.form.code.value = 'MK' + Math.random().toString(36).slice(2, 8).toUpperCase()">🎲 Придумать код</button>
+                        <label>Скидка, %<input type="number" name="discount" min="1" max="100" value="20" required></label>
+                        <label>Где работает
+                            <select name="target">
+                                <option value="all">Везде</option>
+                                <option value="vip">Только VIP и BEYOND</option>
+                                <option value="fine">Только штрафы</option>
+                                <option value="ads">Только реклама</option>
+                            </select></label>
+                        <label>Сколько раз можно использовать<input type="number" name="limit" min="1" max="100000" value="10" required></label>
+                        <button type="submit" class="btn primary" style="width:100%">Создать промокод</button>
+                    </form>
+                    <p class="bc-note">Если код уже есть — он перезапишется с новыми условиями и счётчиком с нуля.</p>
+                </div>
+            </aside>
         </div>
     </div>
 
     <div id="ads-tab" class="tab-content">
-        <div class="panel-block" style="max-width: 1000px;">
-            <h3 style="color: #ffb74d;">📊 Активные рекламные подписки</h3>
-            <p style="color: #aaa; margin-bottom: 15px;">Управление платными размещениями в чатах сети.</p>
-            
-            <table style="width: 100%; border-collapse: collapse; background: #1e1e1e; border: 1px solid #333;">
-                <thead>
-                    <tr style="border-bottom: 2px solid #333;">
-                        <th style="padding: 12px; text-align: left;">ID пользователя</th>
-                        <th style="padding: 12px; text-align: left;">Сеть / Чат</th>
-                        <th style="padding: 12px; text-align: left;">Окончание</th>
-                        <th style="padding: 12px; text-align: center;">Действия</th>
-                    </tr>
-                </thead>
-                <tbody id="ads-table-body">
-                    </tbody>
-            </table>
+        <div class="sec-head">
+            <div><h2>Биржа рекламы</h2><p>Платные рекламные подписки в чатах сети (их продаёт бот МП). Время — по Екатеринбургу.</p></div>
+            <div class="seg"><button type="button" class="seg-btn active" data-a="on" onclick="adSet('on')">Идут <b id="ad-n-on"></b></button><button type="button" class="seg-btn" data-a="soon" onclick="adSet('soon')">Кончаются <b id="ad-n-soon"></b></button><button type="button" class="seg-btn" data-a="off" onclick="adSet('off')">Закончились <b id="ad-n-off"></b></button></div>
         </div>
+        <div class="bc-card"><div class="bc-list" id="ads-table-body"><div class="ib-empty">Загрузка…</div></div></div>
     </div>
 
 <div id="tab-infrastructure" class="tab-content">
@@ -2783,79 +2816,6 @@ function saveSystemTexts() {
     .then(data => {
         if(data.success) showToast(data.message);
     }).catch(() => showToast("❌ Ошибка связи с сервером"));
-}
-
-function loadAds() {
-    fetch('/glaz/api/ads/subs')
-    .then(res => res.json())
-    .then(data => {
-        
-        // 1. Выносим парсер даты наверх, чтобы использовать его дважды
-        const parseDate = (str) => {
-            if (!str || str.includes('ошибка') || str.includes('ПУСТО')) return 0;
-            let [datePart, timePart] = str.split(' ');
-            if (!datePart) return 0;
-            let [d, m, y] = datePart.split('.');
-            let [hr, min] = timePart ? timePart.split(':') : [0,0];
-            return new Date(y, m-1, d, hr, min).getTime();
-        };
-
-        // 2. Сортируем (Новые/Долгие сверху)
-        data.sort((a, b) => parseDate(b.end_date) - parseDate(a.end_date));
-
-        const body = document.getElementById('ads-table-body');
-        body.innerHTML = '';
-        
-        // Берем текущее время браузера в миллисекундах
-        const now = Date.now();
-
-        data.forEach(sub => {
-            const endDateMs = parseDate(sub.end_date);
-            
-            // Проверяем: если дата корректная (больше 0) и она уже в прошлом
-            const isExpired = endDateMs > 0 && endDateMs < now;
-            
-            // Задаем стили в зависимости от статуса (если просрочено — делаем серым)
-            const rowStyle = isExpired 
-                ? "border-bottom: 1px solid #222; color: #666; background: rgba(255,255,255,0.02);" 
-                : "border-bottom: 1px solid #222;";
-                
-            // Для просроченных добавим зачеркивание даты и сделаем кнопки чуть прозрачными
-            const dateStyle = isExpired ? "text-decoration: line-through;" : "";
-            const btnOpacity = isExpired ? "opacity: 0.5;" : "";
-
-            body.innerHTML += `
-            <tr style="${rowStyle}">
-                <td style="padding: 10px;">${sub.uid}</td>
-                <td style="padding: 10px;">${sub.network}</td>
-                <td style="padding: 10px; ${dateStyle}">${sub.end_date}</td>
-                <td style="padding: 10px;">
-                    <button class="act-btn unban" style="padding: 4px 8px; width: auto; ${btnOpacity}" onclick="manageAd('${sub.id}', 'extend')">➕</button>
-                    <button class="act-btn ban" style="padding: 4px 8px; width: auto; ${btnOpacity}" onclick="manageAd('${sub.id}', 'delete')">🗑</button>
-                </td>
-            </tr>`;
-        });
-    });
-}
-
-function manageAd(sub_id, action) {
-    if(!confirm("Подтвердите действие")) return;
-    
-    let body = { sub_id: sub_id, action: action };
-    if(action === 'extend') body.days = prompt("На сколько дней продлить?", "30");
-
-    fetch('/glaz/api/ads/manage', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(body)
-    })
-    .then(res => res.json())
-    .then(data => {
-        if(data.success) {
-            showToast("✅ Успешно!");
-            loadAds(); // Перезагружаем таблицу
-        }
-    });
 }
 
 let revenueChartInstance = null;
@@ -4663,5 +4623,63 @@ function stopMass(id) {
 function msStart() { msPreview(); loadMassJobs(); }
 </script>
 
+<script>
+// =================== 🎫 СКИДКИ ===================
+function prSet(v) {
+    document.querySelectorAll('#tab-promos .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.p === v));
+    let n = 0;
+    document.querySelectorAll('#pr-list .pr-row').forEach(r => { const show = (r.dataset.alive === '1') === (v === 'on'); r.hidden = !show; if (show) n++; });
+    const e = document.querySelector('#pr-list .pr-empty'); if (e) { e.hidden = n > 0; e.textContent = v === 'on' ? 'Работающих промокодов нет — создайте справа' : 'Закончившихся нет'; }
+}
+function prCheck(f) {
+    f.code.value = f.code.value.trim().toUpperCase();
+    const d = +f.discount.value, l = +f.limit.value;
+    if (!f.code.value || d < 1 || d > 100 || l < 1) { showToast('⚠️ Проверьте код, скидку (1–100%) и лимит'); return false; }
+    return confirm(`Создать промокод ${f.code.value}: −${d}%, ${l} раз(а)?`);
+}
+document.addEventListener('DOMContentLoaded', () => { if (document.getElementById('pr-list')) prSet('on'); });
+
+// =================== 📢 БИРЖА РЕКЛАМЫ ===================
+const AD = { view: 'on', data: [] };
+function adSet(v) { AD.view = v; document.querySelectorAll('#ads-tab .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.a === v)); adRender(); }
+function _adLeft(s) {
+    if (!s.end_ts) return { cls: '', txt: 'срок неизвестен' };
+    const d = (s.end_ts - Date.now() / 1000) / 86400;
+    if (d < 0) return { cls: 'off', txt: 'закончилась ' + Math.ceil(-d) + ' дн. назад' };
+    if (d < 1) return { cls: 'soon', txt: 'осталось ' + Math.max(1, Math.round(d * 24)) + ' ч' };
+    return { cls: d <= 3 ? 'soon' : 'on', txt: 'осталось ' + Math.floor(d) + ' дн.' };
+}
+function adRender() {
+    const box = document.getElementById('ads-table-body');
+    const groups = { on: [], soon: [], off: [] };
+    AD.data.forEach(s => { const l = _adLeft(s); s._l = l; (groups[l.cls === 'soon' ? 'soon' : l.cls === 'off' ? 'off' : 'on']).push(s); });
+    groups.on = groups.on.concat(groups.soon);   // «Идут» включает и те, что скоро закончатся
+    ['on', 'soon', 'off'].forEach(k => { const el = document.getElementById('ad-n-' + k); if (el) el.textContent = groups[k].length || ''; });
+    const list = groups[AD.view];
+    box.innerHTML = list.length ? list.map(s => `<div class="bc-row ad-row">
+        <div class="ks-main"><div class="bc-row-top"><b>${_e(s.network)}</b>${s.city && s.city !== 'Неизвестно' ? `<span class="chip">${_e(s.city)}</span>` : ''}${s.has_pin ? '<span class="chip amber">📌 закреп</span>' : ''}
+            <a class="ks-id" href="/glaz?search_id=${encodeURIComponent(s.uid)}">ID ${_e(s.uid)}</a></div>
+            <div class="muted" style="font-size:12.5px">до ${_e(s.end_date)} · <span class="${s._l.cls === 'off' ? '' : s._l.cls === 'soon' ? 'fn-warn' : ''}">${s._l.txt}</span></div></div>
+        <div class="ks-acts"><button class="btn sm ok" onclick="manageAd('${_e(s.id)}', 'extend')">＋ Продлить</button><button class="btn sm danger" onclick="manageAd('${_e(s.id)}', 'delete')">Отключить</button></div>
+    </div>`).join('') : `<div class="ib-empty">${AD.view === 'off' ? 'Закончившихся подписок нет' : AD.view === 'soon' ? 'В ближайшие 3 дня ничего не кончается' : 'Активных рекламных подписок нет'}</div>`;
+}
+function loadAds() {
+    fetch('/glaz/api/ads/subs').then(r => r.json()).then(d => {
+        const box = document.getElementById('ads-table-body');
+        if (!Array.isArray(d)) { box.innerHTML = `<div class="ib-empty">❌ ${_e(d.error || 'Не удалось загрузить')}</div>`; return; }
+        AD.data = d; adRender();
+    }).catch(() => { document.getElementById('ads-table-body').innerHTML = '<div class="ib-empty">❌ Нет связи с сервером</div>'; });
+}
+function manageAd(sub_id, action) {
+    let body = { sub_id, action };
+    if (action === 'extend') {
+        const days = prompt('На сколько дней продлить?', '30');
+        if (!days || !(+days > 0)) return;
+        body.days = days;
+    } else if (!confirm('Отключить рекламную подписку прямо сейчас? Потом её можно будет продлить заново.')) return;
+    fetch('/glaz/api/ads/manage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then(r => r.json()).then(d => { showToast(d.success ? (action === 'extend' ? '✅ Продлено' : '⛔ Отключено') : '❌ ' + (d.error || 'Ошибка')); if (d.success) loadAds(); });
+}
+</script>
 </body>
 </html>
