@@ -432,12 +432,26 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         elif action == 'set_tag':
             new_tag = request.form.get('tag', '').strip()
             if new_tag and new_tag.lower() != 'none':
-                users_collection.update_one({"_id": uid}, {"$set": {"custom_tag": new_tag}}, upsert=True)
+                # Админ ставит тег руками: это не игровой тег (tag_game снимаем). «Спонсор_Одобрен» / «Свободен» — ещё и флаг статуса.
+                from core.guards import SPONSOR_TAG, FREE_TAG
+                _upd = {"$set": {"custom_tag": new_tag}, "$unset": {"tag_game": ""}}
+                if new_tag == SPONSOR_TAG: _upd["$set"]["is_sponsor"] = True
+                elif new_tag == FREE_TAG: _upd["$set"]["is_free"] = True
+                users_collection.update_one({"_id": uid}, _upd, upsert=True)
                 msg = f"🎖️ Выдан тег: {new_tag}"
                 add_radar_log(f"🎖️ ТЕГ [{new_tag}]: {uid}")
                 staff_msg = f"🎖️ **ВЕБ-АДМИНКА: ВЫДАЧА ПОГОН**\n\n• **Пользователь:** `{uid}`\n• **Тег:** `{new_tag}`"
             else:
-                users_collection.update_one({"_id": uid}, {"$unset": {"custom_tag": ""}})
+                # Снимаем тег; если это был статусный («Спонсор_Одобрен» / «Свободен»), снимаем и флаг — как раньше.
+                from core.guards import SPONSOR_TAG, FREE_TAG, INDULGENCE_TAG
+                _doc = users_collection.find_one({"_id": uid}, {"custom_tag": 1, "tag_game": 1}) or {}
+                _cur = _doc.get("custom_tag")
+                _unset = {"custom_tag": "", "tag_game": ""}
+                if not _cur or not _doc.get("tag_game"):
+                    if _cur in (None, "", SPONSOR_TAG): _unset["is_sponsor"] = ""
+                    if _cur in (None, "", FREE_TAG): _unset["is_free"] = ""
+                    if _cur in (None, "", INDULGENCE_TAG): _unset["indulgence"] = ""
+                users_collection.update_one({"_id": uid}, {"$unset": _unset})
                 msg = "🧹 Тег аннулирован."
                 add_radar_log(f"🧹 СНЯТ ТЕГ: {uid}")
                 staff_msg = f"🧹 **ВЕБ-АДМИНКА: СБРОС ТЕГА**\n\n• **Пользователь:** `{uid}`"
@@ -1846,7 +1860,12 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
         
         tag_text = tag_data["tag"]
         if action == "ok":
-            db['users'].update_one({"_id": uid}, {"$set": {"custom_tag": tag_text}}, upsert=True)
+            # Личный тег по купону — украшение (tag_game): иммунитета не даёт, зарезервированные тексты не одобряем
+            from core.guards import reserved_tag_reason
+            _why = reserved_tag_reason(tag_text)
+            if _why:
+                return jsonify({"success": False, "error": f"Тег нельзя одобрить: {_why}. Отклоните заявку."})
+            db['users'].update_one({"_id": uid}, {"$set": {"custom_tag": tag_text, "tag_game": True}}, upsert=True)
             try: bot.send_message(uid, f"🎉 **Поздравляем!**\nВаш личный тег **«{tag_text}»** успешно одобрен и установлен во всех чатах сети!", parse_mode="Markdown")
             except: pass
             msg = f"✅ Тег '{tag_text}' одобрен!"

@@ -47,6 +47,21 @@ def _approve(bot, chat_id, uid):
         return False
 
 
+def _approve_unless_banned(bot, chat_id, uid):
+    """Одобрение отложенной заявки: за время ожидания человека могли забанить — тогда отклоняем."""
+    try:
+        banned = bool(banned_collection.find_one({"_id": uid}))
+    except Exception:
+        banned = False
+    if banned:
+        try:
+            bot.decline_chat_join_request(chat_id, uid)
+        except Exception:
+            pass
+        return False
+    return _approve(bot, chat_id, uid)
+
+
 def approve_or_gate(bot, chat_id, uid, chat_title=""):
     """Вместо bot.approve_chat_join_request в таможне. -> 'approved' | 'gated'."""
     if not cfg("join_via_bot"):
@@ -81,7 +96,7 @@ def release(bot, uid):
     """Человек открыл бота: одобряем все его ждущие заявки. -> список названий групп."""
     titles = []
     for g in list(db['join_gate'].find({"uid": uid})):
-        if db['join_gate'].delete_one({"_id": g["_id"]}).deleted_count and _approve(bot, g["chat_id"], uid):
+        if db['join_gate'].delete_one({"_id": g["_id"]}).deleted_count and _approve_unless_banned(bot, g["chat_id"], uid):
             titles.append(g.get("title") or "группа")
     return titles
 
@@ -114,7 +129,7 @@ def gate_daemon(bot):
             if hours > 0:
                 for g in list(db['join_gate'].find({"ts": {"$lt": time.time() - hours * 3600}}).limit(200)):
                     if db['join_gate'].delete_one({"_id": g["_id"]}).deleted_count:
-                        _approve(bot, g["chat_id"], g["uid"])
+                        _approve_unless_banned(bot, g["chat_id"], g["uid"])
         except Exception as e:
             print(f"join_gate_daemon: {e}")
         time.sleep(600)

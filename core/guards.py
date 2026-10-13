@@ -21,7 +21,7 @@ from urllib.parse import parse_qsl
 
 from pymongo.errors import DuplicateKeyError
 
-from database import db
+from database import db, users_collection
 
 _PROCESS_ID = f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:6]}"
 
@@ -69,6 +69,85 @@ def acquire_lease(name, ttl_seconds):
     except Exception as e:
         print(f"[lease:{name}] {e}")
         return False
+
+
+# ---------------- СТАТУСЫ: ПО ФЛАГАМ, А НЕ ПО ТЕКСТУ ТЕГА ----------------
+# Тег — украшение: его можно сменить или подарить. Статус (иммунитет) живёт во флагах users:
+# is_vip, is_queer, is_verified, indulgence, is_sponsor, is_free. Тег, который поставила игра
+# (подарок / личный по купону), помечен tag_game=True и иммунитета не даёт.
+SPONSOR_TAG = "Спонсор_Одобрен"
+FREE_TAG = "Свободен"
+INDULGENCE_TAG = "Индульгенция"
+SHAME_TAGS = ("Not verified", "Параметры FAKE", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска", "чернильница")
+
+
+def trusted_tag(ud):
+    """custom_tag, которому можно верить (его поставил админ/система). Игровой и шейм-тег -> None."""
+    ud = ud or {}
+    t = ud.get("custom_tag")
+    if not t or ud.get("tag_game") or t in SHAME_TAGS:
+        return None
+    return t
+
+
+def sponsor_status(ud):
+    return bool((ud or {}).get("is_sponsor") or trusted_tag(ud) == SPONSOR_TAG)
+
+
+def free_status(ud):
+    return bool((ud or {}).get("is_free") or trusted_tag(ud) == FREE_TAG)
+
+
+def indulgence_status(ud):
+    return bool((ud or {}).get("indulgence") or trusted_tag(ud) == INDULGENCE_TAG)
+
+
+# Тексты, которые нельзя ставить игровым тегом (проверка после нормализации: регистр, шрифты, латиница→кириллица)
+_RESERVED = ("beyond", "премиум", "premium", "верифиц", "спонсор", "свободен",
+             "индульгенц", "notverified", "параметрыfake", "рисквиртобмен", "автососка", "туалетнаясоска",
+             "чернильниц", "админ", "admin", "модер", "owner", "владелец", "поддержк", "support", "скайнет",
+             "секретар", "staff", "вип", "vip", "quee", "квир")
+_CYR2LAT = str.maketrans("аеорсхукмтвнії", "aeopcxykmtbhii")
+_BOT_SAFE_RE = re.compile(r"(работ|суббот|забот|ботан|ботин)")
+
+
+def reserved_tag_reason(text):
+    """-> причина, если текст тега зарезервирован/опасен, иначе None."""
+    import unicodedata
+    raw = unicodedata.normalize("NFKC", str(text or "")).lower()
+    if re.search(r"(https?://|t\.me/|@\w)", raw):
+        return "ссылки и @упоминания запрещены"
+    norm = re.sub(r"[^0-9a-zа-яё]+", "", raw.translate(_HOMOGLYPHS))
+    if not norm:
+        return "пустой тег"
+    lat = re.sub(r"[^0-9a-z]+", "", raw)
+    lat2 = re.sub(r"[^0-9a-z]+", "", raw.translate(_CYR2LAT))   # «Vіp» с кириллической і
+    
+    for w in _RESERVED:
+        if w in norm or w in lat or (w.isascii() and w in lat2):
+            return f"зарезервированное слово «{w}»"
+            
+    # Отдельно проверяем "бот", вырезая безопасные слова
+    if "бот" in _BOT_SAFE_RE.sub("", norm):
+        return "зарезервированное слово «бот»"
+        
+    return None
+
+
+# ---------------- ПРИВЯЗКА ГОРОДА ----------------
+def bind_city(uid, city):
+    """Атомарно закрепляет за человеком город по «методу первой двери».
+    Кто первым записал город, тот и победил: параллельные заявки в разные города
+    больше не перезаписывают друг друга. -> актуальный main_city (свой или чужой, кто успел)."""
+    try:
+        users_collection.update_one(
+            {"_id": uid, "main_city": {"$in": [None, ""]}},   # None ловит и «поля нет»
+            {"$set": {"main_city": city}},
+            upsert=True,
+        )
+    except DuplicateKeyError:
+        pass  # документ уже есть, а город занят — читаем, что записано
+    return (users_collection.find_one({"_id": uid}, {"main_city": 1}) or {}).get("main_city") or city
 
 
 # ---------------- TELEGRAM ----------------

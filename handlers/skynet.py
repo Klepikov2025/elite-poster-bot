@@ -24,7 +24,7 @@ from config import (
 )
 from database import users_collection, banned_collection, db, archive_collection
 from utils import escape_md, get_user_name
-from core.guards import classify_profile_name, safe_delete
+from core.guards import classify_profile_name, safe_delete, bind_city, trusted_tag, sponsor_status, free_status, indulgence_status
 from core.janitor import schedule_delete
 from core.settings import SkynetSettings
 
@@ -95,12 +95,13 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             user_data = users_collection.find_one({"_id": user_id}) or {}
             
             bot_tags = ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "𝐐𝐔𝐄𝐄𝐑 ♛", "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕", "Верифицирован МК", "Not verified", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска", "Параметры FAKE", "Свободен", "Спонсор_Одобрен"]
-            current_tag = user_data.get("custom_tag", "")
+            current_tag = trusted_tag(user_data) or ""  # игровой (подарочный) тег иммунитета не даёт
             
-            # Элита (Випы, Квиры и Спонсоры - ТЕПЕРЬ СПОНСОРЫ ТОЖЕ ПОД ЗАЩИТОЙ)
+            # Элита (Випы, Квиры, Спонсоры, Свободные, Индульгенция) — по ФЛАГАМ, а не по тексту тега
             is_elite = (user_data.get("is_vip", False) or 
                         user_data.get("is_queer", False) or 
-                        current_tag in ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜",  "Спонсор_Одобрен", "Свободен"])
+                        sponsor_status(user_data) or free_status(user_data) or indulgence_status(user_data) or
+                        current_tag == "𝓟𝓡𝓔𝓜𝓘𝓤𝓜")
             
             # Админы (у них кастомный тег, которого нет в списке дефолтных системных)
             is_admin = current_tag and current_tag not in bot_tags
@@ -240,7 +241,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
         # 1. Проверяем права
         user_data = users_collection.find_one({"_id": uid}) or {}
         is_admin = uid in ADMIN_CHAT_IDS or uid == OWNER_ID
-        is_elite = user_data.get("is_vip") or user_data.get("is_queer") or user_data.get("custom_tag") == "Спонсор_Одобрен"
+        is_elite = user_data.get("is_vip") or user_data.get("is_queer") or sponsor_status(user_data)
         
         if not (is_admin or is_elite):
             if message.chat.type == "private":
@@ -688,8 +689,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                     if detected_city: break
                 
                 if detected_city:
-                    users_collection.update_one({"_id": user_id}, {"$set": {"main_city": detected_city}}, upsert=True)
-                    main_city = detected_city
+                    main_city = bind_city(user_id, detected_city)  # атомарно: не перезаписывает чужую привязку
 
             sys_settings = db['settings'].find_one({"_id": "skynet"}) or {"quarantine_active": True, "may_1_active": True}
 
@@ -726,7 +726,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                 try:
                     member = bot.get_chat_member(chat_id, user_id)
                     current_tag = getattr(member, 'custom_title', None)
-                    bot_tags = ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "𝐐𝐔𝐄𝐄𝐑 ♛", "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕", "Верифицирован МК", "Not verified", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска", "Параметры FAKE", "Свободен", "Спонсор_Одобрен", "чернильница"]
+                    bot_tags = ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "𝐐𝐔𝐄𝐄𝐑 ♛", "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕", "Верифицирован МК", "Not verified", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска", "Параметры FAKE", "Свободен", "Спонсор_Одобрен", "чернильница", "Индульгенция"]
                     
                     if current_tag:
                         # 🔥 ИСПРАВЛЕНИЕ: Защита Веб-панели и команды /tag 🔥
@@ -734,18 +734,30 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                         
                         # Если тег в Телеге НЕ системный, и он ОТЛИЧАЕТСЯ от того, что Скайнет вешал в прошлый раз:
                         # Значит, админ реально поменял его руками прямо в настройках чата! Синхронизируем в базу.
-                        if current_tag not in bot_tags and current_tag != last_known_tag:
-                            users_collection.update_one({"_id": user_id}, {"$set": {"custom_tag": current_tag}}, upsert=True)
+                        if current_tag not in bot_tags and current_tag != last_known_tag and not (current_tag == custom_tag and user_data.get("tag_game")):
+                            users_collection.update_one({"_id": user_id}, {"$set": {"custom_tag": current_tag}, "$unset": {"tag_game": ""}}, upsert=True)
                             custom_tag = current_tag
+                            user_data["custom_tag"] = current_tag
+                            user_data.pop("tag_game", None)
                             
-                        # Если же это системный тег, просто подтверждаем права
-                        elif current_tag == "Верифицирован МК":
+                        # Системный тег в Telegram даёт статус только если его поставили РУКАМИ (отличается от того,
+                        # что Скайнет вешал сам) и это не игровой подарок. Иначе подарочный «Спонсор_Одобрен»
+                        # после истечения срока становился бы вечным.
+                        elif current_tag == "Верифицирован МК" and current_tag != last_known_tag and not user_data.get("tag_game"):
                             is_verified = True
                             users_collection.update_one({"_id": user_id}, {"$set": {"is_verified": True}}, upsert=True)
-                        elif current_tag == "Спонсор_Одобрен":
+                        elif current_tag == "Спонсор_Одобрен" and current_tag != last_known_tag and not user_data.get("tag_game"):
                             custom_tag = "Спонсор_Одобрен"
-                            users_collection.update_one({"_id": user_id}, {"$set": {"custom_tag": "Спонсор_Одобрен"}}, upsert=True)
+                            user_data["custom_tag"] = custom_tag
+                            user_data["is_sponsor"] = True
+                            users_collection.update_one({"_id": user_id}, {"$set": {"custom_tag": "Спонсор_Одобрен", "is_sponsor": True}}, upsert=True)
                 except: pass
+
+            # 🛡 СТАТУСЫ ПО ФЛАГАМ: смена или подарок тега их не снимает, а игровой тег иммунитета не даёт
+            tag_trusted = trusted_tag(user_data)
+            has_sponsor = sponsor_status(user_data)
+            has_free = free_status(user_data)
+            has_indulgence = indulgence_status(user_data)
 
             # 2. Вычисляем, какой тег ДОЛЖЕН быть у юзера:
             target_tag = "Not verified"
@@ -754,6 +766,9 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             elif is_queer: target_tag = "𝐐𝐔𝐄𝐄𝐑 ♛"
             elif is_vip: target_tag = "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕"
             elif is_verified: target_tag = "Верифицирован МК"
+            elif has_sponsor: target_tag = "Спонсор_Одобрен"
+            elif has_free: target_tag = "Свободен"
+            elif has_indulgence: target_tag = "Индульгенция"
             elif shame_tag: target_tag = shame_tag
 
             # 3. МГНОВЕННАЯ РАЗДАЧА
@@ -784,7 +799,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             # 👆 ======================================================= 👆
 
             # 👇 🛡️ ИММУНИТЕТ ДЛЯ ОДОБРЕННЫХ СПОНСОРОВ 🛡️ 👇
-            if custom_tag == "Спонсор_Одобрен":
+            if has_sponsor:
                 return
 
             # 👆 ======================================================= 👆
@@ -862,8 +877,8 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             # 🛡 РАДАР ТВИНКОВ И ТЕКСТОВЫЙ АНТИ-БАЯН
             # (Работает везде КРОМЕ "ПАРНИ 18+". Элита и Админы имеют иммунитет, "Верифицирован МК" - НЕТ)
             # =======================================================
-            is_elite = is_vip or is_queer or custom_tag in ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "Спонсор_Одобрен", "Свободен"]
-            is_admin = custom_tag and custom_tag not in ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "𝐐𝐔𝐄𝐄𝐑 ♛", "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕", "Верифицирован МК", "Not verified", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска", "Параметры FAKE", "Свободен", "Спонсор_Одобрен"]
+            is_elite = is_vip or is_queer or has_sponsor or has_free or has_indulgence or tag_trusted == "𝓟𝓡𝓔𝓜𝓘𝓤𝓜"
+            is_admin = tag_trusted and tag_trusted not in ["𝓟𝓡𝓔𝓜𝓘𝓤𝓜", "𝐐𝐔𝐄𝐄𝐑 ♛", "𝐑𝐄𝐀𝐋/𝐕𝐈𝐏♕", "Верифицирован МК", "Not verified", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска", "Параметры FAKE", "Свободен", "Спонсор_Одобрен", "чернильница", "Индульгенция"]
 
             if chat_id not in PARNI_CHATS and not (is_elite or is_admin or user_id in ADMIN_CHAT_IDS or user_id == OWNER_ID):
                 if len(raw_text) > 30:
@@ -984,7 +999,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
                             )
 
             # 2. А ТОЛЬКО ПОТОМ разрешаем VIP/QUEER писать что угодно (кроме коммерции и копипаста)
-            if any([is_vip, is_queer, is_verified, custom_tag]): return 
+            if any([is_vip, is_queer, is_verified, has_sponsor, has_free, has_indulgence, tag_trusted]): return 
             if chat_id in PARNI_CHATS: return
 
             if not is_subscribed(user_id):
@@ -1148,7 +1163,7 @@ def register_skynet_handlers(bot, ban_user_everywhere, mute_user_everywhere, saf
             bad_tags = ["Not verified", "Параметры FAKE", "РИСК/ВИРТ/ОБМЕН", "автососка", "туалетная соска", "чернильница"]
             
             # Проверяем наличие "хорошего" статуса (они проходят без лимитов)
-            has_good_tag = is_vip or is_queer or is_verified or (custom_tag and custom_tag not in bad_tags)
+            has_good_tag = is_vip or is_queer or is_verified or has_sponsor or has_free or has_indulgence or (tag_trusted and tag_trusted not in bad_tags)
             
             # 🔥 ЧАТЫ СВОБОДНОГО ОБЩЕНИЯ (БЕЗ АНТИФЛУДА) 🔥
             free_chats = [

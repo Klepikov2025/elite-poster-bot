@@ -20,7 +20,7 @@ import threading
 import logging
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
-from core.guards import is_staff, is_staff_admin, deny_callback, acquire_lease, safe_delete
+from core.guards import is_staff, is_staff_admin, deny_callback, acquire_lease, safe_delete, bind_city, trusted_tag, sponsor_status, SPONSOR_TAG, FREE_TAG
 from core.cfg import cfg as _cfg  # настройки из панели «🎛 Управление»
 from core.diag import log_error
 
@@ -136,7 +136,7 @@ def is_banned_in_network(user_id):
 
 def is_indulgence(user_data):
     """Купленная Индульгенция: снятие бана + иммунитет от автоматики, без доступа в премиум-чаты."""
-    return bool(user_data.get("indulgence") or user_data.get("custom_tag") == "Индульгенция")
+    return bool(user_data.get("indulgence") or trusted_tag(user_data) == "Индульгенция")  # игровой тег «Индульгенция» не считается
 
 
 def migrate_indulgence_flags():
@@ -165,6 +165,51 @@ def migrate_indulgence_flags():
         time.sleep(0.1)
     db['settings'].update_one({"_id": "migration_indulgence_v1"}, {"$set": {"done": time.time(), "fixed_flags": fixed}}, upsert=True)
     add_radar_log(f"📜 Миграция Индульгенции: снято лишних VIP/QUEER-флагов: {fixed}")
+
+
+def migrate_status_flags():
+    """Разово: «Спонсор_Одобрен» и «Свободен» раньше жили только текстом тега. Переносим во флаги
+    is_sponsor / is_free, чтобы смена или подарок тега статус не снимали.
+    Временные (подарочные) теги пропускаем: если на человеке сейчас подарочный тег, берём его прежний (base_tag).
+    Тех, у кого нет оплаты нужной суммы в fine_payments, показываем админам списком: возможно, тег подарок."""
+    if db['settings'].find_one({"_id": "migration_status_flags_v1"}):
+        return
+    if not acquire_lease("migration_status_flags", 3600):
+        return
+    now = time.time()
+    base_under_troll = {}
+    try:
+        for t in db['temp_troll_tags'].find({"expire_at": {"$gt": now}}).sort("created", 1):
+            base_under_troll.setdefault(t["uid"], t.get("base_tag", t.get("old_tag", "")))
+        if base_under_troll:
+            users_collection.update_many({"_id": {"$in": list(base_under_troll.keys())}}, {"$set": {"tag_game": True}})
+    except Exception:
+        pass
+    report, suspicious = {}, []
+    for tag, flag, price_key in ((SPONSOR_TAG, "is_sponsor", "fine_tag_sponsor"), (FREE_TAG, "is_free", "fine_tag_free")):
+        uids = set()
+        for u in users_collection.find({"custom_tag": tag}, {"_id": 1}):
+            if u["_id"] not in base_under_troll:          # тег стоит сам, а не поверх подарочного
+                uids.add(u["_id"])
+        uids |= {uid for uid, base in base_under_troll.items() if base == tag}   # настоящий тег лежит под подарочным
+        price = _cfg(price_key)
+        for uid in uids:
+            if not db['fine_payments'].find_one({"uid": uid, "amount": price}):
+                suspicious.append((uid, tag))
+        if uids:
+            users_collection.update_many({"_id": {"$in": list(uids)}}, {"$set": {flag: True}})
+        report[tag] = len(uids)
+    db['settings'].update_one({"_id": "migration_status_flags_v1"},
+                              {"$set": {"done": now, "report": report, "no_payment": [f"{u}:{t}" for u, t in suspicious][:500]}}, upsert=True)
+    add_radar_log(f"🛡 Миграция статусов во флаги: {report}; без записи об оплате: {len(suspicious)}")
+    try:
+        lines = "\n".join(f"• `{u}` — {t}" for u, t in suspicious[:40])
+        bot.send_message(STAFF_GROUP_ID,
+                         f"🛡 **Статусы перенесены во флаги.**\nСпонсоры: {report.get(SPONSOR_TAG, 0)}, «Свободен»: {report.get(FREE_TAG, 0)}.\n\n"
+                         f"Нет записи об оплате нужной суммы ({len(suspicious)}) — проверьте, не подарочные ли теги:\n{lines or '—'}",
+                         parse_mode="Markdown")
+    except Exception:
+        pass
 
 
 def get_main_keyboard():
@@ -470,40 +515,36 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
             # Берем первый город для системных сообщений/пейвола (по умолчанию)
             primary_target_city = possible_cities[0]
 
-            if main_city:
-                # 📍 СЦЕНАРИЙ А: Юзер уже привязан к городу
-                # Пускаем, если его родной город ИЛИ купленный город есть в списке допустимых для этого чата
-                if main_city in possible_cities or any(c in purchased_cities for c in possible_cities):
-                    approve_or_gate(bot, chat_id, user_id, getattr(message.chat, "title", "") or "")
-                    db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
-                    return
-                else:
-                    # Чужой город! Отклоняем моментально + Кидаем Оффер
-                    bot.decline_chat_join_request(chat_id, user_id)
-                    
-                    markup = types.InlineKeyboardMarkup(row_width=1)
-                    markup.add(
-                        types.InlineKeyboardButton(f"🎟 Купить пропуск в г. {primary_target_city} ({_cfg('city_pass_price')}⭐️)", callback_data=f"buy_city_{primary_target_city}"),
-                        types.InlineKeyboardButton("👑 Купить VIP (Все города)", callback_data="start_verification")
-                    )
-                    try:
-                        bot.send_message(
-                            user_id, 
-                            f"❌ Ваша заявка в чат **{primary_target_city}** отклонена.\n\n"
-                            f"По правилам сети за вами закреплен город: **{main_city}**.\n\n"
-                            f"Вы можете приобрести разовый пропуск, либо стать VIP-участником для неограниченного доступа везде.",
-                            reply_markup=markup,
-                            parse_mode="Markdown"
-                        )
-                    except: pass
-                    return
-            else:
-                # 📍 СЦЕНАРИЙ Б: Метод «Первой двери» для новичков
-                users_collection.update_one({"_id": user_id}, {"$set": {"main_city": primary_target_city}}, upsert=True)
-                
+            if not main_city:
+                # 📍 «Первая дверь» — атомарно: если одновременно пришло несколько заявок в разные города,
+                # город закрепит только первая, остальные увидят чужой main_city и пойдут по ветке отказа.
+                main_city = bind_city(user_id, primary_target_city)
+
+            if main_city in possible_cities or any(c in purchased_cities for c in possible_cities):
+                # 📍 Родной город ИЛИ купленный город есть в списке допустимых для этого чата
                 approve_or_gate(bot, chat_id, user_id, getattr(message.chat, "title", "") or "")
                 db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
                 return
+
+            # Чужой город! Отклоняем моментально + Кидаем Оффер
+            bot.decline_chat_join_request(chat_id, user_id)
+
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            markup.add(
+                types.InlineKeyboardButton(f"🎟 Купить пропуск в г. {primary_target_city} ({_cfg('city_pass_price')}⭐️)", callback_data=f"buy_city_{primary_target_city}"),
+                types.InlineKeyboardButton("👑 Купить VIP (Все города)", callback_data="start_verification")
+            )
+            try:
+                bot.send_message(
+                    user_id,
+                    f"❌ Ваша заявка в чат **{primary_target_city}** отклонена.\n\n"
+                    f"По правилам сети за вами закреплен город: **{main_city}**.\n\n"
+                    f"Вы можете приобрести разовый пропуск, либо стать VIP-участником для неограниченного доступа везде.",
+                    reply_markup=markup,
+                    parse_mode="Markdown"
+                )
+            except: pass
+            return
 
     except Exception as e:
         print(f"Ошибка Таможни: {e}")
@@ -635,7 +676,7 @@ def ban_user_everywhere(target_id, reason="Без причины", admin_name="�
         user_data = users_collection.find_one({"_id": target_id}) or {}
         
         # --- УЗКАЯ ЗАЩИТА СПОНСОРОВ (ТОЛЬКО ОТ МП) ---
-        is_sponsor = user_data.get("custom_tag") == "Спонсор_Одобрен"
+        is_sponsor = sponsor_status(user_data)
         if is_sponsor:
             # Слова-маркеры в причине или самом тексте, которые прощаются Спонсорам
             safe_sponsor_triggers = ["мп", "спонсор", "содержан", "вознагражден", "коммерц", "деньги", "плачу", "щедр"]
@@ -683,7 +724,7 @@ def ban_user_everywhere(target_id, reason="Без причины", admin_name="�
     # 👆 ================================================ 👆
 
     # === СБРАСЫВАЕМ VIP-СТАТУС И ТЕГИ ПРИ БАНЕ ===
-    users_collection.update_one({"_id": target_id}, {"$set": {"is_vip": False}, "$unset": {"custom_tag": ""}})
+    users_collection.update_one({"_id": target_id}, {"$set": {"is_vip": False}, "$unset": {"custom_tag": "", "is_sponsor": "", "is_free": "", "indulgence": "", "tag_game": ""}})
     # ============================================
 
     banned_collection.update_one({"_id": target_id}, {"$set": {"reason": reason}}, upsert=True)
@@ -1040,7 +1081,7 @@ def mute_user_everywhere(target_id, reason="Без причины", admin_name="
     user_data = users_collection.find_one({"_id": target_id}) or {}
     
     # --- УЗКАЯ ЗАЩИТА СПОНСОРОВ (ТОЛЬКО ОТ МП) ---
-    is_sponsor = user_data.get("custom_tag") == "Спонсор_Одобрен"
+    is_sponsor = sponsor_status(user_data)
     if is_sponsor:
         safe_sponsor_triggers = ["мп", "спонсор", "содержан", "вознагражден", "коммерц", "деньги", "плачу", "щедр"]
         reason_and_text = (str(reason) + " " + str(trigger_text)).lower()
@@ -1332,6 +1373,7 @@ def catch_illegal_entry(message):
             try:
                 # Надеваем бейджик обратно при входе!
                 safe_set_tag(chat_id, user_id, saved_tag)
+                users_collection.update_one({"_id": user_id}, {"$set": {f"tag_{chat_id}": saved_tag}}, upsert=True)
             except Exception as e:
                 print(f"Не удалось восстановить тег '{saved_tag}' для {user_id}: {e}")
         # 👆 ========================================== 👆
@@ -1516,13 +1558,13 @@ def _execute_skynet_task(task):
                 amount = last_pay.get('amount', 0) if last_pay else 0
             
             if int(amount) == _cfg("fine_tag_free"):
-                users_collection.update_one({"_id": target_uid}, {"$set": {"custom_tag": "Свободен"}, "$unset": {"shame_tag": ""}}, upsert=True)
+                users_collection.update_one({"_id": target_uid}, {"$set": {"custom_tag": "Свободен", "is_free": True}, "$unset": {"shame_tag": "", "tag_game": ""}}, upsert=True)
                 add_radar_log(f"🎖️ Юзер {target_uid} оплатил {amount}⭐️ и получил тег 'Свободен'")
             elif int(amount) == _cfg("fine_tag_sponsor"):
-                users_collection.update_one({"_id": target_uid}, {"$set": {"custom_tag": "Спонсор_Одобрен"}, "$unset": {"shame_tag": ""}}, upsert=True)
+                users_collection.update_one({"_id": target_uid}, {"$set": {"custom_tag": "Спонсор_Одобрен", "is_sponsor": True}, "$unset": {"shame_tag": "", "tag_game": ""}}, upsert=True)
                 add_radar_log(f"💎 Юзер {target_uid} оплатил {amount}⭐️ и получил тег 'Спонсор_Одобрен'")
             else:
-                users_collection.update_one({"_id": target_uid}, {"$unset": {"shame_tag": "", "custom_tag": ""}})
+                users_collection.update_one({"_id": target_uid}, {"$unset": {"shame_tag": "", "custom_tag": "", "tag_game": ""}})
                 add_radar_log(f"🧹 Юзер {target_uid} оплатил обычный штраф ({amount}⭐️), теги сброшены")
         
         # 3. ОТЧЕТ В ФЛУДИЛКУ АДМИНАМ!
@@ -1988,6 +2030,7 @@ threading.Thread(target=heartbeat_skynet, daemon=True).start()
 from core.janitor import janitor_loop
 threading.Thread(target=janitor_loop, args=(bot,), daemon=True).start()
 threading.Thread(target=migrate_indulgence_flags, daemon=True).start()
+threading.Thread(target=migrate_status_flags, daemon=True).start()
 from core.textvars import migrate_texts_v1
 threading.Thread(target=migrate_texts_v1, daemon=True).start()
 # ==============================
