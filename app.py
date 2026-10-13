@@ -1539,10 +1539,12 @@ def _execute_skynet_task(task):
 
     elif task['action'] == "global_unmute":
         _uid = int(task['uid'])
-        if task.get('source') == 'angel':
-            # Вторая линия защиты для Ангела-Хранителя: размутить можно только ИГРОВОЙ мут —
+        if task.get('source') in ('angel', 'escape'):
+            # Вторая линия защиты для Ангела-Хранителя и !побега: размут только ИГРОВЫХ ограничений —
             # «Ордер на Арест» (users.net_mute_reason) или локальный игровой мут (paid_users.game_mute_until).
-            # Баны, гуантанамо, админские и авто-муты (причина мута перезаписывается каждым новым мутом) — отказ.
+            # Гуантанамо снимает только побег. Баны, админские и авто-муты (причина мута перезаписывается
+            # каждым новым мутом) не снимает никто.
+            _src = task.get('source')
             def _t(v):
                 try: return v.timestamp() if hasattr(v, "timestamp") else float(v)
                 except (TypeError, ValueError): return 0.0
@@ -1552,15 +1554,19 @@ def _execute_skynet_task(task):
             _nm = _mu.get("net_mute_until")
             _net_on = _nm is not None and (_t(_nm) == 0 or _t(_nm) > _now)
             _net_game = _net_on and str(_mu.get("net_mute_reason") or "").startswith("Ордер на Арест")
-            _loc_game = (_t(_pu.get("game_mute_until", 0)) > _now
-                         and not str(_pu.get("game_mute_reason") or "").startswith("Ордер Гуантанамо"))
-            if (banned_collection.find_one({"_id": _uid})
-                    or _t(_pu.get("guantanamo_until", 0)) > _now
-                    or (_net_on and not _net_game)
-                    or not (_net_game or _loc_game)):
-                add_radar_log(f"👼 Ангел отклонён для {_uid}: наказание не игровое")
+            _g_on = _t(_pu.get("game_mute_until", 0)) > _now
+            _g_proof = str(_pu.get("game_mute_reason") or "").startswith("Ордер Гуантанамо")
+            _guan = _t(_pu.get("guantanamo_until", 0)) > _now or (_g_on and _g_proof)
+            _loc_game = _g_on and not _g_proof
+            _ok = (not banned_collection.find_one({"_id": _uid})) and not (_net_on and not _net_game)
+            if _src == 'angel':
+                _ok = _ok and not _guan and (_net_game or _loc_game)
+            else:
+                _ok = _ok and (_guan or _net_game or _loc_game)
+            if not _ok:
+                add_radar_log(f"👼 {_src} отклонён для {_uid}: наказание не игровое")
                 from core.diag import log_error
-                log_error("Ангел-Хранитель", f"отказ: у {_uid} не игровой мут (бан/гуантанамо/админский мут)", _uid)
+                log_error("Ангел/Побег", f"отказ ({_src}): у {_uid} не игровое ограничение (бан/админский мут/не тот тип)", _uid)
                 return
         unmute_user_everywhere(_uid)
 
