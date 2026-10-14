@@ -34,15 +34,41 @@ def bot_username(bot):
     return _BOT_NAME["u"]
 
 
+TOO_MANY_TEXT = (
+    "⚠️ Не получилось вступить в группу: в вашем аккаунте уже максимальное число чатов и каналов (лимит Telegram).\n\n"
+    "Выйдите из ненужных групп и каналов и подайте заявку заново."
+)
+
+
+def _too_many(bot, chat_id, uid):
+    """У человека лимит чатов (USER_CHANNELS_TOO_MUCH): заявку отклоняем, чтобы не висела, и один раз просим освободить место."""
+    try:
+        bot.decline_chat_join_request(chat_id, uid)
+    except Exception:
+        pass
+    try:
+        u = users_collection.find_one({"_id": uid}, {"too_many_notified": 1}) or {}
+        if time.time() - float(u.get("too_many_notified") or 0) > 6 * 3600:   # не чаще раза в 6 часов
+            users_collection.update_one({"_id": uid}, {"$set": {"too_many_notified": time.time()}}, upsert=True)
+            bot.send_message(uid, TOO_MANY_TEXT)
+    except Exception:
+        pass  # личка закрыта — ничего страшного
+
+
 def _approve(bot, chat_id, uid):
     try:
         bot.approve_chat_join_request(chat_id, uid)
         return True
     except Exception as e:
+        err = str(e)
         # заявку уже обработали (одобрил админ / человек отозвал) — для нас это не ошибка
-        if "HIDE_REQUESTER_MISSING" in str(e) or "USER_ALREADY_PARTICIPANT" in str(e):
+        if "HIDE_REQUESTER_MISSING" in err or "USER_ALREADY_PARTICIPANT" in err:
             return True
         from core.diag import log_error
+        if "USER_CHANNELS_TOO_MUCH" in err:
+            _too_many(bot, chat_id, uid)
+            log_error("Вход через бота", f"у {uid} лимит чатов (USER_CHANNELS_TOO_MUCH), заявка в {chat_id} отклонена", uid)
+            return False
         log_error("Вход через бота", f"не удалось одобрить заявку {uid} в {chat_id}: {e}", uid)
         return False
 
@@ -63,18 +89,15 @@ def _approve_unless_banned(bot, chat_id, uid):
 
 
 def approve_or_gate(bot, chat_id, uid, chat_title=""):
-    """Вместо bot.approve_chat_join_request в таможне. -> 'approved' | 'gated'."""
+    """Вместо bot.approve_chat_join_request в таможне. -> 'approved' | 'gated' | 'failed' (одобрить не удалось)."""
     if not cfg("join_via_bot"):
-        _approve(bot, chat_id, uid)
-        return "approved"
+        return "approved" if _approve(bot, chat_id, uid) else "failed"
     u = users_collection.find_one({"_id": uid}, {"active": 1, "dm_blocked": 1}) or {}
     if u.get("active") and not u.get("dm_blocked"):
-        _approve(bot, chat_id, uid)  # уже запускал бота — личка и так открыта
-        return "approved"
+        return "approved" if _approve(bot, chat_id, uid) else "failed"   # уже запускал бота — личка и так открыта
     name = bot_username(bot)
     if not name:
-        _approve(bot, chat_id, uid)
-        return "approved"
+        return "approved" if _approve(bot, chat_id, uid) else "failed"
     token = secrets.token_urlsafe(6).replace("-", "x").replace("_", "y")
     db['join_gate'].update_one({"_id": f"{chat_id}:{uid}"},
                                {"$set": {"chat_id": chat_id, "uid": uid, "token": token, "ts": time.time(), "title": chat_title}},
@@ -88,8 +111,7 @@ def approve_or_gate(bot, chat_id, uid, chat_title=""):
     except Exception:
         # личка недоступна даже в окне заявки — не теряем человека
         db['join_gate'].delete_one({"_id": f"{chat_id}:{uid}"})
-        _approve(bot, chat_id, uid)
-        return "approved"
+        return "approved" if _approve(bot, chat_id, uid) else "failed"
 
 
 def release(bot, uid):

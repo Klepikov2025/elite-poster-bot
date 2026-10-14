@@ -1,6 +1,8 @@
 from telebot import types
 import time
 import re
+import io
+from bson.binary import Binary
 from config import (
     STAFF_GROUP_ID, OWNER_ID, PARNI_CHATS, VIP_CHAT_ID, BEYOND_CHAT_ID,
     chat_ids_mk, chat_ids_parni, chat_ids_ns, chat_ids_rainbow, chat_ids_gayznak
@@ -629,3 +631,70 @@ def register_admin_handlers(bot, ban_user_everywhere, mute_user_everywhere, unba
             f"✅ **Синхронизация прав завершена!** 🤖\n\nБоту `{target_bot_id}` обновлены галочки в **{success_count}** чатах.\n\n⚠️ *Ошибок: {error_count}.*",
             parse_mode="Markdown"
         )
+
+
+    # ===================== АВАТАРКИ ЧАТОВ СЕТИ =====================
+    # Картинка (лучше файлом) в STAFF-группу с подписью: /avatar mk | parni | ns | gayznak
+    # Бот сохраняет её в базу и сразу ставит аватаркой во все чаты этой сети.
+    # Откат на прошлую: /avatar_undo mk
+    NET_TARGETS = {"mk": ["mk"], "parni": ["parni"], "ns": ["ns"],
+                   "gayznak": ["gayznak"]}   # Радугу пока не трогаем
+
+    def _push_avatar(reply_chat, net, data):
+        from config import get_network_data
+        _mk, _parni, _ns, _rainbow, _gayznak, *_rest = get_network_data()
+        all_nets = {"mk": _mk, "parni": _parni, "ns": _ns, "rainbow": _rainbow, "gayznak": _gayznak}
+        targets = [(f"{n} | {city}", cid) for n in NET_TARGETS[net] for city, cid in all_nets[n].items()]
+        bot.send_message(reply_chat, f"🖼 Меняю аватарки в {len(targets)} чатах, примерно {len(targets)*3//60+1} мин...")
+        ok, fails = 0, []
+        for name, cid in targets:
+            for attempt in range(2):
+                try:
+                    bio = io.BytesIO(data); bio.name = "avatar.png"
+                    bot.set_chat_photo(cid, bio)
+                    ok += 1
+                    break
+                except Exception as e:
+                    if "429" in str(e) and attempt == 0:
+                        time.sleep(30)
+                        continue
+                    fails.append(f"{name}: {str(e)[:70]}")
+                    break
+            time.sleep(3)
+        text = f"✅ Готово: {ok} из {len(targets)}."
+        if fails:
+            text += "\n\n⚠️ Не вышло:\n" + "\n".join(fails[:20])
+        bot.send_message(reply_chat, text)
+
+    @bot.message_handler(content_types=['document', 'photo'],
+                         func=lambda m: (m.caption or '').startswith('/avatar'))
+    def set_avatar_now(message):
+        if message.chat.id != STAFF_GROUP_ID or not is_staff(message.from_user.id): return
+        args = message.caption.split()
+        if len(args) < 2 or args[1] not in NET_TARGETS:
+            bot.reply_to(message, "Подпись к картинке: `/avatar сеть`\nСети: mk, parni, ns, gayznak", parse_mode="Markdown")
+            return
+        net = args[1]
+        file_id = message.document.file_id if message.document else message.photo[-1].file_id
+        data = bot.download_file(bot.get_file(file_id).file_path)
+        if len(data) > 8_000_000:
+            bot.reply_to(message, "❌ Файл больше 8 МБ")
+            return
+        old = db['avatars'].find_one({"_id": net})
+        if old:
+            db['avatars'].update_one({"_id": net + "_prev"}, {"$set": {"data": old["data"]}}, upsert=True)
+        db['avatars'].update_one({"_id": net}, {"$set": {"data": Binary(data), "ts": int(time.time())}}, upsert=True)
+        _push_avatar(message.chat.id, net, data)
+
+    @bot.message_handler(commands=['avatar_undo'])
+    def undo_avatar(message):
+        if message.chat.id != STAFF_GROUP_ID or not is_staff(message.from_user.id): return
+        args = message.text.split()
+        if len(args) < 2 or args[1] not in NET_TARGETS:
+            bot.reply_to(message, "Формат: `/avatar_undo сеть`", parse_mode="Markdown")
+            return
+        prev = db['avatars'].find_one({"_id": args[1] + "_prev"})
+        if not prev:
+            bot.reply_to(message, "❌ Прошлой версии нет.")
+            return
+        _push_avatar(message.chat.id, args[1], prev["data"])

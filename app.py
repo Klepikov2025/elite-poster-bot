@@ -440,12 +440,13 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
                 except: pass
         
         if is_privileged:
-            approve_or_gate(bot, chat_id, user_id, getattr(message.chat, "title", "") or "")
-            db['network_stats'].update_one(
-                {"_id": "current_period"}, 
-                {"$inc": {"approved": 1, "vip_tickets": 1, f"chats.{chat_id}.approved": 1}}, 
-                upsert=True
-            )
+            _gate_res = approve_or_gate(bot, chat_id, user_id, getattr(message.chat, "title", "") or "")
+            if _gate_res != "failed":   # не считаем «одобренным», если Telegram отказал (например, лимит чатов)
+                db['network_stats'].update_one(
+                    {"_id": "current_period"}, 
+                    {"$inc": {"approved": 1, "vip_tickets": 1, f"chats.{chat_id}.approved": 1}}, 
+                    upsert=True
+                )
             return
 
         # --- ФАЗА 0: Санитарный контроль (БИО) [ТОЛЬКО ДЛЯ ОБЫЧНЫХ ЮЗЕРОВ] ---
@@ -496,8 +497,9 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
             chat_ids_mk.get("Аренда Жилья")
         ]
         if chat_id in big_chats:
-            approve_or_gate(bot, chat_id, user_id, getattr(message.chat, "title", "") or "")
-            db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
+            _gate_res = approve_or_gate(bot, chat_id, user_id, getattr(message.chat, "title", "") or "")
+            if _gate_res != "failed":
+                db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
             return
 
         # --- ФАЗА 3: Гео-контроль (Единый город + Метод первой двери + Монетизация) ---
@@ -522,8 +524,9 @@ def handle_join_requests(message: telebot.types.ChatJoinRequest):
 
             if main_city in possible_cities or any(c in purchased_cities for c in possible_cities):
                 # 📍 Родной город ИЛИ купленный город есть в списке допустимых для этого чата
-                approve_or_gate(bot, chat_id, user_id, getattr(message.chat, "title", "") or "")
-                db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
+                _gate_res = approve_or_gate(bot, chat_id, user_id, getattr(message.chat, "title", "") or "")
+                if _gate_res != "failed":
+                    db['network_stats'].update_one({"_id": "current_period"}, {"$inc": {"approved": 1, f"chats.{chat_id}.approved": 1}}, upsert=True)
                 return
 
             # Чужой город! Отклоняем моментально + Кидаем Оффер
