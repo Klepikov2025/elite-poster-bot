@@ -67,7 +67,14 @@ def _approve(bot, chat_id, uid):
         from core.diag import log_error
         if "USER_CHANNELS_TOO_MUCH" in err:
             _too_many(bot, chat_id, uid)
-            log_error("Вход через бота", f"у {uid} лимит чатов (USER_CHANNELS_TOO_MUCH), заявка в {chat_id} отклонена", uid)
+            log_error("Вход через бота", f"у {uid} лимит чатов (USER_CHANNELS_TOO_MUCH), заявка в {chat_id} отклонена", uid, level="info")
+            return False
+        if "user is deactivated" in err.lower() or "USER_DEACTIVATED" in err:
+            try:
+                bot.decline_chat_join_request(chat_id, uid)   # чтобы заявка не висела
+            except Exception:
+                pass
+            log_error("Вход через бота", f"аккаунт {uid} удалён, заявка в {chat_id} отклонена", uid, level="info")
             return False
         log_error("Вход через бота", f"не удалось одобрить заявку {uid} в {chat_id}: {e}", uid)
         return False

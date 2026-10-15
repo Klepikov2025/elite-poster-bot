@@ -7,9 +7,9 @@ import time
 from database import db
 
 
-def log_error(kind, text, uid=None):
+def log_error(kind, text, uid=None, level="error"):
     try:
-        db['skynet_errors'].insert_one({"ts": time.time(), "kind": kind, "text": str(text)[:500], "uid": uid})
+        db['skynet_errors'].insert_one({"ts": time.time(), "kind": kind, "text": str(text)[:500], "uid": uid, "level": level})
     except Exception:
         pass
 

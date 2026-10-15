@@ -51,7 +51,7 @@ def register_home_routes(app, add_radar_log):
             {"key": "prizes", "icon": "🎁", "label": "Призы и теги ждут выдачи", "tab": "tab-withdrawals",
              "count": cnt('premium_claims', {"status": "pending"}) + cnt('temp_tags', {}), "level": "warm"},
             {"key": "errors", "icon": "🩺", "label": "Ошибки за сутки", "tab": "tab-diag",
-             "count": cnt('skynet_errors', {"ts": {"$gt": day_ago}}), "level": "info"},
+             "count": cnt('skynet_errors', {"ts": {"$gt": day_ago}, "level": {"$ne": "info"}}), "level": "info"},
             {"key": "tasks", "icon": "⚠️", "label": "Приказы ботов с ошибкой", "tab": "tab-diag",
              "count": cnt('skynet_tasks', {"status": "error"}), "level": "hot"},
         ]

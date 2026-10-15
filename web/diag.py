@@ -47,8 +47,9 @@ def register_diag_routes(app, bot):
             "tasks_pending": stuck,
             "tasks_failed": failed,
             "trash_queue": db['bot_trash'].count_documents({}),
-            "errors_24h": db['skynet_errors'].count_documents({"ts": {"$gt": now - 86400}}),
-            "errors": [{"time": _fmt(r.get("ts")), "kind": r.get("kind"), "uid": r.get("uid"), "text": r.get("text")} for r in rows],
+            "errors_24h": db['skynet_errors'].count_documents({"ts": {"$gt": now - 86400}, "level": {"$ne": "info"}}),
+            "errors": [{"time": _fmt(r.get("ts")), "kind": r.get("kind"), "uid": r.get("uid"), "text": r.get("text"),
+                        "level": r.get("level", "error")} for r in rows],
         })
 
     @app.route('/glaz/api/diag/revenue_month')
