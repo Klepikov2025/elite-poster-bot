@@ -226,3 +226,18 @@ def classify_profile_name(first_name, last_name=""):
             if re.fullmatch(p, w):
                 return "alert", p
     return None, None
+
+MIN_MSGS_FOR_POINTS = 50
+NEWBIE_MSG = f"🔒 Недоступно новым аккаунтам: нужно {MIN_MSGS_FOR_POINTS} сообщений в наших чатах или статус (VIP / BEYOND / верификация / индульгенция / тег)."
+
+
+def is_newbie_without_status(uid):
+    """Меньше 50 сообщений в наших чатах И нет ни одного статуса. Админов не трогаем."""
+    if is_staff(uid):
+        return False
+    ud = users_collection.find_one({"_id": uid}) or {}
+    if (ud.get("is_vip") or ud.get("is_queer") or ud.get("is_verified")
+            or sponsor_status(ud) or free_status(ud) or indulgence_status(ud) or trusted_tag(ud)):
+        return False
+    r = list(db['chat_stats'].aggregate([{"$match": {"uid": uid}}, {"$group": {"_id": None, "n": {"$sum": "$msgs"}}}]))
+    return (int(r[0]["n"]) if r else 0) < MIN_MSGS_FOR_POINTS

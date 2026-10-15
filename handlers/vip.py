@@ -794,6 +794,10 @@ def register_vip_handlers(bot, pending_verification_users, active_vip_requests, 
         _answer(call)
         currency_type = 'pts' if call.data.startswith('vip_eco_pts') else 'rub'
         user_id = call.from_user.id
+        from core.guards import is_newbie_without_status, NEWBIE_MSG
+        if is_newbie_without_status(user_id):
+            bot.send_message(call.message.chat.id, NEWBIE_MSG)
+            return
 
         offer = get_offer_or_legacy(user_id)
         if not offer:
