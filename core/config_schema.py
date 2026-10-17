@@ -23,6 +23,9 @@ G_CASH = "💸 Кэшбэк и вывод"
 G_CASINO = "🎰 Казино и экономика"
 G_JOBS = "⏰ Автособытия Секретаря"
 G_ECON = "🏛 Экономика: краны и налоги"
+G_BANK = "🏦 Банковская ячейка"
+G_KARMA = "⭐ Карма"
+G_AUCT = "🔨 Теневой аукцион и артефакты"
 
 _LIST = r"\d+(\s*[,;]\s*\d+)*"
 _PAIRS = r"\d+\s*:\s*\d+(\s*[,;]\s*\d+\s*:\s*\d+)*"
@@ -254,8 +257,56 @@ SCHEMA = [
     {"key": "divorce_price", "group": G_ECON, "label": '💔 Развод: штраф, очков', "type": "int", "default": 1000, "min": 1, "max": 1000000, "bots": "Секретарь", "owner": True},
     {"key": "anniv_reward_pct", "group": G_ECON, "label": '💍 Годовщины: награда, % от таблицы', "type": "int", "default": 100, "min": 0, "max": 1000,
      "help": 'Очки в общак, щиты и осколки за годовщины. 50 — вдвое меньше, 0 — без наград.', "bots": "Секретарь", "owner": True},
-    {"key": "karma_vote_cooldown_s", "group": G_ECON, "label": '⭐ Карма: пауза между «+» одному человеку, сек', "type": "int", "default": 120, "min": 10, "max": 86400,
+    {"key": "karma_vote_cooldown_s", "group": G_KARMA, "label": '⭐ Карма: пауза между «+» одному человеку, сек', "type": "int", "default": 120, "min": 10, "max": 86400,
      "help": 'Сейчас 2 минуты: двое знакомых накручивают до 720 кармы в сутки. 3600 — раз в час.', "bots": "Секретарь", "owner": True},
+
+    # --- 💸 кэшбэк: откуда берутся настоящие рубли ---
+    {"key": "cb_month_cap", "group": G_CASH, "label": 'Лимит вывода на человека за 30 дней, ₽', "type": "int", "default": 0, "min": 0, "max": 1000000,
+     "help": '0 — без лимита. Защита кассы: даже если все разом захотят вывести, за месяц уйдёт не больше этой суммы с человека.', "bots": "Секретарь", "owner": True},
+    {"key": "money_tree_rub", "group": G_CASH, "label": 'Денежное дерево: кэшбэк за урожай «от, до», ₽', "type": "text", "default": '10, 30',
+     "regex": r"\d+\s*[,;]\s*\d+", "regex_hint": 'два числа через запятую, «0, 0» — без рублей',
+     "help": 'Дерево плодоносит каждые сутки бесконечно: это вечный кран НАСТОЯЩИХ рублей из очков. 16 деревьев = до 480 ₽ в сутки одному игроку.', "bots": "Секретарь", "owner": True},
+    {"key": "agent_case_cash_rub", "group": G_CASH, "label": 'Кейс агента CPA: денежный приз, ₽', "type": "int", "default": 500, "min": 0, "max": 100000,
+     "help": '0 — вместо рублей 1000 очков.', "bots": "Секретарь", "owner": True},
+    {"key": "quest_comp_rub", "group": G_CASH, "label": 'Квест: компенсация «все статусы уже есть», ₽', "type": "int", "default": 500, "min": 0, "max": 100000,
+     "help": '0 — вместо рублей 2500 очков.', "bots": "Секретарь", "owner": True},
+
+    # --- 🏦 банковская ячейка ---
+    {"key": "vault_on", "group": G_BANK, "label": 'Банковская ячейка: включена', "type": "bool", "default": True,
+     "help": 'Игроки прячут очки от грабежа в Судную ночь за ежедневную абонентку (сгорает). В мини-приложении — «Рюкзак».', "bots": "Секретарь", "owner": True},
+    {"key": "vault_tiers", "group": G_BANK, "label": 'Абонентка: ступени «порог:% в сутки»', "type": "text", "default": '0:0.5, 30000:1.5, 100000:2.5, 150000:3.5',
+     "regex": r"\d+\s*:\s*\d+(\.\d+)?(\s*[,;]\s*\d+\s*:\s*\d+(\.\d+)?)*", "regex_hint": 'например «0:0.5, 30000:1.5» (дробные проценты можно)',
+     "help": 'Каждая ставка — со своей части суммы. По умолчанию всегда на ~0,5 % дороже налога на роскошь, чтобы в ячейку не прятались от налога. Пример: 100 000 → 1 250 в сутки.', "bots": "Секретарь", "owner": True},
+    {"key": "vault_fee_min", "group": G_BANK, "label": 'Абонентка: минимум, очков в сутки', "type": "int", "default": 50, "min": 0, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "vault_points_protect_pct", "group": G_BANK, "label": 'Тариф «Очки»: защищено, %', "type": "int", "default": 70, "min": 0, "max": 100,
+     "help": 'Остальное в Судную ночь могут украсть. Тариф «Кэшбэк» всегда защищает 100 %.', "bots": "Секретарь", "owner": True},
+    {"key": "vault_rub_discount_pct", "group": G_BANK, "label": 'Тариф «Кэшбэк»: цена, % от очкового (в рублях)', "type": "int", "default": 50, "min": 1, "max": 500,
+     "help": 'Абонентка в рублях = очковая абонентка, пересчитанная по курсу сети, × этот процент. 50 — вдвое выгоднее очков: стимул тратить кэшбэк, а не выводить.', "bots": "Секретарь", "owner": True},
+    {"key": "vault_fresh_h", "group": G_BANK, "label": 'Деньги в пути: защита включается через, часов', "type": "int", "default": 12, "min": 0, "max": 168,
+     "help": 'Чтобы не прятались в момент объявления Судной ночи.', "bots": "Секретарь", "owner": True},
+    {"key": "vault_min_deposit", "group": G_BANK, "label": 'Минимальный вклад, очков', "type": "int", "default": 500, "min": 1, "max": 1000000, "bots": "Секретарь", "owner": True},
+
+    # --- ⭐ карма ---
+    {"key": "karma_minus_cooldown_h", "group": G_KARMA, "label": 'Минус одному и тому же: не чаще раза в, часов', "type": "int", "default": 6, "min": 1, "max": 168,
+     "help": 'Защита от травли. Минусы ставят только не-новички (50+ сообщений или статус) и не Изгои.', "bots": "Секретарь", "owner": True},
+    {"key": "karma_minus_daily_cap", "group": G_KARMA, "label": 'Максимум минусов одному человеку в сутки', "type": "int", "default": 20, "min": 1, "max": 1000,
+     "help": 'Сколько бы людей ни минусовали, за сутки карма упадёт не больше чем на это число.', "bots": "Секретарь", "owner": True},
+    {"key": "karma_regen_per_day", "group": G_KARMA, "label": 'Самовосстановление: +кармы в сутки', "type": "int", "default": 1, "min": 0, "max": 100,
+     "help": 'Тем, кто в минусе, но вчера написал 10+ сообщений и не в муте. 0 — выключено.', "bots": "Секретарь", "owner": True},
+    {"key": "karma_bonus_penalty", "group": G_KARMA, "label": 'Штраф к ежедневному бонусу при −10 / −25 / −50, %', "type": "text", "default": '10, 20, 30',
+     "regex": _LIST, "regex_hint": 'три числа через запятую', "bots": "Секретарь", "owner": True},
+
+    # --- 🔨 аукцион и прочие цены ---
+    {"key": "auction_hours", "group": G_AUCT, "label": 'Торги длятся, часов', "type": "int", "default": 48, "min": 1, "max": 336, "bots": "Секретарь", "owner": True},
+    {"key": "auction_start_bid", "group": G_AUCT, "label": 'Стартовая ставка, очков', "type": "int", "default": 1000, "min": 1, "max": 10000000, "bots": "Секретарь", "owner": True},
+    {"key": "auction_step", "group": G_AUCT, "label": 'Минимальный шаг ставки, очков', "type": "int", "default": 100, "min": 1, "max": 1000000, "bots": "Секретарь", "owner": True},
+    {"key": "auction_charges", "group": G_AUCT, "label": 'Разовые артефакты: зарядов за победу', "type": "int", "default": 1, "min": 1, "max": 20,
+     "help": 'Перчатка, Разлучник, Рейд, Глас Бога, Гуантанамо, Мастер-Ключ, NPC. 3 — артефакт работает три раза.', "bots": "Секретарь", "owner": True},
+    {"key": "auction_casino_owner_days", "group": G_AUCT, "label": '«Владелец Казино» действует, дней', "type": "int", "default": 3, "min": 1, "max": 90, "bots": "Секретарь", "owner": True},
+    {"key": "auction_offshore_days", "group": G_AUCT, "label": '«Офшорный счёт» действует, дней', "type": "int", "default": 7, "min": 1, "max": 90, "bots": "Секретарь", "owner": True},
+    {"key": "anarchy_price", "group": G_AUCT, "label": '🔥 Судная ночь (!анархия): цена, очков', "type": "int", "default": 10000, "min": 1, "max": 10000000, "bots": "Секретарь", "owner": True},
+    {"key": "anarchy_minutes", "group": G_AUCT, "label": '🔥 Судная ночь: длится, минут', "type": "int", "default": 60, "min": 5, "max": 1440, "bots": "Секретарь", "owner": True},
+    {"key": "adopt_price", "group": G_AUCT, "label": '👶 Усыновление: пошлина, очков', "type": "int", "default": 1000, "min": 1, "max": 1000000, "bots": "Секретарь", "owner": True},
 
     {"key": "stealth_enemy_ref", "group": G_STEALTH, "label": "Стелс: какую реф-ссылку подменять", "type": "text", "default": "ref_EQHH7XHV", "bots": "Скайнет", "owner": True},
     {"key": "stealth_boss_ref", "group": G_STEALTH, "label": "Стелс: на какую подменять", "type": "text", "default": "ref_2BBPF35H", "bots": "Скайнет", "owner": True},
@@ -263,4 +314,4 @@ SCHEMA = [
 ]
 
 BY_KEY = {e["key"]: e for e in SCHEMA}
-GROUP_ORDER = [G_MONEY, G_FINES, G_CASH, G_CASINO, G_ECON, G_JOBS, G_SEC, G_VIP, G_BEYOND, G_MP, G_CPA, G_POSTER, G_MOD, G_AI, G_LINKS, G_STEALTH]
+GROUP_ORDER = [G_MONEY, G_FINES, G_CASH, G_CASINO, G_ECON, G_BANK, G_KARMA, G_AUCT, G_JOBS, G_SEC, G_VIP, G_BEYOND, G_MP, G_CPA, G_POSTER, G_MOD, G_AI, G_LINKS, G_STEALTH]

@@ -4975,7 +4975,7 @@ function removeInfraROEnemy(id) {
 // =====================================================================
 // 💎 ЭКОНОМИКА ОЧКОВ (владелец)
 // =====================================================================
-const EC_COL = {wallets: '#9a6fe6', banks: '#17a99b', safes: '#bf8530', auction: '#5d8ee8', plus: '#17a99b', minus: '#bf8530'};
+const EC_COL = {wallets: '#9a6fe6', banks: '#17a99b', vaults: '#d6b04a', safes: '#bf8530', auction: '#5d8ee8', plus: '#17a99b', minus: '#bf8530'};
 let _ecDays = 7, _ecChart = null, _ecHist = null;
 const _n = v => Math.round(v || 0).toLocaleString('ru-RU');
 function loadEconomy(days) {
@@ -4997,15 +4997,16 @@ function renderEconomy(d) {
     const s = d.stock, r = d.rate, c = d.concentration, f = d.flows;
     const stars = s.total / r.points_per_star, rub = stars * r.rub_per_star;
     const parts = [['wallets', 'Кошельки игроков', s.wallets, `${_n(s.holders)} игроков`], ['banks', 'Семейные копилки', s.banks, `${_n(s.banks_n)} копилок`],
+                   ['vaults', 'Банковские ячейки', s.vaults || 0, `${_n(s.vaults_n || 0)} ячеек`],
                    ['safes', 'Сейфы', s.safe_pts, 'налоги, кот, комиссии'], ['auction', 'Ставки на аукционе', s.auction, `${_n(s.auction_n)} лотов`]];
     const tot = s.total || 1;
     const perDay = f.days ? f.net / f.days : 0;
-    const hidden = s.banks + s.safe_pts + s.auction;
+    const hidden = s.banks + s.safe_pts + s.auction + (s.vaults || 0);
     let html = `
     <div class="ec-hero">
         <div class="ec-big"><div class="eyebrow">Всего очков в игре</div><div class="v">${_n(s.total)} 💎</div>
             <div class="sub">≈ ${_n(stars)} ⭐️ услуг ≈ ${_n(rub)} ₽ по курсу ${r.points_per_star} 💎 = 1 ⭐️</div></div>
-        <div class="ec-kpi"><div class="eyebrow">Не видно в ТОП-30</div><div class="v">${_n(hidden)}</div><div class="sub">${Math.round(hidden / tot * 100)}% массы — копилки, сейфы, ставки</div></div>
+        <div class="ec-kpi"><div class="eyebrow">Не видно в ТОП-30</div><div class="v">${_n(hidden)}</div><div class="sub">${Math.round(hidden / tot * 100)}% массы — копилки, ячейки, сейфы, ставки</div></div>
         <div class="ec-kpi"><div class="eyebrow">Чистый выпуск в сутки</div><div class="v ${perDay > 0 ? 'up' : 'down'}">${perDay > 0 ? '+' : ''}${_n(perDay)}</div><div class="sub">среднее за ${f.days} дн., без переводов</div></div>
         <div class="ec-kpi"><div class="eyebrow">Долги по займам</div><div class="v">${_n(s.debt)}</div><div class="sub">${_n(s.debt_n)} должников</div></div>
     </div>

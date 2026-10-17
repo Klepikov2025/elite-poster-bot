@@ -50,6 +50,9 @@ LABELS = {
     "scheduler.refund_expired_courts": "⚖️ Суды: возврат",
     "hack._steal_family_bank": "💻 Взлом копилки (Судная ночь)", "hack.run_hack": "💻 Взлом",
     "scheduler.luxury_tax": "🏛 Налог на роскошь (кошельки)", "scheduler.luxury_tax_bank": "🏛 Налог на роскошь (копилки)",
+    "vault.deposit": "🏦 Ячейка: положили", "vault.withdraw": "🏦 Ячейка: сняли", "vault._close": "🏦 Ячейка: закрыта, возврат",
+    "vault.steal": "🏦 Ячейка: грабёж в Судную ночь", "vault.charge_fees": "🏦 Абонентка ячеек (кошелёк)",
+    "vault.fee_from_vault": "🏦 Абонентка ячеек (из ячейки)", "scheduler.karma_regen": "⭐ Самовосстановление кармы",
 }
 # Эти операции перекладывают уже существующие очки (игрок↔игрок, игрок↔копилка, игрок↔сейф, ставки)
 TRANSFER = {
@@ -60,6 +63,7 @@ TRANSFER = {
     "scheduler.stray_cat_tax", "main.handle_court_funding", "main.bribe_court", "main.public_court",
     "scheduler.refund_expired_courts", "main.divorce",
     "hack._steal_family_bank",   # очки из чужой копилки в кошелёк хакера — не выпуск
+    "vault.deposit", "vault.withdraw", "vault._close", "vault.steal",   # кошелёк ↔ ячейка
 }
 
 
@@ -103,8 +107,10 @@ def stock():
             safe_pts += bal
     auction, auction_n = _sum('auction_lots', {"status": "active", "leader_uid": {"$ne": None}}, "current_bid")
     debt, debt_n = _sum('paid_users', {"debt": {"$gt": 0}}, "debt")
-    total = wallets + banks + safe_pts + auction
+    vaults, vaults_n = _sum('vaults', {"balance": {"$gt": 0}}, "balance")
+    total = wallets + banks + safe_pts + auction + vaults
     return {"wallets": wallets, "holders": holders, "staff_wallets": staff_w, "banks": banks, "banks_n": banks_n,
+            "vaults": vaults, "vaults_n": vaults_n,
             "safes": safes, "safe_pts": safe_pts, "auction": auction, "auction_n": auction_n,
             "debt": debt, "debt_n": debt_n, "total": total, "staff": staff}
 
@@ -171,7 +177,7 @@ def flows(days):
 def snapshot(st):
     today = datetime.now(MSK).strftime("%Y-%m-%d")
     db['econ_snapshots'].update_one({"_id": today}, {"$set": {
-        "total": st["total"], "wallets": st["wallets"], "banks": st["banks"], "safes": st["safe_pts"],
+        "total": st["total"], "wallets": st["wallets"], "banks": st["banks"], "safes": st["safe_pts"], "vaults": st["vaults"],
         "auction": st["auction"], "debt": st["debt"], "ts": time.time()}}, upsert=True)
     return [{"d": s["_id"], "total": s.get("total", 0), "wallets": s.get("wallets", 0), "banks": s.get("banks", 0)}
             for s in db['econ_snapshots'].find().sort("_id", -1).limit(90)][::-1]
