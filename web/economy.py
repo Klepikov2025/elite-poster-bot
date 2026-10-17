@@ -48,6 +48,8 @@ LABELS = {
     "main.api_crack_safe": "🔐 Взлом сейфа", "main.master_key_safe": "🔐 Отмычка сейфа", "scheduler.stray_cat_tax": "🐈 Кот-налог (в сейф)",
     "main.handle_court_funding": "⚖️ Суды", "main.bribe_court": "⚖️ Суды: взятка", "main.public_court": "⚖️ Суды",
     "scheduler.refund_expired_courts": "⚖️ Суды: возврат",
+    "hack._steal_family_bank": "💻 Взлом копилки (Судная ночь)", "hack.run_hack": "💻 Взлом",
+    "scheduler.luxury_tax": "🏛 Налог на роскошь (кошельки)", "scheduler.luxury_tax_bank": "🏛 Налог на роскошь (копилки)",
 }
 # Эти операции перекладывают уже существующие очки (игрок↔игрок, игрок↔копилка, игрок↔сейф, ставки)
 TRANSFER = {
@@ -57,6 +59,7 @@ TRANSFER = {
     "main.join_heist", "main.raider_takeover", "main.api_crack_safe", "main.master_key_safe",
     "scheduler.stray_cat_tax", "main.handle_court_funding", "main.bribe_court", "main.public_court",
     "scheduler.refund_expired_courts", "main.divorce",
+    "hack._steal_family_bank",   # очки из чужой копилки в кошелёк хакера — не выпуск
 }
 
 

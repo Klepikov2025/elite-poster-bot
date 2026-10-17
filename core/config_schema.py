@@ -22,6 +22,7 @@ G_FINES = "⚖️ Прайс штрафов"
 G_CASH = "💸 Кэшбэк и вывод"
 G_CASINO = "🎰 Казино и экономика"
 G_JOBS = "⏰ Автособытия Секретаря"
+G_ECON = "🏛 Экономика: краны и налоги"
 
 _LIST = r"\d+(\s*[,;]\s*\d+)*"
 _PAIRS = r"\d+\s*:\s*\d+(\s*[,;]\s*\d+\s*:\s*\d+)*"
@@ -218,10 +219,48 @@ SCHEMA = [
     {"key": "job_farm_dm", "group": G_JOBS, "label": 'Уведомления фермы в личку', "type": "bool", "default": True, "help": '«Урожай созрел», «пора полить».', "bots": "Секретарь"},
     {"key": "job_collectors", "group": G_JOBS, "label": 'Коллекторы', "type": "bool", "default": True, "help": 'Напоминания и взыскание с должников по займам.', "bots": "Секретарь"},
 
+    # --- 🏛 экономика: краны (откуда берутся очки) и стоки (куда сгорают) ---
+    {"key": "lux_tax_on", "group": G_ECON, "label": '🏛 Налог на роскошь: включён', "type": "bool", "default": False,
+     "help": 'Раз в сутки сгорает процент с больших копилок (и кошельков, если включено ниже). Очки не уходят в сейф — исчезают. Игроки получают уведомление в личку.', "bots": "Секретарь", "owner": True},
+    {"key": "lux_tax_tiers", "group": G_ECON, "label": 'Налог на роскошь: ступени «порог:% в сутки»', "type": "text", "default": '30000:1, 100000:2, 150000:3',
+     "regex": _PAIRS, "regex_hint": 'формат «порог:процент», например «30000:1, 100000:2»',
+     "help": 'Как подоходный по ступеням: каждая ставка берётся только со своей части. «30000:1, 100000:2» — до 30 000 бесплатно, с части 30–100 тыс. 1 %, выше 100 тыс. 2 %. Пример: копилка 188 789 при значении по умолчанию платит 2 863 в сутки.', "bots": "Секретарь", "owner": True},
+    {"key": "lux_tax_wallets", "group": G_ECON, "label": 'Налог на роскошь: и личные кошельки', "type": "bool", "default": True,
+     "help": 'Те же ступени для кошельков (админов не трогает). Выключите — налог только с копилок.', "bots": "Секретарь", "owner": True},
+    {"key": "lux_tax_time", "group": G_ECON, "label": 'Налог на роскошь: время (МСК)', "type": "text", "default": '04:00', "regex": _TIME, "regex_hint": 'время ЧЧ:ММ', "bots": "Секретарь", "owner": True},
+    {"key": "lux_tax_notify", "group": G_ECON, "label": 'Налог на роскошь: писать в личку', "type": "bool", "default": True, "bots": "Секретарь", "owner": True},
+
+    {"key": "potato_seed", "group": G_ECON, "label": '🥔 Поле: цена семян за клетку', "type": "int", "default": 60, "min": 1, "max": 100000,
+     "help": 'Главный «кран» очков. Сейчас урожай в среднем 90 при цене 60 — гарантированные +30 с клетки за 8 ч.', "bots": "Секретарь", "owner": True},
+    {"key": "potato_yield", "group": G_ECON, "label": '🥔 Поле: урожай «от, до», очков', "type": "text", "default": '70, 110', "regex": r"\d+\s*[,;]\s*\d+", "regex_hint": 'два числа через запятую, например «55, 95»',
+     "help": 'Случайно в этих пределах с одного куста.', "bots": "Секретарь", "owner": True},
+    {"key": "potato_grow_h", "group": G_ECON, "label": '🥔 Поле: созревание, часов', "type": "int", "default": 8, "min": 1, "max": 72, "bots": "Секретарь", "owner": True},
+    {"key": "potato_dust", "group": G_ECON, "label": '🥔 Поле: Дуст (убрать жуков), очков', "type": "int", "default": 100, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "potato_spray", "group": G_ECON, "label": '🥔 Поле: обработка от жуков, очков', "type": "int", "default": 150, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "potato_spray_h", "group": G_ECON, "label": '🥔 Поле: обработка действует, часов', "type": "int", "default": 12, "min": 1, "max": 168, "bots": "Секретарь", "owner": True},
+
+    {"key": "safe_blue_tick", "group": G_ECON, "label": '🔐 Сейф данных: прирост в минуту, очков', "type": "int", "default": 5, "min": 0, "max": 1000,
+     "help": '5 в минуту = 7 200 новых очков в сутки из воздуха. 0 — сейф пополняется только налогами и комиссиями.', "bots": "Секретарь", "owner": True},
+    {"key": "safe_blue_start", "group": G_ECON, "label": '🔐 Сейф данных: стартовый куш после взлома, очков', "type": "int", "default": 10000, "min": 0, "max": 1000000, "bots": "Секретарь", "owner": True},
+    {"key": "safe_red_start", "group": G_ECON, "label": '🔐 Фин. сейф: стартовый куш после взлома, ₽', "type": "int", "default": 500, "min": 0, "max": 100000,
+     "help": 'Это настоящие рубли кэшбэка.', "bots": "Секретарь", "owner": True},
+
+    {"key": "hack_cost", "group": G_ECON, "label": '💻 Взлом игрока: цена попытки, очков', "type": "int", "default": 200, "min": 1, "max": 100000, "bots": "Секретарь", "owner": True},
+    {"key": "hack_chance", "group": G_ECON, "label": '💻 Взлом игрока: шанс, %', "type": "int", "default": 30, "min": 0, "max": 100,
+     "help": 'Против «Крысы» +10 %. В Судную ночь — 80 % (не меняется).', "bots": "Секретарь", "owner": True},
+    {"key": "hack_cooldown_min", "group": G_ECON, "label": '💻 Взлом игрока: перезарядка, минут', "type": "int", "default": 60, "min": 1, "max": 10080, "bots": "Секретарь", "owner": True},
+
+    {"key": "wedding_price", "group": G_ECON, "label": '💍 Свадьба: госпошлина, очков', "type": "int", "default": 500, "min": 1, "max": 1000000, "bots": "Секретарь", "owner": True},
+    {"key": "divorce_price", "group": G_ECON, "label": '💔 Развод: штраф, очков', "type": "int", "default": 1000, "min": 1, "max": 1000000, "bots": "Секретарь", "owner": True},
+    {"key": "anniv_reward_pct", "group": G_ECON, "label": '💍 Годовщины: награда, % от таблицы', "type": "int", "default": 100, "min": 0, "max": 1000,
+     "help": 'Очки в общак, щиты и осколки за годовщины. 50 — вдвое меньше, 0 — без наград.', "bots": "Секретарь", "owner": True},
+    {"key": "karma_vote_cooldown_s", "group": G_ECON, "label": '⭐ Карма: пауза между «+» одному человеку, сек', "type": "int", "default": 120, "min": 10, "max": 86400,
+     "help": 'Сейчас 2 минуты: двое знакомых накручивают до 720 кармы в сутки. 3600 — раз в час.', "bots": "Секретарь", "owner": True},
+
     {"key": "stealth_enemy_ref", "group": G_STEALTH, "label": "Стелс: какую реф-ссылку подменять", "type": "text", "default": "ref_EQHH7XHV", "bots": "Скайнет", "owner": True},
     {"key": "stealth_boss_ref", "group": G_STEALTH, "label": "Стелс: на какую подменять", "type": "text", "default": "ref_2BBPF35H", "bots": "Скайнет", "owner": True},
     {"key": "stealth_exempt_ids", "group": G_STEALTH, "label": "Стелс: кому показывать оригинал (ID через запятую)", "type": "text", "default": "7235010425", "bots": "Скайнет", "owner": True},
 ]
 
 BY_KEY = {e["key"]: e for e in SCHEMA}
-GROUP_ORDER = [G_MONEY, G_FINES, G_CASH, G_CASINO, G_JOBS, G_SEC, G_VIP, G_BEYOND, G_MP, G_CPA, G_POSTER, G_MOD, G_AI, G_LINKS, G_STEALTH]
+GROUP_ORDER = [G_MONEY, G_FINES, G_CASH, G_CASINO, G_ECON, G_JOBS, G_SEC, G_VIP, G_BEYOND, G_MP, G_CPA, G_POSTER, G_MOD, G_AI, G_LINKS, G_STEALTH]

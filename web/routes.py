@@ -448,9 +448,11 @@ def register_main_routes(app, bot, add_radar_log, ban_user_everywhere, mute_user
                 _cur = _doc.get("custom_tag")
                 _unset = {"custom_tag": "", "tag_game": ""}
                 if not _cur or not _doc.get("tag_game"):
-                    if _cur in (None, "", SPONSOR_TAG): _unset["is_sponsor"] = ""
-                    if _cur in (None, "", FREE_TAG): _unset["is_free"] = ""
-                    if _cur in (None, "", INDULGENCE_TAG): _unset["indulgence"] = ""
+                    # Флаг снимаем, только если снимаемый тег — именно этот статус. Раньше «снять тег» у человека
+                    # БЕЗ тега стирал заодно купленную Индульгенцию, Спонсора и «Свободен».
+                    if _cur == SPONSOR_TAG: _unset["is_sponsor"] = ""
+                    if _cur == FREE_TAG: _unset["is_free"] = ""
+                    if _cur == INDULGENCE_TAG: _unset["indulgence"] = ""
                 users_collection.update_one({"_id": uid}, {"$unset": _unset})
                 msg = "🧹 Тег аннулирован."
                 add_radar_log(f"🧹 СНЯТ ТЕГ: {uid}")

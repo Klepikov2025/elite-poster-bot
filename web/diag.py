@@ -1,4 +1,6 @@
 """Вкладка «🩺 Диагностика»: журнал админов, что сломалось, выручка по источникам за 30 дней."""
+import hashlib
+import re
 import time
 from datetime import datetime, timedelta
 from flask import jsonify, session, request
@@ -24,13 +26,61 @@ def register_diag_routes(app, bot):
     @app.route('/glaz/api/diag/audit')
     def api_diag_audit():
         if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
-        rows = db['admin_audit'].find().sort("ts", -1).limit(200)
+        rows = db['admin_audit'].find().sort("ts", -1).limit(300)
         return jsonify([{"time": _fmt(r.get("ts")), "login": r.get("login"), "text": r.get("text")} for r in rows])
+
+    from core.diag import mask_secrets
+
+    def _sig(r):
+        """Одинаковые ошибки с разными ID/числами — одна группа: «аккаунт # удалён, заявка в -# отклонена»"""
+        t = re.sub(r"\d+", "#", mask_secrets(r.get("text") or "")).strip().lower()[:160]
+        return hashlib.md5(f"{r.get('kind')}|{t}".encode()).hexdigest()[:16]
+
+    def _groups(days, show):
+        now = time.time()
+        q = {"ts": {"$gt": now - days * 86400}, "resolved": {"$ne": True}}
+        if show == "errors":
+            q["level"] = {"$ne": "info"}
+        rows = list(db['skynet_errors'].find(q).sort("ts", -1).limit(3000))
+        groups = {}
+        for r in rows:
+            g = groups.setdefault(_sig(r), {"sig": _sig(r), "kind": r.get("kind") or "?", "level": r.get("level", "error"),
+                                            "count": 0, "count_24h": 0, "last_ts": r.get("ts", 0), "first_ts": r.get("ts", 0),
+                                            "sample": mask_secrets(r.get("text") or ""), "items": [], "_ids": []})
+            g["count"] += 1
+            g["_ids"].append(r["_id"])
+            if r.get("ts", 0) > now - 86400:
+                g["count_24h"] += 1
+            g["first_ts"] = min(g["first_ts"], r.get("ts", 0))
+            if len(g["items"]) < 10:
+                g["items"].append({"time": _fmt(r.get("ts")), "uid": r.get("uid"), "text": mask_secrets(r.get("text") or "")})
+        out = sorted(groups.values(), key=lambda g: (g["level"] == "info", -g["last_ts"]))
+        for g in out:
+            g["last"], g["first"] = _fmt(g["last_ts"]), _fmt(g["first_ts"])
+        return out
+
+    @app.route('/glaz/api/diag/errors/resolve', methods=['POST'])
+    def api_diag_errors_resolve():
+        """«Решено»: группа прячется; если ошибка повторится — появится снова."""
+        if not session.get('logged_in'): return jsonify({"success": False}), 401
+        data = request.get_json(silent=True) or {}
+        days = max(1, min(30, int(data.get("days") or 7)))
+        sigs = None if data.get("all") else {str(data.get("sig") or "")}
+        n = 0
+        for g in _groups(days, data.get("show") or "errors"):
+            if sigs is None or g["sig"] in sigs:
+                n += db['skynet_errors'].update_many({"_id": {"$in": g["_ids"]}}, {"$set": {"resolved": True, "resolved_at": time.time()}}).modified_count
+        return jsonify({"success": True, "hidden": n})
 
     @app.route('/glaz/api/diag/errors')
     def api_diag_errors():
         if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
-        rows = list(db['skynet_errors'].find().sort("ts", -1).limit(200))
+        try:
+            days = max(1, min(30, int(request.args.get("days", 7))))
+        except ValueError:
+            days = 7
+        show = request.args.get("show", "errors")
+        groups = _groups(days, show)
         now = time.time()
         # Пульс ботов (heartbeat пишут сами боты в settings.bot_status)
         status = db['settings'].find_one({"_id": "bot_status"}) or {}
@@ -47,9 +97,10 @@ def register_diag_routes(app, bot):
             "tasks_pending": stuck,
             "tasks_failed": failed,
             "trash_queue": db['bot_trash'].count_documents({}),
-            "errors_24h": db['skynet_errors'].count_documents({"ts": {"$gt": now - 86400}, "level": {"$ne": "info"}}),
-            "errors": [{"time": _fmt(r.get("ts")), "kind": r.get("kind"), "uid": r.get("uid"), "text": r.get("text"),
-                        "level": r.get("level", "error")} for r in rows],
+            "errors_24h": db['skynet_errors'].count_documents({"ts": {"$gt": now - 86400}, "level": {"$ne": "info"}, "resolved": {"$ne": True}}),
+            "info_7d": db['skynet_errors'].count_documents({"ts": {"$gt": now - days * 86400}, "level": "info", "resolved": {"$ne": True}}),
+            "days": days, "show": show,
+            "groups": [{k: v for k, v in g.items() if k != "_ids"} for g in groups[:100]],
         })
 
     @app.route('/glaz/api/diag/revenue_month')
